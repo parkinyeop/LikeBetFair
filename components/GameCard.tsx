@@ -1,12 +1,12 @@
 // File: components/GameCard.tsx
 import React from 'react';
 
-type GameCardProps = {
+interface GameCardProps {
   teams: string;
   time: string;
-};
+}
 
-const GameCard = ({ teams, time }: GameCardProps) => {
+const GameCard: React.FC<GameCardProps> = ({ teams, time }) => {
   return (
     <div className="bg-white p-4 rounded shadow">
       <p className="font-semibold">{teams}</p>
