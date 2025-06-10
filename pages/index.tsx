@@ -43,11 +43,28 @@ const initialGameData: Record<string, { teams: string; time: string }[]> = {
 };
 
 export default function Home() {
+  const [selectedMatches, setSelectedMatches] = useState<Record<string, string>>({});
+
+  const handleSelect = (match: string, team: string) => {
+    setSelectedMatches((prev) => {
+      // 같은 게임에서 다른 팀을 선택하면 이전 선택은 자동으로 해제됨
+      return {
+        ...prev,
+        [match]: team,
+      };
+    });
+  };
+
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">경기 목록 (index)</h1>
       <div className="grid grid-cols-1 gap-4">
-        <GameCard teams="Chunichi Dragons vs Tohoku Rakuten Golden Eagles" time="18:00" odds={[["2", 2], ["1.7", 1.7]]} />
+        <GameCard 
+          teams="Chunichi Dragons vs Tohoku Rakuten Golden Eagles" 
+          time="18:00" 
+          selectedTeam={selectedMatches["Chunichi Dragons vs Tohoku Rakuten Golden Eagles"] || ""}
+          onSelect={handleSelect}
+        />
       </div>
     </div>
   );
