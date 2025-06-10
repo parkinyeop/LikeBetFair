@@ -1,9 +1,7 @@
 // File: pages/index.tsx
 import React, { useEffect, useState } from 'react';
 import { useRouter } from "next/router";
-import Sidebar from "../components/Sidebar";
 import GameCard from "../components/GameCard";
-import OddsList from "../components/OddsList";
 
 const sportsTree = {
   축구: ["EPL", "라리가", "분데스리가", "세리에 A"],
@@ -45,61 +43,12 @@ const initialGameData: Record<string, { teams: string; time: string }[]> = {
 };
 
 export default function Home() {
-  const router = useRouter();
-  const [selectedMain, setSelectedMain] = useState<string>("");
-  const [selectedSub, setSelectedSub] = useState<string>("");
-  const gameData = initialGameData;
-  const currentCategory = selectedSub || selectedMain;
-  const currentGames = gameData[currentCategory] || [];
-
-  const handleCategoryClick = (category: string) => {
-    const sportKey = getSportKey(category);
-    if (sportKey) {
-      // 라우팅 대신 현재 페이지에서 카드 정보 표시
-      setSelectedMain(category.split(" > ")[0]);
-      setSelectedSub(category);
-    }
-  };
-
-  // 모든 카테고리를 하나의 배열로 변환
-  const allCategories = Object.entries(sportsTree).flatMap(([main, subs]) => [
-    main,
-    ...subs.map(sub => `${main} > ${sub}`)
-  ]);
-
   return (
-    <div className="flex min-h-screen bg-gray-100">
-      <div className="w-64 bg-white shadow-lg">
-        <Sidebar
-          categories={allCategories}
-          selected={selectedSub || selectedMain}
-          onSelect={(category) => {
-            if (category.includes(" > ")) {
-              const [main, sub] = category.split(" > ");
-              setSelectedMain(main);
-              setSelectedSub(sub);
-              handleCategoryClick(sub);
-            } else {
-              setSelectedMain(category);
-              setSelectedSub("");
-              handleCategoryClick(category);
-            }
-          }}
-        />
+    <div>
+      <h1 className="text-2xl font-bold mb-6">경기 목록 (index)</h1>
+      <div className="grid grid-cols-1 gap-4">
+        <GameCard teams="Chunichi Dragons vs Tohoku Rakuten Golden Eagles" time="18:00" odds={[["2", 2], ["1.7", 1.7]]} />
       </div>
-      <main className="flex-1 p-6">
-        <h1 className="text-2xl font-bold mb-6">경기 목록 (index)</h1>
-        <GameCard teams="LA Lakers vs Miami Heat" time="2025-06-11 10:00" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {currentGames.length > 0 ? (
-            currentGames.map((game, index) => (
-              <GameCard key={index} teams={game.teams} time={game.time} />
-            ))
-          ) : (
-            <p className="col-span-full text-gray-500">해당 경기 정보가 없습니다.</p>
-          )}
-        </div>
-      </main>
     </div>
   );
 }
