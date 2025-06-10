@@ -1,38 +1,33 @@
 // File: components/GameCard.tsx
 import React from 'react';
+import { useBetStore } from '../stores/useBetStore';
 
 interface GameCardProps {
+  id: string;
   teams: string;
   time: string;
-  odds?: [string, number][]; // 예: [["Home", 1.7], ["Away", 2.0]]
 }
 
-const GameCard: React.FC<GameCardProps> = ({ teams, time, odds = [["2", 2.0], ["1.7", 1.7]] }) => {
-  const [home, away] = teams.split(" vs ");
+const GameCard: React.FC<GameCardProps> = ({ id, teams, time }) => {
+  const { selections, toggleSelection } = useBetStore();
+  const isSelected = selections.some(selection => selection.team === teams);
 
   return (
-    <div className="bg-gray-900 text-white rounded-md flex items-center justify-between px-4 py-3 shadow">
-      {/* 왼쪽: 팀 이름 */}
-      <div>
-        <p className="text-sm font-medium">{home}</p>
-        <p className="text-sm text-gray-300">{away}</p>
-      </div>
+    <div
+      onClick={() => toggleSelection({ team: teams, odds: 1.5, desc: teams })}
+      className={`p-4 border rounded-md shadow transition-colors cursor-pointer 
+        ${isSelected ? 'bg-yellow-300 border-yellow-500' : 'bg-white hover:bg-gray-100'}`}
+    >
+      <div className="font-semibold mb-2">{teams}</div>
+      <div className="text-sm text-gray-600">{time}</div>
 
-      {/* 오른쪽: 시간 및 배당 */}
-      <div className="flex flex-col items-end">
-        <p className="text-xs font-semibold text-white">Today</p>
-        <p className="text-xs text-gray-400 mb-1">{time}</p>
-        <div className="flex gap-1">
-          {odds.map(([label, value], idx) => (
-            <div
-              key={idx}
-              className="bg-teal-700 px-2 py-1 rounded text-xs font-bold text-white"
-            >
-              {label}
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* 베팅 버튼 */}
+      <button
+        className={`mt-3 px-4 py-2 rounded-md font-medium text-white 
+          ${isSelected ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+      >
+        {isSelected ? '선택됨' : '베팅하기'}
+      </button>
     </div>
   );
 };

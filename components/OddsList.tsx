@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useBetStore } from "../stores/useBetStore";
 
 interface Outcome {
   name: string;
@@ -34,6 +35,7 @@ export default function OddsList({ sportKey }: OddsListProps) {
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { selections, toggleSelection } = useBetStore();
 
   useEffect(() => {
     const fetchOdds = async () => {
@@ -55,6 +57,18 @@ export default function OddsList({ sportKey }: OddsListProps) {
     fetchOdds();
   }, [sportKey]);
 
+  const handleOddsClick = (game: Game, team: string, odds: number) => {
+    toggleSelection({
+      team,
+      odds,
+      desc: `${game.away_team} @ ${game.home_team}`,
+    });
+  };
+
+  const isTeamSelected = (team: string) => {
+    return selections.some(selection => selection.team === team);
+  };
+
   if (loading) return <div>Loading...</div>;
   if (error) return <div>Error: {error}</div>;
   if (games.length === 0) return <div>No games available</div>;
@@ -66,6 +80,8 @@ export default function OddsList({ sportKey }: OddsListProps) {
           const outcomes = game.bookmakers[0]?.markets[0]?.outcomes || [];
           const homeOdds = outcomes[0]?.price;
           const awayOdds = outcomes[1]?.price;
+          const isHomeSelected = isTeamSelected(game.home_team);
+          const isAwaySelected = isTeamSelected(game.away_team);
 
           return (
             <div key={game.id} className="bg-white text-black rounded-md p-4 shadow">
@@ -78,7 +94,14 @@ export default function OddsList({ sportKey }: OddsListProps) {
                     <p className="text-sm text-gray-500">
                       {new Date(game.commence_time).toLocaleString("ko-KR")}
                     </p>
-                    <button className="bg-blue-500 text-white px-6 py-2 rounded text-sm font-bold hover:bg-blue-600 transition-colors">
+                    <button 
+                      onClick={() => handleOddsClick(game, game.home_team, homeOdds)}
+                      className={`px-6 py-2 rounded text-sm font-bold transition-colors ${
+                        isHomeSelected 
+                          ? 'bg-yellow-500 hover:bg-yellow-600' 
+                          : 'bg-blue-500 hover:bg-blue-600'
+                      } text-white`}
+                    >
                       {homeOdds}
                     </button>
                   </div>
@@ -87,7 +110,14 @@ export default function OddsList({ sportKey }: OddsListProps) {
                 {/* 원정팀 */}
                 <div className="flex items-center justify-between">
                   <p className="text-lg font-medium">{game.away_team}</p>
-                  <button className="bg-blue-500 text-white px-6 py-2 rounded text-sm font-bold hover:bg-blue-600 transition-colors">
+                  <button 
+                    onClick={() => handleOddsClick(game, game.away_team, awayOdds)}
+                    className={`px-6 py-2 rounded text-sm font-bold transition-colors ${
+                      isAwaySelected 
+                        ? 'bg-yellow-500 hover:bg-yellow-600' 
+                        : 'bg-blue-500 hover:bg-blue-600'
+                    } text-white`}
+                  >
                     {awayOdds}
                   </button>
                 </div>
