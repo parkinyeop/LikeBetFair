@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 
 export default function Header() {
+  const [selectedCategory, setSelectedCategory] = useState("Exchange");
+
   return (
     <header className="bg-blue-600 text-white shadow-md">
       <div className="max-w-screen-xl mx-auto px-4 py-2 flex items-center justify-between">
@@ -11,8 +13,26 @@ export default function Header() {
             <span className="font-bold text-xl">Lbetfair</span>
           </Link>
           <nav className="hidden sm:flex space-x-4 font-medium">
-            <Link href="/exchange" className="hover:text-blue-200">Exchange</Link>
-            <Link href="/sportsbook" className="hover:text-blue-200">Sportsbook</Link>
+            <button
+              onClick={() => setSelectedCategory("Exchange")}
+              className={`hover:text-blue-200 ${
+                selectedCategory === "Exchange"
+                  ? "text-black font-bold"
+                  : "text-white"
+              }`}
+            >
+              Exchange
+            </button>
+            <button
+              onClick={() => setSelectedCategory("Sportsbook")}
+              className={`hover:text-blue-200 ${
+                selectedCategory === "Sportsbook"
+                  ? "text-black font-bold"
+                  : "text-white"
+              }`}
+            >
+              Sportsbook
+            </button>
             <div className="flex items-center space-x-1">
               <Link href="/casino" className="text-gray-300">Casino</Link>
               <span className="text-[10px] bg-red-500 text-white px-1 rounded">SOON</span>
