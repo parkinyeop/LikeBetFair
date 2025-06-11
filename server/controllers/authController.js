@@ -7,29 +7,30 @@ exports.register = async (req, res) => {
     const { username, email, password } = req.body;
 
     // Check if user already exists
-    let user = await User.findOne({ email });
-    if (user) {
+    const existingUser = await User.findOne({
+      where: { email }
+    });
+    
+    if (existingUser) {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Create new user
-    user = new User({
-      username,
-      email,
-      password
-    });
-
     // Hash password
     const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(password, salt);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-    await user.save();
+    // Create new user
+    const user = await User.create({
+      username,
+      email,
+      password: hashedPassword
+    });
 
     // Create token
     const token = jwt.sign(
-      { userId: user._id },
+      { userId: user.id },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: process.env.JWT_EXPIRES_IN }
     );
 
     res.status(201).json({ token });
@@ -44,7 +45,10 @@ exports.login = async (req, res) => {
     const { email, password } = req.body;
 
     // Check if user exists
-    const user = await User.findOne({ email });
+    const user = await User.findOne({
+      where: { email }
+    });
+    
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
@@ -57,9 +61,9 @@ exports.login = async (req, res) => {
 
     // Create token
     const token = jwt.sign(
-      { userId: user._id },
+      { userId: user.id },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: process.env.JWT_EXPIRES_IN }
     );
 
     res.json({ token });
@@ -71,7 +75,9 @@ exports.login = async (req, res) => {
 
 exports.getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select('-password');
+    const user = await User.findByPk(req.user.userId, {
+      attributes: { exclude: ['password'] }
+    });
     res.json(user);
   } catch (err) {
     console.error(err);

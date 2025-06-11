@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import Link from "next/link";
+import JoinForm from './JoinForm';
 
 export default function Header() {
   const [selectedCategory, setSelectedCategory] = useState("Exchange");
+  const [showJoin, setShowJoin] = useState(false);
 
   return (
     <header className="bg-blue-600 text-white shadow-md">
@@ -59,11 +61,15 @@ export default function Header() {
           <button className="px-3 py-1 bg-white text-blue-600 rounded hover:bg-blue-50">
             Log In
           </button>
-          <button className="px-3 py-1 bg-blue-500 text-white border rounded hover:bg-blue-400">
+          <button
+            onClick={() => setShowJoin(true)}
+            className="px-3 py-1 bg-blue-500 text-white border rounded hover:bg-blue-400"
+          >
             Join Now
           </button>
         </div>
       </div>
+      {showJoin && <JoinForm onClose={() => setShowJoin(false)} />}
     </header>
   );
 } 

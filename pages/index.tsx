@@ -46,13 +46,7 @@ export default function Home() {
   const [selectedMatches, setSelectedMatches] = useState<Record<string, string>>({});
 
   const handleSelect = (match: string, team: string) => {
-    setSelectedMatches((prev) => {
-      // 같은 게임에서 다른 팀을 선택하면 이전 선택은 자동으로 해제됨
-      return {
-        ...prev,
-        [match]: team,
-      };
-    });
+    setSelectedMatches((prev) => ({ ...prev, [match]: team }));
   };
 
   return (
