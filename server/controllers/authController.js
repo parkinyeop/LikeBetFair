@@ -66,7 +66,8 @@ exports.login = async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES_IN }
     );
 
-    res.json({ token });
+    // username과 email도 함께 반환
+    res.json({ token, username: user.username, email: user.email });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

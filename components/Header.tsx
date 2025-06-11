@@ -1,10 +1,14 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import JoinForm from './JoinForm';
+import LoginForm from './LoginForm';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Header() {
   const [selectedCategory, setSelectedCategory] = useState("Exchange");
   const [showJoin, setShowJoin] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  const { isLoggedIn, username, logout } = useAuth();
 
   return (
     <header className="bg-blue-600 text-white shadow-md">
@@ -48,27 +52,35 @@ export default function Header() {
 
         {/* 로그인 & 기타 */}
         <div className="flex items-center space-x-3 text-sm">
-          <input
-            type="text"
-            placeholder="email/username"
-            className="px-2 py-1 rounded border text-black"
-          />
-          <input
-            type="password"
-            placeholder="password"
-            className="px-2 py-1 rounded border text-black"
-          />
-          <button className="px-3 py-1 bg-white text-blue-600 rounded hover:bg-blue-50">
-            Log In
-          </button>
-          <button
-            onClick={() => setShowJoin(true)}
-            className="px-3 py-1 bg-blue-500 text-white border rounded hover:bg-blue-400"
-          >
-            Join Now
-          </button>
+          {isLoggedIn ? (
+            <>
+              <span className="font-semibold text-white">{username}님 접속중입니다</span>
+              <button
+                onClick={logout}
+                className="px-3 py-1 bg-white text-blue-600 rounded hover:bg-blue-50"
+              >
+                로그아웃
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => setShowLogin(true)}
+                className="px-3 py-1 bg-white text-blue-600 rounded hover:bg-blue-50"
+              >
+                로그인
+              </button>
+              <button
+                onClick={() => setShowJoin(true)}
+                className="px-3 py-1 bg-blue-500 text-white border rounded hover:bg-blue-400"
+              >
+                회원가입
+              </button>
+            </>
+          )}
         </div>
       </div>
+      {showLogin && <LoginForm onClose={() => setShowLogin(false)} />}
       {showJoin && <JoinForm onClose={() => setShowJoin(false)} />}
     </header>
   );
