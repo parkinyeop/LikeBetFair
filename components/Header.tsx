@@ -47,6 +47,10 @@ export default function Header() {
               <Link href="/poker" className="text-gray-300">Poker</Link>
               <span className="text-[10px] bg-red-500 text-white px-1 rounded">SOON</span>
             </div>
+            <div className="flex items-center space-x-1">
+              <Link href="/ladder" className="text-gray-300">Ladder</Link>
+              <span className="text-[10px] bg-red-500 text-white px-1 rounded">SOON</span>
+            </div>
           </nav>
         </div>
 

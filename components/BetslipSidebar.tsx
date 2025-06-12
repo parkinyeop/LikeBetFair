@@ -130,13 +130,19 @@ function MyBetsPanel() {
                   <div className="text-gray-300 text-xs mb-2">────────────────────────</div>
                   <div className="mb-2 space-y-1">
                     {Array.isArray(bet.selections)
-                      ? bet.selections.map((sel: any, idx: number) => (
-                          <div key={idx} className="flex items-center text-sm">
-                            <span className="mr-2">✔️</span>
-                            <span className="font-semibold">{sel.team}</span>
-                            <span className="ml-2 text-gray-600">@ {sel.odds}</span>
-                          </div>
-                        ))
+                      ? bet.selections.map((sel: any, idx: number) => {
+                          let icon = '⏳', color = 'text-gray-400', label = '대기';
+                          if (sel.result === 'won') { icon = '✔️'; color = 'text-green-600'; label = '적중'; }
+                          else if (sel.result === 'lost') { icon = '❌'; color = 'text-red-500'; label = '실패'; }
+                          return (
+                            <div key={idx} className="flex items-center text-sm">
+                              <span className={`mr-2 ${color}`}>{icon}</span>
+                              <span className={`font-semibold ${color}`}>{sel.team}</span>
+                              <span className="ml-2 text-gray-600">@ {sel.odds}</span>
+                              <span className={`ml-2 text-xs ${color}`}>{label}</span>
+                            </div>
+                          );
+                        })
                       : '-'}
                   </div>
                   <div className="mt-2 space-y-1 text-sm">

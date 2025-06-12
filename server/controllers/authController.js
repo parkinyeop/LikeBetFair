@@ -1,6 +1,53 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const User = require('../models/userModel');
+const axios = require('axios');
+const Bet = require('../models/betModel');
+
+// The Odds API를 활용한 경기 결과 판정 함수
+async function getGameResult(sel) {
+  // TODO: 스포츠 종류(sportKey)는 sel.desc 등에서 추출하거나 별도 저장 필요
+  // 여기서는 예시로 baseball_mlb만 사용
+  const apiKey = process.env.ODDS_API_KEY;
+  const url = `https://api.the-odds-api.com/v4/sports/baseball_mlb/scores/?apiKey=${apiKey}&daysFrom=3`;
+  try {
+    const res = await axios.get(url);
+    const games = res.data;
+    const game = games.find(g =>
+      g.commence_time === sel.commence_time &&
+      (g.home_team === sel.team || g.away_team === sel.team)
+    );
+    if (!game || !game.completed) return 'pending';
+    const isHome = game.home_team === sel.team;
+    const userScore = isHome ? game.scores.home : game.scores.away;
+    const oppScore = isHome ? game.scores.away : game.scores.home;
+    if (userScore > oppScore) return 'won';
+    else return 'lost';
+  } catch (err) {
+    console.error('getGameResult error:', err.message);
+    return 'pending';
+  }
+}
+
+// 로그인 시 pending 베팅 결과 판정
+async function checkAndUpdatePendingBets(userId) {
+  const bets = await Bet.findAll({ where: { userId, status: 'pending' } });
+  for (const bet of bets) {
+    let allWon = true, anyLost = false;
+    const updatedSelections = await Promise.all(bet.selections.map(async (sel) => {
+      const result = await getGameResult(sel);
+      if (result === 'lost') anyLost = true;
+      if (result !== 'won') allWon = false;
+      return { ...sel, result };
+    }));
+    bet.selections = updatedSelections;
+    if (anyLost) bet.status = 'lost';
+    else if (allWon) bet.status = 'won';
+    else bet.status = 'pending';
+    await bet.save();
+    // TODO: 적중 시 정산(유저 balance 지급) 등 추가 처리 가능
+  }
+}
 
 exports.register = async (req, res) => {
   try {
@@ -58,6 +105,9 @@ exports.login = async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
+
+    // 로그인 시 pending 베팅 결과 판정
+    await checkAndUpdatePendingBets(user.id);
 
     // Create token
     const token = jwt.sign(
