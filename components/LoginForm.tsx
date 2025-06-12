@@ -20,7 +20,7 @@ export default function LoginForm({ onClose }: { onClose: () => void }) {
       const data = await res.json();
       console.log('로그인 응답:', data);
       if (res.ok) {
-        login(data.username || data.email);
+        login(data.username || data.email, Number(data.balance));
         onClose();
       } else {
         setMessage(data.message || '로그인 실패');
