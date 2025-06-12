@@ -92,7 +92,8 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
               onClick={() => toggleSelection({
                 team: game.home_team,
                 odds: game.bookmakers[0]?.markets[0]?.outcomes[0]?.price || 0,
-                desc: `${game.home_team} vs ${game.away_team}`
+                desc: `${game.home_team} vs ${game.away_team}`,
+                commence_time: game.commence_time
               })}
               className={`p-3 rounded-lg text-center transition-colors ${
                 isTeamSelected(game.home_team)
@@ -111,7 +112,8 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
               onClick={() => toggleSelection({
                 team: game.away_team,
                 odds: game.bookmakers[0]?.markets[0]?.outcomes[1]?.price || 0,
-                desc: `${game.home_team} vs ${game.away_team}`
+                desc: `${game.home_team} vs ${game.away_team}`,
+                commence_time: game.commence_time
               })}
               className={`p-3 rounded-lg text-center transition-colors ${
                 isTeamSelected(game.away_team)

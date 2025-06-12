@@ -21,6 +21,7 @@ export default function LoginForm({ onClose }: { onClose: () => void }) {
       console.log('로그인 응답:', data);
       console.log('로그인 응답 balance:', data.balance, typeof data.balance);
       if (res.ok) {
+        localStorage.setItem('token', data.token);
         login(data.username || data.email, Number(data.balance));
         onClose();
       } else {

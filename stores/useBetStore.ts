@@ -5,6 +5,7 @@ export type BetSelection = {
   team: string;
   odds: number;
   desc: string;
+  commence_time?: string;
 };
 
 interface BetState {

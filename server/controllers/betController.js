@@ -1,4 +1,5 @@
 const User = require('../models/userModel');
+const Bet = require('../models/betModel');
 
 exports.placeBet = async (req, res) => {
   try {
@@ -11,7 +12,7 @@ exports.placeBet = async (req, res) => {
     }
 
     // Get user and check balance
-    const user = await User.findById(userId);
+    const user = await User.findByPk(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -21,21 +22,21 @@ exports.placeBet = async (req, res) => {
     }
 
     // Create bet
-    const bet = {
+    const bet = await Bet.create({
+      userId,
       selections,
       stake,
       totalOdds,
       potentialWinnings: stake * totalOdds,
-      status: 'pending',
-      createdAt: new Date()
-    };
+      status: 'pending'
+    });
 
     // Update user balance and add bet
     user.balance -= stake;
-    user.bets.push(bet);
     await user.save();
 
-    res.status(201).json(bet);
+    // 베팅 정보와 갱신된 잔액을 함께 반환
+    res.status(201).json({ bet, balance: user.balance });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -44,12 +45,12 @@ exports.placeBet = async (req, res) => {
 
 exports.getBetHistory = async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    res.json(user.bets);
+    const userId = req.user.userId;
+    const bets = await Bet.findAll({
+      where: { userId },
+      order: [['createdAt', 'DESC']]
+    });
+    res.json(bets);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -58,12 +59,11 @@ exports.getBetHistory = async (req, res) => {
 
 exports.getActiveBets = async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    const activeBets = user.bets.filter(bet => bet.status === 'pending');
+    const userId = req.user.userId;
+    const activeBets = await Bet.findAll({
+      where: { userId, status: 'pending' },
+      order: [['createdAt', 'DESC']]
+    });
     res.json(activeBets);
   } catch (err) {
     console.error(err);
@@ -73,7 +73,7 @@ exports.getActiveBets = async (req, res) => {
 
 exports.getBetById = async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId);
+    const user = await User.findByPk(req.user.userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
