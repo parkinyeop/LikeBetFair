@@ -88,4 +88,28 @@ exports.getBetById = async (req, res) => {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
   }
+};
+
+exports.cancelBet = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const betId = req.params.id;
+    const bet = await Bet.findByPk(betId);
+    if (!bet) return res.status(404).json({ message: 'Bet not found' });
+    if (bet.userId !== userId) return res.status(403).json({ message: 'No permission to cancel this bet' });
+    if (bet.status !== 'pending') return res.status(400).json({ message: '이미 진행된 베팅은 취소할 수 없습니다.' });
+    if (!Array.isArray(bet.selections) || !bet.selections.every(sel => sel.result === 'pending' || !sel.result)) {
+      return res.status(400).json({ message: '이미 일부 경기가 시작되어 취소할 수 없습니다.' });
+    }
+    // 환불 처리
+    const user = await User.findByPk(userId);
+    user.balance = Number(user.balance) + Number(bet.stake);
+    await user.save();
+    // DB에서 베팅 삭제
+    await bet.destroy();
+    res.json({ message: '베팅이 취소되었습니다.', balance: user.balance });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
 }; 

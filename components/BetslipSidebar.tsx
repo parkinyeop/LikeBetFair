@@ -8,6 +8,7 @@ function MyBetsPanel() {
   const [error, setError] = useState('');
   const [openBetIds, setOpenBetIds] = useState<{ [id: string]: boolean }>({});
   const [filter, setFilter] = useState<'all' | 'pending' | 'won' | 'lost'>('all');
+  const { setBalance } = useAuth();
 
   useEffect(() => {
     const fetchBets = async () => {
@@ -148,8 +149,36 @@ function MyBetsPanel() {
                   <div className="mt-2 space-y-1 text-sm">
                     <div>💰 배팅금: <b>{Number(bet.stake).toLocaleString()}원</b></div>
                     <div>📈 배당률: <b>{Number(bet.totalOdds).toFixed(2)}</b></div>
-                    <div>🏆 예상수익: <b>{Math.floor(Number(bet.potentialWinnings)).toLocaleString()}원</b></div>
+                    <div className="flex items-center gap-2">
+                      <span>🏆 예상수익: <b>{Math.floor(Number(bet.potentialWinnings)).toLocaleString()}원</b></span>
+                      {bet.status === 'pending' && Array.isArray(bet.selections) && bet.selections.every((sel: any) => sel.result === 'pending' || !sel.result) && (
+                        <button
+                          className="px-2 py-0.5 text-xs border border-red-500 text-red-500 rounded hover:bg-red-500 hover:text-white transition-colors ml-1"
+                          onClick={async () => {
+                            if (!window.confirm('정말 이 베팅을 취소하시겠습니까?')) return;
+                            const token = localStorage.getItem('token');
+                            const res = await fetch(`http://localhost:5050/api/bet/${bet.id}/cancel`, {
+                              method: 'POST',
+                              headers: { 'x-auth-token': token || '' },
+                            });
+                            const data = await res.json();
+                            if (res.ok) {
+                              alert('베팅이 취소되었습니다.');
+                              if (data.balance !== undefined) setBalance(Number(data.balance));
+                              setBets((prev: any[]) => prev.filter(b => b.id !== bet.id));
+                            } else {
+                              alert(data.message || '취소 실패');
+                            }
+                          }}
+                        >
+                          베팅취소
+                        </button>
+                      )}
+                    </div>
                   </div>
+                  {bet.status === 'pending' && Array.isArray(bet.selections) && !bet.selections.every((sel: any) => sel.result === 'pending' || !sel.result) && (
+                    <div className="mt-2 text-xs text-gray-400">이미 일부 경기가 시작되어 취소할 수 없습니다.</div>
+                  )}
                 </div>
               )}
             </li>

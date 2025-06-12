@@ -40,6 +40,10 @@ export default function Layout({ children }: LayoutProps) {
     setSelected(category);
     if (category.includes(" > ")) {
       const subCategory = category.split(" > ")[1];
+      if (subCategory === "KBL") {
+        alert("KBL은 준비중입니다.");
+        return;
+      }
       const sportKey = sportKeyMap[subCategory];
       if (sportKey) {
         router.push(`/odds/${sportKey}`);
