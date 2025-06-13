@@ -88,6 +88,13 @@ function MyBetsPanel() {
             }
           }
           let expectedResultDate: string | null = null;
+          // 경기별 평균 소요 시간(분)
+          const avgGameDurationBySport: Record<string, number> = {
+            soccer: 120,
+            baseball: 180,
+            basketball: 150,
+            // 필요시 추가
+          };
           if (Array.isArray(bet.selections)) {
             const times = bet.selections
               .map((sel: any) => sel.commence_time)
@@ -96,6 +103,10 @@ function MyBetsPanel() {
               .filter((d: Date) => !isNaN(d.getTime()));
             if (times.length > 0) {
               const maxDate = new Date(Math.max(...times.map(d => d.getTime())));
+              // 스포츠 종류 추출(예: soccer_epl → soccer)
+              const sportType = bet.selections[0]?.sport_key?.split('_')[0] || 'soccer';
+              const duration = avgGameDurationBySport[sportType] || 120;
+              maxDate.setMinutes(maxDate.getMinutes() + duration);
               expectedResultDate = maxDate.toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
             }
           }

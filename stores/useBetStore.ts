@@ -6,6 +6,9 @@ export type BetSelection = {
   odds: number;
   desc: string;
   commence_time?: string;
+  market?: string;
+  gameId?: string;
+  point?: number;
 };
 
 interface BetState {
@@ -32,21 +35,53 @@ export const useBetStore = create<BetState>((set, get) => ({
 
   toggleSelection: (bet) => {
     const { selections } = get();
-    const exists = selections.some((s) => s.team === bet.team);
-    
-    // 같은 게임의 다른 팀 선택 해제
-    const gameDesc = bet.desc;
-    const otherTeamInGame = selections.find(s => s.desc === gameDesc && s.team !== bet.team);
-    
+    // 이미 같은 팀, 마켓, 경기 선택되어 있으면 해제
+    const exists = selections.some(
+      (s) => s.team === bet.team && s.market === bet.market && s.gameId === bet.gameId
+    );
+
     if (exists) {
-      // 같은 팀을 다시 클릭하면 선택 해제
-      get().removeSelection(bet.team);
+      set((state) => ({
+        selections: state.selections.filter(
+          (s) => !(s.team === bet.team && s.market === bet.market && s.gameId === bet.gameId)
+        ),
+      }));
     } else {
-      // 다른 팀을 선택하면 같은 게임의 이전 선택은 해제
-      if (otherTeamInGame) {
-        get().removeSelection(otherTeamInGame.team);
+      // 같은 경기에서 승패(h2h)와 핸디캡(spreads)은 동시에 선택 불가
+      if (
+        (bet.market === '승/패' || bet.market === '핸디캡') &&
+        selections.some(
+          (s) =>
+            s.gameId === bet.gameId &&
+            ((s.market === '승/패' && bet.market === '핸디캡') ||
+              (s.market === '핸디캡' && bet.market === '승/패'))
+        )
+      ) {
+        // 기존 승패 또는 핸디캡 선택 해제 후 추가
+        set((state) => ({
+          selections: [
+            ...state.selections.filter(
+              (s) =>
+                !(
+                  s.gameId === bet.gameId &&
+                  ((s.market === '승/패' && bet.market === '핸디캡') ||
+                    (s.market === '핸디캡' && bet.market === '승/패'))
+                )
+            ),
+            bet,
+          ],
+        }));
+      } else {
+        // 같은 경기, 같은 마켓이면 기존 선택 해제(같은 마켓 내 단일 선택)
+        set((state) => ({
+          selections: [
+            ...state.selections.filter(
+              (s) => !(s.market === bet.market && s.gameId === bet.gameId)
+            ),
+            bet,
+          ],
+        }));
       }
-      get().addSelection(bet);
     }
   },
 

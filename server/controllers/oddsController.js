@@ -24,7 +24,7 @@ exports.getOdds = async (req, res) => {
         params: {
           apiKey,
           regions: 'us',
-          markets: 'h2h'
+          markets: 'h2h,totals,spreads'
         }
       }
     );
