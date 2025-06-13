@@ -105,8 +105,10 @@ exports.cancelBet = async (req, res) => {
     const user = await User.findByPk(userId);
     user.balance = Number(user.balance) + Number(bet.stake);
     await user.save();
-    // DB에서 베팅 삭제
-    await bet.destroy();
+    // status를 cancel로 변경
+    bet.status = 'cancel';
+    await bet.save();
+    console.log(`[Bet Cancel] betId=${bet.id}, userId=${userId}, status=${bet.status}, 환불금액=${bet.stake}`);
     res.json({ message: '베팅이 취소되었습니다.', balance: user.balance });
   } catch (err) {
     console.error(err);

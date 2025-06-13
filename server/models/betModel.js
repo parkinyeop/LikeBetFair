@@ -33,7 +33,7 @@ const Bet = sequelize.define('Bet', {
     allowNull: false
   },
   status: {
-    type: DataTypes.ENUM('pending', 'won', 'lost'),
+    type: DataTypes.ENUM('pending', 'won', 'lost', 'cancel'),
     defaultValue: 'pending'
   }
 }, {
