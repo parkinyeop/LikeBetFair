@@ -17,13 +17,17 @@ const sportsTree = {
     "스페인 2부",
     "스웨덴 알스벤스칸"
   ],
-  농구: ["NBA", "KBL"],
-  야구: ["MLB", "KBO"],
-  미식축구: ["NFL"],
+  농구: [
+    "NBA",
+    "WNBA"
+  ],
+  야구: ["MLB", "KBO", "NCAA"],
+  미식축구: ["CFL", "NCAAF", "NFL", "NFL 프리시즌"],
 };
 
 const sportKeyMap: Record<string, string> = {
   NBA: "basketball_nba",
+  WNBA: "basketball_wnba",
   K리그: "soccer_korea_kleague1",
   J리그: "soccer_japan_j_league",
   "세리에 A": "soccer_italy_serie_a",
@@ -35,7 +39,11 @@ const sportKeyMap: Record<string, string> = {
   "스웨덴 알스벤스칸": "soccer_sweden_allsvenskan",
   MLB: "baseball_mlb",
   KBO: "baseball_kbo",
+  NCAA: "baseball_ncaa",
+  CFL: "americanfootball_cfl",
+  NCAAF: "americanfootball_ncaaf",
   NFL: "americanfootball_nfl",
+  "NFL 프리시즌": "americanfootball_nfl_preseason",
 };
 
 interface LayoutProps {
