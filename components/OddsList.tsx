@@ -44,6 +44,11 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
       try {
         setLoading(true);
         const response = await fetch(`http://localhost:5050/api/odds/${sportKey}`);
+        if (response.status === 404) {
+          setError('해당 리그의 배당 정보가 없습니다.');
+          setGames([]);
+          return;
+        }
         if (!response.ok) {
           throw new Error('Failed to fetch odds');
         }
@@ -112,7 +117,15 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
               ))}
             </div>
             {/* 마켓별 선택 영역 */}
-            {(selectedMarket === '언더/오버' || selectedMarket === '핸디캡') && market ? (
+            {selectedMarket === '핸디캡' && (!market || !market.outcomes || market.outcomes.length === 0) ? (
+              <div className="text-center text-gray-500 py-6">
+                현재 핸디캡 배당 정보가 제공되지 않습니다.
+              </div>
+            ) : selectedMarket === '언더/오버' && (!market || !market.outcomes || market.outcomes.length === 0) ? (
+              <div className="text-center text-gray-500 py-6">
+                현재 언더/오버 배당 정보가 제공되지 않습니다.
+              </div>
+            ) : (selectedMarket === '언더/오버' || selectedMarket === '핸디캡') && market ? (
               <div className="overflow-x-auto">
                 {(() => {
                   // 모든 bookmaker의 해당 마켓 outcomes를 합침
@@ -155,6 +168,11 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                             <>
                               <th className="px-2 py-1 border">Over (최고배당)</th>
                               <th className="px-2 py-1 border">Under (최고배당)</th>
+                            </>
+                          ) : selectedMarket === '핸디캡' ? (
+                            <>
+                              <th className="px-2 py-1 border">Home ({game.home_team})</th>
+                              <th className="px-2 py-1 border">Away ({game.away_team})</th>
                             </>
                           ) : (
                             <>
@@ -215,10 +233,65 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                 <td className="border px-2 py-1">{calcPayout(bestOver, bestUnder)}</td>
                               </tr>
                             );
+                          } else if (selectedMarket === '핸디캡') {
+                            const bestHome = getBest(arr, 'home');
+                            const bestAway = getBest(arr, 'away');
+                            if (!bestHome && !bestAway) {
+                              return (
+                                <tr key={idx}>
+                                  <td colSpan={4} className="border px-2 py-1 text-center text-gray-500">
+                                    현재 핸디캡 배당 정보가 제공되지 않습니다.
+                                  </td>
+                                </tr>
+                              );
+                            }
+                            return (
+                              <tr key={idx}>
+                                <td className="border px-2 py-1 font-semibold">{point}</td>
+                                <td className="border px-2 py-1">
+                                  {bestHome ? (
+                                    <button
+                                      className={`w-full py-1 rounded ${isTeamSelected(bestHome.name + bestHome.bookmaker, selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                                      disabled={!isSoon || !bestHome.price}
+                                      onClick={() => isSoon && bestHome.price && toggleSelection({
+                                        team: bestHome.name + bestHome.bookmaker,
+                                        odds: bestHome.price,
+                                        desc: `${game.home_team} vs ${game.away_team}`,
+                                        commence_time: game.commence_time,
+                                        market: selectedMarket,
+                                        gameId: game.id,
+                                        point: bestHome.point
+                                      })}
+                                    >
+                                      {bestHome.bookmaker}: {bestHome.price}
+                                    </button>
+                                  ) : '-'}
+                                </td>
+                                <td className="border px-2 py-1">
+                                  {bestAway ? (
+                                    <button
+                                      className={`w-full py-1 rounded ${isTeamSelected(bestAway.name + bestAway.bookmaker, selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                                      disabled={!isSoon || !bestAway.price}
+                                      onClick={() => isSoon && bestAway.price && toggleSelection({
+                                        team: bestAway.name + bestAway.bookmaker,
+                                        odds: bestAway.price,
+                                        desc: `${game.home_team} vs ${game.away_team}`,
+                                        commence_time: game.commence_time,
+                                        market: selectedMarket,
+                                        gameId: game.id,
+                                        point: bestAway.point
+                                      })}
+                                    >
+                                      {bestAway.bookmaker}: {bestAway.price}
+                                    </button>
+                                  ) : '-'}
+                                </td>
+                                <td className="border px-2 py-1">{calcPayout(bestHome, bestAway)}</td>
+                              </tr>
+                            );
                           } else {
-                            // 핸디캡: 홈(음수), 어웨이(양수)
-                            const bestHome = arr.filter(o => o.point < 0).reduce((best, cur) => (cur.price > (best?.price ?? 0) ? cur : best), null);
-                            const bestAway = arr.filter(o => o.point > 0).reduce((best, cur) => (cur.price > (best?.price ?? 0) ? cur : best), null);
+                            const bestHome = getBest(arr, 'home');
+                            const bestAway = getBest(arr, 'away');
                             return (
                               <tr key={idx}>
                                 <td className="border px-2 py-1 font-semibold">{point}</td>
@@ -266,7 +339,11 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                           }
                         }) : (
                           <tr>
-                            <td className="border px-2 py-1" colSpan={4}>데이터 없음</td>
+                            <td colSpan={4} className="border px-2 py-1 text-center text-gray-500">
+                              {selectedMarket === '핸디캡' 
+                                ? '현재 핸디캡 배당 정보가 제공되지 않습니다.'
+                                : '현재 배당 정보가 제공되지 않습니다.'}
+                            </td>
                           </tr>
                         )}
                       </tbody>

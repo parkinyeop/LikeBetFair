@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 const sportsList = [
+  { name: "K리그", key: "soccer_korea_kleague1" },
   { name: "NBA", key: "basketball_nba" },
   { name: "EPL", key: "soccer_epl" },
   { name: "MLB", key: "baseball_mlb" },

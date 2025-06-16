@@ -4,7 +4,17 @@ import { useRouter } from "next/router";
 import GameCard from "../components/GameCard";
 
 const sportsTree = {
-  축구: ["EPL", "라리가", "분데스리가", "세리에 A"],
+  축구: [
+    "K리그",
+    "J리그",
+    "세리에 A",
+    "브라질 세리에 A",
+    "MLS",
+    "아르헨티나 프리메라",
+    "중국 슈퍼리그",
+    "스페인 2부",
+    "스웨덴 알스벤스칸"
+  ],
   농구: ["NBA", "KBL"],
   야구: ["MLB", "KBO"],
   미식축구: ["NFL"],
@@ -14,10 +24,15 @@ const sportsTree = {
 
 const sportKeyMap: Record<string, string> = {
   NBA: "basketball_nba",
-  EPL: "soccer_epl",
-  라리가: "soccer_la_liga",
-  분데스리가: "soccer_bundesliga",
-  세리에A: "soccer_serie_a",
+  K리그: "soccer_korea_kleague1",
+  J리그: "soccer_japan_j_league",
+  "세리에 A": "soccer_italy_serie_a",
+  "브라질 세리에 A": "soccer_brazil_campeonato",
+  MLS: "soccer_usa_mls",
+  "아르헨티나 프리메라": "soccer_argentina_primera_division",
+  "중국 슈퍼리그": "soccer_china_superleague",
+  "스페인 2부": "soccer_spain_segunda_division",
+  "스웨덴 알스벤스칸": "soccer_sweden_allsvenskan",
   MLB: "baseball_mlb",
   KBO: "baseball_kbo",
   NFL: "americanfootball_nfl",

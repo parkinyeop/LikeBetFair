@@ -6,8 +6,6 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5분
 
 exports.getOdds = async (req, res) => {
   try {
-    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
-    res.header('Access-Control-Allow-Credentials', 'true');
     const { sport } = req.params;
     const apiKey = process.env.ODDS_API_KEY;
 
@@ -37,8 +35,6 @@ exports.getOdds = async (req, res) => {
 
     res.json(response.data);
   } catch (err) {
-    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
-    res.header('Access-Control-Allow-Credentials', 'true');
     console.error('Error fetching odds:', err);
     if (err.response) {
       // 외부 API의 응답 전체를 출력
