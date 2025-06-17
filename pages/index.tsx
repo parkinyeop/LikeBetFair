@@ -15,10 +15,10 @@ const sportsTree = {
     "스페인 2부",
     "스웨덴 알스벤스칸"
   ],
-  농구: ["NBA", "KBL"],
+  농구: ["NBA"],
   야구: ["MLB", "KBO"],
   미식축구: ["NFL"],
-  격투기: ["UFC", "ONE"],
+  격투기: [],
   Tennis: [],
 };
 
@@ -36,8 +36,6 @@ const sportKeyMap: Record<string, string> = {
   MLB: "baseball_mlb",
   KBO: "baseball_kbo",
   NFL: "americanfootball_nfl",
-  UFC: "mma_mixed_martial_arts",
-  ONE: "mma_one",
 };
 
 const getSportKey = (category: string) => sportKeyMap[category] || "";
@@ -59,21 +57,112 @@ const initialGameData: Record<string, { teams: string; time: string }[]> = {
 
 export default function Home() {
   const [selectedMatches, setSelectedMatches] = useState<Record<string, string>>({});
+  const [games, setGames] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>("KBO");
+  const [currentSportKey, setCurrentSportKey] = useState<string>("");
+
+  useEffect(() => {
+    const fetchGames = async () => {
+      if (selectedCategory === currentSportKey) return; // 이미 로드된 데이터면 스킵
+      
+      try {
+        setLoading(true);
+        const sportKey = getSportKey(selectedCategory);
+        if (!sportKey) {
+          setError('Invalid sport category');
+          setLoading(false);
+          return;
+        }
+
+        console.log(`Fetching data for ${selectedCategory} with sportKey: ${sportKey}`);
+        const response = await fetch(`http://localhost:5050/api/odds/${sportKey}`);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch games for ${selectedCategory}`);
+        }
+        
+        const data = await response.json();
+        if (selectedCategory === "KBO" && data.length > 0) {
+          console.log("KBO bookmakers 구조 sample:", data[0].bookmakers);
+        }
+        setGames(data);
+        setCurrentSportKey(selectedCategory);
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching games:', err);
+        setError(err instanceof Error ? err.message : 'An error occurred');
+        setLoading(false);
+      }
+    };
+
+    fetchGames();
+  }, [selectedCategory, currentSportKey]);
 
   const handleSelect = (match: string, team: string) => {
     setSelectedMatches((prev) => ({ ...prev, [match]: team }));
   };
 
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategory(category);
+  };
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
+
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">경기 목록 (index)</h1>
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-6">경기 목록</h1>
+      
+      {/* 카테고리 선택 버튼들 */}
+      <div className="mb-6 flex flex-wrap gap-2">
+        {Object.entries(sportsTree).map(([mainCategory, subCategories]) => (
+          <div key={mainCategory} className="flex flex-wrap gap-1">
+            {subCategories.map((category) => (
+              <button
+                key={category}
+                onClick={() => handleCategoryChange(category)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  selectedCategory === category
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {/* 현재 선택된 카테고리 표시 */}
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-gray-700">
+          현재 선택: {selectedCategory}
+        </h2>
+        <p className="text-sm text-gray-500">
+          총 {games.length}개의 경기가 있습니다.
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 gap-4">
-        <GameCard 
-          teams="Chunichi Dragons vs Tohoku Rakuten Golden Eagles" 
-          time="18:00" 
-          selectedTeam={selectedMatches["Chunichi Dragons vs Tohoku Rakuten Golden Eagles"] || ""}
-          onSelect={handleSelect}
-        />
+        {games.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            {selectedCategory}에 대한 경기 데이터가 없습니다.
+          </div>
+        ) : (
+          games.map((game, index) => (
+            <GameCard 
+              key={index}
+              teams={`${game.home_team} vs ${game.away_team}`}
+              time={new Date(game.commence_time).toLocaleString()}
+              selectedTeam={selectedMatches[`${game.home_team} vs ${game.away_team}`] || ""}
+              onSelect={handleSelect}
+              bookmakers={game.bookmakers}
+            />
+          ))
+        )}
       </div>
     </div>
   );

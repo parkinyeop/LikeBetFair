@@ -55,14 +55,14 @@ const Sidebar: React.FC<SidebarProps> = ({ categories, selected, onSelect }) => 
                           isSelectedSub
                             ? "font-bold bg-white shadow text-blue-600"
                             : "text-gray-600 hover:bg-gray-300"
-                        }`}
-                      >
+                }`}
+              >
                         {subLabel}
                       </button>
                     );
                   })}
-              </div>
-            )}
+        </div>
+      )}
           </div>
         );
       })}

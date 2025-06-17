@@ -43,7 +43,7 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
     const fetchOdds = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`http://localhost:5050/api/odds/${sportKey}`);
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050'}/api/odds/${sportKey}`);
         if (response.status === 404) {
           setError('해당 리그의 배당 정보가 없습니다.');
           setGames([]);
@@ -53,6 +53,9 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
           throw new Error('Failed to fetch odds');
         }
         const data = await response.json();
+        if (sportKey === "baseball_kbo" && data.length > 0) {
+          console.log("KBO 상세 bookmakers 구조 sample:", JSON.stringify(data[0].bookmakers, null, 2));
+        }
         setGames(data);
         setError(null);
       } catch (err) {
@@ -351,37 +354,79 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                   );
                 })()}
               </div>
-            ) : market && selectedMarket === '승/패' ? (
-              <div className="flex gap-2">
-                {market.outcomes.map((outcome: any, idx: number) => (
-                  <button
-                    key={idx}
-                    onClick={() => isSoon && toggleSelection({
-                      team: outcome.name,
-                      odds: outcome.price,
-                      desc: `${game.home_team} vs ${game.away_team}`,
-                      commence_time: game.commence_time,
-                      market: selectedMarket,
-                      gameId: game.id,
-                      ...(outcome.point && { point: outcome.point })
-                    })}
-                    className={`p-3 rounded-lg text-center transition-colors ${
-                      isTeamSelected(outcome.name, selectedMarket, game.id)
-                        ? 'bg-yellow-500 hover:bg-yellow-600'
-                        : isSoon ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
-                    } text-white`}
-                    disabled={!isSoon}
-                  >
-                    <div className="font-bold">
-                      {outcome.name}
-                      {outcome.point !== undefined ? ` ${outcome.point}` : ''}
-                    </div>
-                    <div className="text-sm">
-                      {outcome.price || 'N/A'}
-                    </div>
-                    {!isSoon && <div className="text-xs text-red-500 mt-1">준비중</div>}
-                  </button>
-                ))}
+            ) : selectedMarket === '승/패' ? (
+              <div className="grid grid-cols-2 gap-2">
+                {(() => {
+                  // 모든 bookmaker의 h2h outcomes를 합침
+                  const allOutcomes: any[] = [];
+                  game.bookmakers.forEach(bm => {
+                    const m = bm.markets.find(m => m.key === 'h2h');
+                    if (m && m.outcomes) {
+                      m.outcomes.forEach(outcome => {
+                        allOutcomes.push({ ...outcome, bookmaker: bm.title });
+                      });
+                    }
+                  });
+                  // 팀별로 최고 배당 추출
+                  const homeBest = allOutcomes.filter(o => o.name === game.home_team)
+                    .sort((a, b) => b.price - a.price)[0];
+                  const awayBest = allOutcomes.filter(o => o.name === game.away_team)
+                    .sort((a, b) => b.price - a.price)[0];
+                  return (
+                    <>
+                      <button
+                        onClick={() => isSoon && homeBest && toggleSelection({
+                          team: homeBest.name + homeBest.bookmaker,
+                          odds: homeBest.price,
+                          desc: `${game.home_team} vs ${game.away_team}`,
+                          commence_time: game.commence_time,
+                          market: selectedMarket,
+                          gameId: game.id,
+                          ...(homeBest.point && { point: homeBest.point })
+                        })}
+                        className={`w-full p-3 rounded-lg text-center transition-colors ${
+                          isTeamSelected(homeBest?.name + homeBest?.bookmaker, selectedMarket, game.id)
+                            ? 'bg-yellow-500 hover:bg-yellow-600'
+                            : isSoon ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                        } text-white`}
+                        disabled={!isSoon || !homeBest}
+                      >
+                        <div className="font-bold">
+                          {game.home_team}
+                        </div>
+                        <div className="text-sm">
+                          {homeBest ? `${homeBest.bookmaker}: ${homeBest.price}` : 'N/A'}
+                        </div>
+                        {!isSoon && <div className="text-xs text-red-500 mt-1">준비중</div>}
+                      </button>
+                      <button
+                        onClick={() => isSoon && awayBest && toggleSelection({
+                          team: awayBest.name + awayBest.bookmaker,
+                          odds: awayBest.price,
+                          desc: `${game.home_team} vs ${game.away_team}`,
+                          commence_time: game.commence_time,
+                          market: selectedMarket,
+                          gameId: game.id,
+                          ...(awayBest.point && { point: awayBest.point })
+                        })}
+                        className={`w-full p-3 rounded-lg text-center transition-colors ${
+                          isTeamSelected(awayBest?.name + awayBest?.bookmaker, selectedMarket, game.id)
+                            ? 'bg-yellow-500 hover:bg-yellow-600'
+                            : isSoon ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                        } text-white`}
+                        disabled={!isSoon || !awayBest}
+                      >
+                        <div className="font-bold">
+                          {game.away_team}
+                        </div>
+                        <div className="text-sm">
+                          {awayBest ? `${awayBest.bookmaker}: ${awayBest.price}` : 'N/A'}
+                        </div>
+                        {!isSoon && <div className="text-xs text-red-500 mt-1">준비중</div>}
+                      </button>
+                    </>
+                  );
+                })()}
               </div>
             ) : null}
           </div>

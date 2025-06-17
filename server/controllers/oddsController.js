@@ -1,49 +1,34 @@
-const axios = require('axios');
-
-// 캐시 설정
-const cache = new Map();
-const CACHE_DURATION = 5 * 60 * 1000; // 5분
+const { OddsCache } = require('../models');
 
 exports.getOdds = async (req, res) => {
   try {
     const { sport } = req.params;
-    const apiKey = process.env.ODDS_API_KEY;
-
-    // 캐시된 데이터 확인
-    const cachedData = cache.get(sport);
-    if (cachedData && Date.now() - cachedData.timestamp < CACHE_DURATION) {
-      return res.json(cachedData.data);
-    }
-
-    // API 호출
-    const response = await axios.get(
-      `https://api.the-odds-api.com/v4/sports/${sport}/odds`,
-      {
-        params: {
-          apiKey,
-          regions: 'us',
-          markets: 'h2h,totals,spreads'
-        }
-      }
-    );
-
-    // 응답 데이터 캐싱
-    cache.set(sport, {
-      data: response.data,
-      timestamp: Date.now()
+    
+    // DB에서 캐시된 데이터 조회
+    const cachedData = await OddsCache.findAll({
+      where: { sport },
+      order: [['commence_time', 'ASC']]
     });
 
-    res.json(response.data);
-  } catch (err) {
-    console.error('Error fetching odds:', err);
-    if (err.response) {
-      // 외부 API의 응답 전체를 출력
-      console.error('API response data:', err.response.data);
-      console.error('API response status:', err.response.status);
-      console.error('API response headers:', err.response.headers);
+    if (!cachedData || cachedData.length === 0) {
+      return res.status(404).json({ message: 'No odds data found for this sport' });
     }
-    res.status(err.response?.status || 500).json({ 
-      message: 'Failed to fetch odds',
+
+    // 데이터 포맷 변환
+    const formattedData = cachedData.map(game => ({
+      id: game.id,
+      sport: game.sport,
+      home_team: game.home_team,
+      away_team: game.away_team,
+      commence_time: game.commence_time,
+      odds: game.odds
+    }));
+
+    res.json(formattedData);
+  } catch (err) {
+    console.error('Error fetching odds from database:', err);
+    res.status(500).json({ 
+      message: 'Failed to fetch odds from database',
       error: err.message 
     });
   }

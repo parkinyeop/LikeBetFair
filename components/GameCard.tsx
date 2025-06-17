@@ -6,9 +6,10 @@ interface GameCardProps {
   time: string;
   selectedTeam: string | null;
   onSelect: (match: string, team: string) => void;
+  bookmakers?: any[];
 }
 
-const GameCard: React.FC<GameCardProps> = ({ teams, time, selectedTeam, onSelect }) => {
+const GameCard: React.FC<GameCardProps> = ({ teams, time, selectedTeam, onSelect, bookmakers }) => {
   const [teamA, teamB] = teams.split(" vs ");
 
   const handleClick = (team: string) => {
@@ -21,22 +22,48 @@ const GameCard: React.FC<GameCardProps> = ({ teams, time, selectedTeam, onSelect
     }
   };
 
+  // 배당율 정보 추출
+  const getOdds = (teamName: string) => {
+    if (!bookmakers || bookmakers.length === 0) return null;
+    for (const bookmaker of bookmakers) {
+      const h2hMarket = bookmaker.markets?.find((market: any) => market.key === 'h2h');
+      if (h2hMarket) {
+        const outcome = h2hMarket.outcomes?.find((outcome: any) =>
+          outcome.name.trim().toLowerCase() === teamName.trim().toLowerCase()
+        );
+        if (outcome) return outcome.price;
+      }
+    }
+    return null;
+  };
+
+  const teamAOdds = getOdds(teamA);
+  const teamBOdds = getOdds(teamB);
+
   return (
     <div className="bg-white p-4 rounded shadow">
       <div className="text-gray-700 font-semibold mb-2">{teams}</div>
       <div className="text-sm text-gray-500 mb-4">{time}</div>
       <div className="flex space-x-4">
-        {[teamA, teamB].map((team) => (
-          <button
-            key={team}
-            onClick={() => handleClick(team)}
-            className={`flex-1 px-4 py-2 rounded text-white font-bold transition-colors
-              ${selectedTeam === team ? "bg-yellow-400" : "bg-blue-600 hover:bg-blue-700"}
-            `}
-          >
-            {team}
-          </button>
-        ))}
+        {[teamA, teamB].map((team, index) => {
+          const odds = index === 0 ? teamAOdds : teamBOdds;
+          return (
+            <button
+              key={team}
+              onClick={() => handleClick(team)}
+              className={`flex-1 px-4 py-2 rounded text-white font-bold transition-colors
+                ${selectedTeam === team ? "bg-yellow-400" : "bg-blue-600 hover:bg-blue-700"}
+              `}
+            >
+              <div>{team}</div>
+              {odds && (
+                <div className="text-xs mt-1 opacity-90">
+                  배당: {odds}
+                </div>
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
