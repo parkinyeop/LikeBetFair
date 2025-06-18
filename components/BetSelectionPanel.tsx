@@ -11,6 +11,11 @@ const BetSelectionPanel = () => {
   const totalOdds = selections.reduce((acc, curr) => acc * curr.odds, 1);
   const expectedReturn = stake * totalOdds;
 
+  // 베팅 가능 시간 체크 (10분 전 마감)
+  const now = new Date();
+  const marginMinutes = 10;
+  const hasPastGame = selections.some(sel => !sel.commence_time || new Date(sel.commence_time) <= new Date(now.getTime() + marginMinutes * 60000));
+
   const handleStakeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/,/g, ''); // 콤마 제거 후 숫자 변환
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
@@ -95,11 +100,14 @@ const BetSelectionPanel = () => {
       </div>
       <button
         className="w-full mt-4 bg-blue-600 text-white py-2 rounded text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
-        disabled={selections.length === 0 || stake <= 0 || loading}
+        disabled={selections.length === 0 || stake <= 0 || loading || hasPastGame}
         onClick={handleBet}
       >
         {loading ? '베팅 중...' : '베팅하기'}
       </button>
+      {hasPastGame && (
+        <div className="mt-2 text-center text-sm text-red-600">이미 시작된 경기가 포함되어 있어 베팅이 불가합니다.</div>
+      )}
       {message && <div className="mt-2 text-center text-sm text-blue-600">{message}</div>}
     </div>
   );

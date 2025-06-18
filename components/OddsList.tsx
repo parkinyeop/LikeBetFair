@@ -96,8 +96,11 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
       {games.map((game) => {
         const gameTime = new Date(game.commence_time);
         const now = new Date();
-        const diffHours = (gameTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-        const isSoon = diffHours < 168; // 7일 미만만 활성화
+        const marginMinutes = 10;
+        const maxDays = 7;
+        const maxDate = new Date(now.getTime() + maxDays * 24 * 60 * 60 * 1000);
+        const isBettable = gameTime > new Date(now.getTime() + marginMinutes * 60000) && gameTime <= maxDate;
+        const isTooFar = gameTime > maxDate;
         const selectedMarket = selectedMarkets[game.id] || '승/패';
         const marketKey = marketKeyMap[selectedMarket];
         const market = game.bookmakers[0]?.markets.find(m => m.key === marketKey);
@@ -199,8 +202,8 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                   {bestOver ? (
                                     <button
                                       className={`w-full py-1 rounded ${isTeamSelected(bestOver.name + bestOver.bookmaker, selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                                      disabled={!isSoon || !bestOver.price}
-                                      onClick={() => isSoon && bestOver.price && toggleSelection({
+                                      disabled={!isBettable || !bestOver.price}
+                                      onClick={() => isBettable && bestOver.price && toggleSelection({
                                         team: bestOver.name + bestOver.bookmaker,
                                         odds: bestOver.price,
                                         desc: `${game.home_team} vs ${game.away_team}`,
@@ -218,8 +221,8 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                   {bestUnder ? (
                                     <button
                                       className={`w-full py-1 rounded ${isTeamSelected(bestUnder.name + bestUnder.bookmaker, selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                                      disabled={!isSoon || !bestUnder.price}
-                                      onClick={() => isSoon && bestUnder.price && toggleSelection({
+                                      disabled={!isBettable || !bestUnder.price}
+                                      onClick={() => isBettable && bestUnder.price && toggleSelection({
                                         team: bestUnder.name + bestUnder.bookmaker,
                                         odds: bestUnder.price,
                                         desc: `${game.home_team} vs ${game.away_team}`,
@@ -255,8 +258,8 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                   {bestHome ? (
                                     <button
                                       className={`w-full py-1 rounded ${isTeamSelected(bestHome.name + bestHome.bookmaker, selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                                      disabled={!isSoon || !bestHome.price}
-                                      onClick={() => isSoon && bestHome.price && toggleSelection({
+                                      disabled={!isBettable || !bestHome.price}
+                                      onClick={() => isBettable && bestHome.price && toggleSelection({
                                         team: bestHome.name + bestHome.bookmaker,
                                         odds: bestHome.price,
                                         desc: `${game.home_team} vs ${game.away_team}`,
@@ -274,8 +277,8 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                   {bestAway ? (
                                     <button
                                       className={`w-full py-1 rounded ${isTeamSelected(bestAway.name + bestAway.bookmaker, selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                                      disabled={!isSoon || !bestAway.price}
-                                      onClick={() => isSoon && bestAway.price && toggleSelection({
+                                      disabled={!isBettable || !bestAway.price}
+                                      onClick={() => isBettable && bestAway.price && toggleSelection({
                                         team: bestAway.name + bestAway.bookmaker,
                                         odds: bestAway.price,
                                         desc: `${game.home_team} vs ${game.away_team}`,
@@ -302,8 +305,8 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                   {bestHome ? (
                                     <button
                                       className={`w-full py-1 rounded ${isTeamSelected(bestHome.name + bestHome.bookmaker, selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                                      disabled={!isSoon || !bestHome.price}
-                                      onClick={() => isSoon && bestHome.price && toggleSelection({
+                                      disabled={!isBettable || !bestHome.price}
+                                      onClick={() => isBettable && bestHome.price && toggleSelection({
                                         team: bestHome.name + bestHome.bookmaker,
                                         odds: bestHome.price,
                                         desc: `${game.home_team} vs ${game.away_team}`,
@@ -321,8 +324,8 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                   {bestAway ? (
                                     <button
                                       className={`w-full py-1 rounded ${isTeamSelected(bestAway.name + bestAway.bookmaker, selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                                      disabled={!isSoon || !bestAway.price}
-                                      onClick={() => isSoon && bestAway.price && toggleSelection({
+                                      disabled={!isBettable || !bestAway.price}
+                                      onClick={() => isBettable && bestAway.price && toggleSelection({
                                         team: bestAway.name + bestAway.bookmaker,
                                         odds: bestAway.price,
                                         desc: `${game.home_team} vs ${game.away_team}`,
@@ -375,7 +378,7 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                   return (
                     <>
                       <button
-                        onClick={() => isSoon && homeBest && toggleSelection({
+                        onClick={() => isBettable && homeBest && toggleSelection({
                           team: homeBest.name + homeBest.bookmaker,
                           odds: homeBest.price,
                           desc: `${game.home_team} vs ${game.away_team}`,
@@ -387,9 +390,9 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                         className={`w-full p-3 rounded-lg text-center transition-colors ${
                           isTeamSelected(homeBest?.name + homeBest?.bookmaker, selectedMarket, game.id)
                             ? 'bg-yellow-500 hover:bg-yellow-600'
-                            : isSoon ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                            : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                         } text-white`}
-                        disabled={!isSoon || !homeBest}
+                        disabled={!isBettable || !homeBest}
                       >
                         <div className="font-bold">
                           {game.home_team}
@@ -397,10 +400,11 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                         <div className="text-sm">
                           {homeBest ? `${homeBest.bookmaker}: ${homeBest.price}` : 'N/A'}
                         </div>
-                        {!isSoon && <div className="text-xs text-red-500 mt-1">준비중</div>}
+                        {!isBettable && !isTooFar && <div className="text-xs text-red-500 mt-1">마감</div>}
+                        {isTooFar && <div className="text-xs text-gray-400 mt-1">오픈 예정</div>}
                       </button>
                       <button
-                        onClick={() => isSoon && awayBest && toggleSelection({
+                        onClick={() => isBettable && awayBest && toggleSelection({
                           team: awayBest.name + awayBest.bookmaker,
                           odds: awayBest.price,
                           desc: `${game.home_team} vs ${game.away_team}`,
@@ -412,9 +416,9 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                         className={`w-full p-3 rounded-lg text-center transition-colors ${
                           isTeamSelected(awayBest?.name + awayBest?.bookmaker, selectedMarket, game.id)
                             ? 'bg-yellow-500 hover:bg-yellow-600'
-                            : isSoon ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                            : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                         } text-white`}
-                        disabled={!isSoon || !awayBest}
+                        disabled={!isBettable || !awayBest}
                       >
                         <div className="font-bold">
                           {game.away_team}
@@ -422,7 +426,8 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                         <div className="text-sm">
                           {awayBest ? `${awayBest.bookmaker}: ${awayBest.price}` : 'N/A'}
                         </div>
-                        {!isSoon && <div className="text-xs text-red-500 mt-1">준비중</div>}
+                        {!isBettable && !isTooFar && <div className="text-xs text-red-500 mt-1">마감</div>}
+                        {isTooFar && <div className="text-xs text-gray-400 mt-1">오픈 예정</div>}
                       </button>
                     </>
                   );

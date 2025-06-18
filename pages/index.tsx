@@ -22,10 +22,7 @@ const sportsTree = {
   농구: ["NBA"],
   야구: ["MLB", "KBO"],
   미식축구: ["NFL"],
-  아이스하키: ["NHL"],
-  격투기: ["UFC"],
-  테니스: ["테니스 ATP", "테니스 WTA"],
-  e스포츠: ["CS2", "LoL", "Dota 2", "Valorant"],
+  아이스하키: ["NHL"]
 };
 
 const sportKeyMap: Record<string, string> = {
@@ -46,14 +43,7 @@ const sportKeyMap: Record<string, string> = {
   MLB: "baseball_mlb",
   KBO: "baseball_kbo",
   NFL: "americanfootball_nfl",
-  NHL: "icehockey_nhl",
-  UFC: "mma_mixed_martial_arts",
-  "테니스 ATP": "tennis_atp_singles",
-  "테니스 WTA": "tennis_wta_singles",
-  CS2: "esports_cs2",
-  LoL: "esports_lol",
-  "Dota 2": "esports_dota2",
-  Valorant: "esports_valorant",
+  NHL: "icehockey_nhl"
 };
 
 const getSportKey = (category: string) => sportKeyMap[category] || "";
@@ -174,7 +164,7 @@ export default function Home() {
             <GameCard 
               key={index}
               teams={`${game.home_team} vs ${game.away_team}`}
-              time={new Date(game.commence_time).toLocaleString()}
+              time={game.commence_time}
               selectedTeam={selectedMatches[`${game.home_team} vs ${game.away_team}`] || ""}
               onSelect={handleSelect}
               bookmakers={game.bookmakers}

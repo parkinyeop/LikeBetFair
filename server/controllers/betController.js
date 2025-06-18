@@ -11,6 +11,24 @@ exports.placeBet = async (req, res) => {
       return res.status(400).json({ message: 'Missing required bet information' });
     }
 
+    // 베팅 가능 시간 체크 (경기 시작 10분 전 마감)
+    const now = new Date();
+    const marginMinutes = 10;
+    const maxDays = 7;
+    const maxDate = new Date(now.getTime() + maxDays * 24 * 60 * 60 * 1000);
+    for (const selection of selections) {
+      if (!selection.commence_time) {
+        return res.status(400).json({ message: `경기 시작 시간이 없는 경기 포함: ${selection.desc}` });
+      }
+      const gameTime = new Date(selection.commence_time);
+      if (gameTime <= new Date(now.getTime() + marginMinutes * 60000)) {
+        return res.status(400).json({ message: `베팅 마감된 경기 포함(10분 전 마감): ${selection.desc}` });
+      }
+      if (gameTime > maxDate) {
+        return res.status(400).json({ message: `너무 먼 미래의 경기 포함(7일 초과): ${selection.desc}` });
+      }
+    }
+
     // Get user and check balance
     const user = await User.findByPk(userId);
     if (!user) {
