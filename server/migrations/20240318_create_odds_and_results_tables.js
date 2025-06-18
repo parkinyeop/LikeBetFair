@@ -63,6 +63,11 @@ module.exports = {
         defaultValue: Sequelize.UUIDV4,
         primaryKey: true
       },
+      eventId: {
+        type: Sequelize.STRING,
+        allowNull: true,
+        unique: true
+      },
       mainCategory: {
         type: Sequelize.STRING,
         allowNull: false

@@ -1,0 +1,257 @@
+const { Sequelize } = require('sequelize');
+require('dotenv').config();
+
+// Sequelize 인스턴스 생성
+const sequelize = new Sequelize({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  database: process.env.DB_NAME,
+  username: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  dialect: 'postgres',
+  logging: false
+});
+
+// Bet 모델 정의
+const Bet = sequelize.define('Bet', {
+  id: {
+    type: Sequelize.UUID,
+    defaultValue: Sequelize.UUIDV4,
+    primaryKey: true
+  },
+  userId: {
+    type: Sequelize.UUID,
+    allowNull: false
+  },
+  selections: {
+    type: Sequelize.JSONB,
+    allowNull: false
+  },
+  stake: {
+    type: Sequelize.DECIMAL(10, 2),
+    allowNull: false
+  },
+  potentialWinnings: {
+    type: Sequelize.DECIMAL(10, 2),
+    allowNull: false
+  },
+  status: {
+    type: Sequelize.ENUM('pending', 'won', 'lost', 'cancelled'),
+    defaultValue: 'pending'
+  }
+}, {
+  tableName: 'Bets',
+  timestamps: true
+});
+
+// GameResult 모델 정의
+const GameResult = sequelize.define('GameResult', {
+  id: {
+    type: Sequelize.UUID,
+    defaultValue: Sequelize.UUIDV4,
+    primaryKey: true
+  },
+  eventId: {
+    type: Sequelize.STRING,
+    allowNull: true,
+    unique: true
+  },
+  mainCategory: {
+    type: Sequelize.STRING,
+    allowNull: false
+  },
+  subCategory: {
+    type: Sequelize.STRING,
+    allowNull: false
+  },
+  homeTeam: {
+    type: Sequelize.STRING,
+    allowNull: false
+  },
+  awayTeam: {
+    type: Sequelize.STRING,
+    allowNull: false
+  },
+  commenceTime: {
+    type: Sequelize.DATE,
+    allowNull: false
+  },
+  status: {
+    type: Sequelize.ENUM('scheduled', 'live', 'finished', 'cancelled'),
+    defaultValue: 'scheduled'
+  },
+  score: {
+    type: Sequelize.JSONB,
+    allowNull: true,
+    defaultValue: null
+  },
+  result: {
+    type: Sequelize.ENUM('home_win', 'away_win', 'draw', 'cancelled', 'pending'),
+    defaultValue: 'pending'
+  },
+  lastUpdated: {
+    type: Sequelize.DATE,
+    allowNull: false,
+    defaultValue: Sequelize.NOW
+  }
+}, {
+  tableName: 'GameResults',
+  timestamps: true
+});
+
+// 스포츠 카테고리 매핑
+const sportCategoryMap = {
+  'Samsung Lions': 'KBO',
+  'KT Wiz': 'KBO',
+  'NC Dinos': 'KBO',
+  'Kia Tigers': 'KBO',
+  'SSG Landers': 'KBO',
+  'Lotte Giants': 'KBO',
+  'Doosan Bears': 'KBO',
+  'Kiwoom Heroes': 'KBO',
+  'Hanwha Eagles': 'KBO',
+  'LG Twins': 'KBO',
+  'Chicago Cubs': 'MLB',
+  'Pittsburgh Pirates': 'MLB'
+};
+
+// 팀명에서 스포츠 카테고리 추정
+function estimateSportCategory(homeTeam, awayTeam) {
+  const allTeams = [homeTeam, awayTeam];
+  
+  for (const team of allTeams) {
+    for (const [teamName, category] of Object.entries(sportCategoryMap)) {
+      if (team.includes(teamName) || teamName.includes(team)) {
+        return category;
+      }
+    }
+  }
+  
+  // 기본값
+  return 'Unknown';
+}
+
+// 경기 설명에서 홈팀과 원정팀 추출
+function extractTeams(desc) {
+  if (!desc || !desc.includes(' vs ')) {
+    return { homeTeam: null, awayTeam: null };
+  }
+  
+  const parts = desc.split(' vs ');
+  if (parts.length !== 2) {
+    return { homeTeam: null, awayTeam: null };
+  }
+  
+  return {
+    homeTeam: parts[0].trim(),
+    awayTeam: parts[1].trim()
+  };
+}
+
+// 메인 함수
+async function updateGameResultsFromBets() {
+  try {
+    console.log('배팅DB에서 경기 정보를 가져와서 GameResults에 저장을 시작합니다...');
+    
+    // 모든 배팅 데이터 가져오기
+    const bets = await Bet.findAll();
+    console.log(`총 ${bets.length}개의 배팅 데이터를 찾았습니다.`);
+    
+    const uniqueGames = new Map();
+    let processedCount = 0;
+    let savedCount = 0;
+    
+    // 각 배팅의 selections에서 고유한 경기 정보 추출
+    for (const bet of bets) {
+      if (!bet.selections || !Array.isArray(bet.selections)) {
+        continue;
+      }
+      
+      for (const selection of bet.selections) {
+        if (!selection.desc) {
+          continue;
+        }
+        
+        const { homeTeam, awayTeam } = extractTeams(selection.desc);
+        if (!homeTeam || !awayTeam) {
+          console.log(`[건너뜀] 팀명 추출 실패: ${selection.desc}`);
+          continue;
+        }
+        
+        // commence_time이 있으면 사용하고, 없으면 오늘 날짜로 설정
+        const commenceTime = selection.commence_time 
+          ? new Date(selection.commence_time)
+          : new Date(); // 오늘 날짜로 설정
+        
+        // 고유한 경기 식별자 생성 (홈팀 + 원정팀 + 시작시간)
+        const gameKey = `${homeTeam}_${awayTeam}_${commenceTime.toISOString().split('T')[0]}`;
+        
+        if (!uniqueGames.has(gameKey)) {
+          uniqueGames.set(gameKey, {
+            homeTeam,
+            awayTeam,
+            commenceTime,
+            desc: selection.desc
+          });
+        }
+      }
+    }
+    
+    console.log(`고유한 경기 ${uniqueGames.size}개를 찾았습니다.`);
+    
+    // 각 고유한 경기에 대해 GameResults에 저장
+    for (const [gameKey, gameInfo] of uniqueGames) {
+      try {
+        // 이미 존재하는지 확인
+        const existingGame = await GameResult.findOne({
+          where: {
+            homeTeam: gameInfo.homeTeam,
+            awayTeam: gameInfo.awayTeam,
+            commenceTime: gameInfo.commenceTime
+          }
+        });
+        
+        if (existingGame) {
+          console.log(`[이미 존재] ${gameInfo.homeTeam} vs ${gameInfo.awayTeam} (${gameInfo.commenceTime.toISOString().split('T')[0]})`);
+          continue;
+        }
+        
+        // 스포츠 카테고리 추정
+        const mainCategory = estimateSportCategory(gameInfo.homeTeam, gameInfo.awayTeam);
+        
+        // GameResults에 저장
+        await GameResult.create({
+          mainCategory,
+          subCategory: mainCategory, // 기본값으로 mainCategory 사용
+          homeTeam: gameInfo.homeTeam,
+          awayTeam: gameInfo.awayTeam,
+          commenceTime: gameInfo.commenceTime,
+          status: 'scheduled',
+          result: 'pending',
+          lastUpdated: new Date()
+        });
+        
+        console.log(`[저장 성공] ${gameInfo.homeTeam} vs ${gameInfo.awayTeam} (${gameInfo.commenceTime.toISOString().split('T')[0]}) - ${mainCategory}`);
+        savedCount++;
+        
+      } catch (error) {
+        console.error(`[저장 실패] ${gameInfo.homeTeam} vs ${gameInfo.awayTeam}:`, error.message);
+      }
+      
+      processedCount++;
+    }
+    
+    console.log(`\n=== 처리 완료 ===`);
+    console.log(`처리된 경기: ${processedCount}개`);
+    console.log(`새로 저장된 경기: ${savedCount}개`);
+    console.log(`총 GameResults: ${await GameResult.count()}개`);
+    
+  } catch (error) {
+    console.error('오류 발생:', error);
+  } finally {
+    await sequelize.close();
+  }
+}
+
+// 스크립트 실행
+updateGameResultsFromBets(); 

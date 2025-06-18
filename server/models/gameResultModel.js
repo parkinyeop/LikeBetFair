@@ -1,22 +1,16 @@
 const { DataTypes } = require('sequelize');
-const { Sequelize } = require('sequelize');
-require('dotenv').config();
-
-const sequelize = new Sequelize({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  username: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  dialect: 'postgres',
-  logging: false
-});
+const sequelize = require('./sequelize');
 
 const GameResult = sequelize.define('GameResult', {
   id: {
     type: DataTypes.UUID,
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true
+  },
+  eventId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    unique: true
   },
   mainCategory: {
     type: DataTypes.STRING,
@@ -59,6 +53,9 @@ const GameResult = sequelize.define('GameResult', {
 }, {
   timestamps: true,
   indexes: [
+    {
+      fields: ['eventId']
+    },
     {
       fields: ['mainCategory', 'subCategory']
     },

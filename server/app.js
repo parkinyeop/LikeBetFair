@@ -40,7 +40,7 @@ app.use(express.json());
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/bet', require('./routes/bet'));
 app.use('/api', oddsRoutes);
-app.use('/api', gameResultRoutes);
+app.use('/api/game-results', gameResultRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -56,6 +56,22 @@ app.use((err, req, res, next) => {
 
 // 스케줄러 초기화
 require('./jobs/oddsUpdateJob');
+
+// 배팅 결과 업데이트 스케줄러 추가
+const betResultService = require('./services/betResultService');
+
+// 5분마다 배팅 결과 업데이트
+setInterval(async () => {
+  try {
+    console.log('[Scheduler] Updating bet results...');
+    const result = await betResultService.updateBetResults();
+    if (result.updatedCount > 0) {
+      console.log(`[Scheduler] Updated ${result.updatedCount} bet results`);
+    }
+  } catch (error) {
+    console.error('[Scheduler] Error updating bet results:', error);
+  }
+}, 5 * 60 * 1000); // 5분
 
 // 데이터베이스 연결 및 서버 시작
 const PORT = process.env.PORT || 5050;

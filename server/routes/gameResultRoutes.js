@@ -1,17 +1,156 @@
 const express = require('express');
 const router = express.Router();
 const gameResultService = require('../services/gameResultService');
+const oddsApiService = require('../services/oddsApiService');
+const { getHealthStatus, updateActiveCategories, getActiveCategories } = require('../jobs/oddsUpdateJob');
 
-// 모든 게임 결과 가져오기
-router.get('/results', async (req, res) => {
+// 스케줄러 상태 조회
+router.get('/scheduler/status', (req, res) => {
+  try {
+    const status = getHealthStatus();
+    res.json(status);
+  } catch (error) {
+    console.error('Error getting scheduler status:', error);
+    res.status(500).json({ error: 'Failed to get scheduler status' });
+  }
+});
+
+// 활성 카테고리 조회
+router.get('/active-categories', (req, res) => {
+  try {
+    const activeCategories = getActiveCategories();
+    res.json({ activeCategories });
+  } catch (error) {
+    console.error('Error getting active categories:', error);
+    res.status(500).json({ error: 'Failed to get active categories' });
+  }
+});
+
+// 활성 카테고리 업데이트
+router.put('/active-categories', (req, res) => {
+  try {
+    const { categories } = req.body;
+    if (!categories || !Array.isArray(categories)) {
+      return res.status(400).json({ error: 'Categories array is required' });
+    }
+    
+    updateActiveCategories(categories);
+    res.json({ 
+      message: 'Active categories updated successfully', 
+      activeCategories: categories,
+      costOptimization: {
+        estimatedApiCalls: `~${categories.length * 2} calls per hour`,
+        savings: `~${Math.round((1 - categories.length / 13) * 100)}% reduction in API calls`
+      }
+    });
+  } catch (error) {
+    console.error('Error updating active categories:', error);
+    res.status(500).json({ error: 'Failed to update active categories' });
+  }
+});
+
+// 누락된 경기 결과 수집
+router.post('/collect-missing-results', async (req, res) => {
+  try {
+    const result = await gameResultService.collectMissingGameResults();
+    res.json({
+      message: 'Missing game results collection completed',
+      ...result
+    });
+  } catch (error) {
+    console.error('Error collecting missing game results:', error);
+    res.status(500).json({ error: 'Failed to collect missing game results' });
+  }
+});
+
+// 데이터베이스 통계
+router.get('/stats', async (req, res) => {
+  try {
+    const stats = await gameResultService.getDatabaseStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('Error getting database stats:', error);
+    res.status(500).json({ error: 'Failed to get database stats' });
+  }
+});
+
+// API 비용 추정
+router.get('/cost-estimate', async (req, res) => {
+  try {
+    const costEstimate = await gameResultService.getApiCostEstimate();
+    res.json(costEstimate);
+  } catch (error) {
+    console.error('Error getting cost estimate:', error);
+    res.status(500).json({ error: 'Failed to get cost estimate' });
+  }
+});
+
+// 배당률 조회
+router.get('/odds', async (req, res) => {
+  try {
+    const { mainCategory, subCategory, limit = 100 } = req.query;
+    const odds = await oddsApiService.getOdds(mainCategory, subCategory, parseInt(limit));
+    res.json(odds);
+  } catch (error) {
+    console.error('Error fetching odds:', error);
+    res.status(500).json({ error: 'Failed to fetch odds' });
+  }
+});
+
+// 배당률 수동 업데이트
+router.post('/odds/update', async (req, res) => {
+  try {
+    await oddsApiService.fetchAndCacheOdds();
+    res.json({ message: 'Odds updated successfully' });
+  } catch (error) {
+    console.error('Error updating odds:', error);
+    res.status(500).json({ error: 'Failed to update odds' });
+  }
+});
+
+// 활성 카테고리 배당률만 업데이트 (비용 절약용)
+router.post('/odds/update/active', async (req, res) => {
+  try {
+    const { categories } = req.body;
+    if (!categories || !Array.isArray(categories)) {
+      return res.status(400).json({ error: 'Categories array is required' });
+    }
+    
+    await oddsApiService.fetchAndCacheOddsForCategories(categories);
+    res.json({ message: 'Active categories odds updated successfully', categories });
+  } catch (error) {
+    console.error('Error updating active categories odds:', error);
+    res.status(500).json({ error: 'Failed to update active categories odds' });
+  }
+});
+
+// 배당률 통계
+router.get('/odds/stats', async (req, res) => {
+  try {
+    const stats = await oddsApiService.getOddsStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('Error getting odds stats:', error);
+    res.status(500).json({ error: 'Failed to get odds stats' });
+  }
+});
+
+// 배당률 비용 추정
+router.get('/odds/cost-estimate', async (req, res) => {
+  try {
+    const costEstimate = await oddsApiService.getApiCostEstimate();
+    res.json(costEstimate);
+  } catch (error) {
+    console.error('Error getting odds cost estimate:', error);
+    res.status(500).json({ error: 'Failed to get odds cost estimate' });
+  }
+});
+
+// 모든 게임 결과 조회
+router.get('/', async (req, res) => {
   try {
     const { mainCategory, subCategory, status, limit = 100 } = req.query;
-    const results = await gameResultService.getGameResults(
-      mainCategory,
-      subCategory,
-      status,
-      parseInt(limit)
-    );
+    const results = await gameResultService.getGameResults(mainCategory, subCategory, status, parseInt(limit));
     res.json(results);
   } catch (error) {
     console.error('Error fetching game results:', error);
@@ -19,11 +158,10 @@ router.get('/results', async (req, res) => {
   }
 });
 
-// 특정 게임의 결과 가져오기
-router.get('/results/:gameId', async (req, res) => {
+// 특정 게임 결과 조회
+router.get('/:id', async (req, res) => {
   try {
-    const { gameId } = req.params;
-    const result = await gameResultService.getGameResultById(gameId);
+    const result = await gameResultService.getGameResultById(req.params.id);
     if (!result) {
       return res.status(404).json({ error: 'Game result not found' });
     }
@@ -34,26 +172,184 @@ router.get('/results/:gameId', async (req, res) => {
   }
 });
 
-// 게임 결과 업데이트 (관리자용)
-router.put('/results/:gameId', async (req, res) => {
+// 게임 결과 수동 업데이트
+router.post('/update', async (req, res) => {
   try {
-    const { gameId } = req.params;
-    const updateData = req.body;
-    
-    // 허용된 필드만 업데이트
-    const allowedFields = ['status', 'score', 'result'];
-    const filteredUpdateData = Object.keys(updateData)
-      .filter(key => allowedFields.includes(key))
-      .reduce((obj, key) => {
-        obj[key] = updateData[key];
-        return obj;
-      }, {});
-
-    const updatedGame = await gameResultService.updateGameResult(gameId, filteredUpdateData);
-    res.json(updatedGame);
+    await gameResultService.fetchAndUpdateResults();
+    res.json({ message: 'Game results updated successfully' });
   } catch (error) {
-    console.error('Error updating game result:', error);
-    res.status(500).json({ error: 'Failed to update game result' });
+    console.error('Error updating game results:', error);
+    res.status(500).json({ error: 'Failed to update game results' });
+  }
+});
+
+// 활성 카테고리만 업데이트 (비용 절약용)
+router.post('/update/active', async (req, res) => {
+  try {
+    const { categories } = req.body;
+    if (!categories || !Array.isArray(categories)) {
+      return res.status(400).json({ error: 'Categories array is required' });
+    }
+    
+    await gameResultService.fetchAndUpdateResultsForCategories(categories);
+    res.json({ message: 'Active categories updated successfully', categories });
+  } catch (error) {
+    console.error('Error updating active categories:', error);
+    res.status(500).json({ error: 'Failed to update active categories' });
+  }
+});
+
+// 특정 스포츠의 최근 경기 결과 조회
+router.get('/recent/:mainCategory', async (req, res) => {
+  try {
+    const { mainCategory } = req.params;
+    const { days = 7 } = req.query;
+    const results = await gameResultService.fetchRecentResults(mainCategory, parseInt(days));
+    res.json(results);
+  } catch (error) {
+    console.error('Error fetching recent results:', error);
+    res.status(500).json({ error: 'Failed to fetch recent results' });
+  }
+});
+
+// 데이터베이스 통계 조회
+router.get('/stats/summary', async (req, res) => {
+  try {
+    const stats = await gameResultService.getDatabaseStats();
+    
+    // 통계 데이터 정리
+    const summary = {
+      total: 0,
+      byCategory: {},
+      byStatus: {},
+      byResult: {},
+      lastUpdate: getHealthStatus()
+    };
+
+    stats.forEach(stat => {
+      const count = parseInt(stat.count);
+      summary.total += count;
+
+      // 카테고리별 통계
+      const categoryKey = `${stat.mainCategory}_${stat.subCategory}`;
+      if (!summary.byCategory[categoryKey]) {
+        summary.byCategory[categoryKey] = 0;
+      }
+      summary.byCategory[categoryKey] += count;
+
+      // 상태별 통계
+      if (!summary.byStatus[stat.status]) {
+        summary.byStatus[stat.status] = 0;
+      }
+      summary.byStatus[stat.status] += count;
+
+      // 결과별 통계
+      if (!summary.byResult[stat.result]) {
+        summary.byResult[stat.result] = 0;
+      }
+      summary.byResult[stat.result] += count;
+    });
+
+    res.json(summary);
+  } catch (error) {
+    console.error('Error fetching database stats:', error);
+    res.status(500).json({ error: 'Failed to fetch database stats' });
+  }
+});
+
+// 특정 카테고리별 상세 통계
+router.get('/stats/category/:mainCategory', async (req, res) => {
+  try {
+    const { mainCategory } = req.params;
+    const { subCategory } = req.query;
+    
+    const whereClause = { mainCategory };
+    if (subCategory) {
+      whereClause.subCategory = subCategory;
+    }
+
+    const results = await gameResultService.getGameResults(mainCategory, subCategory);
+    
+    const stats = {
+      total: results.length,
+      byStatus: {},
+      byResult: {},
+      bySubCategory: {},
+      recentGames: results.slice(0, 10) // 최근 10경기
+    };
+
+    results.forEach(game => {
+      // 상태별 통계
+      if (!stats.byStatus[game.status]) {
+        stats.byStatus[game.status] = 0;
+      }
+      stats.byStatus[game.status]++;
+
+      // 결과별 통계
+      if (!stats.byResult[game.result]) {
+        stats.byResult[game.result] = 0;
+      }
+      stats.byResult[game.result]++;
+
+      // 서브카테고리별 통계
+      if (!stats.bySubCategory[game.subCategory]) {
+        stats.bySubCategory[game.subCategory] = 0;
+      }
+      stats.bySubCategory[game.subCategory]++;
+    });
+
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching category stats:', error);
+    res.status(500).json({ error: 'Failed to fetch category stats' });
+  }
+});
+
+// 데이터 검증 및 정리
+router.post('/cleanup', async (req, res) => {
+  try {
+    await gameResultService.cleanupOldData();
+    res.json({ message: 'Data cleanup completed successfully' });
+  } catch (error) {
+    console.error('Error during data cleanup:', error);
+    res.status(500).json({ error: 'Failed to cleanup data' });
+  }
+});
+
+// 경기 결과 조회
+router.get('/results', async (req, res) => {
+  try {
+    const { mainCategory, subCategory, status, limit = 100 } = req.query;
+    const results = await gameResultService.getGameResults(mainCategory, subCategory, status, parseInt(limit));
+    res.json(results);
+  } catch (error) {
+    console.error('Error fetching game results:', error);
+    res.status(500).json({ error: 'Failed to fetch game results' });
+  }
+});
+
+// 특정 경기 결과 조회
+router.get('/results/:id', async (req, res) => {
+  try {
+    const result = await gameResultService.getGameResultById(req.params.id);
+    if (!result) {
+      return res.status(404).json({ error: 'Game result not found' });
+    }
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching game result:', error);
+    res.status(500).json({ error: 'Failed to fetch game result' });
+  }
+});
+
+// 경기 결과 수동 업데이트
+router.post('/results/update', async (req, res) => {
+  try {
+    await gameResultService.fetchAndUpdateResults();
+    res.json({ message: 'Game results updated successfully' });
+  } catch (error) {
+    console.error('Error updating game results:', error);
+    res.status(500).json({ error: 'Failed to update game results' });
   }
 });
 

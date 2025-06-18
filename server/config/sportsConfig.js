@@ -3,26 +3,22 @@ const sportsConfig = {
     key: 'soccer_usa_mls',
     title: 'Football',
     subcategories: {
-      'mls': 'Major League Soccer',
+      'k-league': 'K League 1 - South Korea',
+      'j-league': 'J League - Japan',
       'serie-a': 'Serie A - Italy',
-      'la-liga': 'La Liga 2 - Spain',
-      'j-league': 'J League',
-      'k-league': 'K League 1',
       'brazil': 'Brazil Série A',
+      'mls': 'Major League Soccer',
       'argentina': 'Primera División - Argentina',
       'china': 'Super League - China',
-      'sweden': 'Allsvenskan - Sweden',
-      'copa-libertadores': 'Copa Libertadores',
-      'copa-sudamericana': 'Copa Sudamericana',
-      'concacaf-gold-cup': 'CONCACAF Gold Cup'
+      'spain-2nd': 'La Liga 2 - Spain',
+      'sweden': 'Allsvenskan - Sweden'
     }
   },
   basketball: {
     key: 'basketball_nba',
     title: 'Basketball',
     subcategories: {
-      'nba': 'NBA',
-      'wnba': 'WNBA'
+      'nba': 'NBA'
     }
   },
   baseball: {
@@ -30,25 +26,43 @@ const sportsConfig = {
     title: 'Baseball',
     subcategories: {
       'mlb': 'Major League Baseball',
-      'kbo': 'KBO League',
-      'ncaa': 'NCAA Baseball'
+      'kbo': 'KBO League - South Korea'
     }
   },
   icehockey: {
     key: 'icehockey_nhl',
     title: 'Ice Hockey',
     subcategories: {
-      'nhl': 'NHL'
+      'nhl': 'NHL',
+      'ahl': 'AHL',
+      'khl': 'KHL'
     }
   },
   americanfootball: {
     key: 'americanfootball_nfl',
     title: 'American Football',
     subcategories: {
-      'nfl': 'NFL',
-      'nfl-preseason': 'NFL Preseason',
-      'ncaaf': 'NCAA Football',
-      'cfl': 'CFL'
+      'nfl': 'NFL'
+    }
+  },
+  tennis: {
+    key: 'tennis_atp_singles',
+    title: 'Tennis',
+    subcategories: {
+      'atp': 'ATP Tour',
+      'wta': 'WTA Tour',
+      'grand-slam': 'Grand Slam',
+      'davis-cup': 'Davis Cup'
+    }
+  },
+  esports: {
+    key: 'esports_cs2',
+    title: 'Esports',
+    subcategories: {
+      'cs2': 'Counter-Strike 2',
+      'lol': 'League of Legends',
+      'dota2': 'Dota 2',
+      'valorant': 'Valorant'
     }
   }
 };

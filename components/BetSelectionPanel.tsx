@@ -47,6 +47,8 @@ const BetSelectionPanel = () => {
         setMessage('베팅이 성공적으로 저장되었습니다!');
         if (data.balance !== undefined) setBalance(Number(data.balance));
         clearAll();
+        // 배팅 완료 이벤트 발생
+        window.dispatchEvent(new Event('betPlaced'));
       } else {
         setMessage(data.message || '베팅 저장 실패');
       }

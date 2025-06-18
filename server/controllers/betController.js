@@ -46,13 +46,61 @@ exports.placeBet = async (req, res) => {
 exports.getBetHistory = async (req, res) => {
   try {
     const userId = req.user.userId;
+    console.log(`[getBetHistory] User ${userId} requesting bet history`);
+    
     const bets = await Bet.findAll({
       where: { userId },
       order: [['createdAt', 'DESC']]
     });
-    res.json(bets);
+
+    console.log(`[getBetHistory] Found ${bets.length} bets for user ${userId}`);
+
+    // 각 배팅의 selections에 경기 결과 정보 업데이트
+    const updatedBets = await Promise.all(bets.map(async (bet) => {
+      if (bet.status === 'pending' && Array.isArray(bet.selections)) {
+        console.log(`[getBetHistory] Processing pending bet ${bet.id} with ${bet.selections.length} selections`);
+        
+        const betResultService = require('../services/betResultService');
+        const updatedSelections = await Promise.all(bet.selections.map(async (selection) => {
+          console.log(`[getBetHistory] Checking result for game: ${selection.desc}`);
+          
+          // 경기 결과 조회
+          const gameResult = await betResultService.getGameResultByTeams(selection);
+          
+          if (gameResult) {
+            console.log(`[getBetHistory] Found game result for ${selection.desc}: status=${gameResult.status}, result=${gameResult.result}`);
+            
+            if (gameResult.status === 'finished') {
+              // 경기가 완료된 경우 결과 판정
+              const selectionResult = betResultService.determineSelectionResult(selection, gameResult);
+              console.log(`[getBetHistory] Selection result for ${selection.desc}: ${selectionResult}`);
+              
+              return {
+                ...selection,
+                result: selectionResult
+              };
+            }
+          } else {
+            console.log(`[getBetHistory] No game result found for ${selection.desc}`);
+          }
+          
+          return selection;
+        }));
+
+        // 업데이트된 selections로 bet 객체 복사
+        return {
+          ...bet.toJSON(),
+          selections: updatedSelections
+        };
+      }
+      
+      return bet.toJSON();
+    }));
+
+    console.log(`[getBetHistory] Returning ${updatedBets.length} updated bets`);
+    res.json(updatedBets);
   } catch (err) {
-    console.error(err);
+    console.error('[getBetHistory] Error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
