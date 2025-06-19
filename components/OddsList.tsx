@@ -61,15 +61,24 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
           return gameTime > now;
         });
         
+        // 중복 게임 제거 (home_team, away_team, commence_time 기준)
+        const uniqueGamesMap = new Map();
+        filteredGames.forEach((game: Game) => {
+          const key = `${game.home_team}|${game.away_team}|${game.commence_time}`;
+          if (!uniqueGamesMap.has(key)) {
+            uniqueGamesMap.set(key, game);
+          }
+        });
+        const uniqueGames = Array.from(uniqueGamesMap.values());
         // 시작 시간순으로 정렬
-        filteredGames.sort((a: Game, b: Game) => {
+        uniqueGames.sort((a: Game, b: Game) => {
           return new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime();
         });
 
         if (sportKey === "baseball_kbo" && filteredGames.length > 0) {
           console.log("KBO 상세 bookmakers 구조 sample:", JSON.stringify(filteredGames[0].bookmakers, null, 2));
         }
-        setGames(filteredGames);
+        setGames(uniqueGames);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch odds');
@@ -100,6 +109,14 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
     return (
       <div className="text-center text-red-500 p-4">
         Error: {error}
+      </div>
+    );
+  }
+
+  if (games.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        해당 리그의 경기 데이터가 없습니다.
       </div>
     );
   }

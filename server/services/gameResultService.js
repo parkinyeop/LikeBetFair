@@ -23,29 +23,73 @@ const clientSportKeyMap = {
 // TheSportsDB 리그ID 매핑 (배당율을 제공하는 실제 스포츠 카테고리)
 const sportsDbLeagueMap = {
   // 축구 (Football)
-  'k-league': '4689',      // K리그
-  'mls': '4346',           // MLS
-  'serie-a': '4332',       // 세리에 A
-  'j-league': '4340',      // J리그
-  'la-liga': '4335',       // 라리가
-  'brazil': '4364',        // 브라질 세리에 A
-  'argentina': '4367',     // 아르헨티나 프리메라
-  
-  // 야구 (Baseball)
-  'mlb': '4424',           // MLB
-  'kbo': '4830',           // KBO (수정)
-  
+  'soccer_korea_kleague1': '4689',      // K리그
+  'soccer_japan_j_league': '4340',      // J리그
+  'soccer_italy_serie_a': '4332',       // 세리에 A
+  'soccer_brazil_campeonato': '4364',   // 브라질 세리에 A
+  'soccer_usa_mls': '4346',             // MLS
+  'soccer_argentina_primera_division': '4367', // 아르헨티나 프리메라
+  'soccer_china_superleague': '4688',   // 중국 슈퍼리그
+  'soccer_spain_segunda_division': '4396', // 스페인 2부
+  'soccer_sweden_allsvenskan': '4429',  // 스웨덴 알스벤스칸
   // 농구 (Basketball)
-  'nba': '4387',           // NBA
-  
+  'basketball_nba': '4387',             // NBA
+  'basketball_wnba': null,              // WNBA (TheSportsDB 미지원)
+  // 야구 (Baseball)
+  'baseball_mlb': '4424',               // MLB
+  'baseball_kbo': '4830',               // KBO
   // 미식축구 (American Football)
-  'nfl': '4391',           // NFL
-  
+  'americanfootball_cfl': null,         // CFL (TheSportsDB 미지원)
+  'americanfootball_ncaaf': null,       // NCAAF (TheSportsDB 미지원)
+  'americanfootball_nfl': '4391',       // NFL
+  'americanfootball_nfl_preseason': null, // NFL 프리시즌 (TheSportsDB 미지원)
   // 아이스하키 (Ice Hockey)
-  'nhl': '4380'            // NHL
+  'icehockey_nhl': '4380'               // NHL
 };
 
 const API_KEY = process.env.THESPORTSDB_API_KEY || '123';
+
+// 표준화된 카테고리 매핑
+const standardizedCategoryMap = {
+  // 축구
+  'soccer_korea_kleague1': { main: 'soccer', sub: 'kleague1' },
+  'soccer_japan_j_league': { main: 'soccer', sub: 'j_league' },
+  'soccer_italy_serie_a': { main: 'soccer', sub: 'serie_a' },
+  'soccer_brazil_campeonato': { main: 'soccer', sub: 'brasileirao' },
+  'soccer_usa_mls': { main: 'soccer', sub: 'mls' },
+  'soccer_argentina_primera_division': { main: 'soccer', sub: 'primera' },
+  'soccer_china_superleague': { main: 'soccer', sub: 'csl' },
+  'soccer_spain_segunda_division': { main: 'soccer', sub: 'laliga2' },
+  'soccer_sweden_allsvenskan': { main: 'soccer', sub: 'allsvenskan' },
+  
+  // 농구
+  'basketball_nba': { main: 'basketball', sub: 'nba' },
+  'basketball_wnba': { main: 'basketball', sub: 'wnba' },
+  
+  // 야구
+  'baseball_mlb': { main: 'baseball', sub: 'mlb' },
+  'baseball_kbo': { main: 'baseball', sub: 'kbo' },
+  
+  // 미식축구
+  'americanfootball_nfl': { main: 'football', sub: 'nfl' },
+  'americanfootball_ncaaf': { main: 'football', sub: 'ncaaf' },
+  'americanfootball_cfl': { main: 'football', sub: 'cfl' },
+  
+  // 아이스하키
+  'icehockey_nhl': { main: 'hockey', sub: 'nhl' },
+  'icehockey_khl': { main: 'hockey', sub: 'khl' },
+  'icehockey_ahl': { main: 'hockey', sub: 'ahl' }
+};
+
+// 스포츠키로부터 표준화된 카테고리 얻기
+function getStandardizedCategory(sportKey) {
+  const category = standardizedCategoryMap[sportKey];
+  if (!category) {
+    console.warn(`[카테고리 매핑] 알 수 없는 스포츠키: ${sportKey}, 기본값 사용`);
+    return { main: 'other', sub: 'other' };
+  }
+  return category;
+}
 
 class GameResultService {
   constructor() {
@@ -103,33 +147,44 @@ class GameResultService {
 
       // 팀명으로 스포츠 카테고리 추정
       const sportCategory = this.estimateSportCategory(homeTeam, awayTeam);
+      console.log(`\n[결과수집] 경기: ${desc}`);
+      console.log(`[결과수집] 추정된 카테고리: ${sportCategory}`);
+
       const sportKey = this.getSportKeyForCategory(sportCategory);
+      console.log(`[결과수집] API 스포츠키: ${sportKey}`);
 
       if (!sportKey) {
         console.log(`Could not determine sport key for game: ${desc}`);
         return false;
       }
 
-      console.log(`Collecting result for ${desc} (${sportKey})...`);
-
       // API에서 경기 결과 조회
-      const resultsResponse = await axios.get(`${this.baseUrl}/${sportKey}/scores`, {
+      const apiUrl = `${this.baseUrl}/${sportKey}/scores`;
+      console.log(`[결과수집] API 요청: ${apiUrl}`);
+
+      const resultsResponse = await axios.get(apiUrl, {
         params: {
           apiKey: this.apiKey,
           daysFrom: 30 // 최근 30일간의 데이터
         }
       });
 
+      console.log(`[결과수집] API 응답 데이터 수: ${resultsResponse.data.length}개`);
+
       // 해당 팀들의 경기 찾기
       const matchingGame = resultsResponse.data.find(gameData => {
-        return (gameData.home_team === homeTeam && gameData.away_team === awayTeam) ||
-               (gameData.home_team === awayTeam && gameData.away_team === homeTeam);
+        const isMatch = (gameData.home_team === homeTeam && gameData.away_team === awayTeam) ||
+                       (gameData.home_team === awayTeam && gameData.away_team === homeTeam);
+        if (isMatch) {
+          console.log(`[결과수집] 매칭된 경기 발견: ${gameData.home_team} vs ${gameData.away_team}`);
+        }
+        return isMatch;
       });
 
       if (matchingGame) {
         // 경기 결과 저장
-        const mainCategory = this.determineMainCategory(sportCategory);
-        const subCategory = this.determineSubCategory(sportCategory);
+        const mainCategory = this.determineMainCategory(sportKey);
+        const subCategory = this.determineSubCategory(sportKey);
         
         await GameResult.upsert({
           mainCategory,
@@ -143,14 +198,19 @@ class GameResultService {
           lastUpdated: new Date()
         });
 
-        console.log(`Successfully collected result for ${desc}`);
+        console.log(`[결과수집] 성공: ${desc} 결과 저장 완료`);
         return true;
       } else {
-        console.log(`No matching game found for ${desc}`);
+        console.log(`[결과수집] 실패: API 응답에서 ${desc} 경기를 찾을 수 없음`);
+        // API 응답의 첫 번째 경기 데이터 형식 출력
+        if (resultsResponse.data.length > 0) {
+          console.log(`[결과수집] API 응답 데이터 형식 예시:`, 
+            JSON.stringify(resultsResponse.data[0], null, 2));
+        }
         return false;
       }
     } catch (error) {
-      console.error(`Error collecting game result for ${game.desc}:`, error.message);
+      console.error(`[결과수집] 오류 발생 (${game.desc}):`, error.message);
       return false;
     }
   }
@@ -172,6 +232,12 @@ class GameResultService {
       'Los Angeles Dodgers', 'San Francisco Giants', 'St. Louis Cardinals'
     ];
 
+    const chineseSuperLeagueTeams = [
+      'Henan FC', 'Shanghai SIPG FC', 'Shenzhen Peng City FC', 
+      'Wuhan Three Towns', 'Beijing Guoan', 'Guangzhou FC',
+      'Shandong Taishan', 'Changchun Yatai'
+    ];
+
     // KBO 팀 확인
     if (koreanBaseballTeams.includes(homeTeam) || koreanBaseballTeams.includes(awayTeam)) {
       return 'KBO';
@@ -182,25 +248,43 @@ class GameResultService {
       return 'K리그';
     }
 
+    // 중국 슈퍼리그 팀 확인
+    if (chineseSuperLeagueTeams.includes(homeTeam) || chineseSuperLeagueTeams.includes(awayTeam)) {
+      return '중국 슈퍼리그';
+    }
+
     // MLB 팀 확인
     if (mlbTeams.includes(homeTeam) || mlbTeams.includes(awayTeam)) {
       return 'MLB';
     }
 
+    console.log(`Unknown teams: ${homeTeam} vs ${awayTeam}`);
     return 'unknown';
   }
 
   // 카테고리별 스포츠 키 반환
   getSportKeyForCategory(category) {
-    const categoryMap = {
-      'KBO': 'baseball_kbo',
+    const map = {
       'K리그': 'soccer_korea_kleague1',
-      'MLB': 'baseball_mlb',
+      'J리그': 'soccer_japan_j_league',
+      '세리에 A': 'soccer_italy_serie_a',
+      '브라질 세리에 A': 'soccer_brazil_campeonato',
+      'MLS': 'soccer_usa_mls',
+      '아르헨티나 프리메라': 'soccer_argentina_primera_division',
+      '중국 슈퍼리그': 'soccer_china_superleague',
+      '스페인 2부': 'soccer_spain_segunda_division',
+      '스웨덴 알스벤스칸': 'soccer_sweden_allsvenskan',
       'NBA': 'basketball_nba',
-      'NFL': 'americanfootball_nfl'
+      'WNBA': 'basketball_wnba',
+      'MLB': 'baseball_mlb',
+      'KBO': 'baseball_kbo',
+      'CFL': 'americanfootball_cfl',
+      'NCAAF': 'americanfootball_ncaaf',
+      'NFL': 'americanfootball_nfl',
+      'NFL 프리시즌': 'americanfootball_nfl_preseason',
+      'NHL': 'icehockey_nhl'
     };
-
-    return categoryMap[category] || null;
+    return map[category] || null;
   }
 
   // 활성 카테고리만 업데이트 (비용 절약용)
@@ -228,8 +312,8 @@ class GameResultService {
             
             for (const event of resultsResponse.data.events) {
               if (this.validateGameData(event)) {
-                const mainCategory = this.determineMainCategory(clientCategory);
-                const subCategory = this.determineSubCategory(clientCategory);
+                const mainCategory = this.determineMainCategory(sportKey);
+                const subCategory = this.determineSubCategory(sportKey);
                 
                 await GameResult.upsert({
                   mainCategory,
@@ -265,13 +349,13 @@ class GameResultService {
 
   // TheSportsDB 리그 ID 반환
   getSportsDbLeagueId(clientCategory) {
-    const categoryMap = {
-      'KBO': '4830', // KBO (수정)
-      'MLB': '4424', 
-      'NBA': '4387',
-      'NFL': '4391'
-    };
-    return categoryMap[clientCategory] || null;
+    const sportKey = this.getSportKeyForCategory(clientCategory);
+    return this.getSportsDbLeagueIdBySportKey(sportKey);
+  }
+
+  // TheSportsDB 리그ID 반환 (clientSportKeyMap과 1:1)
+  getSportsDbLeagueIdBySportKey(sportKey) {
+    return sportsDbLeagueMap[sportKey] || null;
   }
 
   // 전체 카테고리 업데이트 (기존 메서드)
@@ -297,8 +381,8 @@ class GameResultService {
           // 데이터 검증 및 저장
           for (const game of resultsResponse.data) {
             if (this.validateGameData(game)) {
-              const mainCategory = this.determineMainCategory(clientCategory);
-              const subCategory = this.determineSubCategory(clientCategory);
+              const mainCategory = this.determineMainCategory(sportKey);
+              const subCategory = this.determineSubCategory(sportKey);
               
               await GameResult.upsert({
                 mainCategory,
@@ -330,37 +414,12 @@ class GameResultService {
     }
   }
 
-  determineMainCategory(clientCategory) {
-    if (['K리그', 'J리그', '세리에 A', '브라질 세리에 A', 'MLS', '아르헨티나 프리메라', '중국 슈퍼리그', '스페인 2부', '스웨덴 알스벤스칸'].includes(clientCategory)) {
-      return 'football';
-    } else if (clientCategory === 'NBA') {
-      return 'basketball';
-    } else if (['MLB', 'KBO'].includes(clientCategory)) {
-      return 'baseball';
-    } else if (clientCategory === 'NFL') {
-      return 'americanfootball';
-    }
-    return 'other';
+  determineMainCategory(sportKey) {
+    return getStandardizedCategory(sportKey).main;
   }
 
-  determineSubCategory(clientCategory) {
-    const categoryMap = {
-      'K리그': 'k-league',
-      'J리그': 'j-league',
-      '세리에 A': 'serie-a',
-      '브라질 세리에 A': 'brazil',
-      'MLS': 'mls',
-      '아르헨티나 프리메라': 'argentina',
-      '중국 슈퍼리그': 'china',
-      '스페인 2부': 'spain-2nd',
-      '스웨덴 알스벤스칸': 'sweden',
-      'NBA': 'nba',
-      'MLB': 'mlb',
-      'KBO': 'kbo',
-      'NFL': 'nfl'
-    };
-    
-    return categoryMap[clientCategory] || 'other';
+  determineSubCategory(sportKey) {
+    return getStandardizedCategory(sportKey).sub;
   }
 
   validateGameData(game) {
@@ -768,6 +827,7 @@ setInterval(async () => {
 // 배팅 결과 업데이트 스케줄러 추가
 const betResultService = require('./betResultService');
 
-module.exports = new GameResultService();
+const gameResultService = new GameResultService();
+module.exports = gameResultService;
 module.exports.fetchAndSaveAllResults = fetchAndSaveAllResults;
 module.exports.updateMissingGameResultsFromBets = updateMissingGameResultsFromBets; 

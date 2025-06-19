@@ -24,7 +24,9 @@ exports.getOdds = async (req, res) => {
     const uniqueGames = [];
     const seen = new Set();
     for (const game of cachedData) {
-      const key = `${game.sportKey}_${game.homeTeam}_${game.awayTeam}_${game.commenceTime.toISOString()}`;
+      // commenceTime을 분 단위까지만 비교
+      const date = new Date(game.commenceTime);
+      const key = `${game.sportKey}_${game.homeTeam}_${game.awayTeam}_${date.getUTCFullYear()}-${String(date.getUTCMonth()+1).padStart(2,'0')}-${String(date.getUTCDate()).padStart(2,'0')}T${String(date.getUTCHours()).padStart(2,'0')}:${String(date.getUTCMinutes()).padStart(2,'0')}`;
       if (!seen.has(key)) {
         uniqueGames.push(game);
         seen.add(key);

@@ -444,4 +444,5 @@ class BetResultService {
   }
 }
 
-module.exports = new BetResultService(); 
+const betResultService = new BetResultService();
+module.exports = betResultService; 

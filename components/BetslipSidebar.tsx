@@ -110,6 +110,9 @@ function MyBetsPanel() {
     filteredBets = filteredBets.filter(bet => bet.status === 'pending');
   }
 
+  // filteredBets를 createdAt 기준 내림차순 정렬
+  filteredBets = filteredBets.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
   // 상태 한글 변환 및 색상
   const statusLabel = (status: string) => {
     if (status === 'pending') return '진행중';

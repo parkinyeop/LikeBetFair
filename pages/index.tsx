@@ -100,15 +100,24 @@ export default function Home() {
           return gameTime > now;
         });
         
+        // 중복 게임 제거 (home_team, away_team, commence_time 기준)
+        const uniqueGamesMap = new Map();
+        filteredGames.forEach((game: any) => {
+          const key = `${game.home_team}|${game.away_team}|${game.commence_time}`;
+          if (!uniqueGamesMap.has(key)) {
+            uniqueGamesMap.set(key, game);
+          }
+        });
+        const uniqueGames = Array.from(uniqueGamesMap.values());
         // 시작 시간순으로 정렬
-        filteredGames.sort((a: any, b: any) => {
+        uniqueGames.sort((a: any, b: any) => {
           return new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime();
         });
         
         if (selectedCategory === "KBO" && filteredGames.length > 0) {
           console.log("KBO bookmakers 구조 sample:", filteredGames[0].bookmakers);
         }
-        setGames(filteredGames);
+        setGames(uniqueGames);
         setCurrentSportKey(selectedCategory);
         setLoading(false);
       } catch (err) {

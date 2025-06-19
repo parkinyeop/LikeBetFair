@@ -17,17 +17,10 @@ const clientSportKeyMap = {
   
   // 농구 (Basketball)
   'NBA': 'basketball_nba',
-  'WNBA': 'basketball_wnba',
   
   // 야구 (Baseball)
   'MLB': 'baseball_mlb',
   'KBO': 'baseball_kbo',
-  
-  // 미식축구 (American Football)
-  'CFL': 'americanfootball_cfl',
-  'NCAAF': 'americanfootball_ncaaf',
-  'NFL': 'americanfootball_nfl',
-  'NFL 프리시즌': 'americanfootball_nfl_preseason',
   
   // 아이스하키 (Ice Hockey)
   'NHL': 'icehockey_nhl'
