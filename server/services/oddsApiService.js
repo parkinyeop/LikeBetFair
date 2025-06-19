@@ -4,6 +4,7 @@ const sportsConfig = require('../config/sportsConfig');
 
 // 클라이언트에서 사용하는 sport key 매핑
 const clientSportKeyMap = {
+  // 축구 (Soccer)
   'K리그': 'soccer_korea_kleague1',
   'J리그': 'soccer_japan_j_league',
   '세리에 A': 'soccer_italy_serie_a',
@@ -13,22 +14,23 @@ const clientSportKeyMap = {
   '중국 슈퍼리그': 'soccer_china_superleague',
   '스페인 2부': 'soccer_spain_segunda_division',
   '스웨덴 알스벤스칸': 'soccer_sweden_allsvenskan',
-  'EPL': 'soccer_epl',
-  '라리가': 'soccer_spain_la_liga',
-  '분데스리가': 'soccer_germany_bundesliga',
-  '리그 1': 'soccer_france_ligue_1',
+  
+  // 농구 (Basketball)
   'NBA': 'basketball_nba',
+  'WNBA': 'basketball_wnba',
+  
+  // 야구 (Baseball)
   'MLB': 'baseball_mlb',
   'KBO': 'baseball_kbo',
+  
+  // 미식축구 (American Football)
+  'CFL': 'americanfootball_cfl',
+  'NCAAF': 'americanfootball_ncaaf',
   'NFL': 'americanfootball_nfl',
-  'NHL': 'icehockey_nhl',
-  'UFC': 'mma_mixed_martial_arts',
-  '테니스 ATP': 'tennis_atp_singles',
-  '테니스 WTA': 'tennis_wta_singles',
-  'CS2': 'esports_cs2',
-  'LoL': 'esports_lol',
-  'Dota 2': 'esports_dota2',
-  'Valorant': 'esports_valorant'
+  'NFL 프리시즌': 'americanfootball_nfl_preseason',
+  
+  // 아이스하키 (Ice Hockey)
+  'NHL': 'icehockey_nhl'
 };
 
 class OddsApiService {
@@ -163,56 +165,35 @@ class OddsApiService {
   }
 
   determineMainCategory(clientCategory) {
-    if (['K리그', 'J리그', '세리에 A', '브라질 세리에 A', 'MLS', '아르헨티나 프리메라', '중국 슈퍼리그', '스페인 2부', '스웨덴 알스벤스칸', 'EPL', '라리가', '분데스리가', '리그 1'].includes(clientCategory)) {
-      return 'football';
-    } else if (clientCategory === 'NBA') {
-      return 'basketball';
-    } else if (['MLB', 'KBO'].includes(clientCategory)) {
-      return 'baseball';
-    } else if (clientCategory === 'NFL') {
-      return 'americanfootball';
-    } else if (clientCategory === 'NHL') {
-      return 'icehockey';
-    } else if (clientCategory === 'UFC') {
-      return 'mma';
-    } else if (['테니스 ATP', '테니스 WTA'].includes(clientCategory)) {
-      return 'tennis';
-    } else if (['CS2', 'LoL', 'Dota 2', 'Valorant'].includes(clientCategory)) {
-      return 'esports';
+    // The Odds API sportKey에서 mainCategory 추출
+    const sportKey = clientSportKeyMap[clientCategory];
+    if (!sportKey) return 'other';
+    
+    // sportKey 형식: "soccer_korea_kleague1" -> "soccer"
+    // sportKey 형식: "basketball_nba" -> "basketball"
+    // sportKey 형식: "baseball_mlb" -> "baseball"
+    const parts = sportKey.split('_');
+    if (parts.length >= 1) {
+      return parts[0]; // 첫 번째 부분을 mainCategory로 사용
     }
+    
     return 'other';
   }
 
   determineSubCategory(clientCategory) {
-    const categoryMap = {
-      'K리그': 'k-league',
-      'J리그': 'j-league',
-      '세리에 A': 'serie-a',
-      '브라질 세리에 A': 'brazil',
-      'MLS': 'mls',
-      '아르헨티나 프리메라': 'argentina',
-      '중국 슈퍼리그': 'china',
-      '스페인 2부': 'spain-2nd',
-      '스웨덴 알스벤스칸': 'sweden',
-      'EPL': 'epl',
-      '라리가': 'la-liga',
-      '분데스리가': 'bundesliga',
-      '리그 1': 'ligue-1',
-      'NBA': 'nba',
-      'MLB': 'mlb',
-      'KBO': 'kbo',
-      'NFL': 'nfl',
-      'NHL': 'nhl',
-      'UFC': 'ufc',
-      '테니스 ATP': 'atp',
-      '테니스 WTA': 'wta',
-      'CS2': 'cs2',
-      'LoL': 'lol',
-      'Dota 2': 'dota2',
-      'Valorant': 'valorant'
-    };
+    // The Odds API sportKey에서 subCategory 추출
+    const sportKey = clientSportKeyMap[clientCategory];
+    if (!sportKey) return 'other';
     
-    return categoryMap[clientCategory] || 'other';
+    // sportKey 형식: "soccer_korea_kleague1" -> "korea_kleague1"
+    // sportKey 형식: "basketball_nba" -> "nba"
+    // sportKey 형식: "baseball_mlb" -> "mlb"
+    const parts = sportKey.split('_');
+    if (parts.length >= 2) {
+      return parts.slice(1).join('_'); // 첫 번째 부분(그룹명) 제외하고 나머지를 subCategory로 사용
+    }
+    
+    return 'other';
   }
 
   validateOddsData(game) {

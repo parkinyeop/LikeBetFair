@@ -53,10 +53,23 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
           throw new Error('Failed to fetch odds');
         }
         const data = await response.json();
-        if (sportKey === "baseball_kbo" && data.length > 0) {
-          console.log("KBO 상세 bookmakers 구조 sample:", JSON.stringify(data[0].bookmakers, null, 2));
+        
+        // 현재 시간 이후의 경기만 필터링
+        const now = new Date();
+        const filteredGames = data.filter((game: Game) => {
+          const gameTime = new Date(game.commence_time);
+          return gameTime > now;
+        });
+        
+        // 시작 시간순으로 정렬
+        filteredGames.sort((a: Game, b: Game) => {
+          return new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime();
+        });
+
+        if (sportKey === "baseball_kbo" && filteredGames.length > 0) {
+          console.log("KBO 상세 bookmakers 구조 sample:", JSON.stringify(filteredGames[0].bookmakers, null, 2));
         }
-        setGames(data);
+        setGames(filteredGames);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch odds');

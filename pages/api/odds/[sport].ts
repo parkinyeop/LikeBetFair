@@ -5,13 +5,13 @@ export default async function handler(
   res: NextApiResponse
 ) {
   const { sport } = req.query;
-  const apiKey = process.env.ODDS_API_KEY;
 
   if (!sport || typeof sport !== 'string') {
     return res.status(400).json({ error: 'Invalid sport parameter' });
   }
 
-  const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${apiKey}&regions=us&markets=h2h`;
+  const serverUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050';
+  const url = `${serverUrl}/api/odds/${sport}`;
 
   try {
     const response = await fetch(url);
@@ -23,7 +23,7 @@ export default async function handler(
 
     res.status(200).json(data);
   } catch (error) {
-    console.error('Error fetching odds:', error);
-    res.status(500).json({ error: "API fetch failed" });
+    console.error('Error fetching odds from server:', error);
+    res.status(500).json({ error: "Failed to fetch odds from server" });
   }
 } 

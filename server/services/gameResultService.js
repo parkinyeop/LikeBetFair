@@ -33,7 +33,7 @@ const sportsDbLeagueMap = {
   
   // 야구 (Baseball)
   'mlb': '4424',           // MLB
-  'kbo': '4471',           // KBO
+  'kbo': '4830',           // KBO (수정)
   
   // 농구 (Basketball)
   'nba': '4387',           // NBA
@@ -266,7 +266,7 @@ class GameResultService {
   // TheSportsDB 리그 ID 반환
   getSportsDbLeagueId(clientCategory) {
     const categoryMap = {
-      'KBO': '4471',
+      'KBO': '4830', // KBO (수정)
       'MLB': '4424', 
       'NBA': '4387',
       'NFL': '4391'
@@ -717,7 +717,7 @@ function isDateMatch(a, b) {
 
 async function fetchAndSaveResultsFromSportsDBByTeams(sel) {
   // 카테고리 추정 (예시: K리그)
-  const leagueId = sportsDbLeagueMap['k-league']; // 실제로는 sel에서 카테고리 추정 필요
+  const leagueId = sportsDbLeagueMap['kbo']; // KBO 리그 ID를 4830으로 수정
   const url = `https://www.thesportsdb.com/api/v1/json/${API_KEY}/eventspastleague.php?id=${leagueId}`;
   const res = await axios.get(url);
   const events = res.data.events || [];

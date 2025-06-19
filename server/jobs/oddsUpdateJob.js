@@ -5,7 +5,12 @@ const betResultService = require('../services/betResultService');
 
 let isUpdating = false;
 let lastUpdateTime = null;
-let activeCategories = new Set(['KBO', 'MLB', 'NBA']); // 기본 활성 카테고리
+let activeCategories = new Set([
+  'K리그', 'J리그', '세리에 A', '브라질 세리에 A', 'MLS', '아르헨티나 프리메라', '중국 슈퍼리그', '스페인 2부', '스웨덴 알스벤스칸',
+  'NBA', 'WNBA',
+  'MLB', 'KBO',
+  'CFL', 'NCAAF', 'NFL', 'NFL 프리시즌'
+]); // 클라이언트 UI와 동일하게 전체 카테고리 활성화
 
 // 활성 카테고리 관리 함수
 const updateActiveCategories = (categories) => {
