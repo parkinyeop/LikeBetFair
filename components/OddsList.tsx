@@ -53,12 +53,16 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
           throw new Error('Failed to fetch odds');
         }
         const data = await response.json();
+        console.log("OddsList API 응답:", data);
         
-        // 현재 시간 이후의 경기만 필터링
+        // 현재 시각 기준 24시간 이전까지의 경기만 필터링
         const now = new Date();
+        const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24시간(1일) 전
         const filteredGames = data.filter((game: Game) => {
           const gameTime = new Date(game.commence_time);
-          return gameTime > now;
+          // 디버깅용 콘솔
+          console.log("cutoff:", cutoff, "gameTime:", gameTime, "commence_time:", game.commence_time);
+          return gameTime >= cutoff;
         });
         
         // 중복 게임 제거 (home_team, away_team, commence_time 기준)

@@ -101,12 +101,21 @@ export default function Home() {
           return gameTime > now;
         });
         
-        // 중복 게임 제거 (home_team, away_team, commence_time 기준)
+        // 중복 게임 제거 (home_team, away_team, commence_time 기준, 정보가 더 많은 쪽 우선)
         const uniqueGamesMap = new Map();
         filteredGames.forEach((game: any) => {
           const key = `${game.home_team}|${game.away_team}|${game.commence_time}`;
           if (!uniqueGamesMap.has(key)) {
             uniqueGamesMap.set(key, game);
+          } else {
+            // 기존 값과 비교해서 bookmakers가 더 많은 쪽을 남김
+            const prev = uniqueGamesMap.get(key);
+            if (
+              (!prev.bookmakers && game.bookmakers) ||
+              (Array.isArray(game.bookmakers) && Array.isArray(prev.bookmakers) && game.bookmakers.length > prev.bookmakers.length)
+            ) {
+              uniqueGamesMap.set(key, game);
+            }
           }
         });
         const uniqueGames = Array.from(uniqueGamesMap.values());

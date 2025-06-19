@@ -53,14 +53,14 @@ const GameCard: React.FC<GameCardProps> = ({ teams, time, selectedTeam, onSelect
 
   if (infoOnly) {
     return (
-      <div className="bg-white p-4 rounded shadow opacity-90 hover:shadow-lg transition-shadow">
+      <div className="bg-white p-4 rounded shadow opacity-90 hover:shadow-lg transition-shadow border-2 border-blue-400">
         <div className="text-gray-700 font-semibold mb-2">{teams}</div>
         <div className="text-sm text-gray-500 mb-2">{new Date(time).toLocaleString()}</div>
         <div className="flex space-x-4">
           {[teamA, teamB].map((team, index) => {
             const odds = index === 0 ? teamAOdds : teamBOdds;
             return (
-              <div key={team} className="flex-1 px-4 py-2 rounded bg-gray-100 text-gray-700 text-center">
+              <div key={team} className="flex-1 px-4 py-2 rounded bg-gray-100 text-gray-700 text-center border-2 border-gray-400">
                 <div>{team}</div>
                 {odds && (
                   <div className="text-xs mt-1 opacity-90">배당: {odds}</div>
@@ -74,7 +74,7 @@ const GameCard: React.FC<GameCardProps> = ({ teams, time, selectedTeam, onSelect
   }
 
   return (
-    <div className="bg-white p-4 rounded shadow">
+    <div className="bg-white p-4 rounded shadow border-2 border-blue-400">
       <div className="text-gray-700 font-semibold mb-2">{teams}</div>
       <div className="text-sm text-gray-500 mb-4">{new Date(time).toLocaleString()}</div>
       <div className="flex space-x-4">
@@ -84,7 +84,7 @@ const GameCard: React.FC<GameCardProps> = ({ teams, time, selectedTeam, onSelect
             <button
               key={team}
               onClick={() => handleClick(team)}
-              className={`flex-1 px-4 py-2 rounded text-white font-bold transition-colors
+              className={`flex-1 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400
                 ${selectedTeam === team ? "bg-yellow-400" : "bg-blue-600 hover:bg-blue-700"}
                 ${isPastGame || isTooFar ? "opacity-50 cursor-not-allowed" : ""}
               `}
