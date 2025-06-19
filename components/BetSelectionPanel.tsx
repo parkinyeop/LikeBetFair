@@ -96,7 +96,7 @@ const BetSelectionPanel = () => {
       </div>
       <div className="text-sm">
         <p className="mb-1">총 배당률: <span className="font-semibold">{totalOdds.toFixed(2)}</span></p>
-        <p className="mb-1">예상 수익: <span className="font-semibold">{expectedReturn.toLocaleString()} ₩</span></p>
+        <p className="mb-1">예상 수익: <span className="font-semibold">{Math.floor(expectedReturn).toLocaleString()} ₩</span></p>
       </div>
       <button
         className="w-full mt-4 bg-blue-600 text-white py-2 rounded text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"

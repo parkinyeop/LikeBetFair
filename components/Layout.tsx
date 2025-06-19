@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import BetslipSidebar from "./BetslipSidebar";
 
@@ -48,6 +48,16 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const router = useRouter();
   const [selected, setSelected] = useState("NBA");
+
+  useEffect(() => {
+    if (router.pathname.startsWith("/odds/") && router.query.sport) {
+      const sportKey = router.query.sport as string;
+      const found = Object.entries(sportKeyMap).find(([label, key]) => key === sportKey);
+      if (found) {
+        setSelected(found[0]);
+      }
+    }
+  }, [router.pathname, router.query.sport]);
 
   const allCategories = Object.entries(sportsTree).flatMap(([main, subs]) => [
     main,

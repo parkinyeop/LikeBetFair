@@ -7,9 +7,10 @@ interface GameCardProps {
   selectedTeam: string | null;
   onSelect: (match: string, team: string) => void;
   bookmakers?: any[];
+  infoOnly?: boolean;
 }
 
-const GameCard: React.FC<GameCardProps> = ({ teams, time, selectedTeam, onSelect, bookmakers }) => {
+const GameCard: React.FC<GameCardProps> = ({ teams, time, selectedTeam, onSelect, bookmakers, infoOnly }) => {
   const [teamA, teamB] = teams.split(" vs ");
 
   const handleClick = (team: string) => {
@@ -49,6 +50,28 @@ const GameCard: React.FC<GameCardProps> = ({ teams, time, selectedTeam, onSelect
   const isPastGame = commenceTime <= new Date(now.getTime() + marginMinutes * 60000);
   const isTooFar = commenceTime > maxDate;
   const isBettable = !isPastGame && !isTooFar;
+
+  if (infoOnly) {
+    return (
+      <div className="bg-white p-4 rounded shadow opacity-90 hover:shadow-lg transition-shadow">
+        <div className="text-gray-700 font-semibold mb-2">{teams}</div>
+        <div className="text-sm text-gray-500 mb-2">{new Date(time).toLocaleString()}</div>
+        <div className="flex space-x-4">
+          {[teamA, teamB].map((team, index) => {
+            const odds = index === 0 ? teamAOdds : teamBOdds;
+            return (
+              <div key={team} className="flex-1 px-4 py-2 rounded bg-gray-100 text-gray-700 text-center">
+                <div>{team}</div>
+                {odds && (
+                  <div className="text-xs mt-1 opacity-90">배당: {odds}</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white p-4 rounded shadow">

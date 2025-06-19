@@ -70,6 +70,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("KBO");
   const [currentSportKey, setCurrentSportKey] = useState<string>("");
+  const router = useRouter();
 
   useEffect(() => {
     const fetchGames = async () => {
@@ -138,11 +139,22 @@ export default function Home() {
     setSelectedCategory(category);
   };
 
+  // 경기 클릭 시 상세 페이지로 이동
+  const handleGameClick = (game: any) => {
+    const sportKey = getSportKey(selectedCategory);
+    if (sportKey) {
+      router.push(`/odds/${sportKey}`);
+    }
+  };
+
   if (loading) return <div>Loading...</div>;
   if (error) return <div>Error: {error}</div>;
 
   return (
     <div className="p-6">
+      <div className="mb-4 p-3 bg-blue-50 text-blue-700 rounded">
+        홈화면은 정보 제공용입니다. 경기를 클릭하면 상세 페이지로 이동합니다.
+      </div>
       <h1 className="text-2xl font-bold mb-6">경기 목록</h1>
       
       {/* 카테고리 선택 버튼들 */}
@@ -183,14 +195,16 @@ export default function Home() {
           </div>
         ) : (
           games.map((game, index) => (
-            <GameCard 
-              key={index}
-              teams={`${game.home_team} vs ${game.away_team}`}
-              time={game.commence_time}
-              selectedTeam={selectedMatches[`${game.home_team} vs ${game.away_team}`] || ""}
-              onSelect={handleSelect}
-              bookmakers={game.bookmakers}
-            />
+            <div key={index} onClick={() => handleGameClick(game)} style={{ cursor: 'pointer' }}>
+              <GameCard 
+                teams={`${game.home_team} vs ${game.away_team}`}
+                time={game.commence_time}
+                selectedTeam={""}
+                onSelect={() => {}} // 선택 불가
+                bookmakers={game.bookmakers}
+                infoOnly={true}
+              />
+            </div>
           ))
         )}
       </div>
