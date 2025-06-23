@@ -4,6 +4,8 @@ import JoinForm from './JoinForm';
 import LoginForm from './LoginForm';
 import { useAuth } from '../contexts/AuthContext';
 
+const FRONTEND_VERSION = '25062301'; // YYYYMMDD + 2자리 시퀀스
+
 export default function Header() {
   const [selectedCategory, setSelectedCategory] = useState("Sportsbook");
   const [showJoin, setShowJoin] = useState(false);
@@ -20,7 +22,11 @@ export default function Header() {
   };
 
   return (
-    <header className="bg-blue-600 text-white shadow-md">
+    <header className="w-full flex items-center justify-between px-4 py-2 bg-blue-600 text-white shadow">
+      <div className="flex items-center gap-2">
+        <h1 className="text-xl font-bold">LikeBetFair</h1>
+        <span className="ml-2 text-xs bg-white text-blue-600 rounded px-2 py-0.5 font-mono">v{FRONTEND_VERSION}</span>
+      </div>
       <div className="max-w-screen-xl mx-auto px-4 py-2 flex items-center justify-between">
         {/* 로고 & 메뉴 */}
         <div className="flex items-center space-x-6">
@@ -28,16 +34,9 @@ export default function Header() {
             <span className="font-bold text-xl">Lbetfair</span>
           </Link>
           <nav className="hidden sm:flex space-x-4 font-medium">
-            <button
-              onClick={() => handleMenuClick("Exchange")}
-              className={`hover:text-blue-200 ${
-                selectedCategory === "Exchange"
-                  ? "text-yellow-400 font-bold"
-                  : "text-white"
-              }`}
-            >
-              Exchange
-            </button>
+            <Link href="/exchange">
+              <button className="ml-2 px-3 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 transition">Exchange</button>
+            </Link>
             <button
               onClick={() => handleMenuClick("Sportsbook")}
               className={`hover:text-blue-200 ${

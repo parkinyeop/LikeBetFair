@@ -1,7 +1,7 @@
-const cron = require('node-cron');
-const oddsApiService = require('../services/oddsApiService');
-const gameResultService = require('../services/gameResultService');
-const betResultService = require('../services/betResultService');
+import cron from 'node-cron';
+import oddsApiService from '../services/oddsApiService.js';
+import gameResultService from '../services/gameResultService.js';
+import betResultService from '../services/betResultService.js';
 
 let isUpdating = false;
 let lastUpdateTime = null;
@@ -238,10 +238,6 @@ setInterval(async () => {
   }
 }, 60 * 60 * 1000); // 1시간마다
 
-module.exports = {
-  isUpdating: () => isUpdating,
-  getHealthStatus,
-  lastUpdateTime: () => lastUpdateTime,
-  updateActiveCategories,
-  getActiveCategories: () => Array.from(activeCategories)
-}; 
+const getActiveCategories = () => Array.from(activeCategories);
+
+export { getHealthStatus, updateActiveCategories, getActiveCategories }; 

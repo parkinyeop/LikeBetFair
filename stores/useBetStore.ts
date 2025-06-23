@@ -26,7 +26,7 @@ export const useBetStore = create<BetState>((set, get) => ({
   stake: 0,
 
   addSelection: (bet) =>
-    set((state) => ({ selections: [...state.selections, bet] })),
+    set((state) => ({ selections: [...state.selections, { ...bet, market: bet.market || '승/패' }] })),
 
   removeSelection: (team) =>
     set((state) => ({
@@ -35,26 +35,28 @@ export const useBetStore = create<BetState>((set, get) => ({
 
   toggleSelection: (bet) => {
     const { selections } = get();
+    // market 필드 강제 보장
+    const safeBet = { ...bet, market: bet.market || '승/패' };
     // 이미 같은 팀, 마켓, 경기 선택되어 있으면 해제
     const exists = selections.some(
-      (s) => s.team === bet.team && s.market === bet.market && s.gameId === bet.gameId
+      (s) => s.team === safeBet.team && s.market === safeBet.market && s.gameId === safeBet.gameId
     );
 
     if (exists) {
       set((state) => ({
         selections: state.selections.filter(
-          (s) => !(s.team === bet.team && s.market === bet.market && s.gameId === bet.gameId)
+          (s) => !(s.team === safeBet.team && s.market === safeBet.market && s.gameId === safeBet.gameId)
         ),
       }));
     } else {
       // 같은 경기에서 승패(h2h)와 핸디캡(spreads)은 동시에 선택 불가
       if (
-        (bet.market === '승/패' || bet.market === '핸디캡') &&
+        (safeBet.market === '승/패' || safeBet.market === '핸디캡') &&
         selections.some(
           (s) =>
-            s.gameId === bet.gameId &&
-            ((s.market === '승/패' && bet.market === '핸디캡') ||
-              (s.market === '핸디캡' && bet.market === '승/패'))
+            s.gameId === safeBet.gameId &&
+            ((s.market === '승/패' && safeBet.market === '핸디캡') ||
+              (s.market === '핸디캡' && safeBet.market === '승/패'))
         )
       ) {
         // 기존 승패 또는 핸디캡 선택 해제 후 추가
@@ -63,12 +65,12 @@ export const useBetStore = create<BetState>((set, get) => ({
             ...state.selections.filter(
               (s) =>
                 !(
-                  s.gameId === bet.gameId &&
-                  ((s.market === '승/패' && bet.market === '핸디캡') ||
-                    (s.market === '핸디캡' && bet.market === '승/패'))
+                  s.gameId === safeBet.gameId &&
+                  ((s.market === '승/패' && safeBet.market === '핸디캡') ||
+                    (s.market === '핸디캡' && safeBet.market === '승/패'))
                 )
             ),
-            bet,
+            safeBet,
           ],
         }));
       } else {
@@ -76,9 +78,9 @@ export const useBetStore = create<BetState>((set, get) => ({
         set((state) => ({
           selections: [
             ...state.selections.filter(
-              (s) => !(s.market === bet.market && s.gameId === bet.gameId)
+              (s) => !(s.market === safeBet.market && s.gameId === safeBet.gameId)
             ),
-            bet,
+            safeBet,
           ],
         }));
       }

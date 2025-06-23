@@ -1,5 +1,6 @@
-const GameResult = require('./models/gameResultModel');
-const { Op } = require('sequelize');
+import GameResult from './models/gameResultModel.js';
+import { Op } from 'sequelize';
+import axios from 'axios';
 
 async function updateGameResults() {
   try {
@@ -77,4 +78,10 @@ async function updateGameResults() {
   }
 }
 
-updateGameResults(); 
+updateGameResults().then(() => {
+  console.log('경기 결과 업데이트 완료');
+  process.exit();
+}).catch(err => {
+  console.error('업데이트 중 오류:', err);
+  process.exit(1);
+}); 

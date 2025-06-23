@@ -1,7 +1,8 @@
-const express = require('express');
-const cors = require('cors');
-const { Sequelize } = require('sequelize');
-require('dotenv').config();
+import express from 'express';
+import cors from 'cors';
+import { Sequelize } from 'sequelize';
+import dotenv from 'dotenv';
+dotenv.config();
 
 // Sequelize 인스턴스 생성
 const sequelize = new Sequelize({
@@ -15,9 +16,10 @@ const sequelize = new Sequelize({
 });
 
 // 라우트 임포트
-const oddsRoutes = require('./routes/oddsRoutes');
-const gameResultRoutes = require('./routes/gameResultRoutes');
-// const cors = require('cors'); // 기존 cors 미들웨어는 주석 처리
+import oddsRoutes from './routes/oddsRoutes.js';
+import gameResultRoutes from './routes/gameResultRoutes.js';
+import authRoutes from './routes/auth.js';
+import betRoutes from './routes/bet.js';
 
 const app = express();
 
@@ -37,8 +39,8 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/bet', require('./routes/bet'));
+app.use('/api/auth', authRoutes);
+app.use('/api/bet', betRoutes);
 app.use('/api', oddsRoutes);
 app.use('/api/game-results', gameResultRoutes);
 
@@ -55,10 +57,10 @@ app.use((err, req, res, next) => {
 });
 
 // 스케줄러 초기화
-require('./jobs/oddsUpdateJob');
+import './jobs/oddsUpdateJob.js';
 
 // 배팅 결과 업데이트 스케줄러 추가
-const betResultService = require('./services/betResultService');
+import betResultService from './services/betResultService.js';
 
 // 5분마다 배팅 결과 업데이트
 setInterval(async () => {

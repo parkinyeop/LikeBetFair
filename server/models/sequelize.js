@@ -1,5 +1,6 @@
-const { Sequelize } = require('sequelize');
-require('dotenv').config({ path: __dirname + '/../.env' });
+import { Sequelize } from 'sequelize';
+import dotenv from 'dotenv';
+dotenv.config({ path: new URL('../.env', import.meta.url).pathname });
 
 console.log('[공통 DB 연결] process.env.DB_NAME:', process.env.DB_NAME);
 
@@ -13,4 +14,4 @@ const sequelize = new Sequelize({
   logging: false
 });
 
-module.exports = sequelize; 
+export default sequelize; 

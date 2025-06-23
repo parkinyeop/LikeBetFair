@@ -1,8 +1,8 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('./sequelize');
-require('dotenv').config();
-
-const User = require('./userModel');
+import { DataTypes } from 'sequelize';
+import sequelize from './sequelize.js';
+import User from './userModel.js';
+import dotenv from 'dotenv';
+dotenv.config();
 
 const Bet = sequelize.define('Bet', {
   id: {
@@ -46,4 +46,4 @@ const Bet = sequelize.define('Bet', {
 Bet.belongsTo(User, { foreignKey: 'userId' });
 User.hasMany(Bet, { foreignKey: 'userId' });
 
-module.exports = Bet; 
+export default Bet; 

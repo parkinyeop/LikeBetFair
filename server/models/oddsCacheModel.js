@@ -1,5 +1,5 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('./sequelize');
+import { DataTypes } from 'sequelize';
+import sequelize from './sequelize.js';
 
 const OddsCache = sequelize.define('OddsCache', {
   id: {
@@ -59,4 +59,4 @@ const OddsCache = sequelize.define('OddsCache', {
   ]
 });
 
-module.exports = OddsCache; 
+export default OddsCache; 

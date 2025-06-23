@@ -1,5 +1,7 @@
-const { Sequelize } = require('sequelize');
-require('dotenv').config();
+import { Sequelize, DataTypes } from 'sequelize';
+import dotenv from 'dotenv';
+dotenv.config();
+import fs from 'fs';
 
 // Sequelize 인스턴스 생성
 const sequelize = new Sequelize({
@@ -15,28 +17,28 @@ const sequelize = new Sequelize({
 // Bet 모델 정의
 const Bet = sequelize.define('Bet', {
   id: {
-    type: Sequelize.UUID,
-    defaultValue: Sequelize.UUIDV4,
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
     primaryKey: true
   },
   userId: {
-    type: Sequelize.UUID,
+    type: DataTypes.UUID,
     allowNull: false
   },
   selections: {
-    type: Sequelize.JSONB,
+    type: DataTypes.JSONB,
     allowNull: false
   },
   stake: {
-    type: Sequelize.DECIMAL(10, 2),
+    type: DataTypes.DECIMAL(10, 2),
     allowNull: false
   },
   potentialWinnings: {
-    type: Sequelize.DECIMAL(10, 2),
+    type: DataTypes.DECIMAL(10, 2),
     allowNull: false
   },
   status: {
-    type: Sequelize.ENUM('pending', 'won', 'lost', 'cancelled'),
+    type: DataTypes.ENUM('pending', 'won', 'lost', 'cancelled'),
     defaultValue: 'pending'
   }
 }, {
@@ -47,52 +49,52 @@ const Bet = sequelize.define('Bet', {
 // GameResult 모델 정의
 const GameResult = sequelize.define('GameResult', {
   id: {
-    type: Sequelize.UUID,
-    defaultValue: Sequelize.UUIDV4,
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
     primaryKey: true
   },
   eventId: {
-    type: Sequelize.STRING,
+    type: DataTypes.STRING,
     allowNull: true,
     unique: true
   },
   mainCategory: {
-    type: Sequelize.STRING,
+    type: DataTypes.STRING,
     allowNull: false
   },
   subCategory: {
-    type: Sequelize.STRING,
+    type: DataTypes.STRING,
     allowNull: false
   },
   homeTeam: {
-    type: Sequelize.STRING,
+    type: DataTypes.STRING,
     allowNull: false
   },
   awayTeam: {
-    type: Sequelize.STRING,
+    type: DataTypes.STRING,
     allowNull: false
   },
   commenceTime: {
-    type: Sequelize.DATE,
+    type: DataTypes.DATE,
     allowNull: false
   },
   status: {
-    type: Sequelize.ENUM('scheduled', 'live', 'finished', 'cancelled'),
+    type: DataTypes.ENUM('scheduled', 'live', 'finished', 'cancelled'),
     defaultValue: 'scheduled'
   },
   score: {
-    type: Sequelize.JSONB,
+    type: DataTypes.JSONB,
     allowNull: true,
     defaultValue: null
   },
   result: {
-    type: Sequelize.ENUM('home_win', 'away_win', 'draw', 'cancelled', 'pending'),
+    type: DataTypes.ENUM('home_win', 'away_win', 'draw', 'cancelled', 'pending'),
     defaultValue: 'pending'
   },
   lastUpdated: {
-    type: Sequelize.DATE,
+    type: DataTypes.DATE,
     allowNull: false,
-    defaultValue: Sequelize.NOW
+    defaultValue: DataTypes.NOW
   }
 }, {
   tableName: 'GameResults',
@@ -251,6 +253,52 @@ async function updateGameResultsFromBets() {
   } finally {
     await sequelize.close();
   }
+}
+
+// allResults.json을 DB에 반영하는 함수
+async function updateGameResultsFromCrawledData() {
+  const allResults = JSON.parse(fs.readFileSync('allResults.json', 'utf-8'));
+  let total = 0, upserted = 0;
+  for (const [league, games] of Object.entries(allResults)) {
+    for (const game of games) {
+      total++;
+      const { date, home, away, score } = game;
+      // 날짜+팀명으로 고유 경기 식별
+      const commenceTime = new Date(date);
+      // 스코어 파싱
+      let parsedScore = null;
+      let result = 'pending';
+      if (score && score.includes('-')) {
+        const [homeScore, awayScore] = score.split('-').map(s => s.trim());
+        parsedScore = [homeScore, awayScore];
+        if (!isNaN(homeScore) && !isNaN(awayScore)) {
+          if (Number(homeScore) > Number(awayScore)) result = 'home_win';
+          else if (Number(homeScore) < Number(awayScore)) result = 'away_win';
+          else result = 'draw';
+        }
+      }
+      // upsert
+      await GameResult.upsert({
+        mainCategory: league,
+        subCategory: league,
+        homeTeam: home,
+        awayTeam: away,
+        commenceTime,
+        status: 'finished',
+        score: parsedScore,
+        result,
+        lastUpdated: new Date()
+      });
+      upserted++;
+    }
+  }
+  console.log(`총 ${total}개 중 ${upserted}개 경기 결과를 DB에 upsert 완료.`);
+  await sequelize.close();
+}
+
+// 실행 entrypoint (ESM)
+if (process.argv[1] && process.argv[1].endsWith('updateGameResultsFromBets.js')) {
+  updateGameResultsFromCrawledData();
 }
 
 // 스크립트 실행

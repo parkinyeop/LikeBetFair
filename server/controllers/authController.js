@@ -1,8 +1,8 @@
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const User = require('../models/userModel');
-const axios = require('axios');
-const Bet = require('../models/betModel');
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import User from '../models/userModel.js';
+import axios from 'axios';
+import Bet from '../models/betModel.js';
 
 // The Odds API를 활용한 경기 결과 판정 함수
 async function getGameResult(sel) {
@@ -49,93 +49,97 @@ async function checkAndUpdatePendingBets(userId) {
   }
 }
 
-exports.register = async (req, res) => {
-  try {
-    const { username, email, password } = req.body;
+const authController = {
+  register: async (req, res) => {
+    try {
+      const { username, email, password } = req.body;
 
-    // Check if user already exists
-    const existingUser = await User.findOne({
-      where: { email }
-    });
-    
-    if (existingUser) {
-      return res.status(400).json({ message: 'User already exists' });
+      // Check if user already exists
+      const existingUser = await User.findOne({
+        where: { email }
+      });
+      
+      if (existingUser) {
+        return res.status(400).json({ message: 'User already exists' });
+      }
+
+      // Hash password
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+
+      // Create new user
+      const user = await User.create({
+        username,
+        email,
+        password: hashedPassword
+      });
+
+      // Create token
+      const token = jwt.sign(
+        { userId: user.id },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRES_IN }
+      );
+
+      res.status(201).json({ token });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: 'Server error' });
     }
+  },
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+  login: async (req, res) => {
+    try {
+      const { email, password } = req.body;
 
-    // Create new user
-    const user = await User.create({
-      username,
-      email,
-      password: hashedPassword
-    });
+      // Check if user exists
+      const user = await User.findOne({
+        where: { email }
+      });
+      
+      if (!user) {
+        return res.status(400).json({ message: 'Invalid credentials' });
+      }
 
-    // Create token
-    const token = jwt.sign(
-      { userId: user.id },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
-    );
+      // Check password
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ message: 'Invalid credentials' });
+      }
 
-    res.status(201).json({ token });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
+      // 로그인 시 pending 베팅 결과 판정
+      await checkAndUpdatePendingBets(user.id);
+
+      // Create token
+      const token = jwt.sign(
+        { userId: user.id },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRES_IN }
+      );
+
+      // username, email, balance도 함께 반환
+      res.json({ token, username: user.username, email: user.email, balance: Number(user.balance) });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: 'Server error' });
+    }
+  },
+
+  getMe: async (req, res) => {
+    try {
+      const user = await User.findByPk(req.user.userId, {
+        attributes: { exclude: ['password'] }
+      });
+      res.json(user);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: 'Server error' });
+    }
+  },
+
+  logout: (req, res) => {
+    res.json({ message: 'Logged out successfully' });
   }
 };
 
-exports.login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    // Check if user exists
-    const user = await User.findOne({
-      where: { email }
-    });
-    
-    if (!user) {
-      return res.status(400).json({ message: 'Invalid credentials' });
-    }
-
-    // Check password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid credentials' });
-    }
-
-    // 로그인 시 pending 베팅 결과 판정
-    await checkAndUpdatePendingBets(user.id);
-
-    // Create token
-    const token = jwt.sign(
-      { userId: user.id },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
-    );
-
-    // username, email, balance도 함께 반환
-    res.json({ token, username: user.username, email: user.email, balance: Number(user.balance) });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-exports.getMe = async (req, res) => {
-  try {
-    const user = await User.findByPk(req.user.userId, {
-      attributes: { exclude: ['password'] }
-    });
-    res.json(user);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-exports.logout = (req, res) => {
-  res.json({ message: 'Logged out successfully' });
-}; 
+export default authController; 

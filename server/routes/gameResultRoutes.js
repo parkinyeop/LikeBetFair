@@ -1,8 +1,9 @@
-const express = require('express');
+import express from 'express';
+import gameResultService from '../services/gameResultService.js';
+import oddsApiService from '../services/oddsApiService.js';
+import { getHealthStatus, updateActiveCategories, getActiveCategories } from '../jobs/oddsUpdateJob.js';
+
 const router = express.Router();
-const gameResultService = require('../services/gameResultService');
-const oddsApiService = require('../services/oddsApiService');
-const { getHealthStatus, updateActiveCategories, getActiveCategories } = require('../jobs/oddsUpdateJob');
 
 // 스케줄러 상태 조회
 router.get('/scheduler/status', (req, res) => {
@@ -353,4 +354,4 @@ router.post('/results/update', async (req, res) => {
   }
 });
 
-module.exports = router; 
+export default router; 

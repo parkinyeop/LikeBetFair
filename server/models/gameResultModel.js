@@ -1,5 +1,5 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('./sequelize');
+import { DataTypes } from 'sequelize';
+import sequelize from './sequelize.js';
 
 const GameResult = sequelize.define('GameResult', {
   id: {
@@ -71,4 +71,4 @@ const GameResult = sequelize.define('GameResult', {
   ]
 });
 
-module.exports = GameResult; 
+export default GameResult; 

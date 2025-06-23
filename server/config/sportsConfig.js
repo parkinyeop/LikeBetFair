@@ -67,4 +67,4 @@ const sportsConfig = {
   }
 };
 
-module.exports = sportsConfig; 
+export default sportsConfig; 

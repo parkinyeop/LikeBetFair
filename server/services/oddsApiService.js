@@ -1,6 +1,8 @@
-const axios = require('axios');
-const OddsCache = require('../models/oddsCacheModel');
-const sportsConfig = require('../config/sportsConfig');
+import axios from 'axios';
+import OddsCache from '../models/oddsCacheModel.js';
+import sportsConfig from '../config/sportsConfig.js';
+import { Op } from 'sequelize';
+import { normalizeTeamName, normalizeCategory, normalizeCategoryPair } from '../normalizeUtils.js';
 
 // 클라이언트에서 사용하는 sport key 매핑
 const clientSportKeyMap = {
@@ -161,32 +163,19 @@ class OddsApiService {
     // The Odds API sportKey에서 mainCategory 추출
     const sportKey = clientSportKeyMap[clientCategory];
     if (!sportKey) return 'other';
-    
-    // sportKey 형식: "soccer_korea_kleague1" -> "soccer"
-    // sportKey 형식: "basketball_nba" -> "basketball"
-    // sportKey 형식: "baseball_mlb" -> "baseball"
     const parts = sportKey.split('_');
-    if (parts.length >= 1) {
-      return parts[0]; // 첫 번째 부분을 mainCategory로 사용
-    }
-    
-    return 'other';
+    const main = parts[0] || '';
+    const sub = parts.slice(1).join('_') || '';
+    return normalizeCategoryPair(main, sub).mainCategory;
   }
 
   determineSubCategory(clientCategory) {
-    // The Odds API sportKey에서 subCategory 추출
     const sportKey = clientSportKeyMap[clientCategory];
     if (!sportKey) return 'other';
-    
-    // sportKey 형식: "soccer_korea_kleague1" -> "korea_kleague1"
-    // sportKey 형식: "basketball_nba" -> "nba"
-    // sportKey 형식: "baseball_mlb" -> "mlb"
     const parts = sportKey.split('_');
-    if (parts.length >= 2) {
-      return parts.slice(1).join('_'); // 첫 번째 부분(그룹명) 제외하고 나머지를 subCategory로 사용
-    }
-    
-    return 'other';
+    const main = parts[0] || '';
+    const sub = parts.slice(1).join('_') || '';
+    return normalizeCategoryPair(main, sub).subCategory;
   }
 
   validateOddsData(game) {
@@ -230,7 +219,7 @@ class OddsApiService {
       const deletedCount = await OddsCache.destroy({
         where: {
           commenceTime: {
-            [require('sequelize').Op.lt]: sevenDaysAgo
+            [Op.lt]: sevenDaysAgo
           }
         }
       });
@@ -442,6 +431,14 @@ class OddsApiService {
     }
     return reverseMap[sportKey];
   }
+
+  // OddsCache 저장/업데이트 시 정규화 적용 예시 (insert, upsert, update 등 모든 저장 지점에 적용 필요)
+  async upsertOddsCache(data) {
+    // data: { mainCategory, subCategory, ... }
+    const { mainCategory, subCategory } = normalizeCategoryPair(data.mainCategory, data.subCategory);
+    const saveData = { ...data, mainCategory, subCategory };
+    return OddsCache.upsert(saveData);
+  }
 }
 
-module.exports = new OddsApiService(); 
+export default new OddsApiService(); 

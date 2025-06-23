@@ -1,4 +1,4 @@
-const { fetchAndSaveAllResults } = require('./services/gameResultService');
+import { fetchAndSaveAllResults } from './services/gameResultService.js';
 
 (async () => {
   await fetchAndSaveAllResults();

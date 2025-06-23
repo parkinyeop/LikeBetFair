@@ -1,6 +1,7 @@
-const express = require('express');
+import express from 'express';
+import oddsApiService from '../services/oddsApiService.js';
+
 const router = express.Router();
-const oddsApiService = require('../services/oddsApiService');
 
 // 카테고리 목록 가져오기
 router.get('/categories', async (req, res) => {
@@ -26,4 +27,4 @@ router.get('/odds/:sportKey', async (req, res) => {
   }
 });
 
-module.exports = router; 
+export default router; 

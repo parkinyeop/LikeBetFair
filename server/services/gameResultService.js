@@ -1,7 +1,11 @@
-const axios = require('axios');
-const GameResult = require('../models/gameResultModel');
-const sportsConfig = require('../config/sportsConfig');
-const Bet = require('../models/betModel');
+import axios from 'axios';
+import GameResult from '../models/gameResultModel.js';
+import sportsConfig from '../config/sportsConfig.js';
+import Bet from '../models/betModel.js';
+import { Op } from 'sequelize';
+import betResultService from './betResultService.js';
+import OddsCache from '../models/oddsCacheModel.js';
+import { normalizeTeamName, normalizeCategory, normalizeCommenceTime, normalizeCategoryPair } from '../normalizeUtils.js';
 
 // 클라이언트에서 사용하는 sport key 매핑
 const clientSportKeyMap = {
@@ -24,7 +28,7 @@ const clientSportKeyMap = {
 const sportsDbLeagueMap = {
   // 축구 (Football)
   'soccer_korea_kleague1': '4689',      // K리그
-  'soccer_japan_j_league': '4340',      // J리그
+  'soccer_japan_j_league': '5188',      // J리그컵 (기존 4340 → 5188)
   'soccer_italy_serie_a': '4332',       // 세리에 A
   'soccer_brazil_campeonato': '4364',   // 브라질 세리에 A
   'soccer_usa_mls': '4346',             // MLS
@@ -81,15 +85,25 @@ const standardizedCategoryMap = {
   'icehockey_ahl': { main: 'hockey', sub: 'ahl' }
 };
 
+// 배당률 제공 카테고리만 허용
+const allowedCategories = ['baseball', 'soccer', 'basketball']; // 필요시 확장
+
 // 스포츠키로부터 표준화된 카테고리 얻기
 function getStandardizedCategory(sportKey) {
+  // 기존 매핑 유지, 없으면 normalizeCategoryPair로 보완
   const category = standardizedCategoryMap[sportKey];
-  if (!category) {
-    console.warn(`[카테고리 매핑] 알 수 없는 스포츠키: ${sportKey}, 기본값 사용`);
-    return { main: 'other', sub: 'other' };
+  if (category) {
+    return { main: category.main, sub: category.sub };
   }
-  return category;
+  // sportKey가 없거나 매핑이 없으면 normalizeCategoryPair로 보정
+  const parts = sportKey ? sportKey.split('_') : [];
+  const main = parts[0] || '';
+  const sub = parts.slice(1).join('_') || '';
+  return normalizeCategoryPair(main, sub);
 }
+
+// 리그/날짜별 API 응답 캐시
+const apiResultCache = {};
 
 class GameResultService {
   constructor() {
@@ -97,38 +111,102 @@ class GameResultService {
     this.baseUrl = 'https://api.the-odds-api.com/v4/sports';
   }
 
-  // 누락된 경기 결과 수집 (클라이언트 배팅 게임 기준)
-  async collectMissingGameResults() {
-    try {
-      console.log('Starting collection of missing game results...');
-      
-      // 배팅 서비스에서 누락된 게임 목록 가져오기
-      const betResultService = require('./betResultService');
-      const missingGames = await betResultService.identifyMissingGameResults();
-      
-      console.log(`Found ${missingGames.length} missing game results to collect`);
-      
-      let collectedCount = 0;
-      let errorCount = 0;
-
-      for (const game of missingGames) {
-        try {
-          const success = await this.collectGameResult(game);
-          if (success) {
-            collectedCount++;
-          }
-        } catch (error) {
-          console.error(`Error collecting result for ${game.desc}:`, error.message);
-          errorCount++;
-        }
+  // 1. OddsCache에서 배당률이 노출된 모든 경기의 고유 목록 추출
+  async collectAllOddsGames() {
+    const allOdds = await OddsCache.findAll({
+      attributes: ['mainCategory', 'subCategory', 'homeTeam', 'awayTeam', 'commenceTime', 'sportKey'],
+      raw: true
+    });
+    // 고유 경기(홈팀, 원정팀, 날짜) 기준 중복 제거
+    const uniqueGames = new Map();
+    allOdds.forEach(game => {
+      const key = `${normalizeTeamName(game.homeTeam)}_${normalizeTeamName(game.awayTeam)}_${game.commenceTime.toISOString().slice(0,10)}`;
+      if (!uniqueGames.has(key)) {
+        uniqueGames.set(key, game);
       }
+    });
+    return Array.from(uniqueGames.values());
+  }
 
-      console.log(`Game results collection completed: ${collectedCount} collected, ${errorCount} errors`);
-      return { collectedCount, errorCount, totalMissing: missingGames.length };
-    } catch (error) {
-      console.error('Error collecting missing game results:', error);
-      throw error;
+  // 2. GameResults에 이미 저장된 경기와 비교하여 누락 경기만 추출
+  async identifyMissingOddsGameResults() {
+    const oddsGames = await this.collectAllOddsGames();
+    const missingGames = [];
+    for (const game of oddsGames) {
+      const exists = await GameResult.findOne({
+        where: {
+          homeTeam: game.homeTeam,
+          awayTeam: game.awayTeam,
+          commenceTime: game.commenceTime
+        }
+      });
+      if (!exists) missingGames.push(game);
     }
+    return missingGames;
+  }
+
+  // 3. 리그/날짜별로 TheSportsDB API에서 결과 한 번에 받아와, 내부 표준화 매칭 함수로만 매칭하여 DB에 저장
+  async fetchAndSaveResultsForMissingOddsGames() {
+    const missingGames = await this.identifyMissingOddsGameResults();
+    // 리그별로 그룹화
+    const leagueMap = {};
+    for (const game of missingGames) {
+      const league = game.mainCategory;
+      if (!leagueMap[league]) leagueMap[league] = [];
+      leagueMap[league].push(game);
+    }
+    let savedCount = 0;
+    for (const league of Object.keys(leagueMap)) {
+      // 모든 리그를 the-odds-api.com(v2)로 fetch
+      const sportKey = this.getSportKeyForCategory(league);
+      if (!sportKey) continue;
+      const apiUrl = `${this.baseUrl}/${sportKey}/scores`;
+      try {
+        const resultsResponse = await axios.get(apiUrl, {
+          params: {
+            apiKey: this.apiKey,
+            daysFrom: 30 // 최근 30일간의 데이터
+          }
+        });
+        const events = resultsResponse.data || [];
+        for (const game of leagueMap[league]) {
+          const homeTeam = game.homeTeam;
+          const awayTeam = game.awayTeam;
+          const commenceDate = game.commenceTime.toISOString().slice(0, 10);
+          const match = events.find(ev =>
+            (ev.home_team === homeTeam && ev.away_team === awayTeam ||
+             ev.home_team === awayTeam && ev.away_team === homeTeam) &&
+            ev.commence_time && ev.commence_time.slice(0, 10) === commenceDate
+          );
+          if (match) {
+            await GameResult.upsert({
+              mainCategory: this.determineMainCategory(sportKey),
+              subCategory: this.determineSubCategory(sportKey),
+              homeTeam: match.home_team,
+              awayTeam: match.away_team,
+              commenceTime: new Date(match.commence_time),
+              status: this.determineGameStatus(match),
+              score: match.scores,
+              result: this.determineGameResult(match),
+              lastUpdated: new Date()
+            });
+            savedCount++;
+          }
+        }
+      } catch (error) {
+        console.error(`[fetchAndSaveResultsForMissingOddsGames] Error fetching results for ${league}:`, error.message);
+        continue;
+      }
+    }
+    return savedCount;
+  }
+
+  // 4. collectMissingGameResults 함수는 OddsCache 기준으로 동작하도록 전면 리팩토링
+  async collectMissingGameResults() {
+    console.log('Starting collection of missing game results (OddsCache 기준)...');
+    const savedCount = await this.fetchAndSaveResultsForMissingOddsGames();
+    console.log(`Game results collection completed: ${savedCount} collected`);
+    return { savedCount };
   }
 
   // 개별 게임 결과 수집
@@ -136,41 +214,32 @@ class GameResultService {
     try {
       const desc = game.desc;
       const teams = desc.split(' vs ');
-      
       if (teams.length !== 2) {
         console.log(`Invalid game description format: ${desc}`);
         return false;
       }
-
       const homeTeam = teams[0].trim();
       const awayTeam = teams[1].trim();
-
       // 팀명으로 스포츠 카테고리 추정
       const sportCategory = this.estimateSportCategory(homeTeam, awayTeam);
       console.log(`\n[결과수집] 경기: ${desc}`);
       console.log(`[결과수집] 추정된 카테고리: ${sportCategory}`);
-
+      // 모든 리그를 the-odds-api.com(v2)로 fetch
       const sportKey = this.getSportKeyForCategory(sportCategory);
-      console.log(`[결과수집] API 스포츠키: ${sportKey}`);
-
       if (!sportKey) {
         console.log(`Could not determine sport key for game: ${desc}`);
         return false;
       }
-
-      // API에서 경기 결과 조회
+      // API에서 경기 결과 조회 (The Odds API)
       const apiUrl = `${this.baseUrl}/${sportKey}/scores`;
       console.log(`[결과수집] API 요청: ${apiUrl}`);
-
       const resultsResponse = await axios.get(apiUrl, {
         params: {
           apiKey: this.apiKey,
           daysFrom: 30 // 최근 30일간의 데이터
         }
       });
-
       console.log(`[결과수집] API 응답 데이터 수: ${resultsResponse.data.length}개`);
-
       // 해당 팀들의 경기 찾기
       const matchingGame = resultsResponse.data.find(gameData => {
         const isMatch = (gameData.home_team === homeTeam && gameData.away_team === awayTeam) ||
@@ -180,12 +249,10 @@ class GameResultService {
         }
         return isMatch;
       });
-
       if (matchingGame) {
         // 경기 결과 저장
         const mainCategory = this.determineMainCategory(sportKey);
         const subCategory = this.determineSubCategory(sportKey);
-        
         await GameResult.upsert({
           mainCategory,
           subCategory,
@@ -197,15 +264,12 @@ class GameResultService {
           result: this.determineGameResult(matchingGame),
           lastUpdated: new Date()
         });
-
         console.log(`[결과수집] 성공: ${desc} 결과 저장 완료`);
         return true;
       } else {
         console.log(`[결과수집] 실패: API 응답에서 ${desc} 경기를 찾을 수 없음`);
-        // API 응답의 첫 번째 경기 데이터 형식 출력
         if (resultsResponse.data.length > 0) {
-          console.log(`[결과수집] API 응답 데이터 형식 예시:`, 
-            JSON.stringify(resultsResponse.data[0], null, 2));
+          console.log(`[결과수집] API 응답 데이터 형식 예시:`, JSON.stringify(resultsResponse.data[0], null, 2));
         }
         return false;
       }
@@ -520,7 +584,7 @@ class GameResultService {
         where: {
           result: 'cancelled',
           commenceTime: {
-            [require('sequelize').Op.lt]: thirtyDaysAgo
+            [Op.lt]: thirtyDaysAgo
           }
         }
       });
@@ -612,7 +676,8 @@ class GameResultService {
           'subCategory',
           'status',
           'result',
-          [require('sequelize').fn('COUNT', require('sequelize').col('id')), 'count']
+          [Op.count(Op.col('id'))],
+          'count'
         ],
         group: ['mainCategory', 'subCategory', 'status', 'result'],
         raw: true
@@ -649,185 +714,19 @@ class GameResultService {
       throw error;
     }
   }
-}
 
-async function fetchAndSaveResultsFromSportsDB(category) {
-  const leagueId = sportsDbLeagueMap[category];
-  if (!leagueId) return;
-  const url = `https://www.thesportsdb.com/api/v1/json/${API_KEY}/eventspastleague.php?id=${leagueId}`;
-  console.log('[TheSportsDB 요청 URL]', url);
-  try {
-    const res = await axios.get(url, {
-      headers: {
-        'User-Agent': 'curl/7.64.1'
-      }
-    });
-    const events = res.data.events || [];
-    for (const event of events) {
-      try {
-        // homeTeam이나 awayTeam이 null인 경우 저장하지 않음
-        if (!event.strHomeTeam || !event.strAwayTeam) {
-          console.log(`[건너뜀] 팀명이 null인 경기: ${event.strHomeTeam} vs ${event.strAwayTeam} (${event.dateEvent})`);
-          continue;
-        }
-
-        await GameResult.upsert({
-          eventId: event.idEvent,
-          mainCategory: category,
-          subCategory: event.strLeague,
-          homeTeam: event.strHomeTeam,
-          awayTeam: event.strAwayTeam,
-          commenceTime: new Date(event.dateEvent + 'T' + (event.strTime || '00:00:00') + 'Z'),
-          status: event.strStatus === 'Match Finished' ? 'finished' : 'scheduled',
-          score: [
-            { team: event.strHomeTeam, score: event.intHomeScore },
-            { team: event.strAwayTeam, score: event.intAwayScore }
-          ],
-          result: determineResult(event),
-          lastUpdated: new Date()
-        });
-        console.log(`[DB 저장 성공] ${event.strHomeTeam} vs ${event.strAwayTeam} (${event.dateEvent})`);
-      } catch (err) {
-        console.error(`[DB 저장 실패] ${event.strHomeTeam} vs ${event.strAwayTeam} (${event.dateEvent})`, err);
-      }
+  // GameResult 저장/업데이트 시 정규화 적용 예시 (insert, upsert, update 등 모든 저장 지점에 적용 필요)
+  async saveOrUpdateGameResult(data) {
+    // data: { mainCategory, subCategory, ... }
+    const { mainCategory, subCategory } = normalizeCategoryPair(data.mainCategory, data.subCategory);
+    if (!allowedCategories.includes(mainCategory)) {
+      console.log(`[GameResultService] 비허용 카테고리(${mainCategory}) 저장 skip:`, data.homeTeam, data.awayTeam, data.commenceTime);
+      return null;
     }
-  } catch (err) {
-    if (err.response) {
-      console.error('[TheSportsDB 422 에러 응답]', err.response.status, err.response.data);
-    } else {
-      console.error('[TheSportsDB 요청 에러]', err);
-    }
+    const saveData = { ...data, mainCategory, subCategory };
+    return GameResult.upsert(saveData);
   }
 }
-
-function determineResult(event) {
-  if (event.intHomeScore == null || event.intAwayScore == null) return 'pending';
-  if (event.intHomeScore > event.intAwayScore) return 'home_win';
-  if (event.intHomeScore < event.intAwayScore) return 'away_win';
-  if (event.intHomeScore === event.intAwayScore) return 'draw';
-  return 'pending';
-}
-
-async function fetchAndSaveAllResults() {
-  console.log('배당율을 제공하는 스포츠 카테고리의 경기 결과를 업데이트합니다...');
-  
-  // 배당율을 제공하는 실제 스포츠 카테고리만 처리
-  const activeCategories = Object.keys(sportsDbLeagueMap);
-  console.log(`처리할 카테고리: ${activeCategories.join(', ')}`);
-  
-  for (const category of activeCategories) {
-    try {
-      await fetchAndSaveResultsFromSportsDB(category);
-      console.log(`[완료] ${category} 카테고리 업데이트 완료`);
-    } catch (error) {
-      console.error(`[에러] ${category} 카테고리 업데이트 실패:`, error.message);
-    }
-  }
-  
-  console.log('모든 카테고리 업데이트 완료');
-}
-
-// 배팅내역에 있는 경기 중 결과가 없는 경우 TheSportsDB에서 가져와 저장
-async function updateMissingGameResultsFromBets() {
-  const allBets = await Bet.findAll({ attributes: ['selections'] });
-  const uniqueGames = new Map();
-  allBets.forEach(bet => {
-    bet.selections.forEach(sel => {
-      const key = sel.desc || `${sel.team}_${sel.commence_time}`;
-      if (key && !uniqueGames.has(key)) {
-        uniqueGames.set(key, sel);
-      }
-    });
-  });
-  let updatedCount = 0;
-  for (const sel of uniqueGames.values()) {
-    const home = sel.desc?.split(' vs ')[0]?.trim();
-    const away = sel.desc?.split(' vs ')[1]?.trim();
-    const exists = await GameResult.findOne({
-      where: {
-        homeTeam: home,
-        awayTeam: away,
-        commenceTime: sel.commence_time
-      }
-    });
-    if (!exists) {
-      await fetchAndSaveResultsFromSportsDBByTeams(sel);
-      updatedCount++;
-    }
-  }
-  return updatedCount;
-}
-
-function normalizeTeamName(name) {
-  return (name || '')
-    .toLowerCase()
-    .replace(/fc|st|united|motors|citizen|hd|sk|giants|heroes|eagles|twins|wiz|landers|lions|dinos|tigers|bears|ag|\.|\s+/g, '')
-    .replace(/[^a-z0-9]/g, '');
-}
-
-function isTeamMatch(a, b) {
-  return normalizeTeamName(a) === normalizeTeamName(b);
-}
-
-function isDateMatch(a, b) {
-  // a, b: ISO string or YYYY-MM-DD
-  return a.slice(0, 10) === b.slice(0, 10);
-}
-
-async function fetchAndSaveResultsFromSportsDBByTeams(sel) {
-  // 카테고리 추정 (예시: K리그)
-  const leagueId = sportsDbLeagueMap['kbo']; // KBO 리그 ID를 4830으로 수정
-  const url = `https://www.thesportsdb.com/api/v1/json/${API_KEY}/eventspastleague.php?id=${leagueId}`;
-  const res = await axios.get(url);
-  const events = res.data.events || [];
-  const home = sel.desc?.split(' vs ')[0]?.trim();
-  const away = sel.desc?.split(' vs ')[1]?.trim();
-  const match = events.find(ev =>
-    isTeamMatch(ev.strHomeTeam, home) &&
-    isTeamMatch(ev.strAwayTeam, away) &&
-    isDateMatch(ev.dateEvent, sel.commence_time)
-  );
-  if (match) {
-    await GameResult.upsert({
-      eventId: match.idEvent,
-      mainCategory: 'k-league', // 실제로는 sel에서 추정
-      subCategory: match.strLeague,
-      homeTeam: match.strHomeTeam,
-      awayTeam: match.strAwayTeam,
-      commenceTime: new Date(match.dateEvent + 'T' + (match.strTime || '00:00:00') + 'Z'),
-      status: match.strStatus === 'Match Finished' ? 'finished' : 'scheduled',
-      score: [
-        { team: match.strHomeTeam, score: match.intHomeScore },
-        { team: match.strAwayTeam, score: match.intAwayScore }
-      ],
-      result: determineResult(match),
-      lastUpdated: new Date()
-    });
-  } else {
-    console.log('[매칭 실패] home:', home, 'away:', away, 'date:', sel.commence_time);
-    for (const ev of events) {
-      if (isDateMatch(ev.dateEvent, sel.commence_time)) {
-        console.log('  후보:', ev.strHomeTeam, 'vs', ev.strAwayTeam, 'date:', ev.dateEvent);
-      }
-    }
-  }
-}
-
-// 1시간마다 배당율을 제공하는 스포츠 카테고리의 경기 결과 업데이트
-setInterval(async () => {
-  try {
-    console.log('[Scheduler] Updating game results from TheSportsDB...');
-    const result = await fetchAndSaveAllResults();
-    console.log(`[Scheduler] Game results update completed at ${new Date().toISOString()}`);
-  } catch (error) {
-    console.error('[Scheduler] Error updating game results:', error);
-  }
-}, 60 * 60 * 1000); // 1시간
-
-// 배팅 결과 업데이트 스케줄러 추가
-const betResultService = require('./betResultService');
 
 const gameResultService = new GameResultService();
-module.exports = gameResultService;
-module.exports.fetchAndSaveAllResults = fetchAndSaveAllResults;
-module.exports.updateMissingGameResultsFromBets = updateMissingGameResultsFromBets; 
+export default gameResultService; 

@@ -1,15 +1,16 @@
-const express = require('express');
+import express from 'express';
+import { placeBet, getBetHistory, getActiveBets, getBetById, cancelBet } from '../controllers/betController.js';
+import betResultService from '../services/betResultService.js';
+import verifyToken from '../middleware/verifyToken.js';
+
 const router = express.Router();
-const betController = require('../controllers/betController');
-const betResultService = require('../services/betResultService');
-const verifyToken = require('../middleware/verifyToken');
 
 // Bet routes
-router.post('/', verifyToken, betController.placeBet);
-router.get('/history', verifyToken, betController.getBetHistory);
-router.get('/active', verifyToken, betController.getActiveBets);
-router.get('/:id', verifyToken, betController.getBetById);
-router.post('/:id/cancel', verifyToken, betController.cancelBet);
+router.post('/', verifyToken, placeBet);
+router.get('/history', verifyToken, getBetHistory);
+router.get('/active', verifyToken, getActiveBets);
+router.get('/:id', verifyToken, getBetById);
+router.post('/:id/cancel', verifyToken, cancelBet);
 
 // 배팅 결과 업데이트 (관리자용)
 router.post('/update-results', async (req, res) => {
@@ -132,4 +133,4 @@ router.get('/admin/all', async (req, res) => {
   }
 });
 
-module.exports = router; 
+export default router; 

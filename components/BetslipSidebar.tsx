@@ -236,12 +236,22 @@ function MyBetsPanel() {
                             if (sel.result === 'won') { icon = '✔️'; color = 'text-green-600'; label = '적중'; }
                             else if (sel.result === 'lost') { icon = '❌'; color = 'text-red-500'; label = '실패'; }
                             else if (sel.result === 'cancel') { icon = '🚫'; color = 'text-gray-400'; label = '취소'; }
+                            // 스코어 표시
+                            let scoreStr = '';
+                            if (sel.gameResult && sel.gameResult.score && Array.isArray(sel.gameResult.score)) {
+                              const home = sel.gameResult.homeTeam;
+                              const away = sel.gameResult.awayTeam;
+                              const homeScore = sel.gameResult.score[0]?.score ?? '-';
+                              const awayScore = sel.gameResult.score[1]?.score ?? '-';
+                              scoreStr = `(${home} ${homeScore} : ${awayScore} ${away})`;
+                            }
                             return (
                               <div key={idx} className="flex items-center text-sm">
                                 <span className={`mr-2 ${color}`}>{icon}</span>
                                 <span className={`font-semibold ${color}`}>{sel.team}</span>
                                 <span className="ml-2 text-gray-600">@ {sel.odds}</span>
                                 <span className={`ml-2 text-xs ${color}`}>{label}</span>
+                                {scoreStr && <span className="ml-2 text-xs text-gray-500">{scoreStr}</span>}
                               </div>
                             );
                           })
@@ -266,7 +276,7 @@ function MyBetsPanel() {
                               if (res.ok) {
                                 alert('베팅이 취소되었습니다.');
                                 if (data.balance !== undefined) setBalance(Number(data.balance));
-                                setBets((prev: any[]) => prev.filter(b => b.id !== bet.id));
+                                setBets((prev: any[]) => prev.map(b => b.id === bet.id ? { ...b, status: 'cancel' } : b));
                                 // 배팅 취소 이벤트 발생
                                 window.dispatchEvent(new Event('betCancelled'));
                               } else {

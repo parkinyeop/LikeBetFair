@@ -1,17 +1,27 @@
-const GameResult = require('./models/gameResultModel');
-const { Op } = require('sequelize');
+import GameResult from './models/gameResultModel.js';
+import { Op } from 'sequelize';
 
 async function listGameResults() {
-  const startOfDay = new Date('2025-06-15T00:00:00Z');
-  const endOfDay = new Date('2025-06-15T23:59:59Z');
+  const startOfDay = new Date('2025-06-19T00:00:00Z');
+  const endOfDay = new Date('2025-06-19T23:59:59Z');
   const results = await GameResult.findAll({
     where: { commenceTime: { [Op.between]: [startOfDay, endOfDay] } },
-    order: [['commenceTime', 'ASC']]
+    attributes: ['mainCategory', 'subCategory', 'id'],
+    raw: true
   });
-  console.log('2025-06-15 경기 목록:');
+
+  // 카테고리별 집계
+  const countMap = {};
   results.forEach(r => {
-    console.log(`${r.homeTeam} vs ${r.awayTeam} | ${r.commenceTime.toISOString()} | status: ${r.status} | result: ${r.result}`);
+    const key = `${r.mainCategory} / ${r.subCategory}`;
+    countMap[key] = (countMap[key] || 0) + 1;
   });
+
+  console.log('2025-06-19 mainCategory / subCategory별 경기 수:');
+  Object.entries(countMap).forEach(([key, count]) => {
+    console.log(`${key}: ${count}경기`);
+  });
+  console.log(`총 경기 수: ${results.length}경기`);
 }
 
 listGameResults(); 
