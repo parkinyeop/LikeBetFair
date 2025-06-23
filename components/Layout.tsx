@@ -48,6 +48,7 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const router = useRouter();
   const [selected, setSelected] = useState("NBA");
+  const isExchange = router.pathname === "/exchange";
 
   useEffect(() => {
     if (router.pathname.startsWith("/odds/") && router.query.sport) {
@@ -96,7 +97,16 @@ export default function Layout({ children }: LayoutProps) {
           </div>
         </main>
         <div className="overflow-y-auto">
-          <BetslipSidebar />
+          {isExchange ? (
+            <div className="flex items-center justify-center min-h-full p-8 text-center text-gray-500">
+              <div>
+                <h2 className="text-xl font-bold mb-2">Exchange 준비중</h2>
+                <p>이 영역은 곧 Exchange 기능으로 대체됩니다.</p>
+              </div>
+            </div>
+          ) : (
+            <BetslipSidebar />
+          )}
         </div>
       </div>
     </div>

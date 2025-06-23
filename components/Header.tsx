@@ -34,19 +34,22 @@ export default function Header() {
             <span className="font-bold text-xl">Lbetfair</span>
           </Link>
           <nav className="hidden sm:flex space-x-4 font-medium">
-            <Link href="/exchange">
-              <button className="ml-2 px-3 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 transition">Exchange</button>
+            <Link href="/exchange" passHref legacyBehavior>
+              <button
+                onClick={() => handleMenuClick("Exchange")}
+                className={`hover:text-blue-200 ${selectedCategory === "Exchange" ? "text-yellow-400 font-bold" : "text-white"}`}
+              >
+                Exchange
+              </button>
             </Link>
-            <button
-              onClick={() => handleMenuClick("Sportsbook")}
-              className={`hover:text-blue-200 ${
-                selectedCategory === "Sportsbook"
-                  ? "text-yellow-400 font-bold"
-                  : "text-white"
-              }`}
-            >
-              Sportsbook
-            </button>
+            <Link href="/" passHref legacyBehavior>
+              <button
+                onClick={() => handleMenuClick("Sportsbook")}
+                className={`hover:text-blue-200 ${selectedCategory === "Sportsbook" ? "text-yellow-400 font-bold" : "text-white"}`}
+              >
+                Sportsbook
+              </button>
+            </Link>
             <button
               onClick={() => handleMenuClick("Casino")}
               className="flex items-center space-x-1 text-gray-300"
