@@ -440,8 +440,7 @@ class OddsApiService {
         order: [['commenceTime', 'ASC']],
         limit: limit
       });
-      
-      console.log(`Found ${odds.length} cached odds records`);
+      console.log('[getCachedOdds] 쿼리 결과:', odds.length, odds.map(o => ({id: o.id, mainCategory: o.mainCategory, subCategory: o.subCategory, homeTeam: o.homeTeam, awayTeam: o.awayTeam, commenceTime: o.commenceTime})));
       
       // 클라이언트에서 기대하는 형식으로 변환
       const formattedOdds = odds.map(oddsRecord => ({

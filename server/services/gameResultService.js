@@ -179,12 +179,17 @@ class GameResultService {
             ev.commence_time && ev.commence_time.slice(0, 10) === commenceDate
           );
           if (match) {
+            const commenceTime = new Date(match.commence_time);
+            if (commenceTime > new Date()) {
+              // 미래 경기는 저장하지 않음
+              continue;
+            }
             await GameResult.upsert({
               mainCategory: this.determineMainCategory(sportKey),
               subCategory: this.determineSubCategory(sportKey),
               homeTeam: match.home_team,
               awayTeam: match.away_team,
-              commenceTime: new Date(match.commence_time),
+              commenceTime,
               status: this.determineGameStatus(match),
               score: match.scores,
               result: this.determineGameResult(match),
@@ -250,6 +255,11 @@ class GameResultService {
         return isMatch;
       });
       if (matchingGame) {
+        const commenceTime = new Date(matchingGame.commence_time);
+        if (commenceTime > new Date()) {
+          // 미래 경기는 저장하지 않음
+          return false;
+        }
         // 경기 결과 저장
         const mainCategory = this.determineMainCategory(sportKey);
         const subCategory = this.determineSubCategory(sportKey);
@@ -258,7 +268,7 @@ class GameResultService {
           subCategory,
           homeTeam: matchingGame.home_team,
           awayTeam: matchingGame.away_team,
-          commenceTime: new Date(matchingGame.commence_time),
+          commenceTime,
           status: this.determineGameStatus(matchingGame),
           score: matchingGame.scores,
           result: this.determineGameResult(matchingGame),

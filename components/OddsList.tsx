@@ -32,6 +32,18 @@ const marketKeyMap = {
   '핸디캡': 'spreads'
 };
 
+// 팀명 정규화(매핑) 함수 예시
+const normalizeTeamName = (name: string) => {
+  // TODO: 실제 매핑 테이블로 대체
+  const map: Record<string, string> = {
+    "Gimcheon Sangmu": "Sangju Sangmu FC",
+    "Daejeon": "Daejeon Citizen",
+    "Jeju SK": "Jeju United FC",
+    // ... 추가 매핑
+  };
+  return map[name] || name;
+};
+
 const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,16 +66,22 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
         }
         const data = await response.json();
         console.log("OddsList API 응답:", data);
+        // KBO 경기만 추출해서 콘솔에 출력
+        const kboRaw = data.filter(g => g.sport_key === "baseball_kbo");
+        console.log("[KBO] API 응답에 포함된 경기 수:", kboRaw.length, kboRaw);
         
-        // 현재 시각 기준 24시간 이전까지의 경기만 필터링
+        // 현재 시각 기준 24시간 이전까지의 경기만 필터링 (사용자 현지 시간 기준)
         const now = new Date();
         const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24시간(1일) 전
         const filteredGames = data.filter((game: Game) => {
-          const gameTime = new Date(game.commence_time);
+          const gameTime = new Date(game.commence_time); // 현지 시간 기준
           // 디버깅용 콘솔
           console.log("cutoff:", cutoff, "gameTime:", gameTime, "commence_time:", game.commence_time);
           return gameTime >= cutoff;
         });
+        // KBO 경기만 필터링해서 콘솔에 출력
+        const kboGames = filteredGames.filter(g => g.sport_key === "baseball_kbo");
+        console.log("[KBO] filteredGames에 포함된 경기 수:", kboGames.length, kboGames);
         
         // 중복 게임 제거 (home_team, away_team, commence_time 기준)
         const uniqueGamesMap = new Map();
@@ -128,7 +146,10 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
   return (
     <div className="space-y-4">
       {games.map((game) => {
-        const gameTime = new Date(game.commence_time);
+        if (game.sport_key === "baseball_kbo") {
+          console.log("[KBO] 렌더링 map에서 만난 경기:", game);
+        }
+        const gameTime = new Date(game.commence_time); // 현지 시간 기준
         const now = new Date();
         const marginMinutes = 10;
         const maxDays = 7;
@@ -235,10 +256,10 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                 <td className="border px-2 py-1">
                                   {bestOver ? (
                                     <button
-                                      className={`w-full py-1 rounded ${isTeamSelected(bestOver.name + bestOver.bookmaker, selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestOver.name), selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                                       disabled={!isBettable || !bestOver.price}
                                       onClick={() => isBettable && bestOver.price && toggleSelection({
-                                        team: bestOver.name + bestOver.bookmaker,
+                                        team: normalizeTeamName(bestOver.name),
                                         odds: bestOver.price,
                                         desc: `${game.home_team} vs ${game.away_team}`,
                                         commence_time: game.commence_time,
@@ -254,10 +275,10 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                 <td className="border px-2 py-1">
                                   {bestUnder ? (
                                     <button
-                                      className={`w-full py-1 rounded ${isTeamSelected(bestUnder.name + bestUnder.bookmaker, selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestUnder.name), selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                                       disabled={!isBettable || !bestUnder.price}
                                       onClick={() => isBettable && bestUnder.price && toggleSelection({
-                                        team: bestUnder.name + bestUnder.bookmaker,
+                                        team: normalizeTeamName(bestUnder.name),
                                         odds: bestUnder.price,
                                         desc: `${game.home_team} vs ${game.away_team}`,
                                         commence_time: game.commence_time,
@@ -291,10 +312,10 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                 <td className="border px-2 py-1">
                                   {bestHome ? (
                                     <button
-                                      className={`w-full py-1 rounded ${isTeamSelected(bestHome.name + bestHome.bookmaker, selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestHome.name), selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                                       disabled={!isBettable || !bestHome.price}
                                       onClick={() => isBettable && bestHome.price && toggleSelection({
-                                        team: bestHome.name + bestHome.bookmaker,
+                                        team: normalizeTeamName(bestHome.name),
                                         odds: bestHome.price,
                                         desc: `${game.home_team} vs ${game.away_team}`,
                                         commence_time: game.commence_time,
@@ -310,10 +331,10 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                 <td className="border px-2 py-1">
                                   {bestAway ? (
                                     <button
-                                      className={`w-full py-1 rounded ${isTeamSelected(bestAway.name + bestAway.bookmaker, selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestAway.name), selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                                       disabled={!isBettable || !bestAway.price}
                                       onClick={() => isBettable && bestAway.price && toggleSelection({
-                                        team: bestAway.name + bestAway.bookmaker,
+                                        team: normalizeTeamName(bestAway.name),
                                         odds: bestAway.price,
                                         desc: `${game.home_team} vs ${game.away_team}`,
                                         commence_time: game.commence_time,
@@ -338,10 +359,10 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                 <td className="border px-2 py-1">
                                   {bestHome ? (
                                     <button
-                                      className={`w-full py-1 rounded ${isTeamSelected(bestHome.name + bestHome.bookmaker, selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestHome.name), selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                                       disabled={!isBettable || !bestHome.price}
                                       onClick={() => isBettable && bestHome.price && toggleSelection({
-                                        team: bestHome.name + bestHome.bookmaker,
+                                        team: normalizeTeamName(bestHome.name),
                                         odds: bestHome.price,
                                         desc: `${game.home_team} vs ${game.away_team}`,
                                         commence_time: game.commence_time,
@@ -357,10 +378,10 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                 <td className="border px-2 py-1">
                                   {bestAway ? (
                                     <button
-                                      className={`w-full py-1 rounded ${isTeamSelected(bestAway.name + bestAway.bookmaker, selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestAway.name), selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                                       disabled={!isBettable || !bestAway.price}
                                       onClick={() => isBettable && bestAway.price && toggleSelection({
-                                        team: bestAway.name + bestAway.bookmaker,
+                                        team: normalizeTeamName(bestAway.name),
                                         odds: bestAway.price,
                                         desc: `${game.home_team} vs ${game.away_team}`,
                                         commence_time: game.commence_time,
@@ -413,7 +434,7 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                     <>
                       <button
                         onClick={() => isBettable && homeBest && toggleSelection({
-                          team: homeBest.name + homeBest.bookmaker,
+                          team: normalizeTeamName(homeBest.name),
                           odds: homeBest.price,
                           desc: `${game.home_team} vs ${game.away_team}`,
                           commence_time: game.commence_time,
@@ -422,7 +443,7 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                           ...(homeBest.point && { point: homeBest.point })
                         })}
                         className={`w-full p-3 rounded-lg text-center transition-colors ${
-                          isTeamSelected(homeBest?.name + homeBest?.bookmaker, selectedMarket, game.id)
+                          isTeamSelected(normalizeTeamName(homeBest?.name), selectedMarket, game.id)
                             ? 'bg-yellow-500 hover:bg-yellow-600'
                             : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                         } text-white`}
@@ -432,14 +453,14 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                           {game.home_team}
                         </div>
                         <div className="text-sm">
-                          {homeBest ? `${homeBest.bookmaker}: ${homeBest.price}` : 'N/A'}
+                          {homeBest ? homeBest.price : 'N/A'}
                         </div>
                         {!isBettable && !isTooFar && <div className="text-xs text-red-500 mt-1">마감</div>}
                         {isTooFar && <div className="text-xs text-gray-400 mt-1">오픈 예정</div>}
                       </button>
                       <button
                         onClick={() => isBettable && awayBest && toggleSelection({
-                          team: awayBest.name + awayBest.bookmaker,
+                          team: normalizeTeamName(awayBest.name),
                           odds: awayBest.price,
                           desc: `${game.home_team} vs ${game.away_team}`,
                           commence_time: game.commence_time,
@@ -448,7 +469,7 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                           ...(awayBest.point && { point: awayBest.point })
                         })}
                         className={`w-full p-3 rounded-lg text-center transition-colors ${
-                          isTeamSelected(awayBest?.name + awayBest?.bookmaker, selectedMarket, game.id)
+                          isTeamSelected(normalizeTeamName(awayBest?.name), selectedMarket, game.id)
                             ? 'bg-yellow-500 hover:bg-yellow-600'
                             : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                         } text-white`}
@@ -458,7 +479,7 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                           {game.away_team}
                         </div>
                         <div className="text-sm">
-                          {awayBest ? `${awayBest.bookmaker}: ${awayBest.price}` : 'N/A'}
+                          {awayBest ? awayBest.price : 'N/A'}
                         </div>
                         {!isBettable && !isTooFar && <div className="text-xs text-red-500 mt-1">마감</div>}
                         {isTooFar && <div className="text-xs text-gray-400 mt-1">오픈 예정</div>}
