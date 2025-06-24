@@ -4,6 +4,7 @@ import Header from "./Header";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import BetslipSidebar from "./BetslipSidebar";
+import ResizableMainLayout from "./ResizableMainLayout";
 
 const sportsTree = {
   축구: [
@@ -83,21 +84,19 @@ export default function Layout({ children }: LayoutProps) {
   return (
     <div className="min-h-screen bg-gray-100">
       <Header />
-      <div className="flex h-[calc(100vh-64px)]">
-        <div className="w-64 bg-white shadow-lg overflow-y-auto">
+      <ResizableMainLayout
+        left={
           <Sidebar
             categories={allCategories}
             selected={selected}
             onSelect={handleCategorySelect}
           />
-        </div>
-        <main className="flex-1 overflow-y-auto">
-          <div className="p-4">
-            {children}
-          </div>
-        </main>
-        <div className="overflow-y-auto">
-          {isExchange ? (
+        }
+        center={
+          <div className="p-4">{children}</div>
+        }
+        right={
+          isExchange ? (
             <div className="flex items-center justify-center min-h-full p-8 text-center text-gray-500">
               <div>
                 <h2 className="text-xl font-bold mb-2">Exchange 준비중</h2>
@@ -105,10 +104,10 @@ export default function Layout({ children }: LayoutProps) {
               </div>
             </div>
           ) : (
-            <BetslipSidebar />
-          )}
-        </div>
-      </div>
+            <div className="h-full flex flex-col"><BetslipSidebar /></div>
+          )
+        }
+      />
     </div>
   );
 } 

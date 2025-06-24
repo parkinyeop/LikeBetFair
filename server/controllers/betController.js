@@ -76,14 +76,32 @@ export async function getBetHistory(req, res) {
 
     console.log(`[getBetHistory] Found ${bets.length} bets for user ${userId}`);
 
-    // selection별 result와 전체 status 동기화
+    // selection별 result와 전체 status 동기화 + gameResult(score 등) 포함
     const updatedBets = await Promise.all(bets.map(async (bet) => {
-      // 항상 집계 로직을 재적용하여 selection별 result와 전체 status 동기화
       await betResultService.processBetResult(bet);
-      return bet.toJSON();
+      // selections에 gameResult 정보 추가
+      const selectionsWithResults = await Promise.all(
+        bet.selections.map(async (selection) => {
+          const gameResult = await betResultService.getGameResultByTeams(selection);
+          return {
+            ...selection,
+            gameResult: gameResult ? {
+              status: gameResult.status,
+              result: gameResult.result,
+              score: gameResult.score,
+              homeTeam: gameResult.homeTeam,
+              awayTeam: gameResult.awayTeam
+            } : null
+          };
+        })
+      );
+      return {
+        ...bet.toJSON(),
+        selections: selectionsWithResults
+      };
     }));
 
-    console.log(`[getBetHistory] Returning ${updatedBets.length} updated bets`);
+    console.log(`[getBetHistory] Returning ${updatedBets.length} updated bets (with gameResult)`);
     res.json(updatedBets);
   } catch (err) {
     console.error('[getBetHistory] Error:', err);
@@ -150,8 +168,19 @@ export async function cancelBet(req, res) {
       await t.rollback();
       return res.status(400).json({ message: '이미 일부 경기가 시작되어 취소할 수 없습니다.' });
     }
+    // 경기 시작 10분 전 이후에는 취소 불가
+    const now = new Date();
+    const marginMinutes = 10;
+    for (const sel of bet.selections) {
+      if (!sel.commence_time) continue;
+      const gameTime = new Date(sel.commence_time);
+      if (gameTime <= new Date(now.getTime() + marginMinutes * 60000)) {
+        await t.rollback();
+        return res.status(400).json({ message: `경기 시작 10분 전 이후에는 취소할 수 없습니다. (${sel.desc})` });
+      }
+    }
     // 환불 및 상태 변경 트랜잭션 처리
-    bet.status = 'cancel';
+    bet.status = 'cancelled';
     await bet.save({ transaction: t });
     const user = await User.findByPk(userId, { transaction: t, lock: t.LOCK.UPDATE });
     user.balance = Number(user.balance) + Number(bet.stake);

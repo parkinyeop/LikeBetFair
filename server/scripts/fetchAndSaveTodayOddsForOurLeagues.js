@@ -2,6 +2,7 @@ import oddsApiService from '../services/oddsApiService.js';
 import { normalizeCategoryPair } from '../normalizeUtils.js';
 import OddsCache from '../models/oddsCacheModel.js';
 import fs from 'fs';
+import path from 'path';
 
 const clientSportKeyMap = {
   'K리그': 'soccer_korea_kleague1',
@@ -21,6 +22,10 @@ const clientSportKeyMap = {
 
 async function fetchAndSaveTodayOddsForOurLeagues() {
   let totalSaved = 0;
+  // 로그 파일 경로 생성
+  const logDir = path.join(process.cwd(), 'logs');
+  if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
+  const logFile = path.join(logDir, `odds_update_${new Date().toISOString().slice(0,10).replace(/-/g, '')}.log.json`);
   for (const [cat, sportKey] of Object.entries(clientSportKeyMap)) {
     try {
       const oddsList = await oddsApiService.fetchRecentOdds(cat);
@@ -61,6 +66,22 @@ async function fetchAndSaveTodayOddsForOurLeagues() {
         }
         await OddsCache.upsert(saveData);
         totalSaved++;
+        // 로그 기록
+        const logObj = {
+          timestamp: new Date().toISOString(),
+          type: 'odds_update',
+          league: cat,
+          homeTeam: o.home_team,
+          awayTeam: o.away_team,
+          commenceTime: o.commence_time,
+          status: 'success',
+          message: 'Odds upserted',
+          data: {
+            odds: o.bookmakers?.[0]?.markets?.[0]?.outcomes?.[0]?.price,
+            bookmaker: o.bookmakers?.[0]?.title
+          }
+        };
+        fs.appendFileSync(logFile, JSON.stringify(logObj) + '\n');
       }
       console.log(`[${cat}] 오늘 저장된 경기수: ${todayOdds.length}`);
     } catch (e) {
@@ -131,4 +152,4 @@ async function fetchNext7DaysOddsKSTToJson() {
 
 // fetchAndSaveTodayOddsForOurLeagues();
 // fetchTodayOddsKSTToJson();
-fetchNext7DaysOddsKSTToJson(); 
+fetchAndSaveTodayOddsForOurLeagues(); 

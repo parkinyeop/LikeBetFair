@@ -106,7 +106,16 @@ function MyBetsPanel() {
   };
 
   // 필터링된 배팅만 표시
-  let filteredBets = filter === 'all' ? bets : bets.filter((bet) => bet.status === filter);
+  let filteredBets = bets;
+  if (filter === 'all') {
+    // 전체
+    filteredBets = bets;
+  } else if (filter === 'lost') {
+    // 미적중: lost 또는 cancelled
+    filteredBets = bets.filter((bet) => bet.status === 'lost' || bet.status === 'cancelled');
+  } else {
+    filteredBets = bets.filter((bet) => bet.status === filter);
+  }
   if (hidePastResults) {
     filteredBets = filteredBets.filter(bet => bet.status === 'pending');
   }
@@ -119,14 +128,14 @@ function MyBetsPanel() {
     if (status === 'pending') return '진행중';
     if (status === 'won') return '적중';
     if (status === 'lost') return '실패';
-    if (status === 'cancel') return '배팅취소';
+    if (status === 'cancelled') return '배팅취소';
     return status;
   };
   const statusColor = (status: string) => {
     if (status === 'pending') return 'text-blue-600';
     if (status === 'won') return 'text-green-600';
     if (status === 'lost') return 'text-red-500';
-    if (status === 'cancel') return 'text-gray-400';
+    if (status === 'cancelled') return 'text-gray-400';
     return '';
   };
 
@@ -236,16 +245,7 @@ function MyBetsPanel() {
                             let icon = '⏳', color = 'text-gray-400', label = '대기';
                             if (sel.result === 'won') { icon = '✔️'; color = 'text-green-600'; label = '적중'; }
                             else if (sel.result === 'lost') { icon = '❌'; color = 'text-red-500'; label = '실패'; }
-                            else if (sel.result === 'cancel') { icon = '🚫'; color = 'text-gray-400'; label = '취소'; }
-                            // 스코어 표시
-                            let scoreStr = '';
-                            if (sel.gameResult && sel.gameResult.score && Array.isArray(sel.gameResult.score)) {
-                              const home = sel.gameResult.homeTeam;
-                              const away = sel.gameResult.awayTeam;
-                              const homeScore = sel.gameResult.score[0]?.score ?? '-';
-                              const awayScore = sel.gameResult.score[1]?.score ?? '-';
-                              scoreStr = `(${home} ${homeScore} : ${awayScore} ${away})`;
-                            }
+                            else if (sel.result === 'cancelled') { icon = '🚫'; color = 'text-gray-400'; label = '취소'; }
                             // 언더/오버 마켓이면 라인+옵션만 노출
                             const isOverUnder = sel.market === '언더/오버' || sel.market === 'totals';
                             const ouType = normalizeOption(sel.option || sel.team);
@@ -255,17 +255,20 @@ function MyBetsPanel() {
                                 {isOverUnder ? (
                                   <span className={`font-semibold ${color}`}>{ouType} {sel.point !== undefined ? `(${sel.point})` : ''}</span>
                                 ) : (
-                                  <span className={`font-semibold ${color}`}>{sel.team}</span>
+                                  <span className={`font-semibold ${color}`}>{sel.desc ? sel.desc.split(' vs ').find(t => t && sel.team && t.replace(/\s/g, '').toLowerCase().includes(sel.team.replace(/\s/g, '').toLowerCase())) || sel.team : sel.team}</span>
                                 )}
                                 <span className="ml-2 text-gray-600">@ {sel.odds}</span>
                                 <span className={`ml-2 text-xs ${color}`}>{label}</span>
-                                <span className={`ml-2 text-xs ${scoreStr ? 'text-blue-600' : 'text-gray-400'}`}>
-                                  {scoreStr
-                                    ? `결과: ${scoreStr}`
-                                    : sel.result === 'pending'
-                                      ? '결과 대기중'
-                                      : '결과 없음'}
-                                </span>
+                                {bet.status === 'cancelled' && (
+                                  <span className="ml-2 text-xs text-gray-400 font-semibold">배팅이 취소됨</span>
+                                )}
+                                {['won', 'lost'].includes(sel.result) && sel.gameResult && sel.gameResult.score && Array.isArray(sel.gameResult.score) ? (
+                                  <span className="ml-2 text-xs text-blue-600">
+                                    결과: ({sel.gameResult.homeTeam} {sel.gameResult.score[0]?.score ?? '-'} : {sel.gameResult.awayTeam} {sel.gameResult.score[1]?.score ?? '-'})
+                                  </span>
+                                ) : ['won', 'lost'].includes(sel.result) ? (
+                                  <span className="ml-2 text-xs text-gray-400">결과 대기중</span>
+                                ) : null}
                               </div>
                             );
                           })
@@ -286,17 +289,21 @@ function MyBetsPanel() {
                                 method: 'POST',
                                 headers: { 'x-auth-token': token || '' },
                               });
-                              const data = await res.json();
                               if (res.ok) {
+                                const data = await res.json();
                                 alert('베팅이 취소되었습니다.');
                                 if (data.balance !== undefined) setBalance(Number(data.balance));
-                                setBets((prev: any[]) => prev.map(b => b.id === bet.id ? { ...b, status: 'cancel' } : b));
-                                // 배팅 취소 이벤트 발생
+                                setBets((prev: any[]) => prev.map(b => b.id === bet.id ? { ...b, status: 'cancelled' } : b));
                                 window.dispatchEvent(new Event('betCancelled'));
                               } else {
-                                alert(data.message || '취소 실패');
+                                alert('경기 시작 10분 전까지만 베팅 취소가 가능합니다.');
                               }
                             }}
+                            disabled={bet.status === 'cancelled' || bet.selections.some((sel: any) => {
+                              if (!sel.commence_time) return false;
+                              const gameTime = new Date(sel.commence_time);
+                              return gameTime <= new Date(Date.now() + 10 * 60 * 1000);
+                            })}
                           >
                             베팅취소
                           </button>

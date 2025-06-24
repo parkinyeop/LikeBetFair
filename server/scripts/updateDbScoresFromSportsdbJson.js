@@ -1,6 +1,7 @@
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName } from '../normalizeUtils.js';
 import fs from 'fs';
+import path from 'path';
 
 // 팀명 매핑 테이블 (DB팀명/스포츠DB팀명 → 표준팀명)
 const teamNameMap = {
@@ -87,6 +88,10 @@ function getStatusAndResult(event) {
 }
 
 async function main() {
+  // 로그 파일 경로 생성
+  const logDir = path.join(process.cwd(), 'logs');
+  if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
+  const logFile = path.join(logDir, `game_result_update_${new Date().toISOString().slice(0,10).replace(/-/g, '')}.log.json`);
   const allGames = await GameResult.findAll();
   let updated = 0, notFound = [], postponed = 0;
   for (const game of allGames) {
@@ -97,7 +102,19 @@ async function main() {
         if (status === 'postponed') {
           await game.update({ status: 'postponed', result: 'postponed', score: null, lastUpdated: new Date() });
           postponed++;
-          console.log(`[POSTPONED] ${game.commenceTime.toISOString().slice(0, 10)} | ${game.homeTeam} vs ${game.awayTeam}`);
+          // 로그 기록
+          const logObj = {
+            timestamp: new Date().toISOString(),
+            type: 'game_result_update',
+            league: event.strLeague || '',
+            homeTeam: game.homeTeam,
+            awayTeam: game.awayTeam,
+            commenceTime: game.commenceTime,
+            status: 'postponed',
+            message: 'Game postponed',
+            data: {}
+          };
+          fs.appendFileSync(logFile, JSON.stringify(logObj) + '\n');
           continue;
         }
         if (event.intHomeScore != null && event.intAwayScore != null) {
@@ -115,7 +132,22 @@ async function main() {
             lastUpdated: new Date()
           });
           updated++;
-          console.log(`[UPDATED] ${game.commenceTime.toISOString().slice(0, 10)} | ${game.homeTeam} vs ${game.awayTeam} | ${event.strHomeTeam} ${homeScore} - ${awayScore} ${event.strAwayTeam} | result: ${finalResult}`);
+          // 로그 기록
+          const logObj = {
+            timestamp: new Date().toISOString(),
+            type: 'game_result_update',
+            league: event.strLeague || '',
+            homeTeam: game.homeTeam,
+            awayTeam: game.awayTeam,
+            commenceTime: game.commenceTime,
+            status: 'success',
+            message: 'Game result updated',
+            data: {
+              score: scoreArr,
+              result: finalResult
+            }
+          };
+          fs.appendFileSync(logFile, JSON.stringify(logObj) + '\n');
         } else {
           notFound.push({
             id: game.id,
