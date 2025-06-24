@@ -29,8 +29,7 @@ const PaymentHistory = sequelize.define('PaymentHistory', {
   },
   paidAt: {
     type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW
+    allowNull: false
   }
 }, {
   timestamps: true

@@ -1,10 +1,10 @@
 import dotenv from 'dotenv';
 dotenv.config();
-import betResultService from '../services/betResultService.js';
+import BetResultService from '../services/betResultService.js';
 
 async function main() {
   try {
-    const result = await betResultService.updateBetResults();
+    const result = await BetResultService.updateBetResults();
     console.log('Bet results update finished:', result);
   } catch (err) {
     console.error('Bet results update error:', err);

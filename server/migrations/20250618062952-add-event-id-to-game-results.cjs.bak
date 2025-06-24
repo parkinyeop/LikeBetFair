@@ -1,0 +1,20 @@
+'use strict';
+
+/** @type {import('sequelize-cli').Migration} */
+module.exports = {
+  up: async (queryInterface, Sequelize) => {
+    await queryInterface.addColumn('GameResults', 'eventId', {
+      type: Sequelize.STRING,
+      allowNull: true,
+      unique: true
+    });
+
+    // eventId에 인덱스 추가
+    await queryInterface.addIndex('GameResults', ['eventId']);
+  },
+
+  down: async (queryInterface, Sequelize) => {
+    await queryInterface.removeIndex('GameResults', ['eventId']);
+    await queryInterface.removeColumn('GameResults', 'eventId');
+  }
+}; 

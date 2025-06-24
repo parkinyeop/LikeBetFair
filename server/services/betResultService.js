@@ -419,18 +419,31 @@ class BetResultService {
       return 'pending';
     }
 
-    const selectedType = normalizeTeamName(selection.team); // 'Over' or 'Under'
+    // robust하게 옵션 추출 (예: 'Overbet365', 'UnderPinnacle' 등)
+    const option = (selection.option && selection.option !== '')
+      ? require('../normalizeUtils.js').normalizeOption(selection.option)
+      : require('../normalizeUtils.js').normalizeOption(selection.team);
     const point = selection.point;
     
-    // 스코어에서 총 골 수 계산
+    // 스코어에서 총 점수 계산
     let totalScore = 0;
     if (gameResult.score && Array.isArray(gameResult.score)) {
       totalScore = gameResult.score.reduce((sum, score) => sum + parseInt(score.score || 0), 0);
     }
 
-    if (selectedType.includes('Over')) {
+    // point가 없으면 무효
+    if (typeof point !== 'number' || isNaN(point)) {
+      return 'cancel';
+    }
+
+    // 무효 조건: totalScore와 point가 같으면 push/cancel 처리
+    if (totalScore === point) {
+      return 'cancel';
+    }
+
+    if (option === 'Over') {
       return totalScore > point ? 'won' : 'lost';
-    } else if (selectedType.includes('Under')) {
+    } else if (option === 'Under') {
       return totalScore < point ? 'won' : 'lost';
     }
 

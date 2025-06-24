@@ -1,4 +1,5 @@
 import OddsCache from '../models/oddsCacheModel.js';
+import OddsApiService from '../services/oddsApiService.js';
 import { Op } from 'sequelize';
 
 const oddsController = {
@@ -60,4 +61,4 @@ const oddsController = {
   }
 };
 
-export default oddsController; 
+export { oddsController }; 

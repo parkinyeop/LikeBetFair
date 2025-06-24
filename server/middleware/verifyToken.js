@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-const verifyToken = (req, res, next) => {
+function verifyToken(req, res, next) {
   // Get token from header
   const token = req.header('x-auth-token');
 
@@ -17,6 +17,6 @@ const verifyToken = (req, res, next) => {
   } catch (err) {
     res.status(401).json({ message: 'Token is not valid' });
   }
-};
+}
 
 export default verifyToken; 

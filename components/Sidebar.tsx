@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 interface SidebarProps {
   categories: string[];
@@ -11,22 +11,26 @@ const Sidebar: React.FC<SidebarProps> = ({ categories, selected, onSelect }) => 
   const mainCategories = categories.filter(cat => !cat.includes(" > "));
   const subCategories = categories.filter(cat => cat.includes(" > "));
 
-  // 현재 선택된 메인 카테고리와 서브 카테고리
+  // 현재 선택된 메인/서브
   const [currentMain, currentSub] = selected.includes(" > ")
     ? selected.split(" > ")
     : [selected, ""];
 
+  // 하위 카테고리 열림 상태를 별도 관리
+  const [openMain, setOpenMain] = useState(currentMain);
+
   return (
     <div className="flex flex-col p-4 space-y-1">
       {mainCategories.map((category) => {
-        const isSelectedMain = currentMain === category;
+        const isSelectedMain = openMain === category;
 
         return (
           <div key={category}>
             <button
               onClick={() => {
-                // 클릭된 카테고리가 이미 선택된 메인이 아니라면 갱신
-                if (currentMain !== category) {
+                // 다른 메인 카테고리 클릭 시에만 openMain 변경
+                if (openMain !== category) {
+                  setOpenMain(category);
                   onSelect(category); // 메인만 선택됨
                 }
               }}
@@ -39,7 +43,7 @@ const Sidebar: React.FC<SidebarProps> = ({ categories, selected, onSelect }) => 
               {category}
             </button>
 
-            {/* 선택된 메인 카테고리만 하위 표시 */}
+            {/* openMain(열린 메인)만 하위 표시 */}
             {isSelectedMain && (
               <div className="ml-4 mt-1 space-y-1">
                 {subCategories
@@ -55,14 +59,14 @@ const Sidebar: React.FC<SidebarProps> = ({ categories, selected, onSelect }) => 
                           isSelectedSub
                             ? "font-bold bg-white shadow text-blue-600"
                             : "text-gray-600 hover:bg-gray-300"
-                }`}
-              >
+                        }`}
+                      >
                         {subLabel}
                       </button>
                     );
                   })}
-        </div>
-      )}
+              </div>
+            )}
           </div>
         );
       })}

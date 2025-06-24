@@ -247,7 +247,7 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                         point: bestOver.point
                                       })}
                                     >
-                                      {bestOver.bookmaker}: {bestOver.price}
+                                      {bestOver.price}
                                     </button>
                                   ) : '-'}
                                 </td>
@@ -266,7 +266,7 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                         point: bestUnder.point
                                       })}
                                     >
-                                      {bestUnder.bookmaker}: {bestUnder.price}
+                                      {bestUnder.price}
                                     </button>
                                   ) : '-'}
                                 </td>
@@ -303,7 +303,7 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                         point: bestHome.point
                                       })}
                                     >
-                                      {bestHome.bookmaker}: {bestHome.price}
+                                      {bestHome.price}
                                     </button>
                                   ) : '-'}
                                 </td>
@@ -322,7 +322,7 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                         point: bestAway.point
                                       })}
                                     >
-                                      {bestAway.bookmaker}: {bestAway.price}
+                                      {bestAway.price}
                                     </button>
                                   ) : '-'}
                                 </td>
@@ -350,7 +350,7 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                         point: bestHome.point
                                       })}
                                     >
-                                      {bestHome.bookmaker}: {bestHome.price}
+                                      {bestHome.price}
                                     </button>
                                   ) : '-'}
                                 </td>
@@ -369,7 +369,7 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                         point: bestAway.point
                                       })}
                                     >
-                                      {bestAway.bookmaker}: {bestAway.price}
+                                      {bestAway.price}
                                     </button>
                                   ) : '-'}
                                 </td>

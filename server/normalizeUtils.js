@@ -127,8 +127,19 @@ function normalizeSubCategory(sub) {
 function normalizeCategoryPair(main, sub) {
   return {
     mainCategory: normalizeMainCategory(main),
-    subCategory: normalizeSubCategory(sub),
+    subCategory: normalizeSubCategory(sub).toUpperCase(),
   };
+}
+
+/**
+ * sportKey에서 mainCategory, subCategory를 추출 (예: baseball_kbo → baseball, KBO)
+ */
+function parseMainAndSubFromSportKey(sportKey) {
+  if (!sportKey) return { mainCategory: '', subCategory: '' };
+  const parts = sportKey.split('_');
+  const main = parts[0] || '';
+  const sub = parts.slice(1).join('_') || '';
+  return normalizeCategoryPair(main, sub);
 }
 
 export {
@@ -143,4 +154,5 @@ export {
   normalizeMainCategory,
   normalizeSubCategory,
   normalizeCategoryPair,
+  parseMainAndSubFromSportKey,
 }; 

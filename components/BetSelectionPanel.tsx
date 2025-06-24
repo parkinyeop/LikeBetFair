@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useBetStore } from '../stores/useBetStore';
 import { useAuth } from '../contexts/AuthContext';
+import { normalizeOption } from '../server/normalizeUtils';
 
 const BetSelectionPanel = () => {
   const { selections, stake, setStake, removeSelection, clearAll } = useBetStore();
@@ -74,7 +75,11 @@ const BetSelectionPanel = () => {
         {selections.map((sel) => (
           <li key={sel.team} className="flex justify-between items-center">
             <div>
-              <p className="text-sm font-medium">{sel.team}</p>
+              {((sel as any)?.market === '언더/오버' || (sel as any)?.market === 'totals') ? (
+                <p className="text-sm font-medium">{normalizeOption((sel as any)?.option || sel.team)} {(sel as any)?.point !== undefined ? `(${(sel as any).point})` : ''}</p>
+              ) : (
+                <p className="text-sm font-medium">{sel.team}</p>
+              )}
               <p className="text-xs text-gray-500">{sel.desc}</p>
             </div>
             <div className="flex items-center gap-2">

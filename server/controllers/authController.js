@@ -142,4 +142,4 @@ const authController = {
   }
 };
 
-export default authController; 
+export { authController }; 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import BetSelectionPanel from "./BetSelectionPanel";
 import { useAuth } from '../contexts/AuthContext';
+import { normalizeOption } from '../server/normalizeUtils';
 
 function MyBetsPanel() {
   const [bets, setBets] = useState<any[]>([]);
@@ -245,13 +246,26 @@ function MyBetsPanel() {
                               const awayScore = sel.gameResult.score[1]?.score ?? '-';
                               scoreStr = `(${home} ${homeScore} : ${awayScore} ${away})`;
                             }
+                            // 언더/오버 마켓이면 라인+옵션만 노출
+                            const isOverUnder = sel.market === '언더/오버' || sel.market === 'totals';
+                            const ouType = normalizeOption(sel.option || sel.team);
                             return (
                               <div key={idx} className="flex items-center text-sm">
                                 <span className={`mr-2 ${color}`}>{icon}</span>
-                                <span className={`font-semibold ${color}`}>{sel.team}</span>
+                                {isOverUnder ? (
+                                  <span className={`font-semibold ${color}`}>{ouType} {sel.point !== undefined ? `(${sel.point})` : ''}</span>
+                                ) : (
+                                  <span className={`font-semibold ${color}`}>{sel.team}</span>
+                                )}
                                 <span className="ml-2 text-gray-600">@ {sel.odds}</span>
                                 <span className={`ml-2 text-xs ${color}`}>{label}</span>
-                                {scoreStr && <span className="ml-2 text-xs text-gray-500">{scoreStr}</span>}
+                                <span className={`ml-2 text-xs ${scoreStr ? 'text-blue-600' : 'text-gray-400'}`}>
+                                  {scoreStr
+                                    ? `결과: ${scoreStr}`
+                                    : sel.result === 'pending'
+                                      ? '결과 대기중'
+                                      : '결과 없음'}
+                                </span>
                               </div>
                             );
                           })

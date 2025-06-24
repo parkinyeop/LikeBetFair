@@ -41,22 +41,15 @@ const OddsCache = sequelize.define('OddsCache', {
   },
   lastUpdated: {
     type: DataTypes.DATE,
+    allowNull: false
+  },
+  market: {
+    type: DataTypes.STRING,
     allowNull: false,
-    defaultValue: DataTypes.NOW
+    defaultValue: 'h2h'
   }
 }, {
-  timestamps: true,
-  indexes: [
-    {
-      fields: ['mainCategory', 'subCategory']
-    },
-    {
-      fields: ['commenceTime']
-    },
-    {
-      fields: ['lastUpdated']
-    }
-  ]
+  timestamps: true
 });
 
 export default OddsCache; 

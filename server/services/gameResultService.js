@@ -728,5 +728,4 @@ class GameResultService {
   }
 }
 
-const gameResultService = new GameResultService();
-export default gameResultService; 
+export default GameResultService; 

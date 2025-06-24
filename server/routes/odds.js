@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
+import { oddsController } from '../controllers/oddsController.js';
+
 const router = express.Router();
-const oddsController = require('../controllers/oddsController');
 
 router.get('/:sport', oddsController.getOdds);
- 
-module.exports = router; 
+
+export default router; 

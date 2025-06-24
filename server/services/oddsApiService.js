@@ -70,6 +70,11 @@ class OddsApiService {
               const mainCategory = this.determineMainCategory(clientCategory);
               const subCategory = this.determineSubCategory(clientCategory);
               
+              if (!mainCategory || !subCategory) {
+                console.error(`[oddsApiService] mainCategory/subCategory 누락: mainCategory=${mainCategory}, subCategory=${subCategory}, data=`, { mainCategory, subCategory, sportKey, sportTitle: clientCategory, homeTeam: game.home_team, awayTeam: game.away_team, commenceTime: new Date(game.commence_time), bookmakers: game.bookmakers });
+                continue;
+              }
+              
               await OddsCache.upsert({
                 mainCategory,
                 subCategory,
@@ -129,6 +134,11 @@ class OddsApiService {
               const mainCategory = this.determineMainCategory(clientCategory);
               const subCategory = this.determineSubCategory(clientCategory);
               
+              if (!mainCategory || !subCategory) {
+                console.error(`[oddsApiService] mainCategory/subCategory 누락: mainCategory=${mainCategory}, subCategory=${subCategory}, data=`, { mainCategory, subCategory, sportKey, sportTitle: clientCategory, homeTeam: game.home_team, awayTeam: game.away_team, commenceTime: new Date(game.commence_time), bookmakers: game.bookmakers });
+                continue;
+              }
+              
               await OddsCache.upsert({
                 mainCategory,
                 subCategory,
@@ -159,23 +169,51 @@ class OddsApiService {
     }
   }
 
-  determineMainCategory(clientCategory) {
-    // The Odds API sportKey에서 mainCategory 추출
-    const sportKey = clientSportKeyMap[clientCategory];
-    if (!sportKey) return 'other';
+  // sportKey에서 mainCategory/subCategory 직접 추출 (fallback)
+  parseMainAndSubFromSportKey(sportKey) {
+    if (!sportKey) return { mainCategory: '', subCategory: '' };
     const parts = sportKey.split('_');
     const main = parts[0] || '';
     const sub = parts.slice(1).join('_') || '';
-    return normalizeCategoryPair(main, sub).mainCategory;
+    // normalizeCategoryPair는 mainCategory: 소문자, subCategory: 대문자 반환
+    return normalizeCategoryPair(main, sub);
   }
 
-  determineSubCategory(clientCategory) {
-    const sportKey = clientSportKeyMap[clientCategory];
-    if (!sportKey) return 'other';
-    const parts = sportKey.split('_');
-    const main = parts[0] || '';
-    const sub = parts.slice(1).join('_') || '';
-    return normalizeCategoryPair(main, sub).subCategory;
+  // 기존 메서드 보완: sportKey 자체도 허용
+  getClientCategoryFromSportKey(sportKey) {
+    const reverseMap = {};
+    for (const [clientCategory, key] of Object.entries(clientSportKeyMap)) {
+      reverseMap[key] = clientCategory;
+    }
+    // fallback: sportKey 자체 반환
+    return reverseMap[sportKey] || sportKey;
+  }
+
+  // 기존 메서드 보완: clientCategory 또는 sportKey 모두 허용
+  determineMainCategory(clientCategoryOrSportKey) {
+    if (clientSportKeyMap[clientCategoryOrSportKey]) {
+      // clientCategory일 때 기존 방식
+      const sportKey = clientSportKeyMap[clientCategoryOrSportKey];
+      const parts = sportKey.split('_');
+      const main = parts[0] || '';
+      const sub = parts.slice(1).join('_') || '';
+      return normalizeCategoryPair(main, sub).mainCategory;
+    } else {
+      // sportKey일 때 fallback
+      return this.parseMainAndSubFromSportKey(clientCategoryOrSportKey).mainCategory;
+    }
+  }
+
+  determineSubCategory(clientCategoryOrSportKey) {
+    if (clientSportKeyMap[clientCategoryOrSportKey]) {
+      const sportKey = clientSportKeyMap[clientCategoryOrSportKey];
+      const parts = sportKey.split('_');
+      const main = parts[0] || '';
+      const sub = parts.slice(1).join('_') || '';
+      return normalizeCategoryPair(main, sub).subCategory;
+    } else {
+      return this.parseMainAndSubFromSportKey(clientCategoryOrSportKey).subCategory;
+    }
   }
 
   validateOddsData(game) {
@@ -423,22 +461,18 @@ class OddsApiService {
     }
   }
 
-  // 새로운 메서드: sportKey를 클라이언트 카테고리로 변환
-  getClientCategoryFromSportKey(sportKey) {
-    const reverseMap = {};
-    for (const [clientCategory, key] of Object.entries(clientSportKeyMap)) {
-      reverseMap[key] = clientCategory;
-    }
-    return reverseMap[sportKey];
-  }
-
   // OddsCache 저장/업데이트 시 정규화 적용 예시 (insert, upsert, update 등 모든 저장 지점에 적용 필요)
   async upsertOddsCache(data) {
     // data: { mainCategory, subCategory, ... }
     const { mainCategory, subCategory } = normalizeCategoryPair(data.mainCategory, data.subCategory);
     const saveData = { ...data, mainCategory, subCategory };
+    if (!mainCategory || !subCategory) {
+      console.error(`[oddsApiService] mainCategory/subCategory 누락: mainCategory=${mainCategory}, subCategory=${subCategory}, data=`, data);
+      return; // 저장 skip
+    }
     return OddsCache.upsert(saveData);
   }
 }
 
-export default new OddsApiService(); 
+const oddsApiService = new OddsApiService();
+export default oddsApiService; 
