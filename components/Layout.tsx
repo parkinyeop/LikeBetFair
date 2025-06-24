@@ -4,7 +4,6 @@ import Header from "./Header";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import BetslipSidebar from "./BetslipSidebar";
-import ResizableMainLayout from "./ResizableMainLayout";
 
 const sportsTree = {
   축구: [
@@ -82,33 +81,33 @@ export default function Layout({ children }: LayoutProps) {
   };
 
   return (
-    <div className="h-screen bg-gray-100 flex flex-col">
+    <div className="min-h-screen bg-gray-100">
       <Header />
-      <div className="flex-1 h-0">
-        <ResizableMainLayout
-          left={
-            <Sidebar
-              categories={allCategories}
-              selected={selected}
-              onSelect={handleCategorySelect}
-            />
-          }
-          center={
-            <div className="p-4">{children}</div>
-          }
-          right={
-            isExchange ? (
-              <div className="flex items-center justify-center min-h-full p-8 text-center text-gray-500">
-                <div>
-                  <h2 className="text-xl font-bold mb-2">Exchange 준비중</h2>
-                  <p>이 영역은 곧 Exchange 기능으로 대체됩니다.</p>
-                </div>
+      <div className="flex h-[calc(100vh-64px)]">
+        <div className="w-64 bg-white shadow-lg overflow-y-auto">
+          <Sidebar
+            categories={allCategories}
+            selected={selected}
+            onSelect={handleCategorySelect}
+          />
+        </div>
+        <main className="flex-1 overflow-y-auto">
+          <div className="p-4">
+            {children}
+          </div>
+        </main>
+        <div className="overflow-y-auto">
+          {isExchange ? (
+            <div className="flex items-center justify-center min-h-full p-8 text-center text-gray-500">
+              <div>
+                <h2 className="text-xl font-bold mb-2">Exchange 준비중</h2>
+                <p>이 영역은 곧 Exchange 기능으로 대체됩니다.</p>
               </div>
-            ) : (
-              <BetslipSidebar />
-            )
-          }
-        />
+            </div>
+          ) : (
+            <BetslipSidebar />
+          )}
+        </div>
       </div>
     </div>
   );

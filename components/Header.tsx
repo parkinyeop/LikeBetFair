@@ -22,17 +22,17 @@ export default function Header() {
   };
 
   return (
-    <header className="w-full bg-blue-600 text-white shadow px-4 py-2 h-16">
-      <div className="max-w-screen-2xl mx-auto flex items-center justify-between">
+    <header className="w-full bg-blue-600 text-white shadow h-16 flex items-center">
+      <div className="w-full flex items-center justify-between h-full px-4">
         {/* 왼쪽: Lbetfair + 버전 */}
-        <div className="flex items-center gap-2 min-w-[180px]">
+        <div className="flex items-center gap-2 min-w-[180px] h-full">
           <Link href="/">
             <span className="font-bold text-xl">Lbetfair</span>
           </Link>
           <span className="ml-2 text-xs bg-white text-blue-600 rounded px-2 py-0.5 font-mono">v{FRONTEND_VERSION}</span>
         </div>
         {/* 중앙: 메뉴 */}
-        <nav className="flex-1 flex justify-center">
+        <nav className="flex-1 flex items-center justify-center h-full">
           <div className="flex space-x-4 font-medium">
             <Link href="/exchange" passHref legacyBehavior>
               <button
@@ -74,7 +74,7 @@ export default function Header() {
           </div>
         </nav>
         {/* 오른쪽: 로그인/회원가입 또는 유저 정보 */}
-        <div className="flex items-center space-x-3 min-w-[180px] justify-end text-sm">
+        <div className="flex items-center space-x-3 min-w-[180px] justify-end text-sm h-full">
           {isLoggedIn ? (
             <>
               <span className="font-semibold text-white">{username}님 접속중입니다</span>
