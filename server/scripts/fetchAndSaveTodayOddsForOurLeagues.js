@@ -1,24 +1,12 @@
 import oddsApiService from '../services/oddsApiService.js';
 import { normalizeCategoryPair } from '../normalizeUtils.js';
 import OddsCache from '../models/oddsCacheModel.js';
+import Bet from '../models/betModel.js';
 import fs from 'fs';
 import path from 'path';
 
-const clientSportKeyMap = {
-  'K리그': 'soccer_korea_kleague1',
-  'J리그': 'soccer_japan_j_league',
-  '세리에 A': 'soccer_italy_serie_a',
-  '브라질 세리에 A': 'soccer_brazil_campeonato',
-  'MLS': 'soccer_usa_mls',
-  '아르헨티나 프리메라': 'soccer_argentina_primera_division',
-  '중국 슈퍼리그': 'soccer_china_superleague',
-  '스페인 2부': 'soccer_spain_segunda_division',
-  '스웨덴 알스벤스칸': 'soccer_sweden_allsvenskan',
-  'NBA': 'basketball_nba',
-  'MLB': 'baseball_mlb',
-  'KBO': 'baseball_kbo',
-  'NHL': 'icehockey_nhl'
-};
+// 우리가 배당률을 제공하는 리그만 명시
+const activeCategories = ['KBO', 'MLB', 'NBA']; // 필요시 확장
 
 async function fetchAndSaveTodayOddsForOurLeagues() {
   let totalSaved = 0;
@@ -26,66 +14,89 @@ async function fetchAndSaveTodayOddsForOurLeagues() {
   const logDir = path.join(process.cwd(), 'logs');
   if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
   const logFile = path.join(logDir, `odds_update_${new Date().toISOString().slice(0,10).replace(/-/g, '')}.log.json`);
-  for (const [cat, sportKey] of Object.entries(clientSportKeyMap)) {
+
+  // 1. Bet 테이블에서 모든 selections 추출 (중복 제거)
+  const allBets = await Bet.findAll({ attributes: ['selections'] });
+  const uniqueGames = new Map();
+  allBets.forEach(bet => {
+    bet.selections.forEach(sel => {
+      const key = `${sel.category}_${sel.homeTeam}_${sel.awayTeam}_${sel.commence_time}`;
+      if (!uniqueGames.has(key)) uniqueGames.set(key, sel);
+    });
+  });
+
+  // 2. activeCategories의 모든 경기(오늘/미래 경기) odds API에서 받아오기 (중복 제거)
+  for (const category of activeCategories) {
     try {
-      const oddsList = await oddsApiService.fetchRecentOdds(cat);
-      if (cat === 'MLB') {
-        console.log('[MLB oddsList 전체]', JSON.stringify(oddsList, null, 2));
-      }
-      // 오늘 날짜만 필터링
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(today.getDate()+1);
-      if (cat === 'MLB') {
-        console.log(`[MLB today 기준] today: ${today.toISOString()}, tomorrow: ${tomorrow.toISOString()}`);
-      }
-      const todayOdds = oddsList.filter(o => {
-        const dt = new Date(o.commence_time);
-        if (cat === 'MLB') {
-          console.log(`[MLB 경기] commence_time: ${o.commence_time}, dt: ${dt.toISOString()}, today: ${today.toISOString()}, tomorrow: ${tomorrow.toISOString()}, 포함여부: ${dt >= today && dt < tomorrow}`);
-        }
-        return dt >= today && dt < tomorrow;
-      });
-      for (const o of todayOdds) {
-        // 우리 DB 포맷으로 변환
-        const { mainCategory, subCategory } = normalizeCategoryPair(cat, cat);
-        const saveData = {
-          mainCategory,
-          subCategory,
-          sportKey,
-          sportTitle: cat,
-          homeTeam: o.home_team,
-          awayTeam: o.away_team,
-          commenceTime: new Date(o.commence_time),
-          bookmakers: o.bookmakers,
-          lastUpdated: new Date()
-        };
-        if (cat === 'MLB') {
-          console.log('[MLB 저장 직전 데이터]', JSON.stringify(saveData, null, 2));
-        }
-        await OddsCache.upsert(saveData);
-        totalSaved++;
-        // 로그 기록
-        const logObj = {
-          timestamp: new Date().toISOString(),
-          type: 'odds_update',
-          league: cat,
-          homeTeam: o.home_team,
-          awayTeam: o.away_team,
-          commenceTime: o.commence_time,
-          status: 'success',
-          message: 'Odds upserted',
-          data: {
-            odds: o.bookmakers?.[0]?.markets?.[0]?.outcomes?.[0]?.price,
-            bookmaker: o.bookmakers?.[0]?.title
+      const oddsList = await oddsApiService.fetchRecentOdds(category);
+      for (const o of oddsList) {
+        // 오늘/미래 경기만
+        if (new Date(o.commence_time) > new Date()) {
+          const key = `${category}_${o.home_team}_${o.away_team}_${o.commence_time}`;
+          if (!uniqueGames.has(key)) {
+            uniqueGames.set(key, {
+              category,
+              homeTeam: o.home_team,
+              awayTeam: o.away_team,
+              commence_time: o.commence_time
+            });
           }
-        };
-        fs.appendFileSync(logFile, JSON.stringify(logObj) + '\n');
+        }
       }
-      console.log(`[${cat}] 오늘 저장된 경기수: ${todayOdds.length}`);
     } catch (e) {
-      console.error(`[${cat}] (${sportKey}) 에러:`, e.message);
+      console.error(`[${category}] odds API fetch error:`, e.message);
+    }
+  }
+
+  // 3. 중복 없는 모든 경기 odds 저장
+  for (const sel of uniqueGames.values()) {
+    try {
+      const oddsList = await oddsApiService.fetchRecentOdds(sel.category);
+      console.log(`[DEBUG] [${sel.category}] oddsList.length:`, oddsList.length, 'sel:', sel);
+      const targetOdds = oddsList.find(o => {
+        return (
+          o.home_team === sel.homeTeam &&
+          o.away_team === sel.awayTeam &&
+          new Date(o.commence_time).getTime() === new Date(sel.commence_time).getTime() &&
+          new Date(o.commence_time) > new Date() // 미래 경기만
+        );
+      });
+      if (!targetOdds) {
+        console.log(`[DEBUG] [${sel.category}] targetOdds not found for`, sel.homeTeam, sel.awayTeam, sel.commence_time);
+        continue;
+      }
+      const { mainCategory, subCategory } = normalizeCategoryPair(sel.category, sel.category);
+      const saveData = {
+        mainCategory,
+        subCategory,
+        sportKey: sel.category,
+        sportTitle: sel.category,
+        homeTeam: sel.homeTeam,
+        awayTeam: sel.awayTeam,
+        commenceTime: new Date(sel.commence_time),
+        bookmakers: targetOdds.bookmakers,
+        lastUpdated: new Date()
+      };
+      console.log('[DEBUG] saveData:', saveData);
+      await OddsCache.upsert(saveData);
+      totalSaved++;
+      const logObj = {
+        timestamp: new Date().toISOString(),
+        type: 'odds_update',
+        league: sel.category,
+        homeTeam: sel.homeTeam,
+        awayTeam: sel.awayTeam,
+        commenceTime: sel.commence_time,
+        status: 'success',
+        message: 'Odds upserted',
+        data: {
+          odds: targetOdds.bookmakers?.[0]?.markets?.[0]?.outcomes?.[0]?.price,
+          bookmaker: targetOdds.bookmakers?.[0]?.title
+        }
+      };
+      fs.appendFileSync(logFile, JSON.stringify(logObj) + '\n');
+    } catch (e) {
+      console.error(`[${sel.category}] odds fetch/save error:`, e.message);
     }
   }
   console.log(`총 저장된 odds row: ${totalSaved}`);
@@ -150,6 +161,4 @@ async function fetchNext7DaysOddsKSTToJson() {
   process.exit(0);
 }
 
-// fetchAndSaveTodayOddsForOurLeagues();
-// fetchTodayOddsKSTToJson();
 fetchAndSaveTodayOddsForOurLeagues(); 

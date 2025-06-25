@@ -94,11 +94,13 @@ export default function Home() {
         
         const data = await response.json();
         
-        // 현재 시간 이후의 경기만 필터링
+        // 정책: 오늘 00:00~7일 후 경기만 노출
         const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        const maxDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
         const filteredGames = data.filter((game: any) => {
           const gameTime = new Date(game.commence_time);
-          return gameTime > now;
+          return gameTime >= startOfToday && gameTime <= maxDate;
         });
         
         // 중복 게임 제거 (home_team, away_team, commence_time 기준, 정보가 더 많은 쪽 우선)

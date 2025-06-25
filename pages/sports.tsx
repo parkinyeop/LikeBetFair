@@ -14,13 +14,6 @@ const sportsList = [
   { name: "KBO", key: "baseball_kbo" },
   { name: "NFL", key: "americanfootball_nfl" },
   { name: "NHL", key: "icehockey_nhl" },
-  { name: "UFC", key: "mma_mixed_martial_arts" },
-  { name: "테니스 ATP", key: "tennis_atp_singles" },
-  { name: "테니스 WTA", key: "tennis_wta_singles" },
-  { name: "CS2", key: "esports_cs2" },
-  { name: "LoL", key: "esports_lol" },
-  { name: "Dota 2", key: "esports_dota2" },
-  { name: "Valorant", key: "esports_valorant" },
 ];
 
 export default function SportsPage() {

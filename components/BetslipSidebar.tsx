@@ -172,8 +172,8 @@ function MyBetsPanel() {
         ))}
       </div>
       {/* 배팅내역 리스트 + 지난 결과 숨기기 하단 고정 */}
-      <div className="relative">
-        <ul className="space-y-2 max-h-96 overflow-y-auto pr-1">
+      <div className="relative h-full">
+        <ul className="space-y-2 h-full pr-1">
           {filteredBets.map((bet) => {
             let dateStr = '-';
             if (bet.createdAt) {
@@ -360,7 +360,7 @@ export default function BetslipSidebar() {
   }
 
   return (
-    <aside className="w-80 bg-white text-black p-4 space-y-4 border-l border-gray-200">
+    <aside className="w-80 bg-white text-black p-4 space-y-4 border-l border-gray-200 h-full flex flex-col min-h-0 overflow-y-auto">
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-lg font-bold">BET</h2>
         <span className="text-sm font-semibold text-blue-600">잔액: {balance !== null ? Number(balance).toLocaleString() : '-'}원</span>
@@ -379,7 +379,9 @@ export default function BetslipSidebar() {
           배팅내역
         </button>
       </div>
-      {tab === 'betslip' ? <BetSelectionPanel /> : <MyBetsPanel key={refreshKey} />}
+      <div className="flex-1 min-h-0 flex flex-col">
+        {tab === 'betslip' ? <BetSelectionPanel /> : <MyBetsPanel key={refreshKey} />}
+      </div>
     </aside>
   );
 } 

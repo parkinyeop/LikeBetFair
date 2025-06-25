@@ -65,42 +65,14 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
           throw new Error('Failed to fetch odds');
         }
         const data = await response.json();
-        console.log("OddsList API 응답:", data);
-        // KBO 경기만 추출해서 콘솔에 출력
-        const kboRaw = data.filter(g => g.sport_key === "baseball_kbo");
-        console.log("[KBO] API 응답에 포함된 경기 수:", kboRaw.length, kboRaw);
-        
-        // 현재 시각 기준 24시간 이전까지의 경기만 필터링 (사용자 현지 시간 기준)
         const now = new Date();
-        const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24시간(1일) 전
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        const maxDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7일 후
         const filteredGames = data.filter((game: Game) => {
-          const gameTime = new Date(game.commence_time); // 현지 시간 기준
-          // 디버깅용 콘솔
-          console.log("cutoff:", cutoff, "gameTime:", gameTime, "commence_time:", game.commence_time);
-          return gameTime >= cutoff;
+          const gameTime = new Date(game.commence_time);
+          return gameTime >= startOfToday && gameTime <= maxDate;
         });
-        // KBO 경기만 필터링해서 콘솔에 출력
-        const kboGames = filteredGames.filter(g => g.sport_key === "baseball_kbo");
-        console.log("[KBO] filteredGames에 포함된 경기 수:", kboGames.length, kboGames);
-        
-        // 중복 게임 제거 (home_team, away_team, commence_time 기준)
-        const uniqueGamesMap = new Map();
-        filteredGames.forEach((game: Game) => {
-          const key = `${game.home_team}|${game.away_team}|${game.commence_time}`;
-          if (!uniqueGamesMap.has(key)) {
-            uniqueGamesMap.set(key, game);
-          }
-        });
-        const uniqueGames = Array.from(uniqueGamesMap.values());
-        // 시작 시간순으로 정렬
-        uniqueGames.sort((a: Game, b: Game) => {
-          return new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime();
-        });
-
-        if (sportKey === "baseball_kbo" && filteredGames.length > 0) {
-          console.log("KBO 상세 bookmakers 구조 sample:", JSON.stringify(filteredGames[0].bookmakers, null, 2));
-        }
-        setGames(uniqueGames);
+        setGames(filteredGames);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch odds');
@@ -144,7 +116,7 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 h-full flex-1 min-h-0 px-1 overflow-y-auto">
       {games.map((game) => {
         if (game.sport_key === "baseball_kbo") {
           console.log("[KBO] 렌더링 map에서 만난 경기:", game);

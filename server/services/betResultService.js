@@ -73,6 +73,10 @@ class BetResultService {
     let hasWon = false;
     let hasCancel = false;
 
+    // selections deep copy for comparison
+    const prevSelections = JSON.stringify(bet.selections);
+    const prevStatus = bet.status;
+
     for (const selection of selections) {
       // team 정규화 적용
       const normalizedTeam = normalizeTeamName(selection.team);
@@ -108,48 +112,51 @@ class BetResultService {
     } else if (hasLost) {
       betStatus = 'lost';
     } else if (hasWon && !hasLost && !hasPending) {
-      // 모두 'won' 또는 'won'+'cancel'만 있을 때
       betStatus = 'won';
     } else if (hasCancel && !hasWon && !hasLost && !hasPending) {
-      // 모두 'cancel'만 있을 때
       betStatus = 'cancel';
     }
 
-    await bet.update({
-      status: betStatus,
-      selections: selections
-    });
+    // 변경 여부 확인
+    const newSelectionsStr = JSON.stringify(selections);
+    const statusChanged = betStatus !== prevStatus;
+    const selectionsChanged = newSelectionsStr !== prevSelections;
 
-    // 적중(won) 시 유저 balance 지급 (중복 지급 방지, 트랜잭션 적용)
-    if (betStatus === 'won' && bet.status !== 'won') {
-      const t = await User.sequelize.transaction();
-      try {
-        const user = await User.findByPk(bet.userId, { transaction: t, lock: t.LOCK.UPDATE });
-        if (user) {
-          user.balance = Number(user.balance) + Number(bet.potentialWinnings);
-          await user.save({ transaction: t });
-          await PaymentHistory.create({
-            userId: user.id,
-            betId: bet.id,
-            amount: bet.potentialWinnings,
-            balanceAfter: user.balance,
-            memo: '베팅 적중 지급',
-            paidAt: new Date()
-          }, { transaction: t });
-          await t.commit();
-          console.log(`[BetResultService] 적중 지급: userId=${user.id}, betId=${bet.id}, 지급액=${bet.potentialWinnings}, 잔고=${user.balance}`);
-        } else {
+    if (statusChanged || selectionsChanged) {
+      await bet.update({
+        status: betStatus,
+        selections: selections
+      });
+      // 적중(won) 시 유저 balance 지급 (중복 지급 방지, 트랜잭션 적용)
+      if (betStatus === 'won' && prevStatus !== 'won') {
+        const t = await User.sequelize.transaction();
+        try {
+          const user = await User.findByPk(bet.userId, { transaction: t, lock: t.LOCK.UPDATE });
+          if (user) {
+            user.balance = Number(user.balance) + Number(bet.potentialWinnings);
+            await user.save({ transaction: t });
+            await PaymentHistory.create({
+              userId: user.id,
+              betId: bet.id,
+              amount: bet.potentialWinnings,
+              balanceAfter: user.balance,
+              memo: '베팅 적중 지급',
+              paidAt: new Date()
+            }, { transaction: t });
+            await t.commit();
+            console.log(`[BetResultService] 적중 지급: userId=${user.id}, betId=${bet.id}, 지급액=${bet.potentialWinnings}, 잔고=${user.balance}`);
+          } else {
+            await t.rollback();
+            console.error(`[BetResultService] 적중 지급 실패: userId=${bet.userId} (유저 없음)`);
+          }
+        } catch (err) {
           await t.rollback();
-          console.error(`[BetResultService] 적중 지급 실패: userId=${bet.userId} (유저 없음)`);
+          console.error('[BetResultService] 적중 지급 트랜잭션 실패:', err);
         }
-      } catch (err) {
-        await t.rollback();
-        console.error('[BetResultService] 적중 지급 트랜잭션 실패:', err);
       }
+      // 상태 변화 로그
+      console.log(`Bet ${bet.id} updated to ${betStatus} (won:${hasWon}, lost:${hasLost}, cancel:${hasCancel}, pending:${hasPending})`);
     }
-
-    // 상태 변화 로그
-    console.log(`Bet ${bet.id} updated to ${betStatus} (won:${hasWon}, lost:${hasLost}, cancel:${hasCancel}, pending:${hasPending})`);
     return betStatus !== 'pending';
   }
 

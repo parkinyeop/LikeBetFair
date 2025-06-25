@@ -173,6 +173,8 @@ class GameResultService {
           const homeTeam = game.homeTeam;
           const awayTeam = game.awayTeam;
           const commenceDate = game.commenceTime.toISOString().slice(0, 10);
+          // 경기 시작 시간이 현재 시각 이후면 skip
+          if (game.commenceTime > new Date()) continue;
           const match = events.find(ev =>
             (ev.home_team === homeTeam && ev.away_team === awayTeam ||
              ev.home_team === awayTeam && ev.away_team === homeTeam) &&

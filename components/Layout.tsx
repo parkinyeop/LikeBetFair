@@ -93,7 +93,7 @@ export default function Layout({ children }: LayoutProps) {
           />
         }
         center={
-          <div className="p-4">{children}</div>
+          <div className="p-4 h-full flex flex-col">{children}</div>
         }
         right={
           isExchange ? (

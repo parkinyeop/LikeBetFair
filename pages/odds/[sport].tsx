@@ -8,9 +8,11 @@ export default function SportOddsPage() {
   if (!sport || typeof sport !== "string") return <p>Loading...</p>;
 
   return (
-    <div>
+    <div className="h-full flex flex-col">
       <h1 className="text-2xl font-bold mb-6">{sport.toUpperCase()} 배당 정보</h1>
-      <OddsList sportKey={sport} />
+      <div className="flex-1 min-h-0">
+        <OddsList sportKey={sport} />
+      </div>
     </div>
   );
 } 
