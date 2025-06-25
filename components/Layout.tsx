@@ -82,32 +82,34 @@ export default function Layout({ children }: LayoutProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="h-screen bg-gray-100 flex flex-col">
       <Header />
-      <ResizableMainLayout
-        left={
-          <Sidebar
-            categories={allCategories}
-            selected={selected}
-            onSelect={handleCategorySelect}
-          />
-        }
-        center={
-          <div className="p-4 h-full flex flex-col">{children}</div>
-        }
-        right={
-          isExchange ? (
-            <div className="flex items-center justify-center min-h-full p-8 text-center text-gray-500">
-              <div>
-                <h2 className="text-xl font-bold mb-2">Exchange 준비중</h2>
-                <p>이 영역은 곧 Exchange 기능으로 대체됩니다.</p>
+      <div className="flex-1 min-h-0">
+        <ResizableMainLayout
+          left={
+            <Sidebar
+              categories={allCategories}
+              selected={selected}
+              onSelect={handleCategorySelect}
+            />
+          }
+          center={
+            <div className="p-4 h-full flex flex-col">{children}</div>
+          }
+          right={
+            isExchange ? (
+              <div className="flex items-center justify-center min-h-full p-8 text-center text-gray-500">
+                <div>
+                  <h2 className="text-xl font-bold mb-2">Exchange 준비중</h2>
+                  <p>이 영역은 곧 Exchange 기능으로 대체됩니다.</p>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="h-full flex flex-col"><BetslipSidebar /></div>
-          )
-        }
-      />
+            ) : (
+              <div className="h-full flex flex-col"><BetslipSidebar /></div>
+            )
+          }
+        />
+      </div>
     </div>
   );
 } 
