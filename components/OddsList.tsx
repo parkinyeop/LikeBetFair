@@ -87,8 +87,13 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
     return () => clearInterval(interval);
   }, [sportKey]);
 
-  const isTeamSelected = (team: string, market: string, gameId: string) => {
-    return selections.some(selection => selection.team === team && selection.market === market && selection.gameId === gameId);
+  const isTeamSelected = (team: string, market: string, gameId: string, point?: number) => {
+    return selections.some(selection =>
+      selection.team === team &&
+      selection.market === market &&
+      selection.gameId === gameId &&
+      (point === undefined || selection.point === point)
+    );
   };
 
   if (loading) {
@@ -180,6 +185,12 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                       return acc;
                     }, {} as Record<string, typeof allOutcomes>)
                   );
+                  // 라인(point) 기준 오름차순 정렬
+                  grouped.sort((a, b) => {
+                    const pa = (a as any[])[0]?.point ?? 0;
+                    const pb = (b as any[])[0]?.point ?? 0;
+                    return pa - pb;
+                  });
                   // 최고 배당 추출 및 payout 계산
                   const getBest = (arr: any[], type: string) => {
                     const filtered = arr.filter(o => o.name.toLowerCase().includes(type));
@@ -228,7 +239,7 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                 <td className="border px-2 py-1">
                                   {bestOver ? (
                                     <button
-                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestOver.name), selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestOver.name), selectedMarket, game.id, bestOver.point) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                                       disabled={!isBettable || !bestOver.price}
                                       onClick={() => isBettable && bestOver.price && toggleSelection({
                                         team: normalizeTeamName(bestOver.name),
@@ -247,7 +258,7 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                 <td className="border px-2 py-1">
                                   {bestUnder ? (
                                     <button
-                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestUnder.name), selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestUnder.name), selectedMarket, game.id, bestUnder.point) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                                       disabled={!isBettable || !bestUnder.price}
                                       onClick={() => isBettable && bestUnder.price && toggleSelection({
                                         team: normalizeTeamName(bestUnder.name),
@@ -284,7 +295,7 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                 <td className="border px-2 py-1">
                                   {bestHome ? (
                                     <button
-                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestHome.name), selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestHome.name), selectedMarket, game.id, bestHome.point) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                                       disabled={!isBettable || !bestHome.price}
                                       onClick={() => isBettable && bestHome.price && toggleSelection({
                                         team: normalizeTeamName(bestHome.name),
@@ -303,7 +314,7 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                 <td className="border px-2 py-1">
                                   {bestAway ? (
                                     <button
-                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestAway.name), selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestAway.name), selectedMarket, game.id, bestAway.point) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                                       disabled={!isBettable || !bestAway.price}
                                       onClick={() => isBettable && bestAway.price && toggleSelection({
                                         team: normalizeTeamName(bestAway.name),
@@ -331,7 +342,7 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                 <td className="border px-2 py-1">
                                   {bestHome ? (
                                     <button
-                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestHome.name), selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestHome.name), selectedMarket, game.id, bestHome.point) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                                       disabled={!isBettable || !bestHome.price}
                                       onClick={() => isBettable && bestHome.price && toggleSelection({
                                         team: normalizeTeamName(bestHome.name),
@@ -350,7 +361,7 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                                 <td className="border px-2 py-1">
                                   {bestAway ? (
                                     <button
-                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestAway.name), selectedMarket, game.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestAway.name), selectedMarket, game.id, bestAway.point) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                                       disabled={!isBettable || !bestAway.price}
                                       onClick={() => isBettable && bestAway.price && toggleSelection({
                                         team: normalizeTeamName(bestAway.name),
@@ -415,7 +426,7 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                           ...(homeBest.point && { point: homeBest.point })
                         })}
                         className={`w-full p-3 rounded-lg text-center transition-colors ${
-                          isTeamSelected(normalizeTeamName(homeBest?.name), selectedMarket, game.id)
+                          isTeamSelected(normalizeTeamName(homeBest?.name), selectedMarket, game.id, homeBest.point)
                             ? 'bg-yellow-500 hover:bg-yellow-600'
                             : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                         } text-white`}
@@ -441,7 +452,7 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
                           ...(awayBest.point && { point: awayBest.point })
                         })}
                         className={`w-full p-3 rounded-lg text-center transition-colors ${
-                          isTeamSelected(normalizeTeamName(awayBest?.name), selectedMarket, game.id)
+                          isTeamSelected(normalizeTeamName(awayBest?.name), selectedMarket, game.id, awayBest.point)
                             ? 'bg-yellow-500 hover:bg-yellow-600'
                             : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                         } text-white`}
