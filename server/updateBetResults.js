@@ -1,6 +1,6 @@
-const Bet = require('./models/betModel');
-const GameResult = require('./models/gameResultModel');
-const { Op } = require('sequelize');
+import Bet from './models/betModel.js';
+import GameResult from './models/gameResultModel.js';
+import { Op } from 'sequelize';
 
 async function updateBetResults() {
   try {

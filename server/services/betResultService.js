@@ -3,7 +3,7 @@ import GameResult from '../models/gameResultModel.js';
 import User from '../models/userModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
 import { Op, fn, col } from 'sequelize';
-import { normalizeTeamName, normalizeCategory, normalizeCategoryPair } from '../normalizeUtils.js';
+import { normalizeTeamName, normalizeTeamNameForComparison, normalizeCategory, normalizeCategoryPair } from '../normalizeUtils.js';
 
 // 배당률 제공 카테고리만 허용 (gameResultService와 동일하게 유지)
 const allowedCategories = ['baseball', 'soccer', 'basketball'];
@@ -83,10 +83,32 @@ class BetResultService {
       selection.team = normalizedTeam;
       const gameResult = await this.getGameResultByTeams(selection);
 
+      // 디버깅: selection과 gameResult의 주요 값 출력
+      console.log('[정산 디버그] selection:', {
+        desc: selection.desc,
+        team: selection.team,
+        market: selection.market,
+        option: selection.option,
+        point: selection.point,
+        result: selection.result,
+        commence_time: selection.commence_time
+      });
+      if (gameResult) {
+        console.log('[정산 디버그] gameResult:', {
+          status: gameResult.status,
+          result: gameResult.result,
+          score: gameResult.score,
+          homeTeam: gameResult.homeTeam,
+          awayTeam: gameResult.awayTeam,
+          commenceTime: gameResult.commenceTime
+        });
+      } else {
+        console.log('[정산 디버그] gameResult: 없음');
+      }
+
       if (!gameResult) {
         // 경기 결과가 아직 없는 경우
         hasPending = true;
-        console.log(`[processBetResult] No GameResult for ${selection.desc} (${selection.commence_time})`);
         continue;
       }
 
@@ -123,14 +145,16 @@ class BetResultService {
     const selectionsChanged = newSelectionsStr !== prevSelections;
 
     if (statusChanged || selectionsChanged) {
-      await bet.update({
-        status: betStatus,
-        selections: selections
-      });
-      // 적중(won) 시 유저 balance 지급 (중복 지급 방지, 트랜잭션 적용)
-      if (betStatus === 'won' && prevStatus !== 'won') {
-        const t = await User.sequelize.transaction();
-        try {
+      // 트랜잭션으로 모든 업데이트 묶기
+      const t = await Bet.sequelize.transaction();
+      try {
+        // 1. bet 업데이트
+        await bet.update({
+          status: betStatus,
+          selections: selections
+        }, { transaction: t });
+        // 2. 적중(won) 시 유저 balance 지급 및 PaymentHistory 생성
+        if (betStatus === 'won' && prevStatus !== 'won') {
           const user = await User.findByPk(bet.userId, { transaction: t, lock: t.LOCK.UPDATE });
           if (user) {
             user.balance = Number(user.balance) + Number(bet.potentialWinnings);
@@ -143,19 +167,16 @@ class BetResultService {
               memo: '베팅 적중 지급',
               paidAt: new Date()
             }, { transaction: t });
-            await t.commit();
-            console.log(`[BetResultService] 적중 지급: userId=${user.id}, betId=${bet.id}, 지급액=${bet.potentialWinnings}, 잔고=${user.balance}`);
           } else {
-            await t.rollback();
-            console.error(`[BetResultService] 적중 지급 실패: userId=${bet.userId} (유저 없음)`);
+            throw new Error(`[BetResultService] 적중 지급 실패: userId=${bet.userId} (유저 없음)`);
           }
-        } catch (err) {
-          await t.rollback();
-          console.error('[BetResultService] 적중 지급 트랜잭션 실패:', err);
         }
+        await t.commit();
+        console.log(`Bet ${bet.id} updated to ${betStatus} (won:${hasWon}, lost:${hasLost}, cancel:${hasCancel}, pending:${hasPending})`);
+      } catch (err) {
+        await t.rollback();
+        console.error('[BetResultService] 트랜잭션 실패:', err);
       }
-      // 상태 변화 로그
-      console.log(`Bet ${bet.id} updated to ${betStatus} (won:${hasWon}, lost:${hasLost}, cancel:${hasCancel}, pending:${hasPending})`);
     }
     return betStatus !== 'pending';
   }
@@ -169,9 +190,9 @@ class BetResultService {
         console.log(`[getGameResultByTeams] Invalid game description format: ${desc}`);
         return null;
       }
-      // team 정규화 적용
-      const homeTeamNorm = normalizeTeamName(teams[0].trim());
-      const awayTeamNorm = normalizeTeamName(teams[1].trim());
+      // team 정규화 적용 (비교용)
+      const homeTeamNorm = normalizeTeamNameForComparison(teams[0].trim());
+      const awayTeamNorm = normalizeTeamNameForComparison(teams[1].trim());
       // 카테고리 정규화
       const selCatNorm = normalizeCategoryPair(selection.mainCategory, selection.subCategory).mainCategory;
       // commence_time 파싱
@@ -201,8 +222,8 @@ class BetResultService {
       const scheduledCandidates = candidates.filter(c => c.status !== 'finished');
       // 1차: finished 후보군에서 매칭
       for (const candidate of finishedCandidates) {
-        const dbHomeNorm = normalizeTeamName(candidate.homeTeam);
-        const dbAwayNorm = normalizeTeamName(candidate.awayTeam);
+        const dbHomeNorm = normalizeTeamNameForComparison(candidate.homeTeam);
+        const dbAwayNorm = normalizeTeamNameForComparison(candidate.awayTeam);
         const dbCatNorm = normalizeCategoryPair(candidate.mainCategory, candidate.subCategory).mainCategory;
         if (!allowedCategories.includes(dbCatNorm)) continue; // 비허용 카테고리 skip
         console.log(`[getGameResultByTeams] 후보(finished): id=${candidate.id}, homeTeam=${candidate.homeTeam}(${dbHomeNorm}), awayTeam=${candidate.awayTeam}(${dbAwayNorm}), mainCategory=${candidate.mainCategory}, commenceTime=${candidate.commenceTime}`);
@@ -217,8 +238,8 @@ class BetResultService {
       }
       // 1차: scheduled 등 나머지 후보군에서 매칭
       for (const candidate of scheduledCandidates) {
-        const dbHomeNorm = normalizeTeamName(candidate.homeTeam);
-        const dbAwayNorm = normalizeTeamName(candidate.awayTeam);
+        const dbHomeNorm = normalizeTeamNameForComparison(candidate.homeTeam);
+        const dbAwayNorm = normalizeTeamNameForComparison(candidate.awayTeam);
         const dbCatNorm = normalizeCategoryPair(candidate.mainCategory, candidate.subCategory).mainCategory;
         if (!allowedCategories.includes(dbCatNorm)) continue; // 비허용 카테고리 skip
         console.log(`[getGameResultByTeams] 후보(scheduled): id=${candidate.id}, homeTeam=${candidate.homeTeam}(${dbHomeNorm}), awayTeam=${candidate.awayTeam}(${dbAwayNorm}), mainCategory=${candidate.mainCategory}, commenceTime=${candidate.commenceTime}`);
@@ -233,8 +254,8 @@ class BetResultService {
       }
       // 2차: 카테고리 무시, 팀명만 일치 (finished 우선)
       for (const candidate of finishedCandidates) {
-        const dbHomeNorm = normalizeTeamName(candidate.homeTeam);
-        const dbAwayNorm = normalizeTeamName(candidate.awayTeam);
+        const dbHomeNorm = normalizeTeamNameForComparison(candidate.homeTeam);
+        const dbAwayNorm = normalizeTeamNameForComparison(candidate.awayTeam);
         if (
           (dbHomeNorm === homeTeamNorm && dbAwayNorm === awayTeamNorm) ||
           (dbHomeNorm === awayTeamNorm && dbAwayNorm === homeTeamNorm)
@@ -244,8 +265,8 @@ class BetResultService {
         }
       }
       for (const candidate of scheduledCandidates) {
-        const dbHomeNorm = normalizeTeamName(candidate.homeTeam);
-        const dbAwayNorm = normalizeTeamName(candidate.awayTeam);
+        const dbHomeNorm = normalizeTeamNameForComparison(candidate.homeTeam);
+        const dbAwayNorm = normalizeTeamNameForComparison(candidate.awayTeam);
         if (
           (dbHomeNorm === homeTeamNorm && dbAwayNorm === awayTeamNorm) ||
           (dbHomeNorm === awayTeamNorm && dbAwayNorm === homeTeamNorm)
@@ -265,8 +286,8 @@ class BetResultService {
       });
       console.log(`[getGameResultByTeams] 후보군(±12시간): ${candidates12.length}개`);
       for (const candidate of candidates12) {
-        const dbHomeNorm = normalizeTeamName(candidate.homeTeam);
-        const dbAwayNorm = normalizeTeamName(candidate.awayTeam);
+        const dbHomeNorm = normalizeTeamNameForComparison(candidate.homeTeam);
+        const dbAwayNorm = normalizeTeamNameForComparison(candidate.awayTeam);
         console.log(`[getGameResultByTeams] 후보(±12h): id=${candidate.id}, homeTeam=${candidate.homeTeam}(${dbHomeNorm}), awayTeam=${candidate.awayTeam}(${dbAwayNorm}), mainCategory=${candidate.mainCategory}, commenceTime=${candidate.commenceTime}`);
         if (
           (dbHomeNorm === homeTeamNorm && dbAwayNorm === awayTeamNorm) ||
@@ -282,8 +303,8 @@ class BetResultService {
       });
       console.log(`[getGameResultByTeams] 후보군(전체): ${allCandidates.length}개`);
       for (const candidate of allCandidates) {
-        const dbHomeNorm = normalizeTeamName(candidate.homeTeam);
-        const dbAwayNorm = normalizeTeamName(candidate.awayTeam);
+        const dbHomeNorm = normalizeTeamNameForComparison(candidate.homeTeam);
+        const dbAwayNorm = normalizeTeamNameForComparison(candidate.awayTeam);
         if (
           (dbHomeNorm === homeTeamNorm && dbAwayNorm === awayTeamNorm) ||
           (dbHomeNorm === awayTeamNorm && dbAwayNorm === homeTeamNorm)
@@ -378,13 +399,15 @@ class BetResultService {
 
   // 개별 selection 결과 판정
   determineSelectionResult(selection, gameResult) {
-    const marketType = selection.market;
+    // market alias 매핑
+    let marketType = selection.market;
+    if (marketType === 'h2h') marketType = '승/패';
+    if (marketType === 'totals') marketType = '언더/오버';
+    if (marketType === 'spreads') marketType = '핸디캡';
     const resultFunction = this.marketResultMap[marketType];
-    
     if (resultFunction) {
       return resultFunction(selection, gameResult);
     }
-    
     return 'pending';
   }
 
@@ -398,19 +421,19 @@ class BetResultService {
       return 'pending';
     }
 
-    // team 정규화 적용
-    const selectedTeam = normalizeTeamName(selection.team);
+    // team 정규화 적용 (비교용)
+    const selectedTeam = normalizeTeamNameForComparison(selection.team);
     const gameResultData = gameResult.result;
-    const homeTeam = normalizeTeamName(gameResult.homeTeam);
-    const awayTeam = normalizeTeamName(gameResult.awayTeam);
+    const homeTeam = normalizeTeamNameForComparison(gameResult.homeTeam);
+    const awayTeam = normalizeTeamNameForComparison(gameResult.awayTeam);
 
     if (gameResultData === 'home_win') {
       return selectedTeam === homeTeam ? 'won' : 'lost';
     } else if (gameResultData === 'away_win') {
       return selectedTeam === awayTeam ? 'won' : 'lost';
     } else if (gameResultData === 'draw') {
-      // 무승부의 경우 보통 배팅이 무효 처리되거나 특별한 규칙 적용
-      return 'cancel';
+      // 무승부: 승/패 선택 모두 실패, draw로 저장
+      return 'draw';
     }
 
     return 'pending';
@@ -467,7 +490,7 @@ class BetResultService {
       return 'pending';
     }
 
-    const selectedTeam = normalizeTeamName(selection.team);
+    const selectedTeam = normalizeTeamNameForComparison(selection.team);
     const handicap = selection.handicap || 0;
     
     // 스코어 계산
@@ -477,11 +500,14 @@ class BetResultService {
       awayScore = parseInt(gameResult.score[1]?.score || 0);
     }
 
-    // 핸디캡 적용
-    if (selectedTeam === gameResult.homeTeam) {
+    // 핸디캡 적용 (팀명 비교용 정규화)
+    const homeTeamNorm = normalizeTeamNameForComparison(gameResult.homeTeam);
+    const awayTeamNorm = normalizeTeamNameForComparison(gameResult.awayTeam);
+    
+    if (selectedTeam === homeTeamNorm) {
       const adjustedScore = homeScore + handicap;
       return adjustedScore > awayScore ? 'won' : 'lost';
-    } else if (selectedTeam === gameResult.awayTeam) {
+    } else if (selectedTeam === awayTeamNorm) {
       const adjustedScore = awayScore + handicap;
       return adjustedScore > homeScore ? 'won' : 'lost';
     }

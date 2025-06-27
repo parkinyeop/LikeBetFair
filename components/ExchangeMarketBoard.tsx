@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const dummyMarkets = [
   {
@@ -27,6 +27,26 @@ const dummyMarkets = [
 export default function ExchangeMarketBoard() {
   const [selectedMarket, setSelectedMarket] = useState(0);
   const market = dummyMarkets[selectedMarket];
+  const [orders, setOrders] = useState([]);
+  const [form, setForm] = useState({ side: 'back', price: 1.91, amount: 10000 });
+
+  useEffect(() => {
+    fetch('/api/exchange/orderbook?gameId=xxx&market=totals&line=8.5')
+      .then(res => res.json())
+      .then(data => setOrders(data.orders));
+  }, []);
+
+  const handleOrder = async () => {
+    await fetch('/api/exchange/order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...form, userId: 1, gameId: 'xxx', market: 'totals', line: 8.5 })
+    });
+    // 주문 후 호가 갱신
+    fetch('/api/exchange/orderbook?gameId=xxx&market=totals&line=8.5')
+      .then(res => res.json())
+      .then(data => setOrders(data.orders));
+  };
 
   return (
     <div className="bg-white rounded shadow p-6 w-full max-w-3xl mx-auto">
@@ -68,6 +88,20 @@ export default function ExchangeMarketBoard() {
           ))}
         </tbody>
       </table>
+      <h2>Exchange 주문</h2>
+      <select value={form.side} onChange={e => setForm(f => ({ ...f, side: e.target.value }))}>
+        <option value="back">Back</option>
+        <option value="lay">Lay</option>
+      </select>
+      <input type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: +e.target.value }))} />
+      <input type="number" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: +e.target.value }))} />
+      <button onClick={handleOrder}>주문</button>
+      <h3>호가(미체결 주문)</h3>
+      <ul>
+        {orders.map(o => (
+          <li key={o.id}>{o.side} {o.price} {o.amount}</li>
+        ))}
+      </ul>
     </div>
   );
 } 

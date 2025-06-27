@@ -14,18 +14,19 @@ const clientSportKeyMap = {
   'MLS': 'soccer_usa_mls',
   '아르헨티나 프리메라': 'soccer_argentina_primera_division',
   '중국 슈퍼리그': 'soccer_china_superleague',
-  '스페인 2부': 'soccer_spain_segunda_division',
-  '스웨덴 알스벤스칸': 'soccer_sweden_allsvenskan',
+  '라리가': 'soccer_spain_primera_division',
+  '분데스리가': 'soccer_germany_bundesliga',
   
   // 농구 (Basketball)
   'NBA': 'basketball_nba',
+  'KBL': 'basketball_kbl',
   
   // 야구 (Baseball)
   'MLB': 'baseball_mlb',
   'KBO': 'baseball_kbo',
   
-  // 아이스하키 (Ice Hockey)
-  'NHL': 'icehockey_nhl'
+  // 미식축구 (American Football)
+  'NFL': 'americanfootball_nfl'
 };
 
 class OddsApiService {

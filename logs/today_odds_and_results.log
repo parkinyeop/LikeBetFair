@@ -1,0 +1,82 @@
+[공통 DB 연결] process.env.DB_NAME: bettingDB
+=== oddsAPI에서 지원하는 전체 리그 목록 ===
+- K리그 (sportKey: soccer_korea_kleague1, main: soccer, sub: KOREA_KLEAGUE1)
+- J리그 (sportKey: soccer_japan_j_league, main: soccer, sub: JAPAN_J_LEAGUE)
+- 세리에 A (sportKey: soccer_italy_serie_a, main: soccer, sub: ITALY_SERIE_A)
+- 브라질 세리에 A (sportKey: soccer_brazil_campeonato, main: soccer, sub: BRAZIL_CAMPEONATO)
+- MLS (sportKey: soccer_usa_mls, main: soccer, sub: USA_MLS)
+- 아르헨티나 프리메라 (sportKey: soccer_argentina_primera_division, main: soccer, sub: ARGENTINA_PRIMERA_DIVISION)
+- 중국 슈퍼리그 (sportKey: soccer_china_superleague, main: soccer, sub: CHINA_SUPERLEAGUE)
+- 스페인 2부 (sportKey: soccer_spain_segunda_division, main: soccer, sub: SPAIN_SEGUNDA_DIVISION)
+- 스웨덴 알스벤스칸 (sportKey: soccer_sweden_allsvenskan, main: soccer, sub: SWEDEN_ALLSVENSKAN)
+- NBA (sportKey: basketball_nba, main: basketball, sub: NBA)
+- MLB (sportKey: baseball_mlb, main: baseball, sub: MLB)
+- KBO (sportKey: baseball_kbo, main: baseball, sub: KBO)
+- NHL (sportKey: icehockey_nhl, main: icehockey, sub: NHL)
+====================================
+=== oddsAPI에서 제공하는 전체 스포츠/리그 목록 ===
+- key: americanfootball_cfl, group: American Football, title: CFL, active: true
+- key: americanfootball_ncaaf, group: American Football, title: NCAAF, active: true
+- key: americanfootball_ncaaf_championship_winner, group: American Football, title: NCAAF Championship Winner, active: true
+- key: americanfootball_nfl, group: American Football, title: NFL, active: true
+- key: americanfootball_nfl_preseason, group: American Football, title: NFL Preseason, active: true
+- key: americanfootball_nfl_super_bowl_winner, group: American Football, title: NFL Super Bowl Winner, active: true
+- key: aussierules_afl, group: Aussie Rules, title: AFL, active: true
+- key: baseball_kbo, group: Baseball, title: KBO, active: true
+- key: baseball_mlb, group: Baseball, title: MLB, active: true
+- key: baseball_mlb_world_series_winner, group: Baseball, title: MLB World Series Winner, active: true
+- key: basketball_wnba, group: Basketball, title: WNBA, active: true
+- key: boxing_boxing, group: Boxing, title: Boxing, active: true
+- key: cricket_test_match, group: Cricket, title: Test Matches, active: true
+- key: golf_the_open_championship_winner, group: Golf, title: The Open Winner, active: true
+- key: lacrosse_pll, group: Lacrosse, title: PLL, active: true
+- key: mma_mixed_martial_arts, group: Mixed Martial Arts, title: MMA, active: true
+- key: politics_us_presidential_election_winner, group: Politics, title: US Presidential Elections Winner, active: true
+- key: rugbyleague_nrl, group: Rugby League, title: NRL, active: true
+- key: rugbyleague_nrl_state_of_origin, group: Rugby League, title: State of Origin, active: true
+- key: soccer_argentina_primera_division, group: Soccer, title: Primera División - Argentina, active: true
+- key: soccer_belgium_first_div, group: Soccer, title: Belgium First Div, active: true
+- key: soccer_brazil_campeonato, group: Soccer, title: Brazil Série A, active: true
+- key: soccer_brazil_serie_b, group: Soccer, title: Brazil Série B, active: true
+- key: soccer_chile_campeonato, group: Soccer, title: Primera División - Chile, active: true
+- key: soccer_china_superleague, group: Soccer, title: Super League - China, active: true
+- key: soccer_concacaf_gold_cup, group: Soccer, title: CONCACAF Gold Cup, active: true
+- key: soccer_conmebol_copa_libertadores, group: Soccer, title: Copa Libertadores, active: true
+- key: soccer_conmebol_copa_sudamericana, group: Soccer, title: Copa Sudamericana, active: true
+- key: soccer_epl, group: Soccer, title: EPL, active: true
+- key: soccer_fifa_club_world_cup, group: Soccer, title: FIFA Club World Cup, active: true
+- key: soccer_fifa_world_cup_winner, group: Soccer, title: FIFA World Cup Winner, active: true
+- key: soccer_finland_veikkausliiga, group: Soccer, title: Veikkausliiga - Finland, active: true
+- key: soccer_italy_serie_a, group: Soccer, title: Serie A - Italy, active: true
+- key: soccer_japan_j_league, group: Soccer, title: J League, active: true
+- key: soccer_korea_kleague1, group: Soccer, title: K League 1, active: true
+- key: soccer_league_of_ireland, group: Soccer, title: League of Ireland, active: true
+- key: soccer_mexico_ligamx, group: Soccer, title: Liga MX, active: true
+- key: soccer_netherlands_eredivisie, group: Soccer, title: Dutch Eredivisie, active: true
+- key: soccer_norway_eliteserien, group: Soccer, title: Eliteserien - Norway, active: true
+- key: soccer_spl, group: Soccer, title: Premiership - Scotland, active: true
+- key: soccer_sweden_allsvenskan, group: Soccer, title: Allsvenskan - Sweden, active: true
+- key: soccer_sweden_superettan, group: Soccer, title: Superettan - Sweden, active: true
+- key: soccer_uefa_champs_league_qualification, group: Soccer, title: UEFA Champions League Qualification, active: true
+- key: soccer_usa_mls, group: Soccer, title: MLS, active: true
+====================================
+[K리그] (soccer_korea_kleague1) 오늘 경기수: 0
+[J리그] (soccer_japan_j_league) 오늘 경기수: 0
+[세리에 A] (soccer_italy_serie_a) 오늘 경기수: 0
+[브라질 세리에 A] (soccer_brazil_campeonato) 오늘 경기수: 0
+[MLS] (soccer_usa_mls) 오늘 경기수: 0
+[아르헨티나 프리메라] (soccer_argentina_primera_division) 오늘 경기수: 0
+[중국 슈퍼리그] (soccer_china_superleague) 오늘 경기수: 2
+  - Shanghai SIPG FC vs Dalian Yingbo @ 2025-06-26T11:35:00Z
+  - Yunnan Yukun vs Henan FC @ 2025-06-26T12:00:00Z
+[스페인 2부] (soccer_spain_segunda_division) 오늘 경기수: 0
+[스웨덴 알스벤스칸] (soccer_sweden_allsvenskan) 오늘 경기수: 0
+[NBA] (basketball_nba) 오늘 경기수: 0
+[MLB] (baseball_mlb) 오늘 경기수: 0
+[KBO] (baseball_kbo) 오늘 경기수: 5
+  - Doosan Bears vs SSG Landers @ 2025-06-26T09:30:00Z
+  - Samsung Lions vs Hanwha Eagles @ 2025-06-26T09:30:00Z
+  - KT Wiz vs LG Twins @ 2025-06-26T09:30:00Z
+  - Kiwoom Heroes vs Kia Tigers @ 2025-06-26T09:30:00Z
+  - NC Dinos vs Lotte Giants @ 2025-06-26T09:30:00Z
+[NHL] (icehockey_nhl) 오늘 경기수: 0

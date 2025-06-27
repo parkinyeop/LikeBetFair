@@ -6,7 +6,7 @@ import betResultService from '../services/betResultService.js';
 let isUpdating = false;
 let lastUpdateTime = null;
 let activeCategories = new Set([
-  'K리그', 'J리그', '세리에 A', '브라질 세리에 A', 'MLS', '아르헨티나 프리메라', '중국 슈퍼리그', '스페인 2부', '스웨덴 알스벤스칸',
+      'K리그', 'J리그', '세리에 A', '브라질 세리에 A', 'MLS', '아르헨티나 프리메라', '중국 슈퍼리그', '스페인 라리가', '독일 분데스리가',
   'NBA', 'WNBA',
   'MLB', 'KBO',
   'CFL', 'NCAAF', 'NFL', 'NFL 프리시즌'

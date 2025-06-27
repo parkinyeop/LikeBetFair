@@ -16,9 +16,10 @@ const clientSportKeyMap = {
   'MLS': 'soccer_usa_mls',
   '아르헨티나 프리메라': 'soccer_argentina_primera_division',
   '중국 슈퍼리그': 'soccer_china_superleague',
-  '스페인 2부': 'soccer_spain_segunda_division',
-  '스웨덴 알스벤스칸': 'soccer_sweden_allsvenskan',
+  '라리가': 'soccer_spain_primera_division',
+  '분데스리가': 'soccer_germany_bundesliga',
   'NBA': 'basketball_nba',
+  'KBL': 'basketball_kbl',
   'MLB': 'baseball_mlb',
   'KBO': 'baseball_kbo',
   'NFL': 'americanfootball_nfl'
@@ -28,27 +29,22 @@ const clientSportKeyMap = {
 const sportsDbLeagueMap = {
   // 축구 (Football)
   'soccer_korea_kleague1': '4689',      // K리그
-  'soccer_japan_j_league': '5188',      // J리그컵 (기존 4340 → 5188)
+  'soccer_japan_j_league': '4340',      // J리그
   'soccer_italy_serie_a': '4332',       // 세리에 A
-  'soccer_brazil_campeonato': '4364',   // 브라질 세리에 A
+  'soccer_brazil_campeonato': '4351',   // 브라질 세리에 A
   'soccer_usa_mls': '4346',             // MLS
-  'soccer_argentina_primera_division': '4367', // 아르헨티나 프리메라
-  'soccer_china_superleague': '4688',   // 중국 슈퍼리그
-  'soccer_spain_segunda_division': '4396', // 스페인 2부
-  'soccer_sweden_allsvenskan': '4429',  // 스웨덴 알스벤스칸
+  'soccer_argentina_primera_division': '4406', // 아르헨티나 프리메라
+  'soccer_china_superleague': '4359',   // 중국 슈퍼리그
+  'soccer_spain_primera_division': '4335', // 라리가
+  'soccer_germany_bundesliga': '4331',  // 분데스리가
   // 농구 (Basketball)
   'basketball_nba': '4387',             // NBA
-  'basketball_wnba': null,              // WNBA (TheSportsDB 미지원)
+  'basketball_kbl': '5124',             // KBL
   // 야구 (Baseball)
   'baseball_mlb': '4424',               // MLB
   'baseball_kbo': '4830',               // KBO
   // 미식축구 (American Football)
-  'americanfootball_cfl': null,         // CFL (TheSportsDB 미지원)
-  'americanfootball_ncaaf': null,       // NCAAF (TheSportsDB 미지원)
-  'americanfootball_nfl': '4391',       // NFL
-  'americanfootball_nfl_preseason': null, // NFL 프리시즌 (TheSportsDB 미지원)
-  // 아이스하키 (Ice Hockey)
-  'icehockey_nhl': '4380'               // NHL
+  'americanfootball_nfl': '4391'        // NFL
 };
 
 const API_KEY = process.env.THESPORTSDB_API_KEY || '123';
@@ -56,37 +52,30 @@ const API_KEY = process.env.THESPORTSDB_API_KEY || '123';
 // 표준화된 카테고리 매핑
 const standardizedCategoryMap = {
   // 축구
-  'soccer_korea_kleague1': { main: 'soccer', sub: 'kleague1' },
-  'soccer_japan_j_league': { main: 'soccer', sub: 'j_league' },
-  'soccer_italy_serie_a': { main: 'soccer', sub: 'serie_a' },
-  'soccer_brazil_campeonato': { main: 'soccer', sub: 'brasileirao' },
-  'soccer_usa_mls': { main: 'soccer', sub: 'mls' },
-  'soccer_argentina_primera_division': { main: 'soccer', sub: 'primera' },
-  'soccer_china_superleague': { main: 'soccer', sub: 'csl' },
-  'soccer_spain_segunda_division': { main: 'soccer', sub: 'laliga2' },
-  'soccer_sweden_allsvenskan': { main: 'soccer', sub: 'allsvenskan' },
+  'soccer_korea_kleague1': { main: 'soccer', sub: 'K리그' },
+  'soccer_japan_j_league': { main: 'soccer', sub: 'J리그' },
+  'soccer_italy_serie_a': { main: 'soccer', sub: '세리에A' },
+  'soccer_brazil_campeonato': { main: 'soccer', sub: '브라질리라오' },
+  'soccer_usa_mls': { main: 'soccer', sub: 'MLS' },
+  'soccer_argentina_primera_division': { main: 'soccer', sub: '아르헨티나프리메라' },
+  'soccer_china_superleague': { main: 'soccer', sub: 'CSL' },
+  'soccer_spain_primera_division': { main: 'soccer', sub: '라리가' },
+  'soccer_germany_bundesliga': { main: 'soccer', sub: '분데스리가' },
   
   // 농구
-  'basketball_nba': { main: 'basketball', sub: 'nba' },
-  'basketball_wnba': { main: 'basketball', sub: 'wnba' },
+  'basketball_nba': { main: 'basketball', sub: 'NBA' },
+  'basketball_kbl': { main: 'basketball', sub: 'KBL' },
   
   // 야구
-  'baseball_mlb': { main: 'baseball', sub: 'mlb' },
-  'baseball_kbo': { main: 'baseball', sub: 'kbo' },
+  'baseball_mlb': { main: 'baseball', sub: 'MLB' },
+  'baseball_kbo': { main: 'baseball', sub: 'KBO' },
   
   // 미식축구
-  'americanfootball_nfl': { main: 'football', sub: 'nfl' },
-  'americanfootball_ncaaf': { main: 'football', sub: 'ncaaf' },
-  'americanfootball_cfl': { main: 'football', sub: 'cfl' },
-  
-  // 아이스하키
-  'icehockey_nhl': { main: 'hockey', sub: 'nhl' },
-  'icehockey_khl': { main: 'hockey', sub: 'khl' },
-  'icehockey_ahl': { main: 'hockey', sub: 'ahl' }
+  'americanfootball_nfl': { main: 'american_football', sub: 'NFL' }
 };
 
 // 배당률 제공 카테고리만 허용
-const allowedCategories = ['baseball', 'soccer', 'basketball']; // 필요시 확장
+const allowedCategories = ['baseball', 'soccer', 'basketball', 'american_football']; // 필요시 확장
 
 // 스포츠키로부터 표준화된 카테고리 얻기
 function getStandardizedCategory(sportKey) {
