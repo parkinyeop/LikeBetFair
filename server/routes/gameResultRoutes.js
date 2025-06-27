@@ -2,6 +2,8 @@ import express from 'express';
 import gameResultService from '../services/gameResultService.js';
 import oddsApiService from '../services/oddsApiService.js';
 import { getHealthStatus, updateActiveCategories, getActiveCategories } from '../jobs/oddsUpdateJob.js';
+import path from 'path';
+import fs from 'fs';
 
 const router = express.Router();
 
@@ -351,6 +353,153 @@ router.post('/results/update', async (req, res) => {
   } catch (error) {
     console.error('Error updating game results:', error);
     res.status(500).json({ error: 'Failed to update game results' });
+  }
+});
+
+// API 사용량 모니터링
+router.get('/api-usage', async (req, res) => {
+  try {
+    const apiUsage = {
+      tracker: oddsApiService.apiCallTracker,
+      dynamicPriority: oddsApiService.getDynamicPriorityLevel(),
+      recommendations: {
+        canMakeCall: oddsApiService.canMakeApiCall(),
+        suggestedAction: oddsApiService.apiCallTracker.dailyCalls > oddsApiService.apiCallTracker.dailyLimit * 0.8 
+          ? 'Reduce update frequency' 
+          : 'Normal operation',
+        projectedMonthlyUsage: Math.round(oddsApiService.apiCallTracker.dailyCalls * 30),
+        remainingCalls: {
+          daily: Math.max(0, oddsApiService.apiCallTracker.dailyLimit - oddsApiService.apiCallTracker.dailyCalls),
+          monthly: Math.max(0, oddsApiService.apiCallTracker.monthlyLimit - oddsApiService.apiCallTracker.monthlyCalls)
+        }
+      }
+    };
+    res.json(apiUsage);
+  } catch (error) {
+    console.error('Error getting API usage:', error);
+    res.status(500).json({ error: 'Failed to get API usage' });
+  }
+});
+
+// 스케줄러 로그 조회
+router.get('/scheduler-logs', async (req, res) => {
+  try {
+    const { date, type, limit = 100 } = req.query;
+    const logsDir = path.join(process.cwd(), 'logs');
+    
+    // 날짜 지정이 없으면 오늘 날짜 사용
+    const targetDate = date || new Date().toISOString().slice(0, 10);
+    const logFile = path.join(logsDir, `scheduler_${targetDate}.log`);
+    
+    if (!fs.existsSync(logFile)) {
+      return res.json({ 
+        date: targetDate,
+        logs: [],
+        message: 'No logs found for this date'
+      });
+    }
+    
+    // 로그 파일 읽기
+    const logContent = fs.readFileSync(logFile, 'utf8');
+    let logs = logContent.split('\n')
+      .filter(line => line.trim())
+      .map(line => {
+        try {
+          return JSON.parse(line);
+        } catch (e) {
+          return null;
+        }
+      })
+      .filter(log => log !== null);
+    
+    // 타입 필터링
+    if (type) {
+      logs = logs.filter(log => log.type === type);
+    }
+    
+    // 최신순 정렬 및 제한
+    logs = logs
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, parseInt(limit));
+    
+    res.json({
+      date: targetDate,
+      type: type || 'all',
+      count: logs.length,
+      logs: logs
+    });
+    
+  } catch (error) {
+    console.error('Error reading scheduler logs:', error);
+    res.status(500).json({ error: 'Failed to read scheduler logs' });
+  }
+});
+
+// 스케줄러 로그 통계
+router.get('/scheduler-logs/stats', async (req, res) => {
+  try {
+    const { date } = req.query;
+    const logsDir = path.join(process.cwd(), 'logs');
+    
+    // 날짜 지정이 없으면 오늘 날짜 사용
+    const targetDate = date || new Date().toISOString().slice(0, 10);
+    const logFile = path.join(logsDir, `scheduler_${targetDate}.log`);
+    
+    if (!fs.existsSync(logFile)) {
+      return res.json({ 
+        date: targetDate,
+        stats: {},
+        message: 'No logs found for this date'
+      });
+    }
+    
+    // 로그 파일 읽기 및 통계 생성
+    const logContent = fs.readFileSync(logFile, 'utf8');
+    const logs = logContent.split('\n')
+      .filter(line => line.trim())
+      .map(line => {
+        try {
+          return JSON.parse(line);
+        } catch (e) {
+          return null;
+        }
+      })
+      .filter(log => log !== null);
+    
+    const stats = {
+      total: logs.length,
+      byType: {},
+      byStatus: {},
+      errors: [],
+      lastUpdate: logs.length > 0 ? logs[logs.length - 1].timestamp : null
+    };
+    
+    logs.forEach(log => {
+      // 타입별 통계
+      stats.byType[log.type] = (stats.byType[log.type] || 0) + 1;
+      
+      // 상태별 통계
+      stats.byStatus[log.status] = (stats.byStatus[log.status] || 0) + 1;
+      
+      // 에러 수집
+      if (log.status === 'error') {
+        stats.errors.push({
+          timestamp: log.timestamp,
+          type: log.type,
+          message: log.message,
+          error: log.error
+        });
+      }
+    });
+    
+    res.json({
+      date: targetDate,
+      stats: stats
+    });
+    
+  } catch (error) {
+    console.error('Error generating scheduler log stats:', error);
+    res.status(500).json({ error: 'Failed to generate scheduler log stats' });
   }
 });
 
