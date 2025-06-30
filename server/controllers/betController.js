@@ -88,7 +88,7 @@ export async function getBetHistory(req, res) {
             gameResult: gameResult ? {
               status: gameResult.status,
               result: gameResult.result,
-              score: gameResult.score,
+              score: gameResult.score ? (typeof gameResult.score === 'string' ? JSON.parse(gameResult.score) : gameResult.score) : null,
               homeTeam: gameResult.homeTeam,
               awayTeam: gameResult.awayTeam
             } : null

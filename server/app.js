@@ -4,6 +4,9 @@ import { Sequelize } from 'sequelize';
 import dotenv from 'dotenv';
 dotenv.config();
 
+// 중앙화된 설정 import
+import { initializeCentralizedConfig, API_CONFIG } from './config/centralizedConfig.js';
+
 // Sequelize 인스턴스 생성
 const sequelize = new Sequelize({
   host: process.env.DB_HOST,
@@ -78,16 +81,30 @@ setInterval(async () => {
 // 데이터베이스 연결 및 서버 시작
 const PORT = process.env.PORT || 5050;
 
-sequelize.authenticate()
-  .then(() => {
+// 설정 초기화 후 서버 시작
+async function startServer() {
+  try {
+    // 중앙화된 설정 초기화
+    console.log('[시작] 중앙화된 설정 초기화...');
+    await initializeCentralizedConfig();
+    
+    // 데이터베이스 연결
+    console.log('[시작] 데이터베이스 연결 중...');
+    await sequelize.authenticate();
     console.log('Database connection has been established successfully.');
-    return sequelize.sync();
-  })
-  .then(() => {
+    
+    await sequelize.sync();
+    
+    // 서버 시작
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
+      console.log('[완료] 서버 초기화 완료');
     });
-  })
-  .catch(err => {
-    console.error('Unable to connect to the database:', err);
-  }); 
+    
+  } catch (err) {
+    console.error('서버 시작 실패:', err);
+    process.exit(1);
+  }
+}
+
+startServer(); 

@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
 
+interface Order {
+  id: string;
+  side: 'back' | 'lay';
+  price: number;
+  amount: number;
+}
+
 const dummyMarkets = [
   {
     name: 'Moneyline',
@@ -27,7 +34,7 @@ const dummyMarkets = [
 export default function ExchangeMarketBoard() {
   const [selectedMarket, setSelectedMarket] = useState(0);
   const market = dummyMarkets[selectedMarket];
-  const [orders, setOrders] = useState([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [form, setForm] = useState({ side: 'back', price: 1.91, amount: 10000 });
 
   useEffect(() => {
@@ -98,8 +105,8 @@ export default function ExchangeMarketBoard() {
       <button onClick={handleOrder}>주문</button>
       <h3>호가(미체결 주문)</h3>
       <ul>
-        {orders.map(o => (
-          <li key={o.id}>{o.side} {o.price} {o.amount}</li>
+        {orders.map((o, index) => (
+          <li key={o.id || index}>{o.side} {o.price} {o.amount}</li>
         ))}
       </ul>
     </div>

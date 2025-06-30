@@ -245,7 +245,8 @@ function MyBetsPanel() {
                             let icon = '⏳', color = 'text-gray-400', label = '대기';
                             if (sel.result === 'won') { icon = '✔️'; color = 'text-green-600'; label = '적중'; }
                             else if (sel.result === 'lost') { icon = '❌'; color = 'text-red-500'; label = '실패'; }
-                            else if (sel.result === 'cancelled') { icon = '🚫'; color = 'text-gray-400'; label = '취소'; }
+                            else if (sel.result === 'cancelled') { icon = '🚫'; color = 'text-orange-500'; label = '경기취소'; }
+                            else if (sel.result === 'draw') { icon = '⚖️'; color = 'text-blue-500'; label = '무승부'; }
                             // 언더/오버 마켓이면 라인+옵션만 노출
                             const isOverUnder = sel.market === '언더/오버' || sel.market === 'totals';
                             const ouType = normalizeOption(sel.option || sel.team);
@@ -260,7 +261,10 @@ function MyBetsPanel() {
                                 <span className="ml-2 text-gray-600">@ {sel.odds}</span>
                                 <span className={`ml-2 text-xs ${color}`}>{label}</span>
                                 {bet.status === 'cancelled' && (
-                                  <span className="ml-2 text-xs text-gray-400 font-semibold">배팅이 취소됨</span>
+                                  <span className="ml-2 text-xs text-gray-400 font-semibold">베팅 취소됨</span>
+                                )}
+                                {sel.result === 'cancelled' && bet.status !== 'cancelled' && (
+                                  <span className="ml-2 text-xs text-orange-500 font-semibold">경기 취소 (무효처리)</span>
                                 )}
                                 {['won', 'lost'].includes(sel.result) && sel.gameResult && sel.gameResult.score && Array.isArray(sel.gameResult.score) ? (
                                   <span className="ml-2 text-xs text-blue-600">

@@ -2,51 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from "next/router";
 import GameCard from "../components/GameCard";
-
-const sportsTree = {
-  축구: [
-    "K리그",
-    "EPL",
-    "라리가",
-    "분데스리가",
-    "세리에 A",
-    "리그 1",
-    "J리그",
-    "MLS",
-    "아르헨티나 프리메라",
-    "중국 슈퍼리그",
-    "스페인 2부",
-    "스웨덴 알스벤스칸",
-    "브라질 세리에 A"
-  ],
-  농구: ["NBA"],
-  야구: ["MLB", "KBO"],
-  미식축구: ["NFL"],
-  아이스하키: ["NHL"]
-};
-
-const sportKeyMap: Record<string, string> = {
-  NBA: "basketball_nba",
-  K리그: "soccer_korea_kleague1",
-  EPL: "soccer_epl",
-  라리가: "soccer_spain_la_liga",
-  분데스리가: "soccer_germany_bundesliga",
-  "세리에 A": "soccer_italy_serie_a",
-  "리그 1": "soccer_france_ligue_1",
-  J리그: "soccer_japan_j_league",
-  MLS: "soccer_usa_mls",
-  "아르헨티나 프리메라": "soccer_argentina_primera_division",
-  "중국 슈퍼리그": "soccer_china_superleague",
-  "스페인 2부": "soccer_spain_segunda_division",
-  "스웨덴 알스벤스칸": "soccer_sweden_allsvenskan",
-  "브라질 세리에 A": "soccer_brazil_campeonato",
-  MLB: "baseball_mlb",
-  KBO: "baseball_kbo",
-  NFL: "americanfootball_nfl",
-  NHL: "icehockey_nhl"
-};
-
-const getSportKey = (category: string) => sportKeyMap[category] || "";
+import { SPORTS_TREE, getSportKey } from "../config/sportsMapping";
+import { API_CONFIG, TIME_CONFIG, buildApiUrl, isBettingAllowed } from "../config/apiConfig";
 
 const initialGameData: Record<string, { teams: string; time: string }[]> = {
   "EPL": [
@@ -86,7 +43,8 @@ export default function Home() {
         }
 
         console.log(`Fetching data for ${selectedCategory} with sportKey: ${sportKey}`);
-        const response = await fetch(`http://localhost:5050/api/odds/${sportKey}`);
+        const apiUrl = buildApiUrl(`${API_CONFIG.ENDPOINTS.ODDS}/${sportKey}`);
+        const response = await fetch(apiUrl);
         
         if (!response.ok) {
           throw new Error(`Failed to fetch games for ${selectedCategory}`);
@@ -94,10 +52,10 @@ export default function Home() {
         
         const data = await response.json();
         
-        // 정책: 오늘 00:00~7일 후 경기만 노출
+        // 정책: 오늘 00:00~7일 후 경기만 노출 (설정 기준)
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-        const maxDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        const maxDate = new Date(now.getTime() + TIME_CONFIG.BETTING_WINDOW_DAYS * 24 * 60 * 60 * 1000);
         const filteredGames = data.filter((game: any) => {
           const gameTime = new Date(game.commence_time);
           return gameTime >= startOfToday && gameTime <= maxDate;
@@ -170,7 +128,7 @@ export default function Home() {
       
       {/* 카테고리 선택 버튼들 */}
       <div className="mb-6 flex flex-wrap gap-2">
-        {Object.entries(sportsTree).map(([mainCategory, subCategories]) => (
+        {Object.entries(SPORTS_TREE).map(([mainCategory, subCategories]) => (
           <div key={mainCategory} className="flex flex-wrap gap-1">
             {subCategories.map((category) => (
               <button

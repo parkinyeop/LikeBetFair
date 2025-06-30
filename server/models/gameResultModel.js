@@ -33,7 +33,7 @@ const GameResult = sequelize.define('GameResult', {
     allowNull: false
   },
   status: {
-    type: DataTypes.ENUM('scheduled', 'live', 'finished', 'cancelled'),
+    type: DataTypes.ENUM('scheduled', 'live', 'finished', 'cancelled', 'postponed'),
     defaultValue: 'scheduled'
   },
   score: {
@@ -42,7 +42,7 @@ const GameResult = sequelize.define('GameResult', {
     defaultValue: null
   },
   result: {
-    type: DataTypes.ENUM('home_win', 'away_win', 'draw', 'cancelled', 'pending'),
+    type: DataTypes.ENUM('home_win', 'away_win', 'draw', 'cancelled', 'pending', 'postponed'),
     defaultValue: 'pending'
   },
   lastUpdated: {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, memo, useMemo, useCallback } from 'react';
 import { useBetStore } from '../stores/useBetStore';
 
 interface OddsListProps {
@@ -44,7 +44,7 @@ const normalizeTeamName = (name: string) => {
   return map[name] || name;
 };
 
-const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
+const OddsList: React.FC<OddsListProps> = memo(({ sportKey }) => {
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -477,6 +477,8 @@ const OddsList: React.FC<OddsListProps> = ({ sportKey }) => {
       })}
     </div>
   );
-};
+});
+
+OddsList.displayName = 'OddsList';
 
 export default OddsList; 

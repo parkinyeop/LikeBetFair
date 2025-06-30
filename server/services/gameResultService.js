@@ -372,7 +372,7 @@ class GameResultService {
           // TheSportsDB API 사용 (The Odds API 대신)
           const resultsResponse = await axios.get(`https://www.thesportsdb.com/api/v1/json/${this.apiKey}/eventsnextleague.php?id=${this.getSportsDbLeagueId(clientCategory)}`);
           
-          if (resultsResponse.data && resultsResponse.data.events) {
+          if (resultsResponse.data && resultsResponse.data.events && Array.isArray(resultsResponse.data.events)) {
             console.log(`Found ${resultsResponse.data.events.length} events for ${clientCategory}`);
             
             for (const event of resultsResponse.data.events) {
@@ -488,9 +488,14 @@ class GameResultService {
   }
 
   validateGameData(game) {
+    // 문자열이나 배열이 아닌 객체인지 먼저 확인
+    if (typeof game !== 'object' || game === null || Array.isArray(game)) {
+      return false;
+    }
+    
     // TheSportsDB API 형식에 맞게 필수 필드 검증
     if (!game.strHomeTeam || !game.strAwayTeam || !game.dateEvent || !game.strTime) {
-      console.log(`Invalid game data: missing required fields`, game);
+      console.log(`Invalid game data: missing required fields for ${game.strHomeTeam} vs ${game.strAwayTeam}`);
       return false;
     }
 
@@ -729,4 +734,4 @@ class GameResultService {
   }
 }
 
-export default GameResultService; 
+export default new GameResultService(); 

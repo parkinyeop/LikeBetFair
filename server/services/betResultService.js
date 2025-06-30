@@ -3,7 +3,7 @@ import GameResult from '../models/gameResultModel.js';
 import User from '../models/userModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
 import { Op, fn, col } from 'sequelize';
-import { normalizeTeamName, normalizeTeamNameForComparison, normalizeCategory, normalizeCategoryPair } from '../normalizeUtils.js';
+import { normalizeTeamName, normalizeTeamNameForComparison, normalizeCategory, normalizeCategoryPair, normalizeOption } from '../normalizeUtils.js';
 
 // 배당률 제공 카테고리만 허용 (gameResultService와 동일하게 유지)
 const allowedCategories = ['baseball', 'soccer', 'basketball'];
@@ -71,7 +71,7 @@ class BetResultService {
     let hasPending = false;
     let hasLost = false;
     let hasWon = false;
-    let hasCancel = false;
+    let hasCancelled = false;
 
     // selections deep copy for comparison
     const prevSelections = JSON.stringify(bet.selections);
@@ -112,6 +112,15 @@ class BetResultService {
         continue;
       }
 
+      // 취소된 경기 또는 연기된 경기 처리 (즉시 환불)
+      if (gameResult.status === 'cancelled' || gameResult.result === 'cancelled' ||
+          gameResult.status === 'postponed' || gameResult.result === 'postponed') {
+        selection.result = 'cancelled';
+        hasCancelled = true;
+        console.log(`[취소 처리] ${selection.desc} - 경기 취소/연기로 인한 즉시 환불 처리`);
+        continue;
+      }
+
       if (gameResult.status === 'finished') {
         // 경기가 완료된 경우 결과 판정
         const selectionResult = this.determineSelectionResult(selection, gameResult);
@@ -122,22 +131,13 @@ class BetResultService {
 
       // 집계 플래그 설정
       if (selection.result === 'pending') hasPending = true;
-      else if (selection.result === 'lost') hasLost = true;
+      else if (selection.result === 'lost' || selection.result === 'draw') hasLost = true;
       else if (selection.result === 'won') hasWon = true;
-      else if (selection.result === 'cancel') hasCancel = true;
+      else if (selection.result === 'cancelled') hasCancelled = true;
     }
 
-    // 전체 베팅 상태 집계
-    let betStatus = 'pending';
-    if (hasPending) {
-      betStatus = 'pending';
-    } else if (hasLost) {
-      betStatus = 'lost';
-    } else if (hasWon && !hasLost && !hasPending) {
-      betStatus = 'won';
-    } else if (hasCancel && !hasWon && !hasLost && !hasPending) {
-      betStatus = 'cancel';
-    }
+    // 전체 베팅 상태 집계 (개선된 로직)
+    let betStatus = this.determineBetStatus(hasPending, hasWon, hasLost, hasCancelled, selections);
 
     // 변경 여부 확인
     const newSelectionsStr = JSON.stringify(selections);
@@ -148,37 +148,141 @@ class BetResultService {
       // 트랜잭션으로 모든 업데이트 묶기
       const t = await Bet.sequelize.transaction();
       try {
-        // 1. bet 업데이트
-        await bet.update({
-          status: betStatus,
-          selections: selections
-        }, { transaction: t });
+        // 1. bet 업데이트 (selections 배열을 명시적으로 새로 할당)
+        bet.status = betStatus;
+        bet.selections = [...selections]; // 새로운 배열로 할당
+        await bet.save({ transaction: t });
+
         // 2. 적중(won) 시 유저 balance 지급 및 PaymentHistory 생성
         if (betStatus === 'won' && prevStatus !== 'won') {
-          const user = await User.findByPk(bet.userId, { transaction: t, lock: t.LOCK.UPDATE });
-          if (user) {
-            user.balance = Number(user.balance) + Number(bet.potentialWinnings);
-            await user.save({ transaction: t });
-            await PaymentHistory.create({
-              userId: user.id,
-              betId: bet.id,
-              amount: bet.potentialWinnings,
-              balanceAfter: user.balance,
-              memo: '베팅 적중 지급',
-              paidAt: new Date()
-            }, { transaction: t });
-          } else {
-            throw new Error(`[BetResultService] 적중 지급 실패: userId=${bet.userId} (유저 없음)`);
-          }
+          await this.processBetWinnings(bet, t);
         }
+
+        // 3. 🆕 취소(cancelled) 시 유저에게 환불 처리
+        if (betStatus === 'cancelled' && prevStatus !== 'cancelled') {
+          await this.processBetRefund(bet, t, '경기 취소/연기로 인한 즉시 환불');
+        }
+
         await t.commit();
-        console.log(`Bet ${bet.id} updated to ${betStatus} (won:${hasWon}, lost:${hasLost}, cancel:${hasCancel}, pending:${hasPending})`);
+        console.log(`Bet ${bet.id} updated to ${betStatus} (won:${hasWon}, lost:${hasLost}, cancelled:${hasCancelled}, pending:${hasPending})`);
       } catch (err) {
         await t.rollback();
         console.error('[BetResultService] 트랜잭션 실패:', err);
       }
     }
     return betStatus !== 'pending';
+  }
+
+  // 🆕 베팅 전체 상태 결정 로직 (취소 경기 포함)
+  determineBetStatus(hasPending, hasWon, hasLost, hasCancelled, selections) {
+    // 모든 selection이 취소된 경우
+    if (hasCancelled && !hasWon && !hasLost && !hasPending) {
+      return 'cancelled';
+    }
+
+    // pending이 있으면 대기
+    if (hasPending) {
+      return 'pending';
+    }
+
+    // draw 결과도 lost로 처리
+    const hasDrawOrLost = selections.some(s => s.result === 'lost' || s.result === 'draw');
+    
+    // 하나라도 실패하면 전체 실패 (취소된 것은 무시)
+    if (hasLost || hasDrawOrLost) {
+      return 'lost';
+    }
+
+    // 모든 완료된 selection이 성공 또는 취소인 경우
+    if (hasWon || hasCancelled) {
+      // 실제로 승리한 selection이 있는지 확인
+      const hasActualWin = selections.some(s => s.result === 'won');
+      if (hasActualWin) {
+        return 'won';
+      } else if (hasCancelled) {
+        // 모든 selection이 취소된 경우
+        return 'cancelled';
+      }
+    }
+
+    return 'pending';
+  }
+
+  // 🆕 베팅 적중 시 상금 지급
+  async processBetWinnings(bet, transaction) {
+    const user = await User.findByPk(bet.userId, { 
+      transaction, 
+      lock: transaction.LOCK.UPDATE 
+    });
+    
+    if (user) {
+      // 취소된 selection이 있는 경우 배당률 재계산
+      const adjustedWinnings = this.calculateAdjustedWinnings(bet);
+      const hasCancelledSelections = bet.selections.some(s => s.result === 'cancelled');
+      
+      user.balance = Number(user.balance) + Number(adjustedWinnings);
+      await user.save({ transaction });
+      
+      await PaymentHistory.create({
+        userId: user.id,
+        betId: bet.id,
+        amount: adjustedWinnings,
+        balanceAfter: user.balance,
+        memo: hasCancelledSelections ? '베팅 적중 지급 (일부 경기 취소 반영)' : '베팅 적중 지급',
+        paidAt: new Date()
+      }, { transaction });
+      
+      console.log(`[적중 지급] 베팅 ${bet.id}: ${adjustedWinnings}원 지급`);
+    } else {
+      throw new Error(`[BetResultService] 적중 지급 실패: userId=${bet.userId} (유저 없음)`);
+    }
+  }
+
+  // 🆕 베팅 환불 처리
+  async processBetRefund(bet, transaction, memo = '경기 취소로 인한 환불') {
+    const user = await User.findByPk(bet.userId, { 
+      transaction, 
+      lock: transaction.LOCK.UPDATE 
+    });
+    
+    if (user) {
+      user.balance = Number(user.balance) + Number(bet.stake);
+      await user.save({ transaction });
+      
+      await PaymentHistory.create({
+        userId: user.id,
+        betId: bet.id,
+        amount: bet.stake,
+        balanceAfter: user.balance,
+        memo: memo,
+        paidAt: new Date()
+      }, { transaction });
+      
+      console.log(`[환불 처리] 베팅 ${bet.id}: ${bet.stake}원 환불`);
+    } else {
+      throw new Error(`[BetResultService] 환불 실패: userId=${bet.userId} (유저 없음)`);
+    }
+  }
+
+  // 🆕 취소된 selection을 고려한 상금 재계산
+  calculateAdjustedWinnings(bet) {
+    const selections = bet.selections;
+    let adjustedOdds = 1.0;
+    
+    for (const selection of selections) {
+      if (selection.result === 'won') {
+        // 실제 승리한 경우만 배당률 곱하기
+        adjustedOdds *= selection.odds || 1.0;
+      } else if (selection.result === 'cancelled') {
+        // 취소된 경우는 배당률 1.0으로 처리 (무효)
+        adjustedOdds *= 1.0;
+      }
+      // lost나 pending은 전체 베팅에 영향을 주므로 여기서는 고려하지 않음
+    }
+    
+    // 원래 잠재 수익과 조정된 수익 중 작은 값 반환 (안전장치)
+    const adjustedWinnings = Number(bet.stake) * adjustedOdds;
+    return Math.min(adjustedWinnings, Number(bet.potentialWinnings));
   }
 
   // 팀명과 경기 시간으로 경기 결과 조회 (강화된 매칭)
@@ -413,8 +517,10 @@ class BetResultService {
 
   // 승/패 결과 판정
   determineWinLoseResult(selection, gameResult) {
-    if (gameResult.result === 'cancelled') {
-      return 'cancel';
+    // 경기 취소 또는 연기 시 즉시 환불
+    if (gameResult.result === 'cancelled' || gameResult.status === 'cancelled' ||
+        gameResult.result === 'postponed' || gameResult.status === 'postponed') {
+      return 'cancelled';
     }
 
     if (gameResult.result === 'pending') {
@@ -432,8 +538,8 @@ class BetResultService {
     } else if (gameResultData === 'away_win') {
       return selectedTeam === awayTeam ? 'won' : 'lost';
     } else if (gameResultData === 'draw') {
-      // 무승부: 승/패 선택 모두 실패, draw로 저장
-      return 'draw';
+      // 무승부: 승/패 선택 모두 실패 (베팅에서는 lost 처리)
+      return 'lost';
     }
 
     return 'pending';
@@ -441,8 +547,10 @@ class BetResultService {
 
   // 언더/오버 결과 판정
   determineOverUnderResult(selection, gameResult) {
-    if (gameResult.result === 'cancelled') {
-      return 'cancel';
+    // 경기 취소 또는 연기 시 즉시 환불
+    if (gameResult.result === 'cancelled' || gameResult.status === 'cancelled' ||
+        gameResult.result === 'postponed' || gameResult.status === 'postponed') {
+      return 'cancelled';
     }
 
     if (gameResult.result === 'pending') {
@@ -450,40 +558,70 @@ class BetResultService {
     }
 
     // robust하게 옵션 추출 (예: 'Overbet365', 'UnderPinnacle' 등)
-    const option = (selection.option && selection.option !== '')
-      ? require('../normalizeUtils.js').normalizeOption(selection.option)
-      : require('../normalizeUtils.js').normalizeOption(selection.team);
+    let option = '';
+    if (selection.option && selection.option !== '') {
+      option = normalizeOption(selection.option);
+    } else if (selection.team && selection.team !== '') {
+      option = normalizeOption(selection.team);
+    } else {
+      // option과 team이 모두 빈 문자열인 경우 기본값으로 Over 가정
+      // 이는 일반적인 스포츠 베팅에서 기본 선택이 Over이기 때문
+      option = 'Over';
+      console.log(`[언더/오버 판정] option과 team이 비어있음. 기본값 'Over'로 설정`);
+    }
     const point = selection.point;
     
     // 스코어에서 총 점수 계산
     let totalScore = 0;
-    if (gameResult.score && Array.isArray(gameResult.score)) {
-      totalScore = gameResult.score.reduce((sum, score) => sum + parseInt(score.score || 0), 0);
+    if (gameResult.score) {
+      let scoreData = gameResult.score;
+      // 문자열인 경우 JSON 파싱
+      if (typeof scoreData === 'string') {
+        try {
+          scoreData = JSON.parse(scoreData);
+        } catch (e) {
+          console.error('Score parsing error:', e, scoreData);
+          return 'pending';
+        }
+      }
+      // 배열인지 확인 후 총점 계산
+      if (Array.isArray(scoreData)) {
+        totalScore = scoreData.reduce((sum, score) => sum + parseInt(score.score || 0), 0);
+      }
     }
 
     // point가 없으면 무효
     if (typeof point !== 'number' || isNaN(point)) {
-      return 'cancel';
+      return 'cancelled';
     }
 
     // 무효 조건: totalScore와 point가 같으면 push/cancel 처리
     if (totalScore === point) {
-      return 'cancel';
+      return 'cancelled';
     }
 
+    console.log(`[언더/오버 판정] 총점: ${totalScore}, 기준: ${point}, 타입: ${option}`);
+    
     if (option === 'Over') {
-      return totalScore > point ? 'won' : 'lost';
+      const result = totalScore > point ? 'won' : 'lost';
+      console.log(`[언더/오버 판정] Over ${point}: ${totalScore} > ${point} = ${result}`);
+      return result;
     } else if (option === 'Under') {
-      return totalScore < point ? 'won' : 'lost';
+      const result = totalScore < point ? 'won' : 'lost';
+      console.log(`[언더/오버 판정] Under ${point}: ${totalScore} < ${point} = ${result}`);
+      return result;
     }
 
+    console.log(`[언더/오버 판정] 알 수 없는 옵션: ${option}`);
     return 'pending';
   }
 
   // 핸디캡 결과 판정
   determineHandicapResult(selection, gameResult) {
-    if (gameResult.result === 'cancelled') {
-      return 'cancel';
+    // 경기 취소 또는 연기 시 즉시 환불
+    if (gameResult.result === 'cancelled' || gameResult.status === 'cancelled' ||
+        gameResult.result === 'postponed' || gameResult.status === 'postponed') {
+      return 'cancelled';
     }
 
     if (gameResult.result === 'pending') {
@@ -495,9 +633,22 @@ class BetResultService {
     
     // 스코어 계산
     let homeScore = 0, awayScore = 0;
-    if (gameResult.score && Array.isArray(gameResult.score)) {
-      homeScore = parseInt(gameResult.score[0]?.score || 0);
-      awayScore = parseInt(gameResult.score[1]?.score || 0);
+    if (gameResult.score) {
+      let scoreData = gameResult.score;
+      // 문자열인 경우 JSON 파싱
+      if (typeof scoreData === 'string') {
+        try {
+          scoreData = JSON.parse(scoreData);
+        } catch (e) {
+          console.error('Score parsing error:', e, scoreData);
+          return 'pending';
+        }
+      }
+      // 배열인지 확인 후 점수 추출
+      if (Array.isArray(scoreData) && scoreData.length >= 2) {
+        homeScore = parseInt(scoreData[0]?.score || 0);
+        awayScore = parseInt(scoreData[1]?.score || 0);
+      }
     }
 
     // 핸디캡 적용 (팀명 비교용 정규화)

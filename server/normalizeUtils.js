@@ -13,6 +13,45 @@ function normalizeTeamName(team) {
 }
 
 /**
+ * 중국 슈퍼리그 팀명 매핑 (베팅 사이트명 -> DB 저장명)
+ */
+const cslTeamMapping = {
+  'qingdaohainiufc': 'qingdaohainiu',
+  'shanghaishenhuafc': 'shanghaishenhua',
+  'tianjinjinmentigerfc': 'tianjinjinmentiger',
+  'zhejiang': 'zhejiangprofessional',
+  'zhejiangfc': 'zhejiangprofessional',
+  'beijingguoanfc': 'beijingguoan',
+  'shandongtaishanfc': 'shandongtaishan',
+  'wuhanthreetownsfc': 'wuhanthreetowns',
+  'changchunyataifc': 'changchunyatai',
+  'qingdaowestcoastfc': 'qingdaowestcoast',
+  'meizhouhakkafc': 'meizhouhakka',
+  'chengdurongchengfc': 'chengdurongcheng',
+  'shenzhenpengcityfc': 'shenzhenpengcity'
+};
+
+/**
+ * 팀명 비교용 정규화: 더 엄격한 정규화 (앞뒤 공백, 대소문자, 특수문자 모두 제거)
+ */
+function normalizeTeamNameForComparison(team) {
+  if (!team) return '';
+  
+  let normalized = team
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9가-힣]/g, '')
+    .replace(/\s+/g, '');
+  
+  // 중국 슈퍼리그 팀명 매핑 적용
+  if (cslTeamMapping[normalized]) {
+    normalized = cslTeamMapping[normalized];
+  }
+  
+  return normalized;
+}
+
+/**
  * 카테고리/리그명 정규화: 소문자 변환 및 주요 리그명 통일
  */
 function normalizeCategory(cat) {
@@ -144,6 +183,7 @@ function parseMainAndSubFromSportKey(sportKey) {
 
 export {
   normalizeTeamName,
+  normalizeTeamNameForComparison,
   normalizeCategory,
   normalizeCommenceTime,
   extractTeamsFromDesc,

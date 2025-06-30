@@ -1,5 +1,7 @@
 // File: components/GameCard.tsx
-import React from 'react';
+import React, { memo, useMemo, useCallback } from 'react';
+import GameTimeDisplay from './GameTimeDisplay';
+import BettingButton from './BettingButton';
 
 interface GameCardProps {
   teams: string;
@@ -10,10 +12,12 @@ interface GameCardProps {
   infoOnly?: boolean;
 }
 
-const GameCard: React.FC<GameCardProps> = ({ teams, time, selectedTeam, onSelect, bookmakers, infoOnly }) => {
-  const [teamA, teamB] = teams.split(" vs ");
+const GameCard: React.FC<GameCardProps> = memo(({ teams, time, selectedTeam, onSelect, bookmakers, infoOnly }) => {
+  // 팀명 파싱 (메모화)
+  const [teamA, teamB] = useMemo(() => teams.split(" vs "), [teams]);
 
-  const handleClick = (team: string) => {
+  // 클릭 핸들러 (메모화)
+  const handleClick = useCallback((team: string) => {
     // 같은 팀을 다시 클릭하면 선택 해제
     if (selectedTeam === team) {
       onSelect(teams, "");
@@ -21,10 +25,10 @@ const GameCard: React.FC<GameCardProps> = ({ teams, time, selectedTeam, onSelect
       // 다른 팀을 선택하면 이전 선택은 자동으로 해제되고 새로운 팀 선택
       onSelect(teams, team);
     }
-  };
+  }, [selectedTeam, onSelect, teams]);
 
-  // 배당율 정보 추출
-  const getOdds = (teamName: string) => {
+  // 배당율 정보 추출 (메모화)
+  const getOdds = useCallback((teamName: string) => {
     if (!bookmakers || bookmakers.length === 0) return null;
     for (const bookmaker of bookmakers) {
       const h2hMarket = bookmaker.markets?.find((market: any) => market.key === 'h2h');
@@ -36,26 +40,24 @@ const GameCard: React.FC<GameCardProps> = ({ teams, time, selectedTeam, onSelect
       }
     }
     return null;
-  };
+  }, [bookmakers]);
 
-  const teamAOdds = getOdds(teamA);
-  const teamBOdds = getOdds(teamB);
+  // 배당률 계산 (메모화)
+  const { teamAOdds, teamBOdds } = useMemo(() => ({
+    teamAOdds: getOdds(teamA),
+    teamBOdds: getOdds(teamB)
+  }), [getOdds, teamA, teamB]);
 
-  // 경기 시작 시간 체크 (10분 전 마감)
-  const now = new Date();
-  const marginMinutes = 10;
-  const maxDays = 7;
-  const maxDate = new Date(now.getTime() + maxDays * 24 * 60 * 60 * 1000);
-  const commenceTime = new Date(time);
-  const isPastGame = commenceTime <= new Date(now.getTime() + marginMinutes * 60000);
-  const isTooFar = commenceTime > maxDate;
-  const isBettable = !isPastGame && !isTooFar;
+    // 개별 팀 클릭 핸들러 (메모화)
+  const createTeamClickHandler = useCallback((team: string) => () => {
+    handleClick(team);
+  }, [handleClick]);
 
   if (infoOnly) {
     return (
       <div className="bg-white p-4 rounded shadow opacity-90 hover:shadow-lg transition-shadow border-2 border-blue-400">
         <div className="text-gray-700 font-semibold mb-2">{teams}</div>
-        <div className="text-sm text-gray-500 mb-2">{new Date(time).toLocaleString()}</div>
+        <GameTimeDisplay time={time} showStatus={false} />
         <div className="flex space-x-4">
           {[teamA, teamB].map((team, index) => {
             const odds = index === 0 ? teamAOdds : teamBOdds;
@@ -76,38 +78,29 @@ const GameCard: React.FC<GameCardProps> = ({ teams, time, selectedTeam, onSelect
   return (
     <div className="bg-white p-4 rounded shadow border-2 border-blue-400">
       <div className="text-gray-700 font-semibold mb-2">{teams}</div>
-      <div className="text-sm text-gray-500 mb-4">{new Date(time).toLocaleString()}</div>
+      <div className="mb-4">
+        <GameTimeDisplay time={time} showStatus={true} />
+      </div>
       <div className="flex space-x-4">
-        {[teamA, teamB].map((team, index) => {
-          const odds = index === 0 ? teamAOdds : teamBOdds;
-          return (
-            <button
-              key={team}
-              onClick={() => handleClick(team)}
-              className={`flex-1 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400
-                ${selectedTeam === team ? "bg-yellow-400" : "bg-blue-600 hover:bg-blue-700"}
-                ${isPastGame || isTooFar ? "opacity-50 cursor-not-allowed" : ""}
-              `}
-              disabled={isPastGame || isTooFar}
-            >
-              <div>{team}</div>
-              {odds && (
-                <div className="text-xs mt-1 opacity-90">
-                  배당: {odds}
-                </div>
-              )}
-              {isPastGame && (
-                <div className="text-xs mt-1 text-red-400 font-semibold">마감</div>
-              )}
-              {isTooFar && (
-                <div className="text-xs mt-1 text-gray-400 font-semibold">오픈 예정</div>
-              )}
-            </button>
-          );
-        })}
+        <BettingButton
+          team={teamA}
+          odds={teamAOdds}
+          selected={selectedTeam === teamA}
+          commenceTime={time}
+          onSelect={createTeamClickHandler(teamA)}
+        />
+        <BettingButton
+          team={teamB}
+          odds={teamBOdds}
+          selected={selectedTeam === teamB}
+          commenceTime={time}
+          onSelect={createTeamClickHandler(teamB)}
+        />
       </div>
     </div>
   );
-};
+});
+
+GameCard.displayName = 'GameCard';
 
 export default GameCard;
