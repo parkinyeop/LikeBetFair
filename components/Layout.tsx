@@ -22,7 +22,18 @@ const Layout = memo(({ children }: LayoutProps) => {
       const sportKey = router.query.sport as string;
       const displayName = getDisplayNameFromSportKey(sportKey);
       if (displayName) {
-        setSelected(displayName);
+        // 해당 스포츠가 속한 메인 카테고리를 찾아서 트리 형태로 선택
+        const parentCategory = Object.entries(SPORTS_TREE).find(([main, subs]) => 
+          subs.includes(displayName)
+        );
+        
+        if (parentCategory) {
+          // "축구 > K리그" 형태로 설정
+          setSelected(`${parentCategory[0]} > ${displayName}`);
+        } else {
+          // 메인 카테고리에 속하지 않는 경우 (예외적인 경우)
+          setSelected(displayName);
+        }
       }
     }
   }, [router.pathname, router.query.sport]);
