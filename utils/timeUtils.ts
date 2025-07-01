@@ -186,6 +186,109 @@ export function getRelativeTime(targetTime: Date, baseTime?: Date): string | nul
 }
 
 /**
+ * 상대 시간과 절대 시간을 함께 표시 (정보 전달력 향상)
+ * 예: "30분 후 (14:30)", "2시간 전 (12/25 10:00)"
+ */
+export function getEnhancedTimeDisplay(targetTime: Date | string, baseTime?: Date): string {
+  const target = convertUtcToLocal(targetTime);
+  const base = baseTime || getCurrentLocalTime();
+  
+  const relativeTime = getRelativeTime(target, base);
+  
+  // 절대 시간 포맷팅
+  const now = getCurrentLocalTime();
+  const isToday = target.toDateString() === now.toDateString();
+  const isTomorrow = target.toDateString() === new Date(now.getTime() + 24 * 60 * 60 * 1000).toDateString();
+  const isYesterday = target.toDateString() === new Date(now.getTime() - 24 * 60 * 60 * 1000).toDateString();
+  
+  let absoluteTime: string;
+  
+  if (isToday) {
+    // 오늘: 시간만 표시
+    absoluteTime = target.toLocaleTimeString('ko-KR', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } else if (isTomorrow) {
+    // 내일: "내일 HH:MM"
+    absoluteTime = `내일 ${target.toLocaleTimeString('ko-KR', {
+      hour: '2-digit',
+      minute: '2-digit'
+    })}`;
+  } else if (isYesterday) {
+    // 어제: "어제 HH:MM"
+    absoluteTime = `어제 ${target.toLocaleTimeString('ko-KR', {
+      hour: '2-digit',
+      minute: '2-digit'
+    })}`;
+  } else {
+    // 다른 날: "MM/DD HH:MM"
+    absoluteTime = target.toLocaleString('ko-KR', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+  
+  // 상대 시간이 있으면 조합, 없으면 절대 시간만
+  if (relativeTime) {
+    return `${relativeTime} (${absoluteTime})`;
+  } else {
+    return absoluteTime;
+  }
+}
+
+/**
+ * 경기 시간 상태에 따른 표시 최적화
+ */
+export function getGameTimeDisplay(commenceTime: Date | string): {
+  primary: string;    // 주요 표시 (상대시간 + 절대시간)
+  secondary?: string; // 보조 표시 (필요시)
+  status: 'upcoming' | 'soon' | 'live' | 'finished';
+  urgent?: boolean;   // 베팅 마감 임박 (10분 이내)
+} {
+  const gameTime = convertUtcToLocal(commenceTime);
+  const now = getCurrentLocalTime();
+  const diffMs = gameTime.getTime() - now.getTime();
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  
+  // 경기 상태 판단
+  let status: 'upcoming' | 'soon' | 'live' | 'finished';
+  let urgent = false;
+  
+  if (diffMs < -3 * 60 * 60 * 1000) { // 3시간 전
+    status = 'finished';
+  } else if (diffMs < 0) { // 시작됨
+    status = 'live';
+  } else if (diffMinutes <= 10) { // 10분 이내
+    status = 'soon';
+    urgent = true;
+  } else {
+    status = 'upcoming';
+  }
+  
+  const primary = getEnhancedTimeDisplay(gameTime);
+  
+  // 베팅 마감 임박 시 추가 정보
+  let secondary: string | undefined;
+  if (urgent && diffMinutes > 0) {
+    secondary = `베팅 마감 ${diffMinutes}분 전`;
+  } else if (status === 'live') {
+    secondary = '진행 중';
+  } else if (status === 'finished') {
+    secondary = '종료';
+  }
+  
+  return {
+    primary,
+    secondary,
+    status,
+    urgent
+  };
+}
+
+/**
  * 베팅 가능 상태 체크 (클라이언트 시간대 고려)
  */
 export function getBettingStatus(commenceTime: string | Date): {

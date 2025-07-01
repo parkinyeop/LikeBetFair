@@ -7,6 +7,11 @@ const User = sequelize.define('User', {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true
   },
+  username: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    unique: true
+  },
   email: {
     type: DataTypes.STRING,
     allowNull: false,
@@ -20,9 +25,78 @@ const User = sequelize.define('User', {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
     defaultValue: 0
+  },
+  isAdmin: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false
+  },
+  adminLevel: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0
+  },
+  referralCode: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    unique: true
+  },
+  referredBy: {
+    type: DataTypes.STRING(20),
+    allowNull: true
+  },
+  referrerAdminId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    references: {
+      model: 'Users',
+      key: 'id'
+    }
+  },
+  lastLogin: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  isActive: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: true
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  indexes: [
+    { fields: ['email'] },
+    { fields: ['username'] },
+    { fields: ['isAdmin'] },
+    { fields: ['referralCode'] },
+    { fields: ['referredBy'] },
+    { fields: ['referrerAdminId'] }
+  ]
 });
+
+// 인스턴스 메서드
+User.prototype.hasPermission = function(permission) {
+  if (!this.isAdmin) return false;
+  
+  const ADMIN_PERMISSIONS = {
+    0: [],
+    1: ['view_own_referrals'],
+    2: ['view_own_referrals', 'view_user_bets', 'manage_commissions'],
+    3: ['view_own_referrals', 'view_user_bets', 'manage_commissions', 'create_referral_codes'],
+    4: ['view_all_data', 'manage_users', 'system_settings'],
+    5: ['*'] // 모든 권한
+  };
+  
+  const permissions = ADMIN_PERMISSIONS[this.adminLevel] || [];
+  return permissions.includes('*') || permissions.includes(permission);
+};
+
+User.prototype.canViewUser = function(targetUserId) {
+  if (!this.isAdmin) return false;
+  if (this.adminLevel >= 4) return true; // SENIOR 이상은 모든 사용자 조회 가능
+  
+  // 자신이 추천한 사용자만 조회 가능
+  return this.hasPermission('view_own_referrals');
+};
 
 export default User; 

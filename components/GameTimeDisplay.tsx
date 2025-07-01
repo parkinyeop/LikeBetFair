@@ -4,7 +4,8 @@ import {
   formatTimeWithTimezone, 
   getBettingStatus, 
   getGameTimeStatus,
-  getClientTimezoneInfo
+  getClientTimezoneInfo,
+  getGameTimeDisplay
 } from '../utils/timeUtils';
 
 interface GameTimeDisplayProps {
@@ -24,53 +25,62 @@ const GameTimeDisplay = memo(({
   // 시간 관련 상태 계산 (메모화)
   const timeInfo = useMemo(() => {
     const bettingStatus = getBettingStatus(time);
-    const gameTimeStatus = getGameTimeStatus(time);
+    const gameTimeDisplay = getGameTimeDisplay(time);
     const clientTimezoneInfo = getClientTimezoneInfo();
-    
-    const displayTime = formatTimeWithTimezone(time, {
-      format,
-      showRelative: true,
-      showTimezone: showTimezone || !clientTimezoneInfo.isKST
-    });
     
     return {
       bettingStatus,
-      gameTimeStatus,
-      displayTime,
+      gameTimeDisplay,
       clientTimezoneInfo
     };
-  }, [time, format, showTimezone]);
+  }, [time, showTimezone]);
 
-  const { bettingStatus, gameTimeStatus, displayTime } = timeInfo;
+  const { bettingStatus, gameTimeDisplay } = timeInfo;
 
   // 시간 색상 결정
   const getTimeColor = () => {
-    switch (gameTimeStatus.status) {
+    if (gameTimeDisplay.urgent) {
+      return 'text-red-600 font-semibold'; // 베팅 마감 임박
+    }
+    
+    switch (gameTimeDisplay.status) {
       case 'live':
         return 'text-green-600 font-semibold';
       case 'finished':
         return 'text-gray-500';
+      case 'soon':
+        return 'text-orange-600 font-semibold';
       case 'upcoming':
       default:
-        return bettingStatus.status === 'closing_soon' ? 'text-orange-600' : 'text-blue-600';
+        return 'text-blue-600';
     }
+  };
+
+  // 상태 배지 결정
+  const getStatusBadge = () => {
+    if (gameTimeDisplay.status === 'live') {
+      return <span className="ml-2 text-green-600 font-semibold">🔴 LIVE</span>;
+    }
+    if (gameTimeDisplay.status === 'finished') {
+      return <span className="ml-2 text-gray-500 font-medium">종료</span>;
+    }
+    if (gameTimeDisplay.urgent) {
+      return <span className="ml-2 text-red-600 font-semibold">⚠️ 마감임박</span>;
+    }
+    return null;
   };
 
   return (
     <div className="text-sm">
-      <span className={getTimeColor()}>
-        {displayTime}
-      </span>
-      {showStatus && bettingStatus.status === 'closing_soon' && (
-        <span className="ml-2 text-orange-600 font-semibold">
-          ({bettingStatus.message})
-        </span>
+      <div className={getTimeColor()}>
+        {gameTimeDisplay.primary}
+      </div>
+      {showStatus && gameTimeDisplay.secondary && (
+        <div className="text-xs text-gray-600 mt-1">
+          {gameTimeDisplay.secondary}
+        </div>
       )}
-      {showStatus && gameTimeStatus.status === 'live' && (
-        <span className="ml-2 text-green-600 font-semibold">
-          🔴 LIVE
-        </span>
-      )}
+      {showStatus && getStatusBadge()}
     </div>
   );
 });
