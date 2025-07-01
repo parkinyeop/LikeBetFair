@@ -1,5 +1,7 @@
 import React, { useEffect, useState, memo, useMemo, useCallback } from 'react';
 import { useBetStore } from '../stores/useBetStore';
+import GameTimeDisplay from './GameTimeDisplay';
+import { getSeasonInfo } from '../config/sportsMapping';
 
 interface OddsListProps {
   sportKey: string;
@@ -112,12 +114,111 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey }) => {
     );
   }
 
+  // 시즌 상태 판단 로직
+  const getSeasonStatus = (sportKey: string) => {
+    const seasonInfo = getSeasonInfo(sportKey);
+    return seasonInfo?.status || 'active';
+  };
+
+  // 날짜 포맷팅 함수
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('ko-KR', { 
+      month: 'long', 
+      day: 'numeric',
+      weekday: 'short'
+    });
+  };
+
   if (games.length === 0) {
-    return (
-      <div className="text-center py-8 text-gray-500">
-        해당 리그의 경기 데이터가 없습니다.
-      </div>
-    );
+    const seasonInfo = getSeasonInfo(sportKey);
+    const sportName = seasonInfo?.name || sportKey.split('_').pop()?.toUpperCase() || sportKey;
+    
+    if (seasonInfo?.status === 'offseason') {
+      return (
+        <div className="text-center py-12">
+          <div className="mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
+              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">🏖️ 시즌 오프</h3>
+          <p className="text-gray-600 mb-4">
+            {seasonInfo.description}
+          </p>
+          <div className="bg-blue-50 rounded-lg p-4 max-w-md mx-auto">
+            <p className="text-sm text-blue-800">
+              {seasonInfo.nextSeasonStart ? (
+                <>
+                  <strong>다음 시즌 시작:</strong><br/>
+                  {formatDate(seasonInfo.nextSeasonStart)}
+                </>
+              ) : (
+                <>
+                  <strong>새로운 시즌이 시작되면</strong><br/>
+                  배당율이 다시 제공됩니다.
+                </>
+              )}
+            </p>
+          </div>
+        </div>
+      );
+    } else if (seasonInfo?.status === 'break') {
+      return (
+        <div className="text-center py-12">
+          <div className="mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-yellow-100 rounded-full mb-4">
+              <svg className="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4m16 0l-4-4m4 4l-4 4" />
+              </svg>
+            </div>
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">⏸️ 시즌 휴식기</h3>
+          <p className="text-gray-600 mb-4">
+            {seasonInfo.description}
+          </p>
+          <div className="bg-green-50 rounded-lg p-4 max-w-md mx-auto">
+            <p className="text-sm text-green-800">
+              {seasonInfo.breakPeriod?.end ? (
+                <>
+                  <strong>시즌 재개:</strong><br/>
+                  {formatDate(seasonInfo.breakPeriod.end)}
+                </>
+              ) : (
+                <>
+                  <strong>곧 시즌이 재개됩니다</strong><br/>
+                  재개 시 배당율이 업데이트됩니다.
+                </>
+              )}
+            </p>
+          </div>
+        </div>
+      );
+    } else {
+      return (
+        <div className="text-center py-12">
+          <div className="mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-yellow-100 rounded-full mb-4">
+              <svg className="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">📊 경기 준비 중</h3>
+          <p className="text-gray-600 mb-4">
+            현재 {sportName} 리그의 예정된 경기가 없습니다.
+          </p>
+          <div className="bg-green-50 rounded-lg p-4 max-w-md mx-auto">
+            <p className="text-sm text-green-800">
+              <strong>새로운 경기 일정이 발표되면</strong><br/>
+              자동으로 배당율이 업데이트됩니다.
+            </p>
+          </div>
+        </div>
+      );
+    }
   }
 
   return (
@@ -138,9 +239,15 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey }) => {
         const market = game.bookmakers[0]?.markets.find(m => m.key === marketKey);
         return (
           <div key={game.id} className="bg-white rounded-lg shadow p-4">
-            <div className="flex justify-between items-center mb-1">
+            <div className="flex justify-between items-center mb-3">
               <span className="text-lg font-bold">🏟️ {game.home_team} vs {game.away_team}</span>
-              <span className="text-sm">📅 {gameTime.toLocaleDateString()} {gameTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} [{game.sport_title}]</span>
+              <div className="text-right">
+                <GameTimeDisplay 
+                  time={game.commence_time} 
+                  showStatus={true} 
+                />
+                <div className="text-xs text-gray-500 mt-1">[{game.sport_title}]</div>
+              </div>
             </div>
             {/* 마켓 탭 */}
             <div className="flex gap-2 mb-3">
@@ -396,7 +503,10 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey }) => {
                 })()}
               </div>
             ) : selectedMarket === '승/패' ? (
-              <div className="grid grid-cols-2 gap-2">
+              <div className={`grid gap-2 ${
+                // 축구는 무승부가 있으므로 3열, 다른 스포츠는 2열
+                sportKey.startsWith('soccer_') ? 'grid-cols-3' : 'grid-cols-2'
+              }`}>
                 {(() => {
                   // 모든 bookmaker의 h2h outcomes를 합침
                   const allOutcomes: any[] = [];
@@ -408,65 +518,67 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey }) => {
                       });
                     }
                   });
-                  // 팀별로 최고 배당 추출
-                  const homeBest = allOutcomes.filter(o => o.name === game.home_team)
-                    .sort((a, b) => b.price - a.price)[0];
-                  const awayBest = allOutcomes.filter(o => o.name === game.away_team)
-                    .sort((a, b) => b.price - a.price)[0];
+                  
+                  // 축구의 경우 Home-Draw-Away 순서로 정렬
+                  let sortedOutcomes: any[] = [];
+                  if (sportKey.startsWith('soccer_')) {
+                    // 홈팀, 무승부, 원정팀 순서로 정렬
+                    const homeBest = allOutcomes.filter(o => o.name === game.home_team)
+                      .sort((a, b) => b.price - a.price)[0];
+                    const drawBest = allOutcomes.filter(o => o.name.toLowerCase().includes('draw') || o.name === 'Draw' || o.name === 'Tie')
+                      .sort((a, b) => b.price - a.price)[0];
+                    const awayBest = allOutcomes.filter(o => o.name === game.away_team)
+                      .sort((a, b) => b.price - a.price)[0];
+                    
+                    sortedOutcomes = [homeBest, drawBest, awayBest].filter(Boolean);
+                  } else {
+                    // 다른 스포츠는 홈팀, 원정팀만
+                    const homeBest = allOutcomes.filter(o => o.name === game.home_team)
+                      .sort((a, b) => b.price - a.price)[0];
+                    const awayBest = allOutcomes.filter(o => o.name === game.away_team)
+                      .sort((a, b) => b.price - a.price)[0];
+                    
+                    sortedOutcomes = [homeBest, awayBest].filter(Boolean);
+                  }
+
                   return (
                     <>
-                      <button
-                        onClick={() => isBettable && homeBest && toggleSelection({
-                          team: normalizeTeamName(homeBest.name),
-                          odds: homeBest.price,
-                          desc: `${game.home_team} vs ${game.away_team}`,
-                          commence_time: game.commence_time,
-                          market: selectedMarket,
-                          gameId: game.id,
-                          ...(homeBest.point && { point: homeBest.point })
-                        })}
-                        className={`w-full p-3 rounded-lg text-center transition-colors ${
-                          isTeamSelected(normalizeTeamName(homeBest?.name), selectedMarket, game.id, homeBest.point)
-                            ? 'bg-yellow-500 hover:bg-yellow-600'
-                            : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
-                        } text-white`}
-                        disabled={!isBettable || !homeBest}
-                      >
-                        <div className="font-bold">
-                          {game.home_team}
-                        </div>
-                        <div className="text-sm">
-                          {homeBest ? homeBest.price : 'N/A'}
-                        </div>
-                        {!isBettable && !isTooFar && <div className="text-xs text-red-500 mt-1">마감</div>}
-                        {isTooFar && <div className="text-xs text-gray-400 mt-1">오픈 예정</div>}
-                      </button>
-                      <button
-                        onClick={() => isBettable && awayBest && toggleSelection({
-                          team: normalizeTeamName(awayBest.name),
-                          odds: awayBest.price,
-                          desc: `${game.home_team} vs ${game.away_team}`,
-                          commence_time: game.commence_time,
-                          market: selectedMarket,
-                          gameId: game.id,
-                          ...(awayBest.point && { point: awayBest.point })
-                        })}
-                        className={`w-full p-3 rounded-lg text-center transition-colors ${
-                          isTeamSelected(normalizeTeamName(awayBest?.name), selectedMarket, game.id, awayBest.point)
-                            ? 'bg-yellow-500 hover:bg-yellow-600'
-                            : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
-                        } text-white`}
-                        disabled={!isBettable || !awayBest}
-                      >
-                        <div className="font-bold">
-                          {game.away_team}
-                        </div>
-                        <div className="text-sm">
-                          {awayBest ? awayBest.price : 'N/A'}
-                        </div>
-                        {!isBettable && !isTooFar && <div className="text-xs text-red-500 mt-1">마감</div>}
-                        {isTooFar && <div className="text-xs text-gray-400 mt-1">오픈 예정</div>}
-                      </button>
+                      {sortedOutcomes.map((outcome, idx) => {
+                        if (!outcome) return null;
+                        
+                        const isDrawOutcome = outcome.name.toLowerCase().includes('draw') || outcome.name === 'Draw' || outcome.name === 'Tie';
+                        const teamDisplayName = isDrawOutcome ? '무승부' : outcome.name;
+                        
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => isBettable && outcome && toggleSelection({
+                              team: normalizeTeamName(outcome.name),
+                              odds: outcome.price,
+                              desc: `${game.home_team} vs ${game.away_team}`,
+                              commence_time: game.commence_time,
+                              market: selectedMarket,
+                              gameId: game.id,
+                              ...(outcome.point && { point: outcome.point })
+                            })}
+                            className={`w-full p-3 rounded-lg text-center transition-colors ${
+                              isTeamSelected(normalizeTeamName(outcome?.name), selectedMarket, game.id, outcome.point)
+                                ? 'bg-yellow-500 hover:bg-yellow-600'
+                                : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                            } text-white`}
+                            disabled={!isBettable || !outcome}
+                          >
+                            <div className="font-bold">
+                              {teamDisplayName}
+                            </div>
+                            <div className="text-sm">
+                              {outcome ? outcome.price : 'N/A'}
+                            </div>
+                            {!isBettable && !isTooFar && <div className="text-xs text-red-500 mt-1">마감</div>}
+                            {isTooFar && <div className="text-xs text-gray-400 mt-1">오픈 예정</div>}
+                          </button>
+                        );
+                      })}
                     </>
                   );
                 })()}
