@@ -1,4 +1,6 @@
 import betResultService from '../services/betResultService.js';
+import simplifiedOddsValidation from '../services/simplifiedOddsValidation.js';
+import seasonValidationService from '../services/seasonValidationService.js';
 import User from '../models/userModel.js';
 import Bet from '../models/betModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
@@ -12,6 +14,48 @@ export async function placeBet(req, res) {
     // Validate bet data
     if (!selections || !stake || !totalOdds) {
       return res.status(400).json({ message: 'Missing required bet information' });
+    }
+
+    // 🆕 시즌 상태 검증 추가
+    console.log(`[BetController] 시즌 상태 검증 시작: ${selections.length}개 선택`);
+    for (const selection of selections) {
+      const sportKey = selection.sport_key;
+      if (sportKey) {
+        const seasonValidation = await seasonValidationService.validateBettingEligibility(sportKey);
+        if (!seasonValidation.isEligible) {
+          console.log(`[BetController] 시즌 상태 검증 실패: ${selection.desc} - ${seasonValidation.reason}`);
+          return res.status(400).json({ 
+            message: `베팅 불가능한 리그: ${selection.desc}`,
+            reason: seasonValidation.reason,
+            status: seasonValidation.status,
+            code: 'SEASON_OFFSEASON'
+          });
+        }
+        
+        // 시즌 상태 로깅
+        console.log(`[BetController] 시즌 상태 검증 통과: ${selection.desc} - ${seasonValidation.reason}`);
+      }
+    }
+
+    // 🔒 배당율 검증 추가
+    console.log(`[BetController] 베팅 요청 배당율 검증 시작: ${selections.length}개 선택`);
+    for (const selection of selections) {
+      const oddsValidation = await simplifiedOddsValidation.validateBetOdds(selection);
+      if (!oddsValidation.isValid) {
+        console.log(`[BetController] 배당율 검증 실패: ${selection.desc} - ${oddsValidation.reason}`);
+        return res.status(400).json({ 
+          message: `배당율 검증 실패: ${selection.desc}`,
+          reason: oddsValidation.reason,
+          code: oddsValidation.code,
+          currentOdds: oddsValidation.currentOdds,
+          requestedOdds: selection.odds
+        });
+      }
+      
+      // 경고가 있는 경우 로깅
+      if (oddsValidation.warning) {
+        console.log(`[BetController] 배당율 경고: ${selection.desc} - ${oddsValidation.reason}`);
+      }
     }
 
     // 베팅 가능 시간 체크 (경기 시작 10분 전 마감)

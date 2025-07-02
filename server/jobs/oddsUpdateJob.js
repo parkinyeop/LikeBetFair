@@ -4,6 +4,10 @@ import gameResultService from '../services/gameResultService.js';
 import betResultService from '../services/betResultService.js';
 import fs from 'fs';
 import path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 let isUpdating = false;
 let lastUpdateTime = null;
@@ -60,8 +64,8 @@ function saveUpdateLog(type, status, data = {}) {
   console.log(`${emoji} [${now.toISOString()}] ${type.toUpperCase()} ${status.toUpperCase()}:`, data.message || '');
 }
 
-// 비용 효율적인 경기 결과 업데이트 - 2시간마다 실행
-cron.schedule('0 */2 * * *', async () => {
+// 경기 결과 업데이트 - 10분마다 실행
+cron.schedule('*/10 * * * *', async () => {
   if (isUpdating) {
     console.log('Previous game results update is still running, skipping this update');
     return;
@@ -113,10 +117,10 @@ cron.schedule('0 */2 * * *', async () => {
   }
 });
 
-// 고우선순위 리그 - 3시간마다 업데이트
-cron.schedule('0 */3 * * *', async () => {
+// 고우선순위 리그 - 10분마다 업데이트
+cron.schedule('*/10 * * * *', async () => {
   saveUpdateLog('odds', 'start', { 
-    message: 'Starting high-priority leagues odds update',
+    message: 'Starting high-priority leagues odds update (10min interval)',
     priority: 'high',
     leagues: Array.from(highPriorityCategories)
   });
@@ -135,7 +139,7 @@ cron.schedule('0 */3 * * *', async () => {
     }
     
     saveUpdateLog('odds', 'success', { 
-      message: 'High-priority odds update completed',
+      message: 'High-priority odds update completed (10min interval)',
       priority: actualPriority,
       leagues: Array.from(highPriorityCategories),
       dynamicPriority: dynamicPriority
@@ -151,10 +155,10 @@ cron.schedule('0 */3 * * *', async () => {
   }
 });
 
-// 중우선순위 리그 - 6시간마다 업데이트  
-cron.schedule('0 */6 * * *', async () => {
+// 중우선순위 리그 - 1시간마다 업데이트  
+cron.schedule('0 * * * *', async () => {
   saveUpdateLog('odds', 'start', { 
-    message: 'Starting medium-priority leagues odds update',
+    message: 'Starting medium-priority leagues odds update (1hour interval)',
     priority: 'medium',
     leagues: Array.from(mediumPriorityCategories)
   });
@@ -165,7 +169,7 @@ cron.schedule('0 */6 * * *', async () => {
     if (dynamicPriority !== 'high') {
       await oddsApiService.fetchAndCacheOddsForCategories(Array.from(mediumPriorityCategories), 'medium');
       saveUpdateLog('odds', 'success', { 
-        message: 'Medium-priority odds update completed',
+        message: 'Medium-priority odds update completed (1hour interval)',
         priority: 'medium',
         leagues: Array.from(mediumPriorityCategories),
         dynamicPriority: dynamicPriority
@@ -188,10 +192,10 @@ cron.schedule('0 */6 * * *', async () => {
   }
 });
 
-// 저우선순위 리그 - 12시간마다 업데이트 (시즌 오프 리그들)
-cron.schedule('0 */12 * * *', async () => {
+// 저우선순위 리그 - 24시간마다 업데이트 (시즌 오프 리그들)
+cron.schedule('0 0 * * *', async () => {
   saveUpdateLog('odds', 'start', { 
-    message: 'Starting low-priority leagues odds update',
+    message: 'Starting low-priority leagues odds update (24hour interval)',
     priority: 'low',
     leagues: Array.from(lowPriorityCategories)
   });
@@ -202,7 +206,7 @@ cron.schedule('0 */12 * * *', async () => {
     if (dynamicPriority === 'low') {
       await oddsApiService.fetchAndCacheOddsForCategories(Array.from(lowPriorityCategories), 'low');
       saveUpdateLog('odds', 'success', { 
-        message: 'Low-priority odds update completed',
+        message: 'Low-priority odds update completed (24hour interval)',
         priority: 'low',
         leagues: Array.from(lowPriorityCategories),
         dynamicPriority: dynamicPriority
@@ -222,44 +226,6 @@ cron.schedule('0 */12 * * *', async () => {
       leagues: Array.from(lowPriorityCategories),
       error: error.message
     });
-  }
-});
-
-// 배팅 결과 업데이트 - 1시간마다 실행 (경기 결과와 독립적으로)
-cron.schedule('30 * * * *', async () => {
-  saveUpdateLog('bets', 'start', { message: 'Starting scheduled bet results update' });
-
-  try {
-    const result = await betResultService.updateBetResults();
-    saveUpdateLog('bets', 'success', { 
-      message: 'Scheduled bet results update completed',
-      updatedCount: result?.updatedCount || 0,
-      pendingCount: result?.pendingCount || 0
-    });
-  } catch (error) {
-    saveUpdateLog('bets', 'error', { 
-      message: 'Scheduled bet results update failed',
-      error: error.message
-    });
-    
-    // 에러 발생 시 5분 후 재시도
-    setTimeout(async () => {
-      try {
-        saveUpdateLog('bets', 'start', { message: 'Retrying scheduled bet results update', isRetry: true });
-        const retryResult = await betResultService.updateBetResults();
-        saveUpdateLog('bets', 'success', { 
-          message: 'Scheduled bet results retry successful',
-          updatedCount: retryResult?.updatedCount || 0,
-          isRetry: true
-        });
-      } catch (retryError) {
-        saveUpdateLog('bets', 'error', { 
-          message: 'Scheduled bet results retry failed',
-          error: retryError.message,
-          isRetry: true
-        });
-      }
-    }, 5 * 60 * 1000); // 5분
   }
 });
 
@@ -421,7 +387,7 @@ setInterval(async () => {
 setInterval(async () => {
   try {
     console.log('[Scheduler] 배팅내역 기반 누락 경기 결과 자동 보충 시작');
-    const updated = await gameResultService.updateMissingGameResultsFromBets();
+    const updated = await gameResultService.collectMissingGameResults();
     console.log(`[Scheduler] 배팅내역 기반 누락 경기 결과 자동 보충 완료: ${updated}건 보충됨`);
   } catch (error) {
     console.error('[Scheduler] 배팅내역 기반 누락 경기 결과 자동 보충 에러:', error);
@@ -429,5 +395,96 @@ setInterval(async () => {
 }, 60 * 60 * 1000); // 1시간마다
 
 const getActiveCategories = () => Array.from(activeCategories);
+
+// 🔒 보안 감사 작업 - 매일 새벽 3시에 실행
+cron.schedule('0 3 * * *', async () => {
+  saveUpdateLog('security_audit', 'start', { 
+    message: 'Starting daily PaymentHistory security audit'
+  });
+  
+  try {
+    console.log('🔒 [Security Audit] 시작: PaymentHistory 무결성 검사');
+    
+    // PaymentHistory 감사 스크립트 실행
+    const { stdout, stderr } = await execAsync('node scripts/auditPaymentHistory.js', {
+      cwd: process.cwd()
+    });
+    
+    // 출력 파싱
+    const hasIssues = stdout.includes('❌ PaymentHistory 누락된 취소 베팅:') && 
+                     !stdout.includes('❌ PaymentHistory 누락된 취소 베팅: 0개');
+    
+    if (hasIssues) {
+      // 문제 발견 시 알림
+      saveUpdateLog('security_audit', 'warning', { 
+        message: 'PaymentHistory 무결성 문제 발견',
+        details: stdout,
+        requires_attention: true
+      });
+      
+      console.log('🚨 [Security Audit] PaymentHistory 문제 발견! 수동 확인 필요');
+      
+      // 심각한 문제 시 이메일/슬랙 알림 추가 가능
+      
+    } else {
+      saveUpdateLog('security_audit', 'success', { 
+        message: 'PaymentHistory 무결성 검사 통과',
+        details: '모든 취소된 베팅의 환불 기록이 정상적으로 존재'
+      });
+      
+      console.log('✅ [Security Audit] PaymentHistory 무결성 검사 통과');
+    }
+    
+  } catch (error) {
+    saveUpdateLog('security_audit', 'error', { 
+      message: 'PaymentHistory 보안 감사 실패',
+      error: error.message,
+      requires_attention: true
+    });
+    
+    console.error('❌ [Security Audit] 보안 감사 실패:', error.message);
+  }
+});
+
+// 🔒 긴급 보안 감사 작업 - 베팅 취소 후 5분마다 실행 (오후 6시-자정만)
+cron.schedule('*/5 18-23 * * *', async () => {
+  try {
+    // 최근 5분 내에 취소된 베팅이 있는지 확인
+    const { stdout } = await execAsync('node -e "import Bet from \'./models/betModel.js\'; const recentCancelled = await Bet.count({ where: { status: \'cancelled\', updatedAt: { [require(\'sequelize\').Op.gte]: new Date(Date.now() - 5*60*1000) } } }); console.log(recentCancelled);"', {
+      cwd: process.cwd()
+    });
+    
+    const recentCancelledCount = parseInt(stdout.trim());
+    
+    if (recentCancelledCount > 0) {
+      console.log(`🔍 [Emergency Audit] 최근 5분간 ${recentCancelledCount}개 베팅 취소됨, 긴급 감사 실행`);
+      
+      // 긴급 감사 실행
+      const { stdout: auditResult } = await execAsync('node scripts/auditPaymentHistory.js', {
+        cwd: process.cwd()
+      });
+      
+      const hasIssues = auditResult.includes('❌ PaymentHistory 누락된 취소 베팅:') && 
+                       !auditResult.includes('❌ PaymentHistory 누락된 취소 베팅: 0개');
+      
+      if (hasIssues) {
+        saveUpdateLog('emergency_audit', 'critical', { 
+          message: '긴급: 최근 취소된 베팅의 PaymentHistory 누락 감지',
+          recentCancelledCount: recentCancelledCount,
+          details: auditResult,
+          requires_immediate_action: true
+        });
+        
+        console.error('🚨 [Emergency Audit] 긴급 상황: PaymentHistory 누락 감지!');
+      } else {
+        console.log('✅ [Emergency Audit] 최근 취소 베팅들의 PaymentHistory 정상 확인');
+      }
+    }
+    
+  } catch (error) {
+    // 긴급 감사 실패는 조용히 로깅 (너무 많은 알림 방지)
+    console.log('⚠️ [Emergency Audit] 감사 실패:', error.message);
+  }
+});
 
 export { getHealthStatus, updateActiveCategories, getActiveCategories }; 

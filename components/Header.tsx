@@ -11,7 +11,7 @@ export default function Header() {
   const [showJoin, setShowJoin] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showSoon, setShowSoon] = useState(false);
-  const { isLoggedIn, username, logout } = useAuth();
+  const { isLoggedIn, username, logout, isAdmin, adminLevel } = useAuth();
 
   const handleMenuClick = (category: string) => {
     if (["Casino", "Poker", "Ladder"].includes(category)) {
@@ -71,13 +71,37 @@ export default function Header() {
               <span>Ladder</span>
               <span className="text-[10px] bg-red-500 text-white px-1 rounded">SOON</span>
             </button>
+            
+            {/* 관리자 메뉴 - 관리자만 표시 */}
+            {isAdmin && (
+              <Link href="/admin" passHref legacyBehavior>
+                <button
+                  onClick={() => handleMenuClick("Admin")}
+                  className={`flex items-center space-x-1 ${selectedCategory === "Admin" ? "text-yellow-400 font-bold" : "text-white hover:text-blue-200"}`}
+                >
+                  <span>관리자</span>
+                  {adminLevel >= 4 && (
+                    <span className="text-[10px] bg-green-500 text-white px-1 rounded">L{adminLevel}</span>
+                  )}
+                </button>
+              </Link>
+            )}
           </div>
         </nav>
         {/* 오른쪽: 로그인/회원가입 또는 유저 정보 */}
         <div className="flex items-center space-x-3 min-w-[180px] justify-end text-sm h-full">
           {isLoggedIn ? (
             <>
-              <span className="font-semibold text-white">{username}님 접속중입니다</span>
+              <div className="flex flex-col items-end">
+                <span className="font-semibold text-white">
+                  {username}님 접속중입니다
+                  {isAdmin && (
+                    <span className="ml-1 text-xs bg-yellow-500 text-black px-1.5 py-0.5 rounded">
+                      관리자 Lv.{adminLevel}
+                    </span>
+                  )}
+                </span>
+              </div>
               <button
                 onClick={logout}
                 className="px-3 py-1 bg-white text-blue-600 rounded hover:bg-blue-50"

@@ -23,6 +23,7 @@ import oddsRoutes from './routes/oddsRoutes.js';
 import gameResultRoutes from './routes/gameResultRoutes.js';
 import authRoutes from './routes/auth.js';
 import betRoutes from './routes/bet.js';
+import adminRoutes from './routes/admin.js';
 
 const app = express();
 
@@ -44,6 +45,7 @@ app.use(express.json());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/bet', betRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api', oddsRoutes);
 app.use('/api/game-results', gameResultRoutes);
 
@@ -78,6 +80,9 @@ setInterval(async () => {
   }
 }, 5 * 60 * 1000); // 5분
 
+// 스케줄러 관련 import 및 설정
+import { setupSeasonStatusScheduler } from './services/seasonStatusUpdater.js';
+
 // 데이터베이스 연결 및 서버 시작
 const PORT = process.env.PORT || 5050;
 
@@ -99,6 +104,9 @@ async function startServer() {
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
       console.log('[완료] 서버 초기화 완료');
+      
+      // 시즌 상태 자동 체크 스케줄러 시작
+      setupSeasonStatusScheduler();
     });
     
   } catch (err) {

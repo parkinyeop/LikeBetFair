@@ -4,9 +4,12 @@ interface AuthContextType {
   isLoggedIn: boolean;
   username: string | null;
   balance: number | null;
-  login: (username: string, balance: number) => void;
+  isAdmin: boolean;
+  adminLevel: number;
+  login: (username: string, balance: number, isAdmin?: boolean, adminLevel?: number) => void;
   logout: () => void;
   setBalance: (balance: number) => void;
+  hasPermission: (permission: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -15,21 +18,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminLevel, setAdminLevel] = useState(0);
 
-  const login = (username: string, balance: number) => {
+  const login = (username: string, balance: number, isAdmin = false, adminLevel = 0) => {
     setIsLoggedIn(true);
     setUsername(username);
     setBalance(balance);
+    setIsAdmin(isAdmin);
+    setAdminLevel(adminLevel);
   };
 
   const logout = () => {
     setIsLoggedIn(false);
     setUsername(null);
     setBalance(null);
+    setIsAdmin(false);
+    setAdminLevel(0);
+  };
+
+  const hasPermission = (permission: string): boolean => {
+    if (!isAdmin) return false;
+    
+    const ADMIN_PERMISSIONS: Record<number, string[]> = {
+      0: [],
+      1: ['view_own_referrals'],
+      2: ['view_own_referrals', 'view_user_bets', 'manage_commissions'],
+      3: ['view_own_referrals', 'view_user_bets', 'manage_commissions', 'create_referral_codes'],
+      4: ['view_all_data', 'manage_users', 'system_settings'],
+      5: ['*'] // 모든 권한
+    };
+    
+    const permissions = ADMIN_PERMISSIONS[adminLevel] || [];
+    return permissions.includes('*') || permissions.includes(permission);
   };
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, username, balance, login, logout, setBalance }}>
+    <AuthContext.Provider value={{ 
+      isLoggedIn, 
+      username, 
+      balance, 
+      isAdmin,
+      adminLevel,
+      login, 
+      logout, 
+      setBalance,
+      hasPermission
+    }}>
       {children}
     </AuthContext.Provider>
   );

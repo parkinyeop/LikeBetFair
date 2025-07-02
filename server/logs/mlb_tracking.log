@@ -1,0 +1,14 @@
+🚀 MLB 배당율 추적 시작
+📅 대상 경기: 토론토 블루제이스 vs 뉴욕 양키스
+⏰ 매시간 정각에 배당율 수집
+📁 저장 위치: server/logs/mlb_odds_tracking_YYYY-MM-DD.json
+🔄 [2025. 7. 1. 오후 8:31:24] MLB 배당율 수집 시작...
+✅ 스케줄러 설정 완료. Ctrl+C로 종료할 수 있습니다.
+📡 API 응답: 15개 경기 발견
+✅ 경기 발견: New York Yankees @ Toronto Blue Jays
+🕐 경기 시간: 2025. 7. 2. 오전 4:07:00
+📊 평균 배당율:
+   Toronto Blue Jays: 2.392
+   New York Yankees: 1.615
+📈 북메이커 수: 10개
+📊 배당율 데이터 저장됨: /Users/inyeoppark/Documents/MyGemeProject/LikeBetFair/server/logs/mlb_odds_tracking_2025-07-01.json

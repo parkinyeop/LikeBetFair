@@ -270,7 +270,11 @@ async function updateGameResultsFromCrawledData() {
       let result = 'pending';
       if (score && score.includes('-')) {
         const [homeScore, awayScore] = score.split('-').map(s => s.trim());
-        parsedScore = [homeScore, awayScore];
+        // 올바른 객체 배열 형태로 저장
+        parsedScore = [
+          {"name": home, "score": homeScore},
+          {"name": away, "score": awayScore}
+        ];
         if (!isNaN(homeScore) && !isNaN(awayScore)) {
           if (Number(homeScore) > Number(awayScore)) result = 'home_win';
           else if (Number(homeScore) < Number(awayScore)) result = 'away_win';

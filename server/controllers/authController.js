@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import User from '../models/userModel.js';
 import axios from 'axios';
 import Bet from '../models/betModel.js';
+import { Op } from 'sequelize';
 
 // The Odds API를 활용한 경기 결과 판정 함수
 async function getGameResult(sel) {
@@ -92,10 +93,17 @@ const authController = {
     try {
       const { email, password } = req.body;
 
-      // Check if user exists
-      const user = await User.findOne({
-        where: { email }
+      // Check if user exists by email first, then by username
+      let user = await User.findOne({
+        where: { email: email }
       });
+
+      // If not found by email, try username
+      if (!user) {
+        user = await User.findOne({
+          where: { username: email }
+        });
+      }
       
       if (!user) {
         return res.status(400).json({ message: 'Invalid credentials' });
@@ -110,6 +118,9 @@ const authController = {
       // 로그인 시 pending 베팅 결과 판정
       await checkAndUpdatePendingBets(user.id);
 
+      // Update last login time
+      await user.update({ lastLogin: new Date() });
+
       // Create token
       const token = jwt.sign(
         { userId: user.id },
@@ -117,10 +128,17 @@ const authController = {
         { expiresIn: process.env.JWT_EXPIRES_IN }
       );
 
-      // username, email, balance도 함께 반환
-      res.json({ token, username: user.username, email: user.email, balance: Number(user.balance) });
+      // username, email, balance, 관리자 정보도 함께 반환
+      res.json({ 
+        token, 
+        username: user.username, 
+        email: user.email, 
+        balance: Number(user.balance),
+        isAdmin: user.isAdmin,
+        adminLevel: user.adminLevel
+      });
     } catch (err) {
-      console.error(err);
+      console.error('Login error:', err);
       res.status(500).json({ message: 'Server error' });
     }
   },

@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from "next/router";
 import GameCard from "../components/GameCard";
-import { SPORTS_TREE, getSportKey, getSeasonInfo, getSeasonStatusBadge, SPORT_CATEGORIES } from "../config/sportsMapping";
+import { SPORTS_TREE, getSportKey, getSeasonInfo, getSeasonStatusBadge, getSeasonStatusStyle, SPORT_CATEGORIES } from "../config/sportsMapping";
 import { API_CONFIG, TIME_CONFIG, buildApiUrl, isBettingAllowed } from "../config/apiConfig";
 import GameTimeDisplay from "../components/GameTimeDisplay";
 
@@ -180,6 +180,31 @@ export default function Home() {
       day: 'numeric',
       weekday: 'short'
     });
+  };
+
+  // 리그 선택 버튼 스타일 함수
+  const getButtonStyle = (category: string, isSelected: boolean) => {
+    if (isSelected) {
+      return 'bg-blue-600 text-white border-blue-600';
+    }
+    
+    const sportKey = getSportKey(category);
+    const seasonInfo = getSeasonInfo(sportKey);
+    
+    if (!seasonInfo) {
+      return 'bg-gray-200 border-gray-300 text-gray-700 hover:bg-gray-300';
+    }
+    
+    switch (seasonInfo.status) {
+      case 'active':
+        return 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100';
+      case 'break':
+        return 'bg-yellow-50 border-yellow-200 text-yellow-800 hover:bg-yellow-100';
+      case 'offseason':
+        return 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100';
+      default:
+        return 'bg-gray-200 border-gray-300 text-gray-700 hover:bg-gray-300';
+    }
   };
 
   const TodayBettingView = () => {
@@ -448,15 +473,22 @@ export default function Home() {
                   const sportKey = getSportKey(category);
                   const seasonInfo = getSeasonInfo(sportKey);
                   const statusBadge = seasonInfo ? getSeasonStatusBadge(seasonInfo.status) : null;
+                  const statusStyle = seasonInfo ? getSeasonStatusStyle(seasonInfo.status) : null;
                   
                   return (
                     <button
                       key={category}
                       onClick={() => handleCategoryChange(category)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors relative ${
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors relative border-2 shadow-sm ${
                         selectedCategory === category
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : seasonInfo 
+                            ? (seasonInfo.status === 'active' 
+                                ? 'bg-blue-50 border-blue-400 text-blue-900 hover:bg-blue-100 hover:border-blue-500'
+                                : seasonInfo.status === 'break'
+                                ? 'bg-yellow-50 border-yellow-400 text-yellow-900 hover:bg-yellow-100 hover:border-yellow-500'
+                                : 'bg-gray-50 border-gray-400 text-gray-700 hover:bg-gray-100 hover:border-gray-500')
+                            : 'bg-gray-200 border-gray-400 text-gray-700 hover:bg-gray-300'
                       }`}
                     >
                       <div className="flex items-center gap-2">
@@ -487,6 +519,7 @@ export default function Home() {
                 const sportKey = getSportKey(selectedCategory);
                 const seasonInfo = getSeasonInfo(sportKey);
                 const statusBadge = seasonInfo ? getSeasonStatusBadge(seasonInfo.status) : null;
+                const statusStyle = seasonInfo ? getSeasonStatusStyle(seasonInfo.status) : null;
                 
                 return statusBadge ? (
                   <span className={`text-xs px-2 py-1 rounded-full ${statusBadge.className}`}>

@@ -102,7 +102,54 @@ export const SPORT_CATEGORIES: Record<string, SportCategory> = {
     sportKey: "basketball_kbl",
     backendCategory: "KBL",
     sportTitle: "KBL"
-  }
+  },
+
+  // 야구
+    'baseball_kbo': {
+    name: 'KBO',
+    status: 'active',
+    currentSeason: '2025',
+    nextSeasonStart: '2025-03-01',
+    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (5경기), 오늘 경기 진행 중)'
+  },
+  'baseball_mlb': {
+    name: 'MLB',
+    status: 'active',
+    currentSeason: '2025',
+    seasonStart: '2025-03-27',
+    seasonEnd: '2025-10-30',
+    description: '2025 시즌 진행 중'
+  },
+
+  // 농구
+  basketball_nba: {
+    name: 'NBA',
+    status: 'offseason', // 10월 시즌 시작 예정
+    category: 'basketball',
+    subCategory: 'NBA', 
+    seasonStart: '2025-10-15',
+    seasonEnd: '2026-06-15',
+    description: '시즌오프 (10월 15일 2025-26 시즌 시작 예정)'
+  },
+  basketball_kbl: {
+    name: 'KBL', 
+    status: 'offseason', // 10월 시즌 시작 예정
+    category: 'basketball',
+    subCategory: 'KBL',
+    seasonStart: '2025-10-05',
+    seasonEnd: '2026-05-30', 
+    description: '시즌오프 (10월 5일 2025-26 시즌 시작 예정)'
+  },
+
+  // 미식축구
+  americanfootball_nfl: {
+    name: 'NFL',
+    status: 'offseason',
+    currentSeason: '2025',
+    seasonEnd: '2025-02-09',
+    nextSeasonStart: '2025-09-05',
+    description: '시즌오프 (자동 감지: 시즌 시작 예정 (65일 후), 배당율 조기 제공 중)'
+  },
 };
 
 // 프론트엔드 카테고리 트리 구조
@@ -168,58 +215,54 @@ export interface SeasonInfo {
 
 export const SEASON_SCHEDULES: Record<string, SeasonInfo> = {
   // 축구
-  'soccer_korea_kleague1': {
-    name: 'K리그',
-    status: 'offseason',
-    currentSeason: '2024',
-    seasonEnd: '2024-12-01',
-    nextSeasonStart: '2025-02-22',
-    description: '2024시즌 종료, 2025시즌은 2월 22일 개막 예정'
-  },
-  'soccer_japan_j_league': {
-    name: 'J리그',
+    'soccer_korea_kleague1': {
+    name: 'soccer_korea_kleague1',
     status: 'break',
     currentSeason: '2025',
-    breakPeriod: { start: '2025-06-08', end: '2025-07-12' },
-    description: '2025시즌 중반 휴식기, 7월 12일 재개 예정'
+    breakPeriod: { start: '2025-07-02', end: 'TBD' },
+    description: '시즌 중 휴식기 (자동 감지: 최근 10경기, 예정 12경기)'
   },
-  'soccer_italy_serie_a': {
-    name: '세리에 A',
-    status: 'offseason',
-    currentSeason: '2024-25',
-    seasonEnd: '2025-05-25',
-    nextSeasonStart: '2025-08-24',
-    description: '2024-25시즌 종료, 2025-26시즌은 8월 24일 개막 예정'
-  },
-  'soccer_brazil_campeonato': {
-    name: '브라질 세리에 A',
-    status: 'offseason',
-    currentSeason: '2024',
-    seasonEnd: '2024-12-08',
-    nextSeasonStart: '2025-07-12',
-    description: '2024시즌 종료, 2025시즌은 7월 12일 개막 예정'
-  },
-  'soccer_usa_mls': {
-    name: 'MLS',
-    status: 'active',
-    currentSeason: '2025',
-    nextSeasonStart: '2025-02-22',
-    description: '2025시즌 진행 중 (2월 22일 개막)'
-  },
-  'soccer_argentina_primera_division': {
-    name: '아르헨티나 프리메라',
-    status: 'offseason',
-    currentSeason: '2024',
-    seasonEnd: '2024-12-15',
-    nextSeasonStart: '2025-07-12',
-    description: '2024시즌 종료, 2025시즌은 7월 12일 개막 예정'
-  },
-  'soccer_china_superleague': {
-    name: '중국 슈퍼리그',
+    'soccer_japan_j_league': {
+    name: 'J리그',
     status: 'active',
     currentSeason: '2025',
     nextSeasonStart: '2025-03-01',
-    description: '2025시즌 진행 중 (3월 1일 개막)'
+    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (9경기))'
+  },
+          'soccer_italy_serie_a': {
+    name: '세리에 A',
+    status: 'offseason',
+    currentSeason: '2025',
+    nextSeasonStart: '2025-03-01',
+    description: '시즌오프 (자동 감지: 시즌 시작 예정, 배당율 조기 제공 중)'
+  },
+      'soccer_brazil_campeonato': {
+    name: 'soccer_brazil_campeonato',
+    status: 'offseason',
+    currentSeason: '2025',
+    nextSeasonStart: '2025-03-01',
+    description: '시즌오프 (자동 감지: 시즌 시작 예정, 배당율 조기 제공 중)'
+  },
+    'soccer_usa_mls': {
+    name: 'MLS',
+    status: 'active',
+    currentSeason: '2025',
+    nextSeasonStart: '2025-03-01',
+    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (15경기), 최근 30일 43경기 완료)'
+  },
+      'soccer_argentina_primera_division': {
+    name: '아르헨티나 프리메라',
+    status: 'offseason',
+    currentSeason: '2025',
+    nextSeasonStart: '2025-03-01',
+    description: '시즌오프 (자동 감지: 시즌 시작 예정, 배당율 조기 제공 중)'
+  },
+    'soccer_china_superleague': {
+    name: '중국 슈퍼리그',
+    status: 'break',
+    currentSeason: '2025',
+    breakPeriod: { start: '2025-07-02', end: 'TBD' },
+    description: '시즌 중 휴식기 (자동 감지: 최근 27경기, 예정 16경기)'
   },
   'soccer_spain_primera_division': {
     name: '라리가',
@@ -227,58 +270,60 @@ export const SEASON_SCHEDULES: Record<string, SeasonInfo> = {
     currentSeason: '2024-25',
     seasonEnd: '2025-05-25',
     nextSeasonStart: '2025-08-17',
-    description: '2024-25시즌 종료, 2025-26시즌은 8월 17일 개막 예정'
+    description: '시즌오프 (자동 감지: 최근 경기 없음, 예정 경기 없음, 배당율 미제공)'
   },
-  'soccer_germany_bundesliga': {
+          'soccer_germany_bundesliga': {
     name: '분데스리가',
     status: 'offseason',
-    currentSeason: '2024-25',
-    seasonEnd: '2025-05-24',
-    nextSeasonStart: '2025-08-23',
-    description: '2024-25시즌 종료, 2025-26시즌은 8월 23일 개막 예정'
+    currentSeason: '2025',
+    nextSeasonStart: '2025-03-01',
+    description: '시즌오프 (자동 감지: 시즌 시작 예정, 배당율 조기 제공 중)'
   },
 
   // 농구
-  'basketball_nba': {
+  basketball_nba: {
     name: 'NBA',
     status: 'offseason',
     currentSeason: '2024-25',
     seasonEnd: '2025-06-19',
     nextSeasonStart: '2025-10-15',
-    description: '2024-25시즌 종료, 2025-26시즌은 10월 15일 개막 예정'
+    description: '시즌오프 (자동 감지: 최근 경기 없음, 예정 경기 없음, 배당율 미제공)'
   },
-  'basketball_kbl': {
+  basketball_kbl: {
     name: 'KBL',
-    status: 'active',
+    status: 'offseason',
     currentSeason: '2024-25',
-    nextSeasonStart: '2024-10-05',
-    description: '2024-25시즌 진행 중 (10월 5일 개막)'
+    seasonEnd: '2025-04-26',
+    nextSeasonStart: '2025-10-05',
+    description: '시즌오프 (자동 감지: 최근 경기 없음, 예정 경기 없음, 배당율 미제공)'
   },
 
   // 야구
+      'baseball_kbo': {
+    name: 'KBO',
+    status: 'active',
+    currentSeason: '2025',
+    nextSeasonStart: '2025-03-01',
+    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (5경기), 오늘 경기 진행 중)'
+  },
   'baseball_mlb': {
     name: 'MLB',
     status: 'active',
     currentSeason: '2025',
-    nextSeasonStart: '2025-03-28',
-    description: '2025시즌 진행 중 (3월 28일 개막)'
-  },
-  'baseball_kbo': {
-    name: 'KBO',
-    status: 'active',
-    currentSeason: '2025',
-    nextSeasonStart: '2025-03-23',
-    description: '2025시즌 진행 중 (3월 23일 개막)'
+    seasonStart: '2025-03-27',
+    seasonEnd: '2025-10-30',
+    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (18경기), 최근 30일 390경기 완료)'
   },
 
   // 미식축구
-  'americanfootball_nfl': {
+  americanfootball_nfl: {
     name: 'NFL',
-    status: 'active',
-    currentSeason: '2024-25',
-    nextSeasonStart: '2024-09-05',
-    description: '2024-25시즌 진행 중 (9월 5일 개막)'
-  }
+    status: 'offseason',
+    currentSeason: '2025',
+    seasonEnd: '2025-02-09',
+    nextSeasonStart: '2025-09-05',
+    description: '시즌오프 (자동 감지: 시즌 시작 예정 (65일 후), 배당율 조기 제공 중)'
+  },
 };
 
 // 시즌 정보 조회 유틸리티 함수
@@ -290,7 +335,7 @@ export const getSeasonInfo = (sportKey: string): SeasonInfo | null => {
 export const getSeasonStatusStyle = (status: string) => {
   switch (status) {
     case "active":
-      return "bg-green-50 border-green-200 hover:bg-green-100";
+      return "bg-blue-50 border-blue-200 hover:bg-blue-100";
     case "break":
       return "bg-yellow-50 border-yellow-200 hover:bg-yellow-100";
     case "offseason":
@@ -304,7 +349,7 @@ export const getSeasonStatusStyle = (status: string) => {
 export const getSeasonStatusBadge = (status: string) => {
   switch (status) {
     case "active":
-      return { text: "진행중", className: "bg-green-100 text-green-800" };
+      return { text: "진행중", className: "bg-blue-100 text-blue-800" };
     case "break":
       return { text: "휴식기", className: "bg-yellow-100 text-yellow-800" };
     case "offseason":

@@ -3,6 +3,8 @@ import OddsCache from '../models/oddsCacheModel.js';
 import sportsConfig from '../config/sportsConfig.js';
 import { Op } from 'sequelize';
 import { normalizeTeamName, normalizeCategory, normalizeCategoryPair } from '../normalizeUtils.js';
+import oddsHistoryService from './oddsHistoryService.js';
+import { BETTING_CONFIG } from '../config/centralizedConfig.js';
 
 // 클라이언트에서 사용하는 sport key 매핑
 const clientSportKeyMap = {
@@ -184,7 +186,7 @@ class OddsApiService {
                 continue;
               }
               
-              await OddsCache.upsert({
+              const [oddsRecord, created] = await OddsCache.upsert({
                 mainCategory,
                 subCategory,
                 sportKey: sportKey,
@@ -194,7 +196,19 @@ class OddsApiService {
                 commenceTime: new Date(game.commence_time),
                 bookmakers: game.bookmakers,
                 lastUpdated: new Date()
+              }, {
+                returning: true
               });
+
+              // 배당율 히스토리 저장 (새로 생성되거나 업데이트된 경우)
+              if (oddsRecord) {
+                try {
+                  await oddsHistoryService.saveOddsSnapshot(oddsRecord);
+                } catch (historyError) {
+                  console.error(`[OddsHistory] 히스토리 저장 실패 (${clientCategory}):`, historyError.message);
+                  // 히스토리 저장 실패가 전체 프로세스를 중단시키지 않도록 계속 진행
+                }
+              }
             }
           }
         } catch (error) {
@@ -248,7 +262,7 @@ class OddsApiService {
                 continue;
               }
               
-              await OddsCache.upsert({
+              const [oddsRecord, created] = await OddsCache.upsert({
                 mainCategory,
                 subCategory,
                 sportKey: sportKey,
@@ -258,7 +272,19 @@ class OddsApiService {
                 commenceTime: new Date(game.commence_time),
                 bookmakers: game.bookmakers,
                 lastUpdated: new Date()
+              }, {
+                returning: true
               });
+
+              // 배당율 히스토리 저장 (새로 생성되거나 업데이트된 경우)
+              if (oddsRecord) {
+                try {
+                  await oddsHistoryService.saveOddsSnapshot(oddsRecord);
+                } catch (historyError) {
+                  console.error(`[OddsHistory] 히스토리 저장 실패 (${clientCategory}):`, historyError.message);
+                  // 히스토리 저장 실패가 전체 프로세스를 중단시키지 않도록 계속 진행
+                }
+              }
             }
           }
         } catch (error) {

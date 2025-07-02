@@ -2,6 +2,7 @@ import Bet from '../models/betModel.js';
 import GameResult from '../models/gameResultModel.js';
 import User from '../models/userModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
+import simplifiedOddsValidation from './simplifiedOddsValidation.js';
 import { Op, fn, col } from 'sequelize';
 import { normalizeTeamName, normalizeTeamNameForComparison, normalizeCategory, normalizeCategoryPair, normalizeOption } from '../normalizeUtils.js';
 
@@ -153,9 +154,20 @@ class BetResultService {
         bet.selections = [...selections]; // 새로운 배열로 할당
         await bet.save({ transaction: t });
 
-        // 2. 적중(won) 시 유저 balance 지급 및 PaymentHistory 생성
+        // 2. 적중(won) 시 배당율 재검증 후 지급
         if (betStatus === 'won' && prevStatus !== 'won') {
-          await this.processBetWinnings(bet, t);
+          // 🔒 정산 시점 배당율 검증 (간단한 방식)
+          const settlementValidation = await simplifiedOddsValidation.validateSettlementOdds(bet);
+          
+          if (!settlementValidation.isValid) {
+            console.log(`[BetResultService] 정산 배당율 검증 실패: bet ${bet.id} - 환불 처리`);
+            bet.status = 'cancelled';
+            await this.processBetRefund(bet, t, '배당율 검증 실패로 인한 환불');
+          } else {
+            // 검증 통과 시 정상 지급
+            await this.processBetWinnings(bet, t);
+            console.log(`[BetResultService] 배당율 검증 통과: bet ${bet.id} - 정상 지급`);
+          }
         }
 
         // 3. 🆕 취소(cancelled) 시 유저에게 환불 처리

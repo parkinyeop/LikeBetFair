@@ -1,12 +1,14 @@
 // 베팅 버튼 전용 컴포넌트 (성능 최적화)
 import React, { memo, useMemo, useCallback } from 'react';
 import { getBettingStatus } from '../utils/timeUtils';
+import { getSeasonInfo } from '../config/sportsMapping';
 
 interface BettingButtonProps {
   team: string;
   odds: number | null;
   selected: boolean;
   commenceTime: string;
+  sportKey?: string;
   onSelect: () => void;
   disabled?: boolean;
   className?: string;
@@ -17,20 +19,37 @@ const BettingButton = memo(({
   odds, 
   selected, 
   commenceTime,
+  sportKey,
   onSelect,
   disabled = false,
   className = ""
 }: BettingButtonProps) => {
   
+  // 시즌 상태 확인 (메모화)
+  const seasonInfo = useMemo(() => {
+    if (!sportKey) return null;
+    return getSeasonInfo(sportKey);
+  }, [sportKey]);
+
   // 베팅 상태 계산 (메모화)
   const bettingInfo = useMemo(() => {
     const bettingStatus = getBettingStatus(commenceTime);
+    
+    // 시즌 오프 체크
+    if (seasonInfo && seasonInfo.status === 'offseason') {
+      return {
+        isBettable: false,
+        status: 'season_off',
+        message: '시즌오프'
+      };
+    }
+    
     return {
       isBettable: bettingStatus.isBettingAllowed,
       status: bettingStatus.status,
       message: bettingStatus.message
     };
-  }, [commenceTime]);
+  }, [commenceTime, seasonInfo]);
 
   // 클릭 핸들러 (메모화)
   const handleClick = useCallback(() => {
@@ -75,13 +94,15 @@ const BettingButton = memo(({
       aria-label={`${team} 베팅 - 배당률 ${odds || 'N/A'}`}
     >
       <div>{team}</div>
-      {odds && (
+      {odds && bettingInfo.isBettable && (
         <div className="text-xs mt-1 opacity-90">
           배당: {odds}
         </div>
       )}
       {statusMessage && (
-        <div className="text-xs mt-1 text-red-400 font-semibold">
+        <div className={`text-xs mt-1 font-semibold ${
+          bettingInfo.status === 'season_off' ? 'text-orange-400' : 'text-red-400'
+        }`}>
           {statusMessage}
         </div>
       )}

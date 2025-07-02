@@ -157,10 +157,10 @@ function MyBetsPanel() {
       {/* 필터 버튼 */}
       <div className="flex gap-2 mb-2">
         {[
-          { key: 'all', label: '전체' },
           { key: 'pending', label: '진행중' },
           { key: 'won', label: '적중' },
           { key: 'lost', label: '미적중' },
+          { key: 'all', label: '전체' },
         ].map(btn => (
           <button
             key={btn.key}
@@ -268,7 +268,16 @@ function MyBetsPanel() {
                                 )}
                                 {['won', 'lost'].includes(sel.result) && sel.gameResult && sel.gameResult.score && Array.isArray(sel.gameResult.score) ? (
                                   <span className="ml-2 text-xs text-blue-600">
-                                    결과: ({sel.gameResult.homeTeam} {sel.gameResult.score[0]?.score ?? '-'} : {sel.gameResult.awayTeam} {sel.gameResult.score[1]?.score ?? '-'})
+                                    결과: ({sel.gameResult.homeTeam} {
+                                      // 스코어 형태에 따라 다르게 처리: ['3', '7'] 또는 [{score: '3'}, {score: '7'}]
+                                      typeof sel.gameResult.score[0] === 'string' 
+                                        ? sel.gameResult.score[0] 
+                                        : sel.gameResult.score[0]?.score ?? '-'
+                                    } : {sel.gameResult.awayTeam} {
+                                      typeof sel.gameResult.score[1] === 'string' 
+                                        ? sel.gameResult.score[1] 
+                                        : sel.gameResult.score[1]?.score ?? '-'
+                                    })
                                   </span>
                                 ) : ['won', 'lost'].includes(sel.result) ? (
                                   <span className="ml-2 text-xs text-gray-400">결과 대기중</span>

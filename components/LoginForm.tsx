@@ -22,7 +22,12 @@ export default function LoginForm({ onClose }: { onClose: () => void }) {
       console.log('로그인 응답 balance:', data.balance, typeof data.balance);
       if (res.ok) {
         localStorage.setItem('token', data.token);
-        login(data.username || data.email, Number(data.balance));
+        login(
+          data.username || data.email, 
+          Number(data.balance), 
+          data.isAdmin || false, 
+          data.adminLevel || 0
+        );
         onClose();
       } else {
         setMessage(data.message || '로그인 실패');
