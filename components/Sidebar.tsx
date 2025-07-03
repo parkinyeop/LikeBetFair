@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 
 interface SidebarProps {
   categories: string[];
@@ -18,24 +18,6 @@ const Sidebar: React.FC<SidebarProps> = ({ categories, selected, onSelect }) => 
 
   // 하위 카테고리 열림 상태를 별도 관리
   const [openMain, setOpenMain] = useState(currentMain);
-
-  // selected prop 변경 시 openMain 업데이트
-  useEffect(() => {
-    if (selected.includes(" > ")) {
-      const [main] = selected.split(" > ");
-      setOpenMain(main);
-    } else {
-      // 개별 스포츠가 선택된 경우, 해당 스포츠가 속한 메인 카테고리를 찾아서 열기
-      const parentCategory = subCategories
-        .find(sub => sub.split(" > ")[1] === selected)
-        ?.split(" > ")[0];
-      if (parentCategory) {
-        setOpenMain(parentCategory);
-      } else {
-        setOpenMain(selected);
-      }
-    }
-  }, [selected, subCategories]);
 
   return (
     <div className="flex flex-col p-4 space-y-1 h-full min-h-0 overflow-y-auto">

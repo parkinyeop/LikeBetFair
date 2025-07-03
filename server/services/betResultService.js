@@ -43,10 +43,33 @@ class BetResultService {
 
       console.log(`Found ${pendingBets.length} pending bets to process`);
 
+      // 🔒 이미 환불 처리된 베팅 제외
+      const filteredBets = [];
+      for (const bet of pendingBets) {
+        const existingRefund = await PaymentHistory.findOne({
+          where: {
+            betId: bet.id,
+            memo: { [Op.like]: '%환불%' }
+          }
+        });
+        
+        if (existingRefund) {
+          console.log(`[스케줄러] 이미 환불 처리된 베팅 제외: ${bet.id}`);
+          // 베팅 상태를 cancelled로 강제 업데이트
+          bet.status = 'cancelled';
+          await bet.save();
+          continue;
+        }
+        
+        filteredBets.push(bet);
+      }
+
+      console.log(`Processing ${filteredBets.length} bets (${pendingBets.length - filteredBets.length} excluded due to refunds)`);
+
       let updatedCount = 0;
       let errorCount = 0;
 
-      for (const bet of pendingBets) {
+      for (const bet of filteredBets) {
         try {
           const isCompleted = await this.processBetResult(bet);
           if (isCompleted) {
@@ -68,6 +91,29 @@ class BetResultService {
 
   // 개별 배팅 결과 처리
   async processBetResult(bet) {
+    // ✅ 환불 기록이 있으면 무조건 cancelled로 고정
+    console.log('[DEBUG] PaymentHistory 타입:', typeof PaymentHistory, PaymentHistory?.name);
+    console.log('[DEBUG] Op 타입:', typeof Op, Op?.like);
+    console.log('[DEBUG] sequelize:', typeof Bet?.sequelize, Bet?.sequelize?.config?.database);
+    const whereCond = {
+      betId: bet.id,
+      memo: { [Op.like]: '%환불%' }
+    };
+    console.log('[DEBUG] PaymentHistory 쿼리 조건:', whereCond);
+    const existingRefund = await PaymentHistory.findOne({ where: whereCond });
+    console.log(`[DEBUG] PaymentHistory 환불 기록 조회: betId=${bet.id}, 환불기록=${!!existingRefund}, 결과:`, existingRefund);
+    if (existingRefund) {
+      if (bet.status !== 'cancelled') {
+        bet.status = 'cancelled';
+        // selection.result도 모두 cancelled로 강제
+        if (Array.isArray(bet.selections)) {
+          bet.selections = bet.selections.map(sel => ({ ...sel, result: 'cancelled' }));
+        }
+        await bet.save();
+      }
+      return true; // 더 이상 처리하지 않음
+    }
+
     const selections = bet.selections;
     let hasPending = false;
     let hasLost = false;

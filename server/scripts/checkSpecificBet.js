@@ -1,9 +1,10 @@
 import Bet from '../models/betModel.js';
 import GameResult from '../models/gameResultModel.js';
 import { Op } from 'sequelize';
+import betResultService from '../services/betResultService.js';
 
 async function main() {
-  const betId = '423ec960-c6f9-44c6-a105-d69ed013c2de';
+  const betId = '423ec960-c6f9-44c6-a105-d69ed013c2de'; // test001 계정의 문제 베팅
   
   try {
     const bet = await Bet.findByPk(betId);
@@ -13,6 +14,9 @@ async function main() {
       return;
     }
     
+    // ✅ 베팅 결과 처리(환불 체크 포함)
+    await betResultService.processBetResult(bet);
+
     console.log('📋 베팅 상세 정보:');
     console.log(`베팅 ID: ${bet.id}`);
     console.log(`사용자 ID: ${bet.userId}`);
