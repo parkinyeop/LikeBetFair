@@ -38,7 +38,7 @@ const sportsDbLeagueMap = {
   'soccer_spain_primera_division': '4335', // 라리가
   'soccer_germany_bundesliga': '4331',  // 분데스리가
   // 농구 (Basketball)
-  'basketball_nba': '4387',             // NBA
+  'basketball_nba': '4387',             // NBA - 수정 필요
   'basketball_kbl': '5124',             // KBL
   // 야구 (Baseball)
   'baseball_mlb': '4424',               // MLB
@@ -394,6 +394,10 @@ class GameResultService {
                 });
               }
             }
+          } else if (resultsResponse.data && resultsResponse.data.events === null) {
+            console.log(`${clientCategory}: 시즌 오프 상태 - 다가오는 이벤트 없음`);
+          } else {
+            console.log(`${clientCategory}: 예상치 못한 응답 형식`);
           }
         } catch (error) {
           console.error(`Error fetching results for ${clientCategory}:`, error.message);

@@ -27,8 +27,7 @@ export interface OrderForm {
 }
 
 export const useExchange = () => {
-  const { token } = useAuth();
-  const [balance, setBalance] = useState<number>(0);
+  const { token, balance, setBalance } = useAuth();
   const [orders, setOrders] = useState<ExchangeOrder[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,23 +37,20 @@ export const useExchange = () => {
     'x-auth-token': token || '',
   };
 
-  // 잔고 조회
+  // 잔고 조회 (AuthContext의 balance 사용)
   const fetchBalance = useCallback(async () => {
     if (!token) return;
     
     try {
-      setLoading(true);
       const response = await fetch('http://localhost:5050/api/exchange/balance', { headers });
       if (!response.ok) throw new Error('잔고 조회 실패');
       
       const data: ExchangeBalance = await response.json();
       setBalance(data.balance);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '잔고 조회 중 오류 발생');
-    } finally {
-      setLoading(false);
+      console.error('잔고 조회 중 오류:', err);
     }
-  }, [token]);
+  }, [token, setBalance]);
 
   // 주문 내역 조회
   const fetchOrders = useCallback(async () => {
@@ -103,8 +99,13 @@ export const useExchange = () => {
       
       const data = await response.json();
       
-      // 잔고와 주문 내역 갱신
-      await Promise.all([fetchBalance(), fetchOrders()]);
+      // 잔고 업데이트 (응답에 포함된 경우)
+      if (data.newBalance !== undefined) {
+        setBalance(data.newBalance);
+      }
+      
+      // 주문 내역 갱신
+      await fetchOrders();
       
       return data;
     } catch (err) {
@@ -133,8 +134,13 @@ export const useExchange = () => {
       
       const data = await response.json();
       
-      // 잔고와 주문 내역 갱신
-      await Promise.all([fetchBalance(), fetchOrders()]);
+      // 잔고 업데이트 (응답에 포함된 경우)
+      if (data.newBalance !== undefined) {
+        setBalance(data.newBalance);
+      }
+      
+      // 주문 내역 갱신
+      await fetchOrders();
       
       return data;
     } catch (err) {

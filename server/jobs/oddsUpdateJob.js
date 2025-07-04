@@ -450,7 +450,7 @@ cron.schedule('0 3 * * *', async () => {
 cron.schedule('*/5 18-23 * * *', async () => {
   try {
     // 최근 5분 내에 취소된 베팅이 있는지 확인
-    const { stdout } = await execAsync('node -e "import Bet from \'./models/betModel.js\'; const recentCancelled = await Bet.count({ where: { status: \'cancelled\', updatedAt: { [require(\'sequelize\').Op.gte]: new Date(Date.now() - 5*60*1000) } } }); console.log(recentCancelled);"', {
+    const { stdout } = await execAsync('node -e "import Bet from \'./models/betModel.js\'; import { Op } from \'sequelize\'; const recentCancelled = await Bet.count({ where: { status: \'cancelled\', updatedAt: { [Op.gte]: new Date(Date.now() - 5*60*1000) } } }); console.log(recentCancelled);"', {
       cwd: process.cwd()
     });
     

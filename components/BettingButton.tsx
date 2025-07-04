@@ -12,6 +12,7 @@ interface BettingButtonProps {
   onSelect: () => void;
   disabled?: boolean;
   className?: string;
+  onBettingAreaSelect?: () => void;
 }
 
 const BettingButton = memo(({ 
@@ -22,7 +23,8 @@ const BettingButton = memo(({
   sportKey,
   onSelect,
   disabled = false,
-  className = ""
+  className = "",
+  onBettingAreaSelect
 }: BettingButtonProps) => {
   
   // 시즌 상태 확인 (메모화)
@@ -55,8 +57,12 @@ const BettingButton = memo(({
   const handleClick = useCallback(() => {
     if (bettingInfo.isBettable && !disabled && odds) {
       onSelect();
+      // 배팅 영역 선택 시 배팅슬립으로 자동 변경
+      if (onBettingAreaSelect) {
+        onBettingAreaSelect();
+      }
     }
-  }, [bettingInfo.isBettable, disabled, odds, onSelect]);
+  }, [bettingInfo.isBettable, disabled, odds, onSelect, onBettingAreaSelect]);
 
   // 버튼 스타일 계산 (메모화)
   const buttonStyle = useMemo(() => {

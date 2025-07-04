@@ -173,6 +173,12 @@ export default function Home() {
     }
   };
 
+  // 카테고리 선택 핸들러 (사이드바 자동 이동용)
+  const handleCategorySelect = (category: string) => {
+    // 전역 이벤트를 발생시켜 Layout에서 처리하도록 함
+    window.dispatchEvent(new CustomEvent('categorySelected', { detail: { category } }));
+  };
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('ko-KR', { 
@@ -546,6 +552,8 @@ export default function Home() {
                     onSelect={() => {}}
                     bookmakers={game.bookmakers}
                     infoOnly={true}
+                    sportKey={currentSportKey}
+                    onCategorySelect={handleCategorySelect}
                   />
                 </div>
               ))

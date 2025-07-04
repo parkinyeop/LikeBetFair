@@ -14,6 +14,7 @@ interface LayoutProps {
 const Layout = memo(({ children }: LayoutProps) => {
   const router = useRouter();
   const [selected, setSelected] = useState("NBA");
+  const [betslipTab, setBetslipTab] = useState<'betslip' | 'mybets'>('betslip'); // 배팅슬립 탭 상태 추가
   
   // 페이지 체크 메모화
   const isExchange = useMemo(() => router.pathname === "/exchange", [router.pathname]);
@@ -58,6 +59,31 @@ const Layout = memo(({ children }: LayoutProps) => {
     }
   }, [router]);
 
+  // 배팅 영역 선택 핸들러 (메모화)
+  const handleBettingAreaSelect = useCallback(() => {
+    setBetslipTab('betslip'); // 배팅슬립 탭으로 변경
+  }, []);
+
+  // 전역 이벤트 리스너 추가
+  useEffect(() => {
+    const handleBettingAreaSelected = () => {
+      setBetslipTab('betslip');
+    };
+
+    const handleCategorySelected = (event: CustomEvent) => {
+      const { category } = event.detail;
+      setSelected(category);
+    };
+
+    window.addEventListener('bettingAreaSelected', handleBettingAreaSelected);
+    window.addEventListener('categorySelected', handleCategorySelected as EventListener);
+    
+    return () => {
+      window.removeEventListener('bettingAreaSelected', handleBettingAreaSelected);
+      window.removeEventListener('categorySelected', handleCategorySelected as EventListener);
+    };
+  }, []);
+
   return (
     <div className="h-screen bg-gray-100 flex flex-col">
       <Header />
@@ -79,7 +105,13 @@ const Layout = memo(({ children }: LayoutProps) => {
             isExchange ? (
               <ExchangeSidebar />
             ) : (
-              <div className="h-full flex flex-col"><BetslipSidebar /></div>
+              <div className="h-full flex flex-col">
+                <BetslipSidebar 
+                  activeTab={betslipTab}
+                  onTabChange={setBetslipTab}
+                  onBettingAreaSelect={handleBettingAreaSelect}
+                />
+              </div>
             )
           }
         />

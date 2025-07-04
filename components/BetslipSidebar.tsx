@@ -3,12 +3,18 @@ import BetSelectionPanel from "./BetSelectionPanel";
 import { useAuth } from '../contexts/AuthContext';
 import { normalizeOption } from '../server/normalizeUtils';
 
+interface BetslipSidebarProps {
+  activeTab?: 'betslip' | 'mybets';
+  onTabChange?: (tab: 'betslip' | 'mybets') => void;
+  onBettingAreaSelect?: () => void;
+}
+
 function MyBetsPanel() {
   const [bets, setBets] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [openBetIds, setOpenBetIds] = useState<{ [id: string]: boolean }>({});
-  const [filter, setFilter] = useState<'all' | 'pending' | 'won' | 'lost'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'won' | 'lost'>('pending');
   const [hidePastResults, setHidePastResults] = useState(false);
   const { setBalance } = useAuth();
 
@@ -347,13 +353,18 @@ function MyBetsPanel() {
   );
 }
 
-export default function BetslipSidebar() {
+export default function BetslipSidebar({ 
+  activeTab = 'betslip', 
+  onTabChange, 
+  onBettingAreaSelect 
+}: BetslipSidebarProps) {
   const { isLoggedIn, balance } = useAuth();
-  const [tab, setTab] = useState<'betslip' | 'mybets'>('betslip');
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleTabChange = (newTab: 'betslip' | 'mybets') => {
-    setTab(newTab);
+    if (onTabChange) {
+      onTabChange(newTab);
+    }
     if (newTab === 'mybets') {
       // 배팅내역 탭으로 전환 시 새로고침
       setRefreshKey(prev => prev + 1);
@@ -380,20 +391,20 @@ export default function BetslipSidebar() {
       </div>
       <div className="flex space-x-2 mb-2">
         <button
-          className={`flex-1 py-1 rounded ${tab === 'betslip' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+          className={`flex-1 py-1 rounded ${activeTab === 'betslip' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
           onClick={() => handleTabChange('betslip')}
         >
           베팅슬립
         </button>
         <button
-          className={`flex-1 py-1 rounded ${tab === 'mybets' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+          className={`flex-1 py-1 rounded ${activeTab === 'mybets' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
           onClick={() => handleTabChange('mybets')}
         >
           배팅내역
         </button>
       </div>
       <div className="flex-1 min-h-0 flex flex-col">
-        {tab === 'betslip' ? <BetSelectionPanel /> : <MyBetsPanel key={refreshKey} />}
+        {activeTab === 'betslip' ? <BetSelectionPanel /> : <MyBetsPanel key={refreshKey} />}
       </div>
     </aside>
   );

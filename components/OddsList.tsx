@@ -1,8 +1,10 @@
 import React, { useEffect, useState, memo, useMemo, useCallback } from 'react';
 import { useBetStore } from '../stores/useBetStore';
+import { normalizeTeamName } from '../server/normalizeUtils';
 
 interface OddsListProps {
   sportKey: string;
+  onBettingAreaSelect?: () => void;
 }
 
 interface Game {
@@ -32,19 +34,7 @@ const marketKeyMap = {
   '핸디캡': 'spreads'
 };
 
-// 팀명 정규화(매핑) 함수 예시
-const normalizeTeamName = (name: string) => {
-  // TODO: 실제 매핑 테이블로 대체
-  const map: Record<string, string> = {
-    "Gimcheon Sangmu": "Sangju Sangmu FC",
-    "Daejeon": "Daejeon Citizen",
-    "Jeju SK": "Jeju United FC",
-    // ... 추가 매핑
-  };
-  return map[name] || name;
-};
-
-const OddsList: React.FC<OddsListProps> = memo(({ sportKey }) => {
+const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect }) => {
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +62,15 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey }) => {
           const gameTime = new Date(game.commence_time);
           return gameTime >= startOfToday && gameTime <= maxDate;
         });
-        setGames(filteredGames);
+        
+        // 경기 시간 기준으로 최신순 정렬 (가장 빠른 경기부터)
+        const sortedGames = filteredGames.sort((a: Game, b: Game) => {
+          const timeA = new Date(a.commence_time).getTime();
+          const timeB = new Date(b.commence_time).getTime();
+          return timeA - timeB;
+        });
+        
+        setGames(sortedGames);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch odds');
@@ -95,6 +93,12 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey }) => {
       (point === undefined || selection.point === point)
     );
   };
+
+  const handleBettingAreaSelect = useCallback(() => {
+    if (onBettingAreaSelect) {
+      onBettingAreaSelect();
+    }
+  }, [onBettingAreaSelect]);
 
   if (loading) {
     return (
@@ -241,15 +245,20 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey }) => {
                                     <button
                                       className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestOver.name), selectedMarket, game.id, bestOver.point) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                                       disabled={!isBettable || !bestOver.price}
-                                      onClick={() => isBettable && bestOver.price && toggleSelection({
-                                        team: normalizeTeamName(bestOver.name),
-                                        odds: bestOver.price,
-                                        desc: `${game.home_team} vs ${game.away_team}`,
-                                        commence_time: game.commence_time,
-                                        market: selectedMarket,
-                                        gameId: game.id,
-                                        point: bestOver.point
-                                      })}
+                                      onClick={() => {
+                                        if (isBettable && bestOver.price) {
+                                          toggleSelection({
+                                            team: normalizeTeamName(bestOver.name),
+                                            odds: bestOver.price,
+                                            desc: `${game.home_team} vs ${game.away_team}`,
+                                            commence_time: game.commence_time,
+                                            market: selectedMarket,
+                                            gameId: game.id,
+                                            point: bestOver.point
+                                          });
+                                          handleBettingAreaSelect();
+                                        }
+                                      }}
                                     >
                                       {bestOver.price}
                                     </button>
@@ -260,15 +269,20 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey }) => {
                                     <button
                                       className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestUnder.name), selectedMarket, game.id, bestUnder.point) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                                       disabled={!isBettable || !bestUnder.price}
-                                      onClick={() => isBettable && bestUnder.price && toggleSelection({
-                                        team: normalizeTeamName(bestUnder.name),
-                                        odds: bestUnder.price,
-                                        desc: `${game.home_team} vs ${game.away_team}`,
-                                        commence_time: game.commence_time,
-                                        market: selectedMarket,
-                                        gameId: game.id,
-                                        point: bestUnder.point
-                                      })}
+                                      onClick={() => {
+                                        if (isBettable && bestUnder.price) {
+                                          toggleSelection({
+                                            team: normalizeTeamName(bestUnder.name),
+                                            odds: bestUnder.price,
+                                            desc: `${game.home_team} vs ${game.away_team}`,
+                                            commence_time: game.commence_time,
+                                            market: selectedMarket,
+                                            gameId: game.id,
+                                            point: bestUnder.point
+                                          });
+                                          handleBettingAreaSelect();
+                                        }
+                                      }}
                                     >
                                       {bestUnder.price}
                                     </button>
@@ -297,15 +311,20 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey }) => {
                                     <button
                                       className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestHome.name), selectedMarket, game.id, bestHome.point) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                                       disabled={!isBettable || !bestHome.price}
-                                      onClick={() => isBettable && bestHome.price && toggleSelection({
-                                        team: normalizeTeamName(bestHome.name),
-                                        odds: bestHome.price,
-                                        desc: `${game.home_team} vs ${game.away_team}`,
-                                        commence_time: game.commence_time,
-                                        market: selectedMarket,
-                                        gameId: game.id,
-                                        point: bestHome.point
-                                      })}
+                                      onClick={() => {
+                                        if (isBettable && bestHome.price) {
+                                          toggleSelection({
+                                            team: normalizeTeamName(bestHome.name),
+                                            odds: bestHome.price,
+                                            desc: `${game.home_team} vs ${game.away_team}`,
+                                            commence_time: game.commence_time,
+                                            market: selectedMarket,
+                                            gameId: game.id,
+                                            point: bestHome.point
+                                          });
+                                          handleBettingAreaSelect();
+                                        }
+                                      }}
                                     >
                                       {bestHome.price}
                                     </button>
@@ -316,15 +335,20 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey }) => {
                                     <button
                                       className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestAway.name), selectedMarket, game.id, bestAway.point) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                                       disabled={!isBettable || !bestAway.price}
-                                      onClick={() => isBettable && bestAway.price && toggleSelection({
-                                        team: normalizeTeamName(bestAway.name),
-                                        odds: bestAway.price,
-                                        desc: `${game.home_team} vs ${game.away_team}`,
-                                        commence_time: game.commence_time,
-                                        market: selectedMarket,
-                                        gameId: game.id,
-                                        point: bestAway.point
-                                      })}
+                                      onClick={() => {
+                                        if (isBettable && bestAway.price) {
+                                          toggleSelection({
+                                            team: normalizeTeamName(bestAway.name),
+                                            odds: bestAway.price,
+                                            desc: `${game.home_team} vs ${game.away_team}`,
+                                            commence_time: game.commence_time,
+                                            market: selectedMarket,
+                                            gameId: game.id,
+                                            point: bestAway.point
+                                          });
+                                          handleBettingAreaSelect();
+                                        }
+                                      }}
                                     >
                                       {bestAway.price}
                                     </button>
@@ -344,15 +368,20 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey }) => {
                                     <button
                                       className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestHome.name), selectedMarket, game.id, bestHome.point) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                                       disabled={!isBettable || !bestHome.price}
-                                      onClick={() => isBettable && bestHome.price && toggleSelection({
-                                        team: normalizeTeamName(bestHome.name),
-                                        odds: bestHome.price,
-                                        desc: `${game.home_team} vs ${game.away_team}`,
-                                        commence_time: game.commence_time,
-                                        market: selectedMarket,
-                                        gameId: game.id,
-                                        point: bestHome.point
-                                      })}
+                                      onClick={() => {
+                                        if (isBettable && bestHome.price) {
+                                          toggleSelection({
+                                            team: normalizeTeamName(bestHome.name),
+                                            odds: bestHome.price,
+                                            desc: `${game.home_team} vs ${game.away_team}`,
+                                            commence_time: game.commence_time,
+                                            market: selectedMarket,
+                                            gameId: game.id,
+                                            point: bestHome.point
+                                          });
+                                          handleBettingAreaSelect();
+                                        }
+                                      }}
                                     >
                                       {bestHome.price}
                                     </button>
@@ -363,15 +392,20 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey }) => {
                                     <button
                                       className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestAway.name), selectedMarket, game.id, bestAway.point) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                                       disabled={!isBettable || !bestAway.price}
-                                      onClick={() => isBettable && bestAway.price && toggleSelection({
-                                        team: normalizeTeamName(bestAway.name),
-                                        odds: bestAway.price,
-                                        desc: `${game.home_team} vs ${game.away_team}`,
-                                        commence_time: game.commence_time,
-                                        market: selectedMarket,
-                                        gameId: game.id,
-                                        point: bestAway.point
-                                      })}
+                                      onClick={() => {
+                                        if (isBettable && bestAway.price) {
+                                          toggleSelection({
+                                            team: normalizeTeamName(bestAway.name),
+                                            odds: bestAway.price,
+                                            desc: `${game.home_team} vs ${game.away_team}`,
+                                            commence_time: game.commence_time,
+                                            market: selectedMarket,
+                                            gameId: game.id,
+                                            point: bestAway.point
+                                          });
+                                          handleBettingAreaSelect();
+                                        }
+                                      }}
                                     >
                                       {bestAway.price}
                                     </button>
@@ -416,15 +450,20 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey }) => {
                   return (
                     <>
                       <button
-                        onClick={() => isBettable && homeBest && toggleSelection({
-                          team: normalizeTeamName(homeBest.name),
-                          odds: homeBest.price,
-                          desc: `${game.home_team} vs ${game.away_team}`,
-                          commence_time: game.commence_time,
-                          market: selectedMarket,
-                          gameId: game.id,
-                          ...(homeBest.point && { point: homeBest.point })
-                        })}
+                        onClick={() => {
+                          if (isBettable && homeBest) {
+                            toggleSelection({
+                              team: normalizeTeamName(homeBest.name),
+                              odds: homeBest.price,
+                              desc: `${game.home_team} vs ${game.away_team}`,
+                              commence_time: game.commence_time,
+                              market: selectedMarket,
+                              gameId: game.id,
+                              ...(homeBest.point && { point: homeBest.point })
+                            });
+                            handleBettingAreaSelect();
+                          }
+                        }}
                         className={`w-full p-3 rounded-lg text-center transition-colors ${
                           isTeamSelected(normalizeTeamName(homeBest?.name), selectedMarket, game.id, homeBest.point)
                             ? 'bg-yellow-500 hover:bg-yellow-600'
@@ -442,15 +481,20 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey }) => {
                         {isTooFar && <div className="text-xs text-gray-400 mt-1">오픈 예정</div>}
                       </button>
                       <button
-                        onClick={() => isBettable && awayBest && toggleSelection({
-                          team: normalizeTeamName(awayBest.name),
-                          odds: awayBest.price,
-                          desc: `${game.home_team} vs ${game.away_team}`,
-                          commence_time: game.commence_time,
-                          market: selectedMarket,
-                          gameId: game.id,
-                          ...(awayBest.point && { point: awayBest.point })
-                        })}
+                        onClick={() => {
+                          if (isBettable && awayBest) {
+                            toggleSelection({
+                              team: normalizeTeamName(awayBest.name),
+                              odds: awayBest.price,
+                              desc: `${game.home_team} vs ${game.away_team}`,
+                              commence_time: game.commence_time,
+                              market: selectedMarket,
+                              gameId: game.id,
+                              ...(awayBest.point && { point: awayBest.point })
+                            });
+                            handleBettingAreaSelect();
+                          }
+                        }}
                         className={`w-full p-3 rounded-lg text-center transition-colors ${
                           isTeamSelected(normalizeTeamName(awayBest?.name), selectedMarket, game.id, awayBest.point)
                             ? 'bg-yellow-500 hover:bg-yellow-600'

@@ -2,6 +2,7 @@
 import React, { memo, useMemo, useCallback } from 'react';
 import GameTimeDisplay from './GameTimeDisplay';
 import BettingButton from './BettingButton';
+import { getSportKey, getDisplayNameFromSportKey } from '../config/sportsMapping';
 
 interface GameCardProps {
   teams: string;
@@ -10,9 +11,11 @@ interface GameCardProps {
   onSelect: (match: string, team: string) => void;
   bookmakers?: any[];
   infoOnly?: boolean;
+  sportKey?: string;
+  onCategorySelect?: (category: string) => void;
 }
 
-const GameCard: React.FC<GameCardProps> = memo(({ teams, time, selectedTeam, onSelect, bookmakers, infoOnly }) => {
+const GameCard: React.FC<GameCardProps> = memo(({ teams, time, selectedTeam, onSelect, bookmakers, infoOnly, sportKey, onCategorySelect }) => {
   // 팀명 파싱 (메모화)
   const [teamA, teamB] = useMemo(() => teams.split(" vs "), [teams]);
 
@@ -26,6 +29,33 @@ const GameCard: React.FC<GameCardProps> = memo(({ teams, time, selectedTeam, onS
       onSelect(teams, team);
     }
   }, [selectedTeam, onSelect, teams]);
+
+  // 게임 카드 클릭 핸들러 (메모화)
+  const handleCardClick = useCallback(() => {
+    if (sportKey && onCategorySelect) {
+      const displayName = getDisplayNameFromSportKey(sportKey);
+      if (displayName) {
+        // 해당 스포츠가 속한 메인 카테고리를 찾아서 트리 형태로 선택
+        const parentCategory = Object.entries({
+          "축구": ["K리그", "EPL", "라리가", "분데스리가", "세리에 A", "리그 1", "J리그", "MLS", "브라질 세리에 A", "아르헨티나 프리메라", "중국 슈퍼리그"],
+          "농구": ["NBA", "KBL"],
+          "야구": ["MLB", "KBO"],
+          "미식축구": ["NFL"],
+          "아이스하키": ["NHL"]
+        }).find(([main, subs]) => 
+          subs.includes(displayName)
+        );
+        
+        if (parentCategory) {
+          // "축구 > K리그" 형태로 설정
+          onCategorySelect(`${parentCategory[0]} > ${displayName}`);
+        } else {
+          // 메인 카테고리에 속하지 않는 경우
+          onCategorySelect(displayName);
+        }
+      }
+    }
+  }, [sportKey, onCategorySelect]);
 
   // 배당율 정보 추출 (메모화)
   const getOdds = useCallback((teamName: string) => {
@@ -55,7 +85,10 @@ const GameCard: React.FC<GameCardProps> = memo(({ teams, time, selectedTeam, onS
 
   if (infoOnly) {
     return (
-      <div className="bg-white p-4 rounded shadow opacity-90 hover:shadow-lg transition-shadow border-2 border-blue-400">
+      <div 
+        className="bg-white p-4 rounded shadow opacity-90 hover:shadow-lg transition-shadow border-2 border-blue-400 cursor-pointer"
+        onClick={handleCardClick}
+      >
         <div className="text-gray-700 font-semibold mb-2">{teams}</div>
         <GameTimeDisplay time={time} showStatus={false} />
         <div className="flex space-x-4">
@@ -88,6 +121,10 @@ const GameCard: React.FC<GameCardProps> = memo(({ teams, time, selectedTeam, onS
           selected={selectedTeam === teamA}
           commenceTime={time}
           onSelect={createTeamClickHandler(teamA)}
+          onBettingAreaSelect={onCategorySelect ? () => {
+            // 배팅 영역 선택 시 배팅슬립으로 자동 변경
+            window.dispatchEvent(new CustomEvent('bettingAreaSelected'));
+          } : undefined}
         />
         <BettingButton
           team={teamB}
@@ -95,6 +132,10 @@ const GameCard: React.FC<GameCardProps> = memo(({ teams, time, selectedTeam, onS
           selected={selectedTeam === teamB}
           commenceTime={time}
           onSelect={createTeamClickHandler(teamB)}
+          onBettingAreaSelect={onCategorySelect ? () => {
+            // 배팅 영역 선택 시 배팅슬립으로 자동 변경
+            window.dispatchEvent(new CustomEvent('bettingAreaSelected'));
+          } : undefined}
         />
       </div>
     </div>
