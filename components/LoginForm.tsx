@@ -25,6 +25,7 @@ export default function LoginForm({ onClose }: { onClose: () => void }) {
         login(
           data.username || data.email, 
           Number(data.balance), 
+          data.token,
           data.isAdmin || false, 
           data.adminLevel || 0
         );

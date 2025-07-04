@@ -6,7 +6,8 @@ interface AuthContextType {
   balance: number | null;
   isAdmin: boolean;
   adminLevel: number;
-  login: (username: string, balance: number, isAdmin?: boolean, adminLevel?: number) => void;
+  token: string | null;
+  login: (username: string, balance: number, token: string, isAdmin?: boolean, adminLevel?: number) => void;
   logout: () => void;
   setBalance: (balance: number) => void;
   hasPermission: (permission: string) => boolean;
@@ -20,11 +21,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [balance, setBalance] = useState<number | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminLevel, setAdminLevel] = useState(0);
+  const [token, setToken] = useState<string | null>(null);
 
-  const login = (username: string, balance: number, isAdmin = false, adminLevel = 0) => {
+  const login = (username: string, balance: number, token: string, isAdmin = false, adminLevel = 0) => {
     setIsLoggedIn(true);
     setUsername(username);
     setBalance(balance);
+    setToken(token);
     setIsAdmin(isAdmin);
     setAdminLevel(adminLevel);
   };
@@ -33,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoggedIn(false);
     setUsername(null);
     setBalance(null);
+    setToken(null);
     setIsAdmin(false);
     setAdminLevel(0);
   };
@@ -60,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       balance, 
       isAdmin,
       adminLevel,
+      token,
       login, 
       logout, 
       setBalance,

@@ -23,7 +23,8 @@
     "node-schedule": "^2.1.1",
     "pg": "^8.11.3",
     "pg-hstore": "^2.3.4",
-    "sequelize": "^6.37.1"
+    "sequelize": "^6.37.1",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.3",

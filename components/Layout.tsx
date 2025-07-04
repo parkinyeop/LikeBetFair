@@ -3,6 +3,7 @@ import Sidebar from "./Sidebar";
 import Header from "./Header";
 import { useRouter } from "next/router";
 import BetslipSidebar from "./BetslipSidebar";
+import ExchangeSidebar from "./ExchangeSidebar";
 import ResizableMainLayout from "./ResizableMainLayout";
 import { SPORTS_TREE, getSportKey, getDisplayNameFromSportKey, getAllCategories } from "../config/sportsMapping";
 
@@ -70,16 +71,13 @@ const Layout = memo(({ children }: LayoutProps) => {
             />
           }
           center={
-            <div className="p-4 h-full flex flex-col">{children}</div>
+            <div className="h-full flex flex-col p-4">
+              {children}
+            </div>
           }
           right={
             isExchange ? (
-              <div className="flex items-center justify-center min-h-full p-8 text-center text-gray-500">
-                <div>
-                  <h2 className="text-xl font-bold mb-2">Exchange 준비중</h2>
-                  <p>이 영역은 곧 Exchange 기능으로 대체됩니다.</p>
-                </div>
-              </div>
+              <ExchangeSidebar />
             ) : (
               <div className="h-full flex flex-col"><BetslipSidebar /></div>
             )
