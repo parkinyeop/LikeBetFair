@@ -84,9 +84,19 @@ cron.schedule('*/10 * * * *', async () => {
     
     lastUpdateTime = new Date();
     
+    // 실제 업데이트 결과를 상세히 로그에 기록
+    const gameResultsSummary = {
+      totalUpdated: updateResult?.updatedCount || 0,
+      newGames: updateResult?.newCount || 0,
+      existingGamesUpdated: updateResult?.updatedExistingCount || 0,
+      skippedGames: updateResult?.skippedCount || 0,
+      categoriesProcessed: updateResult?.categories?.length || 0
+    };
+    
     saveUpdateLog('results', 'success', { 
       message: 'Game results and bet results update completed',
-      gameResultsUpdated: updateResult?.updatedCount || 'N/A',
+      gameResultsUpdated: gameResultsSummary.totalUpdated,
+      gameResultsDetail: gameResultsSummary,
       betResultsUpdated: betUpdateResult?.updatedCount || 0,
       categories: Array.from(activeCategories)
     });
@@ -102,12 +112,30 @@ cron.schedule('*/10 * * * *', async () => {
     setTimeout(async () => {
       try {
         saveUpdateLog('results', 'start', { message: 'Retrying game results update', isRetry: true });
-        await gameResultService.fetchAndUpdateResultsForCategories(Array.from(activeCategories));
-        await betResultService.updateBetResults();
+        const retryResult = await gameResultService.fetchAndUpdateResultsForCategories(Array.from(activeCategories));
+        const betRetryResult = await betResultService.updateBetResults();
         lastUpdateTime = new Date();
-        saveUpdateLog('results', 'success', { message: 'Game results retry successful', isRetry: true });
+        
+        const retrySummary = {
+          totalUpdated: retryResult?.updatedCount || 0,
+          newGames: retryResult?.newCount || 0,
+          existingGamesUpdated: retryResult?.updatedExistingCount || 0,
+          skippedGames: retryResult?.skippedCount || 0
+        };
+        
+        saveUpdateLog('results', 'success', { 
+          message: 'Game results retry successful', 
+          isRetry: true,
+          gameResultsUpdated: retrySummary.totalUpdated,
+          gameResultsDetail: retrySummary,
+          betResultsUpdated: betRetryResult?.updatedCount || 0
+        });
       } catch (retryError) {
-        saveUpdateLog('results', 'error', { message: 'Game results retry failed', error: retryError.message, isRetry: true });
+        saveUpdateLog('results', 'error', { 
+          message: 'Game results retry failed', 
+          error: retryError.message, 
+          isRetry: true 
+        });
       } finally {
         isUpdating = false;
       }
@@ -130,19 +158,32 @@ cron.schedule('*/10 * * * *', async () => {
     const dynamicPriority = oddsApiService.getDynamicPriorityLevel();
     const actualPriority = dynamicPriority === 'high' ? 'high' : 'medium';
     
+    let oddsUpdateResult;
     if (dynamicPriority === 'high') {
       // API 사용량이 높을 때는 고우선순위만
-      await oddsApiService.fetchAndCacheOddsForCategories(Array.from(highPriorityCategories), 'high');
+      oddsUpdateResult = await oddsApiService.fetchAndCacheOddsForCategories(Array.from(highPriorityCategories), 'high');
     } else {
       // 정상적일 때는 기존대로
-      await oddsApiService.fetchAndCacheOddsForCategories(Array.from(highPriorityCategories), 'medium');
+      oddsUpdateResult = await oddsApiService.fetchAndCacheOddsForCategories(Array.from(highPriorityCategories), 'medium');
     }
+    
+    // 실제 업데이트 결과를 상세히 로그에 기록
+    const oddsSummary = {
+      totalUpdated: oddsUpdateResult?.updatedCount || 0,
+      newOdds: oddsUpdateResult?.newCount || 0,
+      existingOddsUpdated: oddsUpdateResult?.updatedExistingCount || 0,
+      skippedOdds: oddsUpdateResult?.skippedCount || 0,
+      apiCalls: oddsUpdateResult?.apiCalls || 0,
+      categoriesProcessed: oddsUpdateResult?.categories?.length || 0
+    };
     
     saveUpdateLog('odds', 'success', { 
       message: 'High-priority odds update completed (10min interval)',
       priority: actualPriority,
       leagues: Array.from(highPriorityCategories),
-      dynamicPriority: dynamicPriority
+      dynamicPriority: dynamicPriority,
+      oddsUpdated: oddsSummary.totalUpdated,
+      oddsDetail: oddsSummary
     });
     
   } catch (error) {
@@ -167,12 +208,25 @@ cron.schedule('0 * * * *', async () => {
     // API 사용량이 높지 않을 때만 실행
     const dynamicPriority = oddsApiService.getDynamicPriorityLevel();
     if (dynamicPriority !== 'high') {
-      await oddsApiService.fetchAndCacheOddsForCategories(Array.from(mediumPriorityCategories), 'medium');
+      const oddsUpdateResult = await oddsApiService.fetchAndCacheOddsForCategories(Array.from(mediumPriorityCategories), 'medium');
+      
+      // 실제 업데이트 결과를 상세히 로그에 기록
+      const oddsSummary = {
+        totalUpdated: oddsUpdateResult?.updatedCount || 0,
+        newOdds: oddsUpdateResult?.newCount || 0,
+        existingOddsUpdated: oddsUpdateResult?.updatedExistingCount || 0,
+        skippedOdds: oddsUpdateResult?.skippedCount || 0,
+        apiCalls: oddsUpdateResult?.apiCalls || 0,
+        categoriesProcessed: oddsUpdateResult?.categories?.length || 0
+      };
+      
       saveUpdateLog('odds', 'success', { 
         message: 'Medium-priority odds update completed (1hour interval)',
         priority: 'medium',
         leagues: Array.from(mediumPriorityCategories),
-        dynamicPriority: dynamicPriority
+        dynamicPriority: dynamicPriority,
+        oddsUpdated: oddsSummary.totalUpdated,
+        oddsDetail: oddsSummary
       });
     } else {
       saveUpdateLog('odds', 'skip', { 

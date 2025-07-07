@@ -6,6 +6,10 @@ import { Op } from 'sequelize';
 import betResultService from './betResultService.js';
 import OddsCache from '../models/oddsCacheModel.js';
 import { normalizeTeamName, normalizeCategory, normalizeCommenceTime, normalizeCategoryPair } from '../normalizeUtils.js';
+import dotenv from 'dotenv';
+
+// 환경변수 로드
+dotenv.config();
 
 // 클라이언트에서 사용하는 sport key 매핑
 const clientSportKeyMap = {
@@ -354,6 +358,10 @@ class GameResultService {
 
   // 활성 카테고리만 업데이트 (비용 절약용)
   async fetchAndUpdateResultsForCategories(activeCategories) {
+    let totalUpdatedCount = 0;
+    let totalNewCount = 0;
+    let totalSkippedCount = 0;
+    
     try {
       console.log(`Starting game results update for active categories: ${activeCategories.join(', ')}`);
       
@@ -368,9 +376,13 @@ class GameResultService {
         const sportKey = clientSportKeyMap[clientCategory];
         console.log(`Fetching results for ${clientCategory} (${sportKey})...`);
         
+        let categoryUpdatedCount = 0;
+        let categoryNewCount = 0;
+        let categorySkippedCount = 0;
+        
         try {
-          // TheSportsDB API 사용 (The Odds API 대신)
-          const resultsResponse = await axios.get(`https://www.thesportsdb.com/api/v1/json/${this.apiKey}/eventsnextleague.php?id=${this.getSportsDbLeagueId(clientCategory)}`);
+          // TheSportsDB API 사용 - 완료된 경기 결과 가져오기
+          const resultsResponse = await axios.get(`https://www.thesportsdb.com/api/v1/json/${this.apiKey}/eventsseason.php?id=${this.getSportsDbLeagueId(clientCategory)}&s=2025`);
           
           if (resultsResponse.data && resultsResponse.data.events && Array.isArray(resultsResponse.data.events)) {
             console.log(`Found ${resultsResponse.data.events.length} events for ${clientCategory}`);
@@ -380,7 +392,16 @@ class GameResultService {
                 const mainCategory = this.determineMainCategory(sportKey);
                 const subCategory = this.determineSubCategory(sportKey);
                 
-                await GameResult.upsert({
+                // 기존 데이터 확인
+                const existingGame = await GameResult.findOne({
+                  where: {
+                    eventId: event.idEvent,
+                    mainCategory,
+                    subCategory
+                  }
+                });
+                
+                const gameData = {
                   mainCategory,
                   subCategory,
                   homeTeam: event.strHomeTeam,
@@ -391,9 +412,34 @@ class GameResultService {
                   result: this.determineGameResult(event),
                   eventId: event.idEvent,
                   lastUpdated: new Date()
-                });
+                };
+                
+                if (existingGame) {
+                  // 기존 데이터 업데이트
+                  const [updatedCount] = await GameResult.update(gameData, {
+                    where: { id: existingGame.id }
+                  });
+                  
+                  if (updatedCount > 0) {
+                    categoryUpdatedCount++;
+                    totalUpdatedCount++;
+                    console.log(`Updated existing game: ${event.strHomeTeam} vs ${event.strAwayTeam}`);
+                  }
+                } else {
+                  // 새 데이터 생성
+                  await GameResult.create(gameData);
+                  categoryNewCount++;
+                  totalNewCount++;
+                  console.log(`Created new game: ${event.strHomeTeam} vs ${event.strAwayTeam}`);
+                }
+              } else {
+                categorySkippedCount++;
+                totalSkippedCount++;
               }
             }
+            
+            console.log(`${clientCategory} update summary: ${categoryNewCount} new, ${categoryUpdatedCount} updated, ${categorySkippedCount} skipped`);
+            
           } else if (resultsResponse.data && resultsResponse.data.events === null) {
             console.log(`${clientCategory}: 시즌 오프 상태 - 다가오는 이벤트 없음`);
           } else {
@@ -409,7 +455,16 @@ class GameResultService {
       // 기존 데이터 정리 (30일 이상 된 데이터 삭제)
       await this.cleanupOldData();
       
-      console.log('Game results update completed for active categories');
+      console.log(`Game results update completed for active categories. Total: ${totalNewCount} new, ${totalUpdatedCount} updated, ${totalSkippedCount} skipped`);
+      
+      return {
+        updatedCount: totalUpdatedCount + totalNewCount,
+        newCount: totalNewCount,
+        updatedExistingCount: totalUpdatedCount,
+        skippedCount: totalSkippedCount,
+        categories: categoriesToUpdate
+      };
+      
     } catch (error) {
       console.error('Error fetching and updating results for active categories:', error);
       throw error;

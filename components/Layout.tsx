@@ -1,4 +1,4 @@
-import { ReactNode, useState, useEffect, memo, useMemo, useCallback } from "react";
+import React, { ReactNode, useState, useEffect, memo, useMemo, useCallback } from "react";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import { useRouter } from "next/router";
@@ -17,10 +17,10 @@ const Layout = memo(({ children }: LayoutProps) => {
   const [betslipTab, setBetslipTab] = useState<'betslip' | 'mybets'>('betslip'); // 배팅슬립 탭 상태 추가
   
   // 페이지 체크 메모화
-  const isExchange = useMemo(() => router.pathname === "/exchange", [router.pathname]);
+  const isExchange = useMemo(() => router.pathname.startsWith("/exchange"), [router.pathname]);
 
   useEffect(() => {
-    if (router.pathname.startsWith("/odds/") && router.query.sport) {
+    if ((router.pathname.startsWith("/odds/") || router.pathname.startsWith("/exchange/")) && router.query.sport) {
       const sportKey = router.query.sport as string;
       const displayName = getDisplayNameFromSportKey(sportKey);
       if (displayName) {
@@ -46,6 +46,7 @@ const Layout = memo(({ children }: LayoutProps) => {
   // 카테고리 선택 핸들러 메모화
   const handleCategorySelect = useCallback((category: string) => {
     setSelected(category);
+    
     if (category.includes(" > ")) {
       const subCategory = category.split(" > ")[1];
       if (subCategory === "KBL") {
@@ -54,10 +55,16 @@ const Layout = memo(({ children }: LayoutProps) => {
       }
       const sportKey = getSportKey(subCategory);
       if (sportKey) {
-        router.push(`/odds/${sportKey}`);
+        // 익스체인지 페이지에서는 익스체인지 하위 페이지로 이동
+        if (isExchange) {
+          router.push(`/exchange/${sportKey}`);
+        } else {
+          // 스포츠북 페이지에서는 스포츠북 하위 페이지로 이동
+          router.push(`/odds/${sportKey}`);
+        }
       }
     }
-  }, [router]);
+  }, [router, isExchange]);
 
   // 배팅 영역 선택 핸들러 (메모화)
   const handleBettingAreaSelect = useCallback(() => {
@@ -98,7 +105,11 @@ const Layout = memo(({ children }: LayoutProps) => {
           }
           center={
             <div className="h-full flex flex-col p-4">
-              {children}
+              {isExchange ? (
+                React.cloneElement(children as React.ReactElement, { selectedCategory: selected })
+              ) : (
+                children
+              )}
             </div>
           }
           right={

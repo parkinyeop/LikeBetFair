@@ -136,6 +136,11 @@ class OddsApiService {
 
   // 활성 카테고리만 업데이트 (비용 절약용) - 스마트 캐싱 적용
   async fetchAndCacheOddsForCategories(activeCategories, priorityLevel = 'medium') {
+    let totalUpdatedCount = 0;
+    let totalNewCount = 0;
+    let totalSkippedCount = 0;
+    let totalApiCalls = 0;
+    
     try {
       console.log(`Starting odds update for active categories with priority: ${priorityLevel}`);
       
@@ -149,6 +154,10 @@ class OddsApiService {
       for (const clientCategory of categoriesToUpdate) {
         const sportKey = clientSportKeyMap[clientCategory];
         console.log(`Fetching odds for ${clientCategory} (${sportKey}) with priority ${priorityLevel}...`);
+        
+        let categoryUpdatedCount = 0;
+        let categoryNewCount = 0;
+        let categorySkippedCount = 0;
         
         try {
           // API 호출 가능 여부 확인
@@ -170,6 +179,7 @@ class OddsApiService {
 
           // API 호출 추적
           this.trackApiCall();
+          totalApiCalls++;
 
           // 우선순위에 따라 게임 필터링
           const filteredGames = this.filterGamesByPriority(oddsResponse.data, priorityLevel);
@@ -183,10 +193,23 @@ class OddsApiService {
               
               if (!mainCategory || !subCategory) {
                 console.error(`[oddsApiService] mainCategory/subCategory 누락: mainCategory=${mainCategory}, subCategory=${subCategory}, data=`, { mainCategory, subCategory, sportKey, sportTitle: clientCategory, homeTeam: game.home_team, awayTeam: game.away_team, commenceTime: new Date(game.commence_time), bookmakers: game.bookmakers });
+                categorySkippedCount++;
+                totalSkippedCount++;
                 continue;
               }
               
-              const [oddsRecord, created] = await OddsCache.upsert({
+              // 기존 데이터 확인
+              const existingOdds = await OddsCache.findOne({
+                where: {
+                  mainCategory,
+                  subCategory,
+                  homeTeam: game.home_team,
+                  awayTeam: game.away_team,
+                  commenceTime: new Date(game.commence_time)
+                }
+              });
+              
+              const oddsData = {
                 mainCategory,
                 subCategory,
                 sportKey: sportKey,
@@ -196,21 +219,51 @@ class OddsApiService {
                 commenceTime: new Date(game.commence_time),
                 bookmakers: game.bookmakers,
                 lastUpdated: new Date()
-              }, {
-                returning: true
-              });
-
-              // 배당율 히스토리 저장 (새로 생성되거나 업데이트된 경우)
-              if (oddsRecord) {
+              };
+              
+              if (existingOdds) {
+                // 기존 데이터 업데이트
+                const [updatedCount] = await OddsCache.update(oddsData, {
+                  where: { id: existingOdds.id }
+                });
+                
+                if (updatedCount > 0) {
+                  categoryUpdatedCount++;
+                  totalUpdatedCount++;
+                  console.log(`Updated existing odds: ${game.home_team} vs ${game.away_team}`);
+                  
+                  // 업데이트된 배당률 히스토리 저장
+                  try {
+                    const updatedOdds = await OddsCache.findByPk(existingOdds.id);
+                    if (updatedOdds) {
+                      await oddsHistoryService.saveOddsSnapshot(updatedOdds);
+                    }
+                  } catch (historyError) {
+                    console.error(`[OddsHistory] 히스토리 저장 실패 (${clientCategory}):`, historyError.message);
+                  }
+                }
+              } else {
+                // 새 데이터 생성
+                const newOdds = await OddsCache.create(oddsData);
+                categoryNewCount++;
+                totalNewCount++;
+                console.log(`Created new odds: ${game.home_team} vs ${game.away_team}`);
+                
+                // 새 배당률 히스토리 저장
                 try {
-                  await oddsHistoryService.saveOddsSnapshot(oddsRecord);
+                  await oddsHistoryService.saveOddsSnapshot(newOdds);
                 } catch (historyError) {
                   console.error(`[OddsHistory] 히스토리 저장 실패 (${clientCategory}):`, historyError.message);
-                  // 히스토리 저장 실패가 전체 프로세스를 중단시키지 않도록 계속 진행
                 }
               }
+            } else {
+              categorySkippedCount++;
+              totalSkippedCount++;
             }
           }
+          
+          console.log(`${clientCategory} odds update summary: ${categoryNewCount} new, ${categoryUpdatedCount} updated, ${categorySkippedCount} skipped`);
+          
         } catch (error) {
           console.error(`Error fetching odds for ${clientCategory}:`, error.message);
           // 개별 스포츠 에러가 전체 프로세스를 중단시키지 않도록 계속 진행
@@ -221,7 +274,17 @@ class OddsApiService {
       // 기존 데이터 정리 (7일 이상 된 데이터 삭제)
       await this.cleanupOldData();
       
-      console.log('Odds update completed for active categories');
+      console.log(`Odds update completed for active categories. Total: ${totalNewCount} new, ${totalUpdatedCount} updated, ${totalSkippedCount} skipped, ${totalApiCalls} API calls`);
+      
+      return {
+        updatedCount: totalUpdatedCount + totalNewCount,
+        newCount: totalNewCount,
+        updatedExistingCount: totalUpdatedCount,
+        skippedCount: totalSkippedCount,
+        apiCalls: totalApiCalls,
+        categories: categoriesToUpdate
+      };
+      
     } catch (error) {
       console.error('Error fetching and caching odds for active categories:', error);
       throw error;
