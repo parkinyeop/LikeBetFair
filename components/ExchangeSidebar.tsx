@@ -1,23 +1,52 @@
 import React, { useState } from 'react';
 import { useExchange, ExchangeOrder, OrderForm } from '../hooks/useExchange';
 import { useAuth } from '../contexts/AuthContext';
+import { useExchangeContext } from '../contexts/ExchangeContext';
 
 function OrderPanel() {
   const { 
     loading, 
     error, 
     placeOrder, 
-    clearError 
+    clearError
   } = useExchange();
+  const { selectedBet, setSelectedBet } = useExchangeContext();
   const { balance } = useAuth();
   
+  // 디버깅용 로그
+  console.log('OrderPanel selectedBet:', selectedBet);
+  console.log('OrderPanel selectedBet type:', typeof selectedBet);
+  console.log('OrderPanel selectedBet keys:', selectedBet ? Object.keys(selectedBet) : 'null');
+  
   const [form, setForm] = useState<OrderForm>({ side: 'back', price: 1.91, amount: 10000 });
+  
+  // selectedBet이 변경될 때 form의 price 업데이트
+  React.useEffect(() => {
+    if (selectedBet) {
+      setForm(prev => ({ ...prev, price: selectedBet.price }));
+    }
+  }, [selectedBet]);
   const [selectedGame, setSelectedGame] = useState('xxx');
   const [selectedLine, setSelectedLine] = useState(8.5);
 
   const handleOrder = async () => {
+    if (!selectedBet) {
+      alert('배팅을 선택해주세요.');
+      return;
+    }
+    
     try {
-      await placeOrder(selectedGame, 'totals', selectedLine, form);
+      const orderData = {
+        gameId: selectedBet.gameId || selectedGame,
+        market: selectedBet.market || 'totals',
+        line: selectedBet.line || selectedLine,
+        side: selectedBet.type,
+        price: selectedBet.price,
+        amount: form.amount,
+        selection: selectedBet.team // 팀명을 selection으로 전달
+      };
+      
+      await placeOrder(orderData);
     } catch (err) {
       console.error('주문 실패:', err);
     }
@@ -25,43 +54,78 @@ function OrderPanel() {
 
   return (
     <div className="h-full overflow-y-auto">
+      {/* 선택된 배팅 정보 */}
+      <div className="bg-gray-50 p-3 rounded mb-3 border border-gray-200">
+        <h3 className="font-semibold mb-2 text-sm text-gray-700">선택된 배팅</h3>
+        {selectedBet ? (
+          <div className="space-y-2 text-sm">
+            <div className="text-center">
+              <div className="font-bold text-lg text-gray-800 mb-1">{selectedBet.team}</div>
+              {selectedBet.market && (
+                <div className="text-gray-500 text-xs">{selectedBet.market}</div>
+              )}
+            </div>
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-gray-600">유형:</span>
+                <span className={`font-medium ${selectedBet.type === 'back' ? 'text-blue-600' : 'text-pink-600'}`}>
+                  {selectedBet.type === 'back' ? 'Back (베팅)' : 'Lay (레이)'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">배당:</span>
+                <span className="font-medium">{selectedBet.price.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-600">상태:</span>
+              <span className="font-medium text-red-600">미선택</span>
+            </div>
+            <p className="text-sm text-gray-500">중앙에서 Back/Lay 버튼을 클릭하여 배팅을 선택하세요.</p>
+          </div>
+        )}
+      </div>
+
       {/* Exchange 주문 폼 */}
       <div className="bg-gray-50 p-3 rounded mb-3">
         <h3 className="font-semibold mb-2 text-sm text-gray-700">Exchange 주문</h3>
         <div className="space-y-2">
           <div>
-            <label className="block text-sm font-medium mb-1">Side</label>
-            <select 
-              value={form.side} 
-              onChange={e => setForm(f => ({ ...f, side: e.target.value as 'back' | 'lay' }))}
-              className="w-full p-1 border rounded text-sm"
-            >
-              <option value="back">Back (베팅)</option>
-              <option value="lay">Lay (레이)</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Price</label>
+            <label className="block text-sm font-medium mb-1">Odds (배당률)</label>
             <input 
               type="number" 
               step="0.01"
               value={form.price} 
-              onChange={e => setForm(f => ({ ...f, price: +e.target.value }))} 
+              onChange={e => {
+                const newPrice = +e.target.value;
+                setForm(f => ({ ...f, price: newPrice }));
+                if (selectedBet) {
+                  setSelectedBet({ ...selectedBet, price: newPrice });
+                }
+              }} 
               className="w-full p-1 border rounded text-sm"
             />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Amount (원)</label>
             <input 
-              type="number" 
-              value={form.amount} 
-              onChange={e => setForm(f => ({ ...f, amount: +e.target.value }))} 
+              type="text" 
+              value={form.amount.toLocaleString()} 
+              onChange={e => {
+                const value = e.target.value.replace(/,/g, '');
+                const numValue = parseInt(value) || 0;
+                setForm(f => ({ ...f, amount: numValue }));
+              }}
               className="w-full p-1 border rounded text-sm"
+              placeholder="0"
             />
           </div>
           <button 
             onClick={handleOrder}
-            disabled={loading}
+            disabled={loading || !selectedBet}
             className="w-full bg-blue-600 text-white py-1 px-2 rounded hover:bg-blue-700 disabled:bg-gray-400 text-sm font-medium"
           >
             {loading ? '처리중...' : '주문'}
@@ -76,6 +140,16 @@ function OrderPanel() {
           <button onClick={clearError} className="float-right font-bold">&times;</button>
         </div>
       )}
+      
+      {/* 디버깅 정보 */}
+      <div className="bg-yellow-50 p-2 rounded mb-3 border border-yellow-200 text-xs">
+        <h4 className="font-semibold text-yellow-700 mb-1">디버깅 정보</h4>
+        <div className="space-y-1">
+          <div>selectedBet 존재: {selectedBet ? 'YES' : 'NO'}</div>
+          <div>selectedBet 타입: {typeof selectedBet}</div>
+          <div>selectedBet 값: {JSON.stringify(selectedBet, null, 2)}</div>
+        </div>
+      </div>
     </div>
   );
 }

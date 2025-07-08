@@ -303,4 +303,58 @@ export const getSeasonStatusBadge = (status: string) => {
     case 'break': return '휴식기';
     default: return '알 수 없음';
   }
+};
+
+// 게임 ID를 실제 경기 정보로 매핑
+export const GAME_INFO_MAP: Record<string, {
+  homeTeam: string;
+  awayTeam: string;
+  gameDate: string;
+  sport: string;
+  displayName: string;
+}> = {
+  // 실제 데이터
+  '8818fb84-7b44-4cfa-a406-83f8bf1457d1': {
+    homeTeam: 'Unknown Home',
+    awayTeam: 'Unknown Away', 
+    gameDate: '2025-07-08 16:20:00',
+    sport: 'NBA',
+    displayName: '미확인 경기 (레거시 데이터)'
+  },
+  
+  // 새로운 현실적인 NBA 데이터
+  'nba_lakers_warriors_20250714': {
+    homeTeam: 'Los Angeles Lakers',
+    awayTeam: 'Golden State Warriors',
+    gameDate: '2025-07-14 12:30:00',
+    sport: 'NBA',
+    displayName: 'Lakers vs Warriors'
+  },
+  
+  'nba_celtics_heat_20250714': {
+    homeTeam: 'Boston Celtics', 
+    awayTeam: 'Miami Heat',
+    gameDate: '2025-07-14 15:00:00',
+    sport: 'NBA',
+    displayName: 'Celtics vs Heat'
+  },
+  
+  'nba_bulls_knicks_20250715': {
+    homeTeam: 'Chicago Bulls',
+    awayTeam: 'New York Knicks', 
+    gameDate: '2025-07-15 16:30:00',
+    sport: 'NBA',
+    displayName: 'Bulls vs Knicks'
+  }
+};
+
+// 게임 정보 조회 함수
+export const getGameInfo = (gameId: string) => {
+  return GAME_INFO_MAP[gameId] || {
+    homeTeam: 'Unknown',
+    awayTeam: 'Unknown',
+    gameDate: 'Unknown',
+    sport: 'Unknown',
+    displayName: `Unknown Game (${gameId.substring(0, 8)}...)`
+  };
 }; 

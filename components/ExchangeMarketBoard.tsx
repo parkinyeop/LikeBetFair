@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useExchange, ExchangeOrder } from '../hooks/useExchange';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useExchange, type ExchangeOrder } from '../hooks/useExchange';
 import { useAuth } from '../contexts/AuthContext';
-import BettingModal from './BettingModal';
-import { getSportKey } from '../config/sportsMapping';
+import { useExchangeContext } from '../contexts/ExchangeContext';
+import { getSportKey, getGameInfo } from '../config/sportsMapping';
 
 interface Order {
   id: string;
@@ -50,7 +50,7 @@ interface ExchangeMarketBoardProps {
 
 export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: ExchangeMarketBoardProps) {
   const { isLoggedIn } = useAuth();
-  const { fetchOrderbook } = useExchange();
+  const { fetchOrderbook, placeMatchOrder } = useExchange();
   
   const [selectedMarket, setSelectedMarket] = useState(0);
   const [orderbook, setOrderbook] = useState<ExchangeOrder[]>([]);
@@ -60,13 +60,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
   const [loading, setLoading] = useState(true);
   const [markets, setMarkets] = useState<Market[]>([]);
   const [selectedGameIndex, setSelectedGameIndex] = useState(0);
-  const [bettingModal, setBettingModal] = useState<{
-    isOpen: boolean;
-    selection: { team: string; price: number; type: 'back' | 'lay' };
-  }>({
-    isOpen: false,
-    selection: { team: '', price: 0, type: 'back' }
-  });
+  const { setSelectedBet, selectedBet } = useExchangeContext();
 
   // 선택된 카테고리에 따른 스포츠 키 결정
   const getSportsByCategory = (category: string): string[] => {
@@ -197,18 +191,18 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
     
     if (selectedCategory.includes("NBA") || selectedCategory === "농구") {
       // NBA 경기들 (1주일 범위)
-      const nbaTeams = [
-        { home: 'Los Angeles Lakers', away: 'Golden State Warriors' },
-        { home: 'Boston Celtics', away: 'Miami Heat' },
-        { home: 'Chicago Bulls', away: 'New York Knicks' },
+      const nbaGames = [
+        { id: 'nba_lakers_warriors_20250714', home: 'Los Angeles Lakers', away: 'Golden State Warriors' },
+        { id: 'nba_celtics_heat_20250714', home: 'Boston Celtics', away: 'Miami Heat' },
+        { id: 'nba_bulls_knicks_20250715', home: 'Chicago Bulls', away: 'New York Knicks' },
         { home: 'Dallas Mavericks', away: 'Houston Rockets' },
         { home: 'Phoenix Suns', away: 'Denver Nuggets' }
       ];
       
-      nbaTeams.forEach((teams, index) => {
+      nbaGames.forEach((teams, index) => {
         const gameTime = new Date(now.getTime() + (index + 11) * 12 * 60 * 60 * 1000);
         dummyGames.push({
-          id: `nba_${index}`,
+          id: teams.id || `nba_${index}`,
           sport_key: 'basketball_nba',
           sport_title: 'NBA',
           commence_time: gameTime.toISOString(),
@@ -246,6 +240,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
 
   // 배당율 데이터로부터 마켓 생성
   const generateMarketsFromOdds = (gameData: OddsData): Market[] => {
+    console.log('마켓 생성 시작:', gameData);
     const newMarkets: Market[] = [];
     
     // Moneyline 마켓
@@ -257,11 +252,11 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
           team: outcome.name,
           back: { 
             price: outcome.price, 
-            amount: Math.floor(Math.random() * 200) + 50 // 더미 거래량
+            amount: 0 // 거래량 정보 제거
           },
           lay: { 
-            price: outcome.price + (Math.random() * 0.1 + 0.02), // 약간 높은 레이 가격
-            amount: Math.floor(Math.random() * 200) + 50 
+            price: outcome.price + 0.05, // 고정된 레이 가격 차이
+            amount: 0 // 거래량 정보 제거
           }
         }));
         
@@ -269,6 +264,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
           name: '승패',
           selections
         });
+        console.log('승패 마켓 생성됨');
       }
     }
 
@@ -281,11 +277,11 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
           team: outcome.name,
           back: { 
             price: outcome.price, 
-            amount: Math.floor(Math.random() * 200) + 50 
+            amount: 0 // 거래량 정보 제거
           },
           lay: { 
-            price: outcome.price + (Math.random() * 0.1 + 0.02),
-            amount: Math.floor(Math.random() * 200) + 50 
+            price: outcome.price + 0.05, // 고정된 레이 가격 차이
+            amount: 0 // 거래량 정보 제거
           }
         }));
         
@@ -293,6 +289,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
           name: '총점',
           selections
         });
+        console.log('총점 마켓 생성됨');
       }
     }
 
@@ -305,11 +302,11 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
           team: outcome.name,
           back: { 
             price: outcome.price, 
-            amount: Math.floor(Math.random() * 200) + 50 
+            amount: 0 // 거래량 정보 제거
           },
           lay: { 
-            price: outcome.price + (Math.random() * 0.1 + 0.02),
-            amount: Math.floor(Math.random() * 200) + 50 
+            price: outcome.price + 0.05, // 고정된 레이 가격 차이
+            amount: 0 // 거래량 정보 제거
           }
         }));
         
@@ -317,9 +314,11 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
           name: '핸디캡',
           selections
         });
+        console.log('핸디캡 마켓 생성됨');
       }
     }
 
+    console.log('최종 생성된 마켓들:', newMarkets);
     return newMarkets;
   };
 
@@ -441,7 +440,9 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
         
         // 첫 번째 경기로 마켓 생성
         if (exchangeGames.length > 0) {
-          generateMarketsFromOdds(exchangeGames[0]);
+          const firstGameMarkets = generateMarketsFromOdds(exchangeGames[0]);
+          console.log('첫 번째 경기 마켓 설정:', firstGameMarkets);
+          setMarkets(firstGameMarkets);
         }
       } catch (error) {
         console.error('Error fetching odds:', error);
@@ -459,7 +460,9 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
         });
         setOddsData(exchangeGames);
         if (exchangeGames.length > 0) {
-          generateMarketsFromOdds(exchangeGames[0]);
+          const firstGameMarkets = generateMarketsFromOdds(exchangeGames[0]);
+          console.log('첫 번째 경기 마켓 설정:', firstGameMarkets);
+          setMarkets(firstGameMarkets);
         }
       } finally {
         setLoading(false);
@@ -471,46 +474,107 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
 
   // 호가 데이터 로드
   useEffect(() => {
-    if (isLoggedIn && oddsData[selectedGameIndex]) {
+    console.log('호가 데이터 로드 useEffect 실행 체크:', {
+      isLoggedIn,
+      selectedGameIndex,
+      'oddsData[selectedGameIndex]': oddsData[selectedGameIndex],
+      'markets[selectedMarket]': markets[selectedMarket],
+      markets,
+      selectedMarket
+    });
+    
+    if (isLoggedIn && oddsData[selectedGameIndex] && markets[selectedMarket]) {
       const game = oddsData[selectedGameIndex];
-      setSelectedGame(`${game.home_team}_${game.away_team}`);
+      setSelectedGame(game.id);
       
-      // 실제 호가 데이터를 가져오되, 없으면 더미 데이터 생성
-      fetchOrderbook(selectedGame, 'totals', selectedLine).then((orders) => {
-        if (orders.length === 0) {
-          // 더미 호가 데이터 생성
-          const dummyOrders = generateDummyOrderbook(game);
-          setOrderbook(dummyOrders);
-        } else {
-          setOrderbook(orders);
-        }
+      console.log('호가 데이터 로드 시도:', {
+        gameId: game.id,
+        market: markets[selectedMarket].name,
+        line: selectedLine,
+        isLoggedIn
       });
+      
+      // 실제 호가 데이터를 가져와서 오더북에 반영 (선택된 마켓명 사용)
+      fetchOrderbook(game.id, markets[selectedMarket].name, selectedLine).then((orders) => {
+        console.log('가져온 호가 데이터:', orders);
+        setOrderbook(orders);
+      }).catch((error) => {
+        console.error('호가 데이터 로드 실패:', error);
+      });
+    } else {
+      console.log('호가 데이터 로드 조건 불만족');
     }
-  }, [isLoggedIn, selectedGameIndex, selectedLine, fetchOrderbook, oddsData]);
+  }, [isLoggedIn, selectedGameIndex, selectedLine, fetchOrderbook, oddsData, markets, selectedMarket]);
 
   // 경기 선택 시 마켓 업데이트
   const handleGameSelect = (index: number) => {
+    console.log('경기 선택:', { index, game: oddsData[index] });
     setSelectedGameIndex(index);
     if (oddsData[index]) {
-      generateMarketsFromOdds(oddsData[index]);
+      const markets = generateMarketsFromOdds(oddsData[index]);
+      console.log('생성된 마켓들:', markets);
+      setMarkets(markets);
       setSelectedMarket(0);
     }
   };
 
   // 배팅 버튼 클릭 핸들러
-  const handleBetClick = (team: string, price: number, type: 'back' | 'lay') => {
-    setBettingModal({
-      isOpen: true,
-      selection: { team, price, type }
-    });
+  const handleBetClick = (team: string, price: number, type: 'back' | 'lay', gameId: string, marketName: string) => {
+    console.log('🎯 베팅 선택:', { team, price, type, gameId, marketName });
+    setSelectedBet({ team, price, type, gameId, market: marketName });
   };
 
-  // 배팅 확인 핸들러
-  const handleBetConfirm = (betData: any) => {
-    console.log('배팅 확인:', betData);
-    // TODO: 실제 배팅 API 호출
-    alert(`${betData.type === 'back' ? 'Back' : 'Lay'} 배팅이 완료되었습니다!`);
-  };
+  // 매치 주문 핸들러
+  const handleMatchOrder = useCallback(async (existingOrder: ExchangeOrder) => {
+    if (!isLoggedIn) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
+
+    try {
+      // 기존 주문의 반대편으로 매치 주문 생성
+      const oppositeSide: 'back' | 'lay' = existingOrder.side === 'back' ? 'lay' : 'back';
+      const matchPrice = existingOrder.price; // 기존 주문 가격으로 매치
+      
+      // 현재 선택된 베팅 정보에서 팀명 가져오기
+      let selectionName = existingOrder.selection || `${oppositeSide} ${matchPrice}`;
+      if (selectedBet && selectedBet.team) {
+        selectionName = selectedBet.team;
+      }
+      
+      const orderData = {
+        gameId: existingOrder.gameId,
+        market: existingOrder.market,
+        line: existingOrder.line,
+        side: oppositeSide,
+        price: matchPrice,
+        amount: existingOrder.amount, // 전액 매치
+        selection: selectionName // 팀명 또는 기본값
+      };
+
+      console.log('🎯 매치 주문 실행:', orderData);
+      
+      const result = await placeMatchOrder(orderData);
+      
+      if (result.success) {
+        alert(`✅ 매치 성공!\n매치된 금액: ${result.totalMatched.toLocaleString()}원\n매치 개수: ${result.matches}개`);
+        
+        // 호가창 데이터 새로고침
+        const gameData = oddsData[selectedGameIndex];
+        const marketData = markets[selectedMarket];
+        
+        if (gameData && marketData) {
+          const updatedOrderbook = await fetchOrderbook(gameData.id, marketData.name, selectedLine);
+          setOrderbook(updatedOrderbook);
+        }
+      } else {
+        alert('매치 실패: ' + (result.error || '알 수 없는 오류'));
+      }
+    } catch (error) {
+      console.error('❌ 매치 주문 오류:', error);
+      alert('매치 주문 중 오류가 발생했습니다: ' + (error as Error).message);
+    }
+  }, [isLoggedIn, placeMatchOrder, oddsData, selectedGameIndex, markets, selectedMarket, selectedLine, fetchOrderbook]);
 
   if (loading) {
     return (
@@ -543,6 +607,117 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
       <div className="bg-white rounded shadow p-6 flex-1 overflow-y-auto">
         <h2 className="text-xl font-bold mb-4">시장 보드 - {selectedCategory}</h2>
         
+        {/* 호가창 섹션 추가 */}
+        {oddsData.length > 0 && currentGame && market && (
+          <div className="mb-6 border rounded-lg p-4 bg-gray-50">
+            {(() => {
+              const gameInfo = getGameInfo(currentGame.id);
+              return (
+                <>
+                  <h3 className="text-lg font-bold mb-3">
+                    {gameInfo.displayName !== `Unknown Game (${currentGame.id.substring(0, 8)}...)` ? (
+                      <>
+                        호가창 - {gameInfo.displayName} ({market.name})
+                        <div className="text-sm text-gray-500 font-normal mt-1">
+                          📅 {new Date(gameInfo.gameDate).toLocaleString('ko-KR', {
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })} | 🏀 {gameInfo.homeTeam} vs {gameInfo.awayTeam}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        호가창 - {currentGame.home_team} vs {currentGame.away_team} ({market.name})
+                        <div className="text-sm text-gray-500 font-normal mt-1">
+                          📅 {new Date(currentGame.commence_time).toLocaleString('ko-KR')}
+                        </div>
+                      </>
+                    )}
+                  </h3>
+                </>
+              );
+            })()}
+            
+            {!isLoggedIn ? (
+              <div className="text-center py-4">
+                <p className="text-gray-500">로그인 후 호가 정보를 확인할 수 있습니다.</p>
+              </div>
+            ) : orderbook.length === 0 ? (
+              <div className="text-center py-4">
+                <p className="text-gray-500">현재 등록된 호가가 없습니다.</p>
+                <p className="text-sm text-gray-400">첫 번째 주문을 등록해보세요!</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                {/* Back 주문들 */}
+                <div>
+                  <h4 className="text-sm font-semibold text-blue-600 mb-2 text-center">Back (베팅)</h4>
+                  <div className="space-y-1">
+                    {orderbook
+                      .filter(order => order.side === 'back')
+                      .sort((a, b) => b.price - a.price) // 높은 가격부터
+                      .map((order) => (
+                        <div key={order.id} className="bg-blue-50 border border-blue-200 rounded p-2 text-sm">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="font-bold text-blue-700">{order.price.toFixed(2)}</span>
+                            <span className="text-right text-blue-600">{order.amount.toLocaleString()}원</span>
+                          </div>
+                          <div className="flex justify-center">
+                            <button
+                              onClick={() => handleMatchOrder(order)}
+                              className="px-2 py-1 bg-pink-500 text-white text-xs rounded hover:bg-pink-600 transition-colors"
+                            >
+                              Lay로 매치
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+                
+                {/* Lay 주문들 */}
+                <div>
+                  <h4 className="text-sm font-semibold text-pink-600 mb-2 text-center">Lay (레이)</h4>
+                  <div className="space-y-1">
+                    {orderbook
+                      .filter(order => order.side === 'lay')
+                      .sort((a, b) => a.price - b.price) // 낮은 가격부터
+                      .map((order) => (
+                        <div key={order.id} className="bg-pink-50 border border-pink-200 rounded p-2 text-sm">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="font-bold text-pink-700">{order.price.toFixed(2)}</span>
+                            <span className="text-right text-pink-600">{order.amount.toLocaleString()}원</span>
+                          </div>
+                          <div className="flex justify-center">
+                            <button
+                              onClick={() => handleMatchOrder(order)}
+                              className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors"
+                            >
+                              Back으로 매치
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="mt-3 text-xs text-gray-500 text-center">
+              {(() => {
+                const gameInfo = getGameInfo(currentGame.id);
+                return gameInfo.displayName !== `Unknown Game (${currentGame.id.substring(0, 8)}...)` ? (
+                  <>현재 선택된 경기: {gameInfo.displayName} | 마켓: {market.name} | 라인: {selectedLine}</>
+                ) : (
+                  <>현재 선택된 경기: {currentGame.id} | 마켓: {market.name} | 라인: {selectedLine}</>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+        
         {oddsData.length > 0 ? (
           <div className="space-y-6">
             {oddsData.map((game, gameIndex) => {
@@ -561,6 +736,19 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                         hour: '2-digit',
                         minute: '2-digit'
                       })}
+                    </div>
+                    {/* 경기 선택 버튼 추가 */}
+                    <div className="mt-2">
+                      <button
+                        onClick={() => handleGameSelect(gameIndex)}
+                        className={`px-3 py-1 rounded text-sm font-medium ${
+                          selectedGameIndex === gameIndex
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {selectedGameIndex === gameIndex ? '선택됨' : '호가 보기'}
+                      </button>
                     </div>
                   </div>
                   
@@ -583,20 +771,34 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                                   <td className="py-3 font-medium">{sel.team}</td>
                                   <td>
                                     <button 
-                                      onClick={() => handleBetClick(sel.team, sel.back.price, 'back')}
-                                      className="px-4 py-2 bg-blue-100 hover:bg-blue-200 rounded text-blue-700 font-bold transition-colors w-full"
+                                      onClick={() => handleBetClick(sel.team, sel.back.price, 'back', game.id, market.name)}
+                                      className={`px-4 py-2 rounded font-bold transition-colors w-full ${
+                                        selectedBet && 
+                                        selectedBet.team === sel.team && 
+                                        selectedBet.type === 'back' &&
+                                        selectedBet.gameId === game.id &&
+                                        selectedBet.market === market.name
+                                          ? 'bg-blue-600 text-white shadow-lg ring-2 ring-blue-300'
+                                          : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
+                                      }`}
                                     >
                                       <div className="text-lg font-bold">{sel.back.price.toFixed(2)}</div>
-                                      <div className="text-xs text-blue-600">거래량: {sel.back.amount.toLocaleString()}원</div>
                                     </button>
                                   </td>
                                   <td>
                                     <button 
-                                      onClick={() => handleBetClick(sel.team, sel.lay.price, 'lay')}
-                                      className="px-4 py-2 bg-pink-100 hover:bg-pink-200 rounded text-pink-700 font-bold transition-colors w-full"
+                                      onClick={() => handleBetClick(sel.team, sel.lay.price, 'lay', game.id, market.name)}
+                                      className={`px-4 py-2 rounded font-bold transition-colors w-full ${
+                                        selectedBet && 
+                                        selectedBet.team === sel.team && 
+                                        selectedBet.type === 'lay' &&
+                                        selectedBet.gameId === game.id &&
+                                        selectedBet.market === market.name
+                                          ? 'bg-pink-600 text-white shadow-lg ring-2 ring-pink-300'
+                                          : 'bg-pink-100 hover:bg-pink-200 text-pink-700'
+                                      }`}
                                     >
                                       <div className="text-lg font-bold">{sel.lay.price.toFixed(2)}</div>
-                                      <div className="text-xs text-pink-600">거래량: {sel.lay.amount.toLocaleString()}원</div>
                                     </button>
                                   </td>
                                 </tr>
@@ -622,13 +824,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
         )}
       </div>
 
-      {/* 배팅 모달 */}
-      <BettingModal
-        isOpen={bettingModal.isOpen}
-        onClose={() => setBettingModal({ ...bettingModal, isOpen: false })}
-        onConfirm={handleBetConfirm}
-        selection={bettingModal.selection}
-      />
+
     </div>
   );
 } 
