@@ -8,11 +8,20 @@ import sequelize from '../models/sequelize.js';
 
 export async function placeBet(req, res) {
   try {
+    console.log('🎯 [PlaceBet] 요청 데이터:', {
+      body: req.body,
+      user: req.user,
+      headers: {
+        'x-auth-token': req.headers['x-auth-token']?.substring(0, 20) + '...'
+      }
+    });
+
     const { selections, stake, totalOdds } = req.body;
     const userId = req.user.userId;
 
     // Validate bet data
     if (!selections || !stake || !totalOdds) {
+      console.log('❌ [PlaceBet] 필수 데이터 누락:', { selections: !!selections, stake: !!stake, totalOdds: !!totalOdds });
       return res.status(400).json({ message: 'Missing required bet information' });
     }
 
@@ -37,13 +46,30 @@ export async function placeBet(req, res) {
       }
     }
 
-    // 🔒 배당율 검증 추가
+    // 🔒 배당율 검증 추가 (개선된 버전)
     console.log(`[BetController] 베팅 요청 배당율 검증 시작: ${selections.length}개 선택`);
     for (const selection of selections) {
       const oddsValidation = await simplifiedOddsValidation.validateBetOdds(selection);
       if (!oddsValidation.isValid) {
         console.log(`[BetController] 배당율 검증 실패: ${selection.desc} - ${oddsValidation.reason}`);
+        
+        // 배당율이 변경된 경우 특별 처리
+        if (oddsValidation.code === 'ODDS_CHANGED') {
+          return res.status(409).json({ // 409 Conflict
+            success: false,
+            code: 'ODDS_CHANGED',
+            message: oddsValidation.message,
+            selection: selection.desc,
+            oldOdds: oddsValidation.requestedOdds,
+            newOdds: oddsValidation.currentOdds,
+            newBettingData: oddsValidation.newBettingData,
+            action: 'confirm_new_odds' // 프론트엔드에서 처리할 액션
+          });
+        }
+        
+        // 기타 검증 실패
         return res.status(400).json({ 
+          success: false,
           message: `배당율 검증 실패: ${selection.desc}`,
           reason: oddsValidation.reason,
           code: oddsValidation.code,
@@ -55,6 +81,8 @@ export async function placeBet(req, res) {
       // 경고가 있는 경우 로깅
       if (oddsValidation.warning) {
         console.log(`[BetController] 배당율 경고: ${selection.desc} - ${oddsValidation.reason}`);
+      } else {
+        console.log(`[BetController] 배당율 검증 성공: ${selection.desc}`);
       }
     }
 
@@ -79,10 +107,13 @@ export async function placeBet(req, res) {
     // Get user and check balance
     const user = await User.findByPk(userId);
     if (!user) {
+      console.log('❌ [PlaceBet] 사용자 없음:', userId);
       return res.status(404).json({ message: 'User not found' });
     }
 
+    console.log('💰 [PlaceBet] 잔액 확인:', { userBalance: user.balance, betStake: stake });
     if (user.balance < stake) {
+      console.log('❌ [PlaceBet] 잔액 부족:', { balance: user.balance, stake });
       return res.status(400).json({ message: 'Insufficient balance' });
     }
 

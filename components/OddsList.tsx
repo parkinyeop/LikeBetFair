@@ -82,7 +82,17 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
     fetchOdds();
     const interval = setInterval(fetchOdds, 5 * 60 * 1000); // 5분마다 갱신
 
-    return () => clearInterval(interval);
+    // refreshOdds 이벤트 리스너 추가
+    const handleRefreshOdds = () => {
+      fetchOdds();
+    };
+
+    window.addEventListener('refreshOdds', handleRefreshOdds);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('refreshOdds', handleRefreshOdds);
+    };
   }, [sportKey]);
 
   const isTeamSelected = (team: string, market: string, gameId: string, point?: number) => {
@@ -247,15 +257,16 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                                       disabled={!isBettable || !bestOver.price}
                                       onClick={() => {
                                         if (isBettable && bestOver.price) {
-                                          toggleSelection({
-                                            team: normalizeTeamName(bestOver.name),
-                                            odds: bestOver.price,
-                                            desc: `${game.home_team} vs ${game.away_team}`,
-                                            commence_time: game.commence_time,
-                                            market: selectedMarket,
-                                            gameId: game.id,
-                                            point: bestOver.point
-                                          });
+                                                                    toggleSelection({
+                            team: normalizeTeamName(bestOver.name),
+                            odds: bestOver.price,
+                            desc: `${game.home_team} vs ${game.away_team}`,
+                            commence_time: game.commence_time,
+                            market: selectedMarket,
+                            gameId: game.id,
+                            point: bestOver.point,
+                            sport_key: game.sport_key
+                          });
                                           handleBettingAreaSelect();
                                         }
                                       }}
@@ -271,15 +282,16 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                                       disabled={!isBettable || !bestUnder.price}
                                       onClick={() => {
                                         if (isBettable && bestUnder.price) {
-                                          toggleSelection({
-                                            team: normalizeTeamName(bestUnder.name),
-                                            odds: bestUnder.price,
-                                            desc: `${game.home_team} vs ${game.away_team}`,
-                                            commence_time: game.commence_time,
-                                            market: selectedMarket,
-                                            gameId: game.id,
-                                            point: bestUnder.point
-                                          });
+                                                                    toggleSelection({
+                            team: normalizeTeamName(bestUnder.name),
+                            odds: bestUnder.price,
+                            desc: `${game.home_team} vs ${game.away_team}`,
+                            commence_time: game.commence_time,
+                            market: selectedMarket,
+                            gameId: game.id,
+                            point: bestUnder.point,
+                            sport_key: game.sport_key
+                          });
                                           handleBettingAreaSelect();
                                         }
                                       }}
@@ -320,7 +332,8 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                                             commence_time: game.commence_time,
                                             market: selectedMarket,
                                             gameId: game.id,
-                                            point: bestHome.point
+                                            point: bestHome.point,
+                                            sport_key: game.sport_key
                                           });
                                           handleBettingAreaSelect();
                                         }
@@ -344,7 +357,8 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                                             commence_time: game.commence_time,
                                             market: selectedMarket,
                                             gameId: game.id,
-                                            point: bestAway.point
+                                            point: bestAway.point,
+                                            sport_key: game.sport_key
                                           });
                                           handleBettingAreaSelect();
                                         }
@@ -377,7 +391,8 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                                             commence_time: game.commence_time,
                                             market: selectedMarket,
                                             gameId: game.id,
-                                            point: bestHome.point
+                                            point: bestHome.point,
+                                            sport_key: game.sport_key
                                           });
                                           handleBettingAreaSelect();
                                         }
@@ -401,7 +416,8 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                                             commence_time: game.commence_time,
                                             market: selectedMarket,
                                             gameId: game.id,
-                                            point: bestAway.point
+                                            point: bestAway.point,
+                                            sport_key: game.sport_key
                                           });
                                           handleBettingAreaSelect();
                                         }
@@ -459,6 +475,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                               commence_time: game.commence_time,
                               market: selectedMarket,
                               gameId: game.id,
+                              sport_key: game.sport_key,
                               ...(homeBest.point && { point: homeBest.point })
                             });
                             handleBettingAreaSelect();
@@ -490,6 +507,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                               commence_time: game.commence_time,
                               market: selectedMarket,
                               gameId: game.id,
+                              sport_key: game.sport_key,
                               ...(awayBest.point && { point: awayBest.point })
                             });
                             handleBettingAreaSelect();

@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from "next/router";
 import GameCard from "../components/GameCard";
-import { SPORTS_TREE, getSportKey, getSeasonInfo, getSeasonStatusBadge, getSeasonStatusStyle, SPORT_CATEGORIES } from "../config/sportsMapping";
+import { SPORTS_TREE, getSportKey, getSeasonInfo, getSeasonStatusBadge, getSeasonStatusStyle, SPORT_CATEGORIES, getDisplayNameFromSportKey } from "../config/sportsMapping";
 import { API_CONFIG, TIME_CONFIG, buildApiUrl, isBettingAllowed } from "../config/apiConfig";
 import GameTimeDisplay from "../components/GameTimeDisplay";
 
@@ -162,12 +162,47 @@ export default function Home() {
 
   const handleGameClick = (game: any, leagueName?: string) => {
     let sportKey;
+    let categoryToSet;
+    
     if (leagueName) {
       sportKey = getSportKey(leagueName);
+      // SPORTS_TREE를 사용하여 해당 스포츠가 속한 메인 카테고리를 찾음
+      const parentCategory = Object.entries(SPORTS_TREE).find(([main, subs]) => 
+        subs.includes(leagueName)
+      );
+      
+      if (parentCategory) {
+        // "축구 > K리그" 형태로 설정
+        categoryToSet = `${parentCategory[0]} > ${leagueName}`;
+      } else {
+        // 메인 카테고리에 속하지 않는 경우
+        categoryToSet = leagueName;
+      }
     } else {
       sportKey = getSportKey(selectedCategory);
+      const displayName = getDisplayNameFromSportKey(selectedCategory);
+      if (displayName) {
+        // SPORTS_TREE를 사용하여 해당 스포츠가 속한 메인 카테고리를 찾음
+        const parentCategory = Object.entries(SPORTS_TREE).find(([main, subs]) => 
+          subs.includes(displayName)
+        );
+        
+        if (parentCategory) {
+          // "축구 > K리그" 형태로 설정
+          categoryToSet = `${parentCategory[0]} > ${displayName}`;
+        } else {
+          // 메인 카테고리에 속하지 않는 경우
+          categoryToSet = displayName;
+        }
+      }
     }
     
+    // 사이드바 카테고리 동기화를 위한 이벤트 발생
+    if (categoryToSet) {
+      window.dispatchEvent(new CustomEvent('categorySelected', { detail: { category: categoryToSet } }));
+    }
+    
+    // 페이지 이동
     if (sportKey) {
       router.push(`/odds/${sportKey}`);
     }

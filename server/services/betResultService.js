@@ -459,19 +459,24 @@ class BetResultService {
           return candidate;
         }
       }
-      // 4차: 팀명만 일치(시간 무시, 가장 최근 경기)
-      const allCandidates = await GameResult.findAll({
+      // 4차: 팀명만 일치하되 ±24시간 범위 내로 제한 (완전한 시간 무시 방지)
+      const startTime24 = new Date(commenceTime.getTime() - 24 * 60 * 60 * 1000);
+      const endTime24 = new Date(commenceTime.getTime() + 24 * 60 * 60 * 1000);
+      const candidates24 = await GameResult.findAll({
+        where: {
+          commenceTime: { [Op.between]: [startTime24, endTime24] }
+        },
         order: [['commenceTime', 'DESC']]
       });
-      console.log(`[getGameResultByTeams] 후보군(전체): ${allCandidates.length}개`);
-      for (const candidate of allCandidates) {
+      console.log(`[getGameResultByTeams] 후보군(±24시간): ${candidates24.length}개`);
+      for (const candidate of candidates24) {
         const dbHomeNorm = normalizeTeamNameForComparison(candidate.homeTeam);
         const dbAwayNorm = normalizeTeamNameForComparison(candidate.awayTeam);
         if (
           (dbHomeNorm === homeTeamNorm && dbAwayNorm === awayTeamNorm) ||
           (dbHomeNorm === awayTeamNorm && dbAwayNorm === homeTeamNorm)
         ) {
-          console.log(`[getGameResultByTeams] 시간 무시, 팀명만 일치 매칭 성공: candidate.id=${candidate.id}`);
+          console.log(`[getGameResultByTeams] ±24시간 제한 매칭 성공: candidate.id=${candidate.id}, commenceTime=${candidate.commenceTime}`);
           return candidate;
         }
       }

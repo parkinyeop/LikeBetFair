@@ -15,6 +15,7 @@ const Layout = memo(({ children }: LayoutProps) => {
   const router = useRouter();
   const [selected, setSelected] = useState("NBA");
   const [betslipTab, setBetslipTab] = useState<'betslip' | 'mybets'>('betslip'); // 배팅슬립 탭 상태 추가
+  const [resetToHome, setResetToHome] = useState(false); // 홈 리셋 상태
   
   // 페이지 체크 메모화
   const isExchange = useMemo(() => router.pathname.startsWith("/exchange"), [router.pathname]);
@@ -36,7 +37,12 @@ const Layout = memo(({ children }: LayoutProps) => {
           // 메인 카테고리에 속하지 않는 경우 (예외적인 경우)
           setSelected(displayName);
         }
+        setResetToHome(false); // 특정 스포츠 페이지로 이동 시 리셋 해제
       }
+    } else if (router.pathname === "/") {
+      // 홈페이지일 때는 사이드바 모든 카테고리 닫기
+      setResetToHome(true);
+      setSelected(""); // 선택 해제
     }
   }, [router.pathname, router.query.sport]);
 
@@ -46,6 +52,7 @@ const Layout = memo(({ children }: LayoutProps) => {
   // 카테고리 선택 핸들러 메모화
   const handleCategorySelect = useCallback((category: string) => {
     setSelected(category);
+    setResetToHome(false); // 카테고리 선택 시 리셋 해제
     
     if (category.includes(" > ")) {
       const subCategory = category.split(" > ")[1];
@@ -80,14 +87,23 @@ const Layout = memo(({ children }: LayoutProps) => {
     const handleCategorySelected = (event: CustomEvent) => {
       const { category } = event.detail;
       setSelected(category);
+      setResetToHome(false); // 카테고리 선택 시 리셋 해제
+    };
+
+    const handleSportsbookSelected = () => {
+      // 헤더에서 스포츠북 선택 시 사이드바 리셋
+      setResetToHome(true);
+      setSelected("");
     };
 
     window.addEventListener('bettingAreaSelected', handleBettingAreaSelected);
     window.addEventListener('categorySelected', handleCategorySelected as EventListener);
+    window.addEventListener('sportsbookSelected', handleSportsbookSelected);
     
     return () => {
       window.removeEventListener('bettingAreaSelected', handleBettingAreaSelected);
       window.removeEventListener('categorySelected', handleCategorySelected as EventListener);
+      window.removeEventListener('sportsbookSelected', handleSportsbookSelected);
     };
   }, []);
 
@@ -101,6 +117,7 @@ const Layout = memo(({ children }: LayoutProps) => {
               categories={allCategories}
               selected={selected}
               onSelect={handleCategorySelect}
+              resetToHome={resetToHome}
             />
           }
           center={

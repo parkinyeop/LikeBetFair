@@ -9,6 +9,7 @@ export type BetSelection = {
   market?: string;
   gameId?: string;
   point?: number;
+  sport_key?: string; // 시즌 검증을 위한 스포츠 키 추가
 };
 
 interface BetState {
@@ -17,6 +18,7 @@ interface BetState {
   addSelection: (bet: BetSelection) => void;
   removeSelection: (team: string) => void;
   toggleSelection: (bet: BetSelection) => void;
+  updateSelection: (index: number, updates: Partial<BetSelection>) => void;
   setStake: (amount: number) => void;
   clearAll: () => void;
 }
@@ -86,6 +88,11 @@ export const useBetStore = create<BetState>((set, get) => ({
       }
     }
   },
+
+  updateSelection: (index, updates) =>
+    set((state) => ({
+      selections: state.selections.map((s, i) => (i === index ? { ...s, ...updates } : s)),
+    })),
 
   setStake: (amount) => set(() => ({ stake: amount })),
 

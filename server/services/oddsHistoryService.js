@@ -55,27 +55,47 @@ class OddsHistoryService {
   }
 
   /**
-   * 베팅 시점 배당율 검증용 히스토리 조회
+   * 베팅 시점 배당율 검증용 히스토리 조회 (개선된 매칭)
    * @param {Object} selection - 베팅 선택 정보
    * @param {Date} betTime - 베팅 시간
    * @returns {Promise<Object|null>} - 히스토리 데이터
    */
   async getValidationHistory(selection, betTime) {
     try {
+      console.log(`[OddsHistory] 히스토리 검색 시작: ${selection.desc}, 팀: ${selection.team}, 시간: ${betTime}`);
+      
+      // 팀명 정규화
+      const normalizedTeam = selection.team ? selection.team.toLowerCase().replace(/[^a-z0-9가-힣]/g, '') : '';
+      
+      const timeRange = 10 * 60 * 1000; // 10분 범위
       const whereClause = {
         marketType: this.getMarketKey(selection.market),
-        outcomeName: selection.team || selection.option,
         snapshotTime: {
           [Op.between]: [
-            new Date(betTime.getTime() - 10 * 60 * 1000), // 10분 전
-            new Date(betTime.getTime() + 10 * 60 * 1000)  // 10분 후
+            new Date(betTime.getTime() - timeRange),
+            new Date(betTime.getTime() + timeRange)
           ]
         }
       };
 
+      // 팀명 매칭 (정규화된 이름으로 부분 검색)
+      if (normalizedTeam) {
+        whereClause[Op.or] = [
+          { outcomeName: { [Op.iLike]: `%${normalizedTeam}%` } },
+          { outcomeName: { [Op.iLike]: `%${selection.team}%` } },
+          { homeTeam: { [Op.iLike]: `%${normalizedTeam}%` } },
+          { awayTeam: { [Op.iLike]: `%${normalizedTeam}%` } }
+        ];
+      } else if (selection.option) {
+        // Over/Under 등 옵션 매칭
+        whereClause.outcomeName = { [Op.iLike]: `%${selection.option}%` };
+      }
+
       if (selection.point !== undefined) {
         whereClause.outcomePoint = selection.point;
       }
+
+      console.log(`[OddsHistory] 검색 조건:`, JSON.stringify(whereClause, null, 2));
 
       const history = await OddsHistory.findOne({
         where: whereClause,
@@ -83,8 +103,12 @@ class OddsHistoryService {
         limit: 1
       });
 
-      if (!history) return null;
+      if (!history) {
+        console.log(`[OddsHistory] 히스토리 없음: ${selection.desc}`);
+        return null;
+      }
 
+      console.log(`[OddsHistory] 히스토리 발견: ${history.outcomeName} = ${history.oddsValue} (${history.snapshotTime})`);
       return {
         odds: parseFloat(history.oddsValue),
         timestamp: history.snapshotTime,

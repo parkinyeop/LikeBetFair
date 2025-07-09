@@ -1,10 +1,13 @@
 import OddsCache from '../models/oddsCacheModel.js';
+import OddsHistory from '../models/oddsHistoryModel.js';
+import { Op } from 'sequelize';
 import { BETTING_CONFIG } from '../config/centralizedConfig.js';
+import { normalizeTeamNameForComparison, normalizeOption } from '../normalizeUtils.js';
+import oddsHistoryService from './oddsHistoryService.js';
 
 class SimplifiedOddsValidation {
   constructor() {
-    // 배당율 허용 오차 (부동소수점 오차 등을 위한 최소한의 여유)
-    this.ODDS_TOLERANCE = 0.001; // 0.1%
+    this.ODDS_TOLERANCE = 0.001; // 0.1% 허용 오차로 원래대로 복원
   }
 
   /**
@@ -29,10 +32,13 @@ class SimplifiedOddsValidation {
       const currentOdds = await this.getCurrentOfferedOdds(selection);
       
       if (!currentOdds) {
+        // 경기를 찾을 수 없는 경우 범위 검증만 수행 (관대한 정책)
+        console.log(`[SimplifiedValidation] 경기 미발견으로 범위 검증만 수행: ${selection.desc}`);
         return {
-          isValid: false,
-          reason: '현재 해당 배당율을 제공하지 않습니다',
-          code: 'ODDS_NOT_AVAILABLE'
+          isValid: true,
+          reason: '경기 미발견으로 범위 검증만 수행됨 (허용)',
+          code: 'ODDS_RANGE_ONLY',
+          warning: true
         };
       }
 
@@ -42,10 +48,17 @@ class SimplifiedOddsValidation {
       if (deviation > this.ODDS_TOLERANCE) {
         return {
           isValid: false,
-          reason: `배당율 불일치 - 현재 제공: ${currentOdds.odds}, 요청: ${selection.odds}`,
-          code: 'ODDS_MISMATCH',
+          reason: '배당율이 변경되었습니다',
+          code: 'ODDS_CHANGED',
           currentOdds: currentOdds.odds,
-          requestedOdds: selection.odds
+          requestedOdds: selection.odds,
+          message: `배당율이 ${selection.odds}에서 ${currentOdds.odds}로 변경되었습니다. 새로운 배당율로 베팅하시겠습니까?`,
+          newBettingData: {
+            ...selection,
+            odds: currentOdds.odds,
+            bookmaker: currentOdds.bookmaker,
+            lastUpdate: currentOdds.lastUpdate
+          }
         };
       }
 
@@ -141,14 +154,29 @@ class SimplifiedOddsValidation {
    */
   async getCurrentOfferedOdds(selection) {
     try {
+      console.log(`[SimplifiedValidation] 배당율 조회 시작: ${selection.desc}, 시작시간: ${selection.commence_time}`);
+      
       // commence_time 기준으로 해당 경기 찾기
       const commenceTime = new Date(selection.commence_time);
       const timeRange = 30 * 60 * 1000; // 30분 범위
       
+      // 팀명으로 경기 찾기 (시간 + 팀명 모두 고려)
+      const homeAwayTeams = selection.desc.split(' vs ');
+      if (homeAwayTeams.length !== 2) {
+        console.log(`[SimplifiedValidation] desc 형식 오류: ${selection.desc}`);
+        return null;
+      }
+      
+      const normalizedHomeTeam = normalizeTeamNameForComparison(homeAwayTeams[0]);
+      const normalizedAwayTeam = normalizeTeamNameForComparison(homeAwayTeams[1]);
+      const normalizedSelectionTeam = normalizeTeamNameForComparison(selection.team);
+      
+      console.log(`[SimplifiedValidation] 경기 정보: ${normalizedHomeTeam} vs ${normalizedAwayTeam}, 선택팀: ${normalizedSelectionTeam}`);
+      
       const oddsCache = await OddsCache.findOne({
         where: {
           commenceTime: {
-            [require('sequelize').Op.between]: [
+            [Op.between]: [
               new Date(commenceTime.getTime() - timeRange),
               new Date(commenceTime.getTime() + timeRange)
             ]
@@ -159,9 +187,11 @@ class SimplifiedOddsValidation {
       });
 
       if (!oddsCache) {
-        console.log(`[SimplifiedValidation] 경기를 찾을 수 없음: ${selection.desc}`);
+        console.log(`[SimplifiedValidation] 시간 범위내 경기를 찾을 수 없음: ${selection.desc}`);
         return null;
       }
+      
+      console.log(`[SimplifiedValidation] 찾은 경기: ${oddsCache.homeTeam} vs ${oddsCache.awayTeam}`);
 
       // 북메이커 데이터에서 해당 선택의 배당율 찾기
       const marketKey = this.getMarketKey(selection.market);
@@ -227,24 +257,41 @@ class SimplifiedOddsValidation {
   }
 
   /**
-   * 베팅 시점 스냅샷 조회
+   * 베팅 시점 스냅샷 조회 (OddsHistory 활용)
    * @param {Object} selection - 베팅 선택 정보
    * @param {Date} betTime - 베팅 시간
    * @returns {Object|null} - 스냅샷 정보
    */
   async getBetSnapshot(selection, betTime) {
     try {
-      // selection에서 스냅샷 정보 추출
+      console.log(`[SimplifiedValidation] 정산 검증용 히스토리 조회: ${selection.desc}, 베팅시간: ${betTime}`);
+      
+      // 1. selection에서 임시 스냅샷 정보 추출 (현재 베팅)
       if (selection._oddsSnapshot) {
+        console.log(`[SimplifiedValidation] 임시 스냅샷 사용: ${selection._oddsSnapshot.offeredOdds}`);
         return selection._oddsSnapshot;
       }
       
-      // 스냅샷이 없는 경우 (기존 베팅의 경우)
-      console.log(`[SimplifiedValidation] 스냅샷이 없는 베팅: ${selection.desc}`);
+      // 2. OddsHistory에서 베팅 시점 배당율 조회 (기존 베팅)
+      const historicalOdds = await oddsHistoryService.getValidationHistory(selection, betTime);
+      
+      if (historicalOdds) {
+        console.log(`[SimplifiedValidation] OddsHistory에서 발견: ${historicalOdds.odds} (${historicalOdds.timestamp})`);
+        return {
+          offeredOdds: historicalOdds.odds,
+          betTime: historicalOdds.timestamp,
+          bookmaker: historicalOdds.bookmaker,
+          source: 'database'
+        };
+      }
+      
+      // 3. 히스토리를 찾을 수 없는 경우 - 베팅 배당율 그대로 사용 (관대한 정책)
+      console.log(`[SimplifiedValidation] 히스토리 미발견으로 베팅 배당율 사용: ${selection.odds}`);
       return {
-        offeredOdds: selection.odds, // 기존 베팅은 베팅 배당율을 그대로 사용
+        offeredOdds: selection.odds,
         betTime: betTime,
-        source: 'legacy'
+        source: 'fallback',
+        warning: '히스토리 기록 없음'
       };
 
     } catch (error) {
@@ -266,28 +313,52 @@ class SimplifiedOddsValidation {
   }
 
   /**
-   * 선택과 결과가 일치하는지 확인
+   * 선택과 결과가 일치하는지 확인 (개선된 버전)
    */
   matchesSelection(outcome, selection) {
-    // 1. 팀명 매칭
+    console.log(`[SimplifiedValidation] 매칭 검사: outcome="${outcome.name}" vs selection="${selection.team || selection.option}"`);
+    
+    // 1. 팀명 매칭 (정규화 함수 활용)
     if (selection.team && outcome.name) {
-      if (outcome.name.toLowerCase().includes(selection.team.toLowerCase()) ||
-          selection.team.toLowerCase().includes(outcome.name.toLowerCase())) {
+      const normalizedOutcome = normalizeTeamNameForComparison(outcome.name);
+      const normalizedSelection = normalizeTeamNameForComparison(selection.team);
+      
+      console.log(`[SimplifiedValidation] 팀명 정규화: "${normalizedOutcome}" vs "${normalizedSelection}"`);
+      
+      // 정확한 일치
+      if (normalizedOutcome === normalizedSelection) {
+        console.log(`[SimplifiedValidation] 팀명 정확 매칭 성공`);
+        return true;
+      }
+      
+      // 부분 일치 (한쪽이 다른 쪽을 포함)
+      if (normalizedOutcome.includes(normalizedSelection) || 
+          normalizedSelection.includes(normalizedOutcome)) {
+        console.log(`[SimplifiedValidation] 팀명 부분 매칭 성공`);
         return true;
       }
     }
 
     // 2. 옵션 매칭 (Over/Under 등)
     if (selection.option && outcome.name) {
-      if (outcome.name.toLowerCase().includes(selection.option.toLowerCase())) {
+      const normalizedOutcomeOption = normalizeOption(outcome.name);
+      const normalizedSelectionOption = normalizeOption(selection.option);
+      
+      console.log(`[SimplifiedValidation] 옵션 정규화: "${normalizedOutcomeOption}" vs "${normalizedSelectionOption}"`);
+      
+      if (normalizedOutcomeOption.toLowerCase() === normalizedSelectionOption.toLowerCase()) {
         // 포인트도 일치하는지 확인
         if (selection.point !== undefined && outcome.point !== undefined) {
-          return Math.abs(selection.point - outcome.point) < 0.001;
+          const pointMatch = Math.abs(selection.point - outcome.point) < 0.001;
+          console.log(`[SimplifiedValidation] 포인트 매칭: ${selection.point} vs ${outcome.point} = ${pointMatch}`);
+          return pointMatch;
         }
+        console.log(`[SimplifiedValidation] 옵션 매칭 성공`);
         return true;
       }
     }
 
+    console.log(`[SimplifiedValidation] 매칭 실패`);
     return false;
   }
 }

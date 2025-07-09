@@ -2,7 +2,7 @@
 import React, { memo, useMemo, useCallback } from 'react';
 import GameTimeDisplay from './GameTimeDisplay';
 import BettingButton from './BettingButton';
-import { getSportKey, getDisplayNameFromSportKey } from '../config/sportsMapping';
+import { getSportKey, getDisplayNameFromSportKey, SPORTS_TREE } from '../config/sportsMapping';
 
 interface GameCardProps {
   teams: string;
@@ -36,23 +36,24 @@ const GameCard: React.FC<GameCardProps> = memo(({ teams, time, selectedTeam, onS
       const displayName = getDisplayNameFromSportKey(sportKey);
       if (displayName) {
         // 해당 스포츠가 속한 메인 카테고리를 찾아서 트리 형태로 선택
-        const parentCategory = Object.entries({
-          "축구": ["K리그", "EPL", "라리가", "분데스리가", "세리에 A", "리그 1", "J리그", "MLS", "브라질 세리에 A", "아르헨티나 프리메라", "중국 슈퍼리그"],
-          "농구": ["NBA", "KBL"],
-          "야구": ["MLB", "KBO"],
-          "미식축구": ["NFL"],
-          "아이스하키": ["NHL"]
-        }).find(([main, subs]) => 
+        const parentCategory = Object.entries(SPORTS_TREE).find(([main, subs]) => 
           subs.includes(displayName)
         );
         
+        let categoryToSet;
         if (parentCategory) {
           // "축구 > K리그" 형태로 설정
-          onCategorySelect(`${parentCategory[0]} > ${displayName}`);
+          categoryToSet = `${parentCategory[0]} > ${displayName}`;
         } else {
           // 메인 카테고리에 속하지 않는 경우
-          onCategorySelect(displayName);
+          categoryToSet = displayName;
         }
+        
+        // 사이드바 카테고리 동기화를 위한 이벤트 발생
+        window.dispatchEvent(new CustomEvent('categorySelected', { detail: { category: categoryToSet } }));
+        
+        // onCategorySelect 콜백도 호출 (기존 동작 유지)
+        onCategorySelect(categoryToSet);
       }
     }
   }, [sportKey, onCategorySelect]);

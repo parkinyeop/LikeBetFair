@@ -19,6 +19,11 @@ export default function Header() {
       return;
     }
     setSelectedCategory(category);
+    
+    // 스포츠북 선택 시 사이드바 리셋 이벤트 발생
+    if (category === "Sportsbook") {
+      window.dispatchEvent(new CustomEvent('sportsbookSelected'));
+    }
   };
 
   return (
