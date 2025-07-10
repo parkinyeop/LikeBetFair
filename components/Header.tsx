@@ -20,9 +20,11 @@ export default function Header() {
     }
     setSelectedCategory(category);
     
-    // 스포츠북 선택 시 사이드바 리셋 이벤트 발생
+    // 스포츠북 또는 Exchange 홈 선택 시 사이드바 리셋 이벤트 발생
     if (category === "Sportsbook") {
       window.dispatchEvent(new CustomEvent('sportsbookSelected'));
+    } else if (category === "Exchange") {
+      window.dispatchEvent(new CustomEvent('exchangeHomeSelected'));
     }
   };
 

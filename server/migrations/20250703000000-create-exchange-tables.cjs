@@ -8,7 +8,7 @@ module.exports = {
       // 1. ExchangeBalances 테이블 생성
       await queryInterface.createTable('ExchangeBalances', {
         userId: {
-          type: Sequelize.INTEGER,
+          type: Sequelize.UUID,
           primaryKey: true,
           allowNull: false,
           references: {
@@ -45,7 +45,7 @@ module.exports = {
           allowNull: false
         },
         userId: {
-          type: Sequelize.INTEGER,
+          type: Sequelize.UUID,
           allowNull: false,
           references: {
             model: 'Users',

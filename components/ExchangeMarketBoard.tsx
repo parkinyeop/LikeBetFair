@@ -3,6 +3,7 @@ import { useExchange, type ExchangeOrder } from '../hooks/useExchange';
 import { useAuth } from '../contexts/AuthContext';
 import { useExchangeContext } from '../contexts/ExchangeContext';
 import { getSportKey, getGameInfo } from '../config/sportsMapping';
+import { useExchangeGames, ExchangeGame } from '../hooks/useExchangeGames';
 
 interface Order {
   id: string;
@@ -51,6 +52,7 @@ interface ExchangeMarketBoardProps {
 export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: ExchangeMarketBoardProps) {
   const { isLoggedIn } = useAuth();
   const { fetchOrderbook, placeMatchOrder } = useExchange();
+  const { games: exchangeGames, loading: gamesLoading, error: gamesError, getGamesByCategory } = useExchangeGames();
   
   const [selectedMarket, setSelectedMarket] = useState(0);
   const [orderbook, setOrderbook] = useState<ExchangeOrder[]>([]);
@@ -70,7 +72,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
       return sportKey ? [sportKey] : [];
     }
     
-    // 메인 카테고리인 경우 해당 카테고리의 모든 스포츠
+    // 메인 카테고리인 경우 해당 카테고리의 모든 스포츠 (스포츠북의 전체 리그)
     const categorySports: Record<string, string[]> = {
       "축구": [
         'soccer_korea_kleague1',  // K리그
@@ -238,6 +240,63 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
     return dummyGames;
   };
 
+  // Exchange 게임에서 마켓 생성 (실제 데이터 기반)
+  const generateMarketsFromExchangeGame = (game: ExchangeGame): Market[] => {
+    console.log('🔧 Exchange 게임에서 마켓 생성:', game);
+    return game.availableMarkets.map(market => {
+      let selections: MarketSelection[] = [];
+      
+      if (market.type === 'h2h') {
+        // 승패 마켓
+        selections = [
+          {
+            team: game.homeTeam,
+            back: { price: 1.90, amount: 0 },
+            lay: { price: 1.95, amount: 0 }
+          },
+          {
+            team: game.awayTeam,
+            back: { price: 1.90, amount: 0 },
+            lay: { price: 1.95, amount: 0 }
+          }
+        ];
+      } else if (market.type === 'totals') {
+        // 총점 마켓
+        selections = [
+          {
+            team: 'Over 2.5',
+            back: { price: 1.85, amount: 0 },
+            lay: { price: 1.90, amount: 0 }
+          },
+          {
+            team: 'Under 2.5',
+            back: { price: 1.95, amount: 0 },
+            lay: { price: 2.00, amount: 0 }
+          }
+        ];
+      } else if (market.type === 'spreads') {
+        // 핸디캡 마켓
+        selections = [
+          {
+            team: `${game.homeTeam} (-0.5)`,
+            back: { price: 1.90, amount: 0 },
+            lay: { price: 1.95, amount: 0 }
+          },
+          {
+            team: `${game.awayTeam} (+0.5)`,
+            back: { price: 1.90, amount: 0 },
+            lay: { price: 1.95, amount: 0 }
+          }
+        ];
+      }
+      
+      return {
+        name: market.name,
+        selections
+      };
+    });
+  };
+
   // 배당율 데이터로부터 마켓 생성
   const generateMarketsFromOdds = (gameData: OddsData): Market[] => {
     console.log('마켓 생성 시작:', gameData);
@@ -372,105 +431,47 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
     });
   };
 
-  // 배당율 데이터 로드
+  // Exchange 게임 데이터 변환
   useEffect(() => {
-    const fetchOdds = async () => {
-      try {
-        setLoading(true);
-        // 선택된 카테고리에 따른 스포츠만 로드
-        const sports = getSportsByCategory(selectedCategory);
-        const allOdds: OddsData[] = [];
-        
-        for (const sport of sports) {
-          try {
-            console.log(`Fetching odds for ${sport}...`);
-            const response = await fetch(`/api/odds/${sport}`);
-            if (response.ok) {
-              const data = await response.json();
-              if (Array.isArray(data)) {
-                console.log(`Found ${data.length} games for ${sport}`);
-                allOdds.push(...data);
-              } else {
-                console.log(`No array data for ${sport}:`, data);
-              }
-            } else {
-              console.log(`API error for ${sport}: ${response.status} ${response.statusText}`);
-            }
-          } catch (error) {
-            console.error(`Error fetching odds for ${sport}:`, error);
-          }
-        }
-        
-        console.log(`Total games found: ${allOdds.length}`);
-        
-        // API에서 데이터를 가져오지 못한 경우 더미 데이터 생성
-        if (allOdds.length === 0) {
-          console.log('API에서 데이터를 가져오지 못해 더미 데이터를 생성합니다.');
-          allOdds.push(...generateDummyOdds());
-        } else {
-          // API에서 데이터를 가져지만 미래 경기가 없는 경우에도 더미 데이터 생성
-          const now = new Date();
-          const futureGames = allOdds.filter(game => {
-            const gameTime = new Date(game.commence_time);
-            return gameTime > now;
-          });
-          
-          if (futureGames.length === 0) {
-            console.log('API에서 가져온 데이터에 미래 경기가 없어 더미 데이터를 생성합니다.');
-            allOdds.length = 0; // 기존 데이터 클리어
-            allOdds.push(...generateDummyOdds());
-          }
-        }
-        
-        // 현재 시간 이후의 경기만 필터링
-        const now = new Date();
-        const futureGames = allOdds.filter(game => {
-          const gameTime = new Date(game.commence_time);
-          return gameTime > now;
-        });
-        
-        // 익스체인지는 사용자 간 거래이므로 1주일 이후의 경기도 표시
-        const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-        const exchangeGames = futureGames.filter(game => {
-          const gameTime = new Date(game.commence_time);
-          return gameTime <= nextWeek;
-        });
-        
-        setOddsData(exchangeGames);
-        
-        // 첫 번째 경기로 마켓 생성
-        if (exchangeGames.length > 0) {
-          const firstGameMarkets = generateMarketsFromOdds(exchangeGames[0]);
-          console.log('첫 번째 경기 마켓 설정:', firstGameMarkets);
-          setMarkets(firstGameMarkets);
-        }
-      } catch (error) {
-        console.error('Error fetching odds:', error);
-        // 에러 발생 시에도 더미 데이터 생성
-        const dummyOdds = generateDummyOdds();
-        const now = new Date();
-        const futureGames = dummyOdds.filter(game => {
-          const gameTime = new Date(game.commence_time);
-          return gameTime > now;
-        });
-        const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-        const exchangeGames = futureGames.filter(game => {
-          const gameTime = new Date(game.commence_time);
-          return gameTime <= nextWeek;
-        });
-        setOddsData(exchangeGames);
-        if (exchangeGames.length > 0) {
-          const firstGameMarkets = generateMarketsFromOdds(exchangeGames[0]);
-          console.log('첫 번째 경기 마켓 설정:', firstGameMarkets);
-          setMarkets(firstGameMarkets);
-        }
-      } finally {
-        setLoading(false);
+    if (!gamesLoading && exchangeGames.length > 0) {
+      console.log('🎮 Exchange 게임 데이터 로드:', exchangeGames.length, '개');
+      
+      // Exchange 게임을 OddsData 형태로 변환
+      const convertedGames: OddsData[] = exchangeGames.map(game => ({
+        id: game.id,
+        sport_key: game.sportKey,
+        sport_title: game.league,
+        commence_time: game.commenceTime,
+        home_team: game.homeTeam,
+        away_team: game.awayTeam,
+        bookmakers: [{
+          key: 'exchange',
+          title: 'Exchange',
+          last_update: new Date().toISOString(),
+          markets: game.availableMarkets.map(market => ({
+            key: market.type,
+            last_update: new Date().toISOString(),
+            outcomes: market.selections || []
+          }))
+        }]
+      }));
+      
+      setOddsData(convertedGames);
+      setLoading(false);
+      
+      // 첫 번째 경기로 마켓 생성
+      if (convertedGames.length > 0) {
+        const firstGameMarkets = generateMarketsFromExchangeGame(exchangeGames[0]);
+        console.log('✅ 첫 번째 경기 마켓 설정:', firstGameMarkets);
+        setMarkets(firstGameMarkets);
       }
-    };
-
-    fetchOdds();
-  }, [selectedCategory]);
+    } else if (gamesError) {
+      console.error('❌ Exchange 게임 로드 오류:', gamesError);
+      setOddsData([]);
+      setMarkets([]);
+      setLoading(false);
+    }
+  }, [exchangeGames, gamesLoading, gamesError]);
 
   // 호가 데이터 로드
   useEffect(() => {
@@ -483,15 +484,14 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
       selectedMarket
     });
     
-    if (isLoggedIn && oddsData[selectedGameIndex] && markets[selectedMarket]) {
+    if (oddsData[selectedGameIndex] && markets[selectedMarket]) {
       const game = oddsData[selectedGameIndex];
       setSelectedGame(game.id);
       
       console.log('호가 데이터 로드 시도:', {
         gameId: game.id,
         market: markets[selectedMarket].name,
-        line: selectedLine,
-        isLoggedIn
+        line: selectedLine
       });
       
       // 실제 호가 데이터를 가져와서 오더북에 반영 (선택된 마켓명 사용)
@@ -504,7 +504,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
     } else {
       console.log('호가 데이터 로드 조건 불만족');
     }
-  }, [isLoggedIn, selectedGameIndex, selectedLine, fetchOrderbook, oddsData, markets, selectedMarket]);
+  }, [selectedGameIndex, selectedLine, fetchOrderbook, oddsData, markets, selectedMarket]);
 
   // 경기 선택 시 마켓 업데이트
   const handleGameSelect = (index: number) => {
@@ -661,8 +661,8 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       .map((order) => (
                         <div key={order.id} className="bg-blue-50 border border-blue-200 rounded p-2 text-sm">
                           <div className="flex justify-between items-center mb-1">
-                            <span className="font-bold text-blue-700">{order.price.toFixed(2)}</span>
-                            <span className="text-right text-blue-600">{order.amount.toLocaleString()}원</span>
+                            <span className="font-bold text-blue-700">{order.price?.toFixed(2) || 'N/A'}</span>
+                            <span className="text-right text-blue-600">{order.amount?.toLocaleString() || 0}원</span>
                           </div>
                           <div className="flex justify-center">
                             <button
@@ -687,8 +687,8 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       .map((order) => (
                         <div key={order.id} className="bg-pink-50 border border-pink-200 rounded p-2 text-sm">
                           <div className="flex justify-between items-center mb-1">
-                            <span className="font-bold text-pink-700">{order.price.toFixed(2)}</span>
-                            <span className="text-right text-pink-600">{order.amount.toLocaleString()}원</span>
+                            <span className="font-bold text-pink-700">{order.price?.toFixed(2) || 'N/A'}</span>
+                            <span className="text-right text-pink-600">{order.amount?.toLocaleString() || 0}원</span>
                           </div>
                           <div className="flex justify-center">
                             <button
@@ -782,7 +782,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                                           : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
                                       }`}
                                     >
-                                      <div className="text-lg font-bold">{sel.back.price.toFixed(2)}</div>
+                                      <div className="text-lg font-bold">{sel.back?.price?.toFixed(2) || 'N/A'}</div>
                                     </button>
                                   </td>
                                   <td>
@@ -798,7 +798,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                                           : 'bg-pink-100 hover:bg-pink-200 text-pink-700'
                                       }`}
                                     >
-                                      <div className="text-lg font-bold">{sel.lay.price.toFixed(2)}</div>
+                                      <div className="text-lg font-bold">{sel.lay?.price?.toFixed(2) || 'N/A'}</div>
                                     </button>
                                   </td>
                                 </tr>

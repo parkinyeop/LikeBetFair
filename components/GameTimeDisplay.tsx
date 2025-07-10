@@ -45,7 +45,7 @@ const GameTimeDisplay = memo(({
     
     switch (gameTimeDisplay.status) {
       case 'live':
-        return 'text-green-600 font-semibold';
+        return 'text-red-600 font-semibold';
       case 'finished':
         return 'text-gray-500';
       case 'soon':

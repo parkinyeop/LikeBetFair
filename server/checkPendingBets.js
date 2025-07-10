@@ -1,10 +1,4 @@
-import { Sequelize } from 'sequelize';
-import dotenv from 'dotenv';
-import User from './models/userModel.js';
-import Bet from './models/betModel.js';
-import sequelize from './models/db.js';
-
-dotenv.config();
+const { User, Bet } = require('./models/db.js');
 
 async function checkPendingBets() {
   try {
@@ -24,7 +18,7 @@ async function checkPendingBets() {
         userId: user.id,
         status: 'pending'
       },
-      include: [User],
+      include: ['selections'],
       order: [['createdAt', 'DESC']]
     });
     
@@ -33,28 +27,22 @@ async function checkPendingBets() {
     
     pendingBets.forEach((bet, index) => {
       console.log(`\n${index + 1}. 베팅 ID: ${bet.id}`);
-      console.log(`   금액: ${bet.stake}원`);
+      console.log(`   금액: ${bet.amount}원`);
       console.log(`   상태: ${bet.status}`);
       console.log(`   생성일: ${bet.createdAt}`);
       console.log(`   선택사항:`);
       
-      if (bet.selections && Array.isArray(bet.selections)) {
-        bet.selections.forEach((selection, selIndex) => {
-          console.log(`     ${selIndex + 1}. ${selection.desc || '설명 없음'}`);
-          console.log(`        팀: ${selection.team || '팀명 없음'}`);
-          console.log(`        마켓: ${selection.market || '마켓 없음'}`);
-          console.log(`        결과: ${selection.result || '결과 없음'}`);
-          console.log(`        경기시간: ${selection.commence_time || '시간 없음'}`);
-        });
-      } else {
-        console.log('     선택사항 데이터 없음');
-      }
+      bet.selections.forEach((selection, selIndex) => {
+        console.log(`     ${selIndex + 1}. ${selection.desc}`);
+        console.log(`        팀: ${selection.team}`);
+        console.log(`        마켓: ${selection.market}`);
+        console.log(`        결과: ${selection.result}`);
+        console.log(`        경기시간: ${selection.commence_time}`);
+      });
     });
     
   } catch (error) {
     console.error('오류:', error);
-  } finally {
-    await sequelize.close();
   }
 }
 

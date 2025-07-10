@@ -4,57 +4,110 @@ import User from '../models/userModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
 import verifyToken from '../middleware/verifyToken.js';
 import exchangeWebSocketService from '../services/exchangeWebSocketService.js';
+import exchangeGameMappingService from '../services/exchangeGameMappingService.js';
+import exchangeSettlementService from '../services/exchangeSettlementService.js';
 import { Op } from 'sequelize';
 
 const router = express.Router();
 
-// 주문 등록
+// 주문 등록 (게임 데이터 연동 포함)
 router.post('/order', verifyToken, async (req, res) => {
-  const { gameId, market, line, side, price, amount, selection } = req.body;
-  const userId = req.user.userId;
-  
-  // 일반 잔고 사용
-  const user = await User.findByPk(userId);
-  const required = side === 'back' ? amount : Math.floor((price - 1) * amount);
-  
-  if (!user || user.balance < required) {
-    return res.status(400).json({ message: '잔고 부족' });
-  }
-  
-  user.balance -= required;
-  await user.save();
-  
-  const opposite = side === 'back' ? 'lay' : 'back';
-  const match = await ExchangeOrder.findOne({
-    where: { gameId, market, line, price, amount, side: opposite, status: 'open' }
-  });
-  
-  // 거래 정보 계산
-  const stakeAmount = side === 'back' ? amount : Math.floor((price - 1) * amount);
-  const potentialProfit = side === 'back' ? Math.floor((price - 1) * amount) : amount;
-  
-  let order;
-  if (match) {
-    match.status = 'matched';
-    await match.save();
-    order = await ExchangeOrder.create({
-      userId, gameId, market, line, side, price, amount, selection,
-      status: 'matched', matchedOrderId: match.id,
-      stakeAmount, potentialProfit
+  try {
+    const { gameId, market, line, side, price, amount, selection, homeTeam, awayTeam, commenceTime } = req.body;
+    const userId = req.user.userId;
+    
+    console.log('🎯 Exchange 주문 생성 요청:', { gameId, market, line, side, price, amount, selection });
+    
+    // 게임 데이터 매핑
+    const orderData = await exchangeGameMappingService.mapGameDataToOrder({
+      gameId, market, line, side, price, amount, selection, homeTeam, awayTeam, commenceTime, userId
     });
-    match.matchedOrderId = order.id;
-    await match.save();
-  } else {
-    order = await ExchangeOrder.create({
-      userId, gameId, market, line, side, price, amount, selection, status: 'open',
-      stakeAmount, potentialProfit
+    
+    console.log('📊 매핑된 게임 데이터:', {
+      gameResultId: orderData.gameResultId,
+      homeTeam: orderData.homeTeam,
+      awayTeam: orderData.awayTeam,
+      sportKey: orderData.sportKey
     });
+    
+    // 일반 잔고 사용
+    const user = await User.findByPk(userId);
+    const required = side === 'back' ? amount : Math.floor((price - 1) * amount);
+    
+    if (!user || user.balance < required) {
+      return res.status(400).json({ message: '잔고 부족' });
+    }
+    
+    user.balance -= required;
+    await user.save();
+    
+    const opposite = side === 'back' ? 'lay' : 'back';
+    const match = await ExchangeOrder.findOne({
+      where: { gameId, market, line, price, amount, side: opposite, status: 'open' }
+    });
+    
+    // 거래 정보 계산
+    const stakeAmount = side === 'back' ? amount : Math.floor((price - 1) * amount);
+    const potentialProfit = side === 'back' ? Math.floor((price - 1) * amount) : amount;
+    
+    let order;
+    const orderCreateData = {
+      userId, 
+      gameId, 
+      market, 
+      line, 
+      side, 
+      price, 
+      amount, 
+      selection,
+      stakeAmount, 
+      potentialProfit,
+      // 매핑된 게임 데이터 추가
+      homeTeam: orderData.homeTeam,
+      awayTeam: orderData.awayTeam,
+      commenceTime: orderData.commenceTime,
+      sportKey: orderData.sportKey,
+      gameResultId: orderData.gameResultId,
+      selectionDetails: orderData.selectionDetails,
+      autoSettlement: true
+    };
+    
+    if (match) {
+      match.status = 'matched';
+      await match.save();
+      order = await ExchangeOrder.create({
+        ...orderCreateData,
+        status: 'matched', 
+        matchedOrderId: match.id
+      });
+      match.matchedOrderId = order.id;
+      await match.save();
+      console.log('✅ 즉시 매칭 완료:', { orderId: order.id, matchedWith: match.id });
+    } else {
+      order = await ExchangeOrder.create({
+        ...orderCreateData,
+        status: 'open'
+      });
+      console.log('📝 새 주문 생성:', { orderId: order.id, status: 'open' });
+    }
+    
+    // WebSocket으로 주문 업데이트 브로드캐스트
+    exchangeWebSocketService.broadcastOrderUpdate(gameId, { order });
+    
+    res.json({ 
+      order: order.toJSON(),
+      gameInfo: {
+        homeTeam: orderData.homeTeam,
+        awayTeam: orderData.awayTeam,
+        sportKey: orderData.sportKey,
+        hasGameMapping: !!orderData.gameResultId
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Exchange 주문 생성 오류:', error);
+    res.status(500).json({ message: '주문 생성 중 오류가 발생했습니다.' });
   }
-  
-  // WebSocket으로 주문 업데이트 브로드캐스트
-  exchangeWebSocketService.broadcastOrderUpdate(gameId, { order });
-  
-  res.json({ order });
 });
 
 // 호가(orderbook) 조회 - 테스트용 (로그인 불필요)
@@ -63,8 +116,14 @@ router.get('/orderbook-test', async (req, res) => {
     const { gameId, market, line } = req.query;
     console.log('테스트 호가 조회 요청:', { gameId, market, line });
     
+    // Where 조건을 동적으로 구성
+    const whereCondition = { gameId, market, status: 'open' };
+    if (line !== undefined && line !== null && line !== '') {
+      whereCondition.line = line;
+    }
+    
     const orders = await ExchangeOrder.findAll({
-      where: { gameId, market, line, status: 'open' }
+      where: whereCondition
     });
     
     console.log('찾은 주문 수:', orders.length);
@@ -87,11 +146,24 @@ router.get('/orderbook-test', async (req, res) => {
 
 // 호가(orderbook) 조회
 router.get('/orderbook', verifyToken, async (req, res) => {
-  const { gameId, market, line } = req.query;
-  const orders = await ExchangeOrder.findAll({
-    where: { gameId, market, line, status: 'open' }
-  });
-  res.json({ orders });
+  try {
+    const { gameId, market, line } = req.query;
+    
+    // Where 조건을 동적으로 구성
+    const whereCondition = { gameId, market, status: 'open' };
+    if (line !== undefined && line !== null && line !== '') {
+      whereCondition.line = line;
+    }
+    
+    const orders = await ExchangeOrder.findAll({
+      where: whereCondition
+    });
+    
+    res.json({ orders });
+  } catch (error) {
+    console.error('호가 조회 오류:', error);
+    res.status(500).json({ message: '호가 조회 중 오류가 발생했습니다.' });
+  }
 });
 
 // 정산(경기 결과 입력) - 관리자만 접근 가능
@@ -185,7 +257,7 @@ router.post('/cancel/:orderId', verifyToken, async (req, res) => {
     res.json({ 
       message: '주문이 취소되었습니다.',
       refundAmount: refundAmount,
-      newBalance: balance.balance
+      newBalance: user.balance
     });
     
   } catch (error) {
@@ -267,43 +339,107 @@ router.get('/stats', verifyToken, async (req, res) => {
   }
 });
 
-// 경기별 Exchange 마켓 정보 조회
+// Exchange에서 사용 가능한 게임 목록 조회
+router.get('/games', async (req, res) => {
+  try {
+    const { category, sport } = req.query;
+    console.log('🎮 Exchange 게임 목록 요청:', { category, sport });
+    
+    // 카테고리를 스포츠키로 변환
+    let targetSportKey = sport;
+    if (category && !sport) {
+      const categoryToSportKey = {
+        'KBO': 'baseball_kbo',
+        'MLB': 'baseball_mlb', 
+        'NBA': 'basketball_nba',
+        'KBL': 'basketball_kbl',
+        'NFL': 'american_football_nfl',
+        'K리그': 'soccer_k_league',
+        'EPL': 'soccer_epl',
+        'LaLiga': 'soccer_laliga',
+        'Bundesliga': 'soccer_bundesliga',
+        'Serie A': 'soccer_serie_a',
+        'J리그': 'soccer_j_league',
+        'MLS': 'soccer_mls',
+        '브라질 세리에 A': 'soccer_brasileirao',
+        '아르헨티나 프리메라': 'soccer_argentina_primera',
+        '중국 슈퍼리그': 'soccer_chinese_super_league'
+      };
+      targetSportKey = categoryToSportKey[category];
+    }
+    
+    console.log('🔍 스포츠키 변환:', { category, sport, targetSportKey });
+    
+    // 사용 가능한 게임들 조회 (앞으로 7일 이내의 예정된 경기)
+    const availableGames = await exchangeGameMappingService.getAvailableGames({
+      sportKey: targetSportKey,
+      limit: 50
+    });
+    
+    // 카테고리별 필터링 (백업 필터)
+    let filteredGames = availableGames;
+    if (category && !targetSportKey) {
+      // 카테고리 매핑이 없는 경우 직접 필터링
+      const categoryFilters = {
+        'KBO': (game) => game.sportKey === 'baseball_kbo' || game.category === 'baseball',
+        'MLB': (game) => game.sportKey === 'baseball_mlb' || game.category === 'baseball',
+        'NBA': (game) => game.sportKey === 'basketball_nba' || game.category === 'basketball',
+        'KBL': (game) => game.sportKey === 'basketball_kbl' || game.category === 'basketball',
+        'NFL': (game) => game.sportKey === 'american_football_nfl' || game.category === 'american_football'
+      };
+      
+      const filter = categoryFilters[category];
+      if (filter) {
+        filteredGames = availableGames.filter(filter);
+      }
+    }
+    
+    console.log(`📊 전체 게임: ${availableGames.length}개, 필터링 후: ${filteredGames.length}개`);
+    
+    res.json({
+      games: filteredGames,
+      total: filteredGames.length
+    });
+    
+  } catch (error) {
+    console.error('❌ Exchange 게임 목록 조회 오류:', error);
+    res.status(500).json({ message: '게임 목록 조회 중 오류가 발생했습니다.' });
+  }
+});
+
+// 경기별 Exchange 마켓 정보 조회 (실제 게임 데이터 연동)
 router.get('/markets/:gameId', verifyToken, async (req, res) => {
   try {
     const { gameId } = req.params;
     
-    // 실제 경기 데이터에서 마켓 정보 가져오기
-    // 여기서는 더미 데이터를 반환하지만, 실제로는 odds_cache 테이블에서 가져와야 함
-    const markets = [
-      {
-        name: 'Moneyline',
-        type: 'h2h',
-        selections: [
-          { name: 'Home Team', price: 2.16 },
-          { name: 'Away Team', price: 1.83 },
-        ]
-      },
-      {
-        name: 'Handicap',
-        type: 'spreads',
-        line: 1.5,
-        selections: [
-          { name: 'Home Team +1.5', price: 1.51 },
-          { name: 'Away Team -1.5', price: 2.52 },
-        ]
-      },
-      {
-        name: 'Total',
-        type: 'totals',
-        line: 9.5,
-        selections: [
-          { name: 'Over 9.5', price: 1.93 },
-          { name: 'Under 9.5', price: 1.98 },
-        ]
-      }
-    ];
+    console.log('🏟️ 게임 마켓 정보 조회:', gameId);
     
-    res.json({ markets });
+    // GameResults에서 게임 정보 조회
+    const games = await exchangeGameMappingService.getAvailableGames({ limit: 100 });
+    const game = games.find(g => g.id === gameId || g.eventId === gameId);
+    
+    if (!game) {
+      return res.status(404).json({ message: '게임을 찾을 수 없습니다.' });
+    }
+    
+    console.log('🎯 게임 정보:', {
+      homeTeam: game.homeTeam,
+      awayTeam: game.awayTeam,
+      sportKey: game.sportKey
+    });
+    
+    res.json({ 
+      game: {
+        id: game.id,
+        homeTeam: game.homeTeam,
+        awayTeam: game.awayTeam,
+        commenceTime: game.commenceTime,
+        sportKey: game.sportKey,
+        league: game.league
+      },
+      markets: game.availableMarkets
+    });
+    
   } catch (error) {
     console.error('Exchange markets error:', error);
     res.status(500).json({ message: '마켓 정보 조회 중 오류가 발생했습니다.' });
@@ -312,11 +448,12 @@ router.get('/markets/:gameId', verifyToken, async (req, res) => {
 
 // 새로운 주문 생성 (기존 주문과 즉시 매칭 시도)
 router.post('/match-order', verifyToken, async (req, res) => {
-  const { gameId, market, line, side, price, amount, selection } = req.body;
-  const userId = req.user.id;
+  const { gameId, market, line, side, price, amount, selection, homeTeam, awayTeam, commenceTime } = req.body;
+  const userId = req.user.userId; // 수정: userId 사용
 
   try {
     console.log(`🎯 매치 주문 요청: ${side} ${price} (${amount}원) - User: ${userId}`);
+    console.log(`📊 요청 데이터:`, { gameId, market, line, side, price, amount, selection });
 
     // 1. 매칭 가능한 반대편 주문 찾기
     const oppositeSide = side === 'back' ? 'lay' : 'back';
@@ -368,14 +505,15 @@ router.post('/match-order', verifyToken, async (req, res) => {
       if (existingOrder.amount === matchAmount) {
         // 완전 매칭 - 주문 완료 처리
         await existingOrder.update({
-          status: 'filled',
-          filledAmount: existingOrder.amount
+          status: 'matched',
+          matchedOrderId: null // 매치된 주문 ID는 별도 처리 필요
         });
       } else {
-        // 부분 매칭 - 남은 금액으로 업데이트
+        // 부분 매칭 - 남은 금액으로 업데이트 (부분 매칭은 복잡하므로 현재는 지원하지 않음)
+        // 전체 매칭만 지원
         await existingOrder.update({
-          amount: existingOrder.amount - matchAmount,
-          filledAmount: (existingOrder.filledAmount || 0) + matchAmount
+          status: 'matched',
+          matchedOrderId: null
         });
       }
 
@@ -392,6 +530,19 @@ router.post('/match-order', verifyToken, async (req, res) => {
     // 3. 새 주문 생성 (남은 금액이 있으면)
     let newOrder = null;
     if (remainingAmount > 0) {
+      console.log(`🔧 게임 매핑 시작...`);
+      // 게임 데이터 매핑
+      const orderData = await exchangeGameMappingService.mapGameDataToOrder({
+        gameId, market, line, side, price, amount: remainingAmount, selection, 
+        homeTeam, awayTeam, commenceTime, userId
+      });
+      console.log(`✅ 게임 매핑 완료:`, { 
+        gameResultId: orderData.gameResultId, 
+        sportKey: orderData.sportKey,
+        homeTeam: orderData.homeTeam,
+        awayTeam: orderData.awayTeam
+      });
+      
       newOrder = await ExchangeOrder.create({
         userId,
         gameId,
@@ -402,7 +553,17 @@ router.post('/match-order', verifyToken, async (req, res) => {
         amount: remainingAmount,
         selection,
         status: 'open',
-        filledAmount: amount - remainingAmount
+        // filledAmount: amount - remainingAmount, // 이 필드는 테이블에 없음
+        // 게임 매핑 데이터 추가
+        homeTeam: orderData.homeTeam,
+        awayTeam: orderData.awayTeam,
+        commenceTime: orderData.commenceTime,
+        sportKey: orderData.sportKey,
+        gameResultId: orderData.gameResultId,
+        selectionDetails: orderData.selectionDetails,
+        stakeAmount: side === 'back' ? remainingAmount : Math.floor((price - 1) * remainingAmount),
+        potentialProfit: side === 'back' ? Math.floor((price - 1) * remainingAmount) : remainingAmount,
+        autoSettlement: true
       });
       console.log(`📝 새 주문 생성: ${remainingAmount}원 (부분 매칭)`);
     } else {
@@ -426,6 +587,88 @@ router.post('/match-order', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('❌ 매치 주문 오류:', error);
     res.status(500).json({ error: '매치 주문 처리 중 오류가 발생했습니다.' });
+  }
+});
+
+// 특정 경기 자동 정산 (관리자 전용)
+router.post('/settle/:gameResultId', verifyToken, async (req, res) => {
+  try {
+    const { gameResultId } = req.params;
+    
+    // 관리자 권한 확인
+    const user = await User.findByPk(req.user.userId);
+    if (!user.isAdmin) {
+      return res.status(403).json({ message: '관리자 권한이 필요합니다.' });
+    }
+    
+    console.log(`🎯 관리자 ${user.username}이 경기 ${gameResultId} 정산 요청`);
+    
+    const result = await exchangeSettlementService.settleGameOrders(gameResultId);
+    
+    res.json({
+      message: '정산이 완료되었습니다.',
+      result
+    });
+    
+  } catch (error) {
+    console.error('정산 오류:', error);
+    res.status(500).json({ 
+      message: '정산 중 오류가 발생했습니다.',
+      error: error.message 
+    });
+  }
+});
+
+// 모든 완료된 경기 자동 정산 (관리자 전용)
+router.post('/settle-all', verifyToken, async (req, res) => {
+  try {
+    // 관리자 권한 확인
+    const user = await User.findByPk(req.user.userId);
+    if (!user.isAdmin) {
+      return res.status(403).json({ message: '관리자 권한이 필요합니다.' });
+    }
+    
+    console.log(`🎯 관리자 ${user.username}이 전체 자동 정산 요청`);
+    
+    const result = await exchangeSettlementService.settleAllFinishedGames();
+    
+    res.json({
+      message: `${result.settledGames}개 경기 정산이 완료되었습니다.`,
+      result
+    });
+    
+  } catch (error) {
+    console.error('전체 정산 오류:', error);
+    res.status(500).json({ 
+      message: '전체 정산 중 오류가 발생했습니다.',
+      error: error.message 
+    });
+  }
+});
+
+// 정산 가능한 주문 조회
+router.get('/settleable/:gameResultId', verifyToken, async (req, res) => {
+  try {
+    const { gameResultId } = req.params;
+    
+    const orders = await exchangeSettlementService.getSettlableOrders(gameResultId);
+    
+    res.json({
+      gameResultId,
+      settlableOrders: orders.length,
+      orders: orders.map(order => ({
+        id: order.id,
+        market: order.market,
+        side: order.side,
+        selection: order.selection,
+        amount: order.amount,
+        price: order.price
+      }))
+    });
+    
+  } catch (error) {
+    console.error('정산 가능 주문 조회 오류:', error);
+    res.status(500).json({ message: '조회 중 오류가 발생했습니다.' });
   }
 });
 

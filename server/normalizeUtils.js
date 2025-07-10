@@ -13,22 +13,167 @@ function normalizeTeamName(team) {
 }
 
 /**
- * 중국 슈퍼리그 팀명 매핑 (베팅 사이트명 -> DB 저장명)
+ * 글로벌 팀명 매핑 (베팅 사이트명 -> DB 저장명)
+ * 모든 리그의 팀명을 통합하여 관리
  */
-const cslTeamMapping = {
+const globalTeamMapping = {
+  // === MLS (미국 프로축구) ===
+  'intermiamicf': 'intermiami',
+  'intermiami': 'intermiami',
+  'newenglandrevolution': 'newenglandrevolution',
+  'newyorkcityfc': 'newyorkcityfc',
+  'torontofc': 'torontofc',
+  'atlantaunitedfc': 'atlantaunited',
+  'atlantaunited': 'atlantaunited',
+  'chicagofirefc': 'chicagofire',
+  'chicagofire': 'chicagofire',
+  'coloradorapids': 'coloradorapids',
+  'columbuscrewsc': 'columbuscrew',
+  'columbuscrew': 'columbuscrew',
+  'dccunited': 'dccunited',
+  'fcincinnati': 'fcincinnati',
+  'fcdallas': 'fcdallas',
+  'houstondynamofc': 'houstondynamo',
+  'houstondynamo': 'houstondynamo',
+  'lafc': 'lafc',
+  'lagalaxy': 'lagalaxy',
+  'minnesotaunitedfc': 'minnesotaunited',
+  'minnesotaunited': 'minnesotaunited',
+  'montrealimpact': 'montrealimpact',
+  'nashvillesc': 'nashvillesc',
+  'newyorkredbulls': 'newyorkredbulls',
+  'orlandocitysc': 'orlandocity',
+  'orlandocity': 'orlandocity',
+  'philadelphiaunion': 'philadelphiaunion',
+  'portlandtimbers': 'portlandtimbers',
+  'realsaltlake': 'realsaltlake',
+  'sanantoniobsc': 'sanantoniobsc',
+  'seattlesoundersfc': 'seattlesounders',
+  'seattlesounders': 'seattlesounders',
+  'sportingkansascity': 'sportingkansascity',
+  'vancouverwhitecapsfc': 'vancouverwhitecaps',
+  'vancouverwhitecaps': 'vancouverwhitecaps',
+
+  // === KBO (한국 프로야구) ===
+  'kiwoomhe': 'kiwoomheroes',
+  'kiwoomheroes': 'kiwoomheroes',
+  'hanwhaea': 'hanwhaeagles', // 수정: hanwhaegles → hanwhaeagles
+  'hanwhaegles': 'hanwhaeagles', // 수정: hanwhaegles → hanwhaeagles
+  'hanwhaeagles': 'hanwhaeagles',
+  'ktwiz': 'ktwiz',
+  'ncdinos': 'ncdinos',
+  'kiatigers': 'kiatigers',
+  'ssglanders': 'ssglanders',
+  'lottegiants': 'lottegiants',
+  'doosanbears': 'doosanbears',
+  'lgtwins': 'lgtwins',
+  'samsunglions': 'samsunglions',
+
+  // === MLB (미국 프로야구) ===
+  'arizonadiamondbacks': 'arizonadiamondbacks',
+  'atlantabraves': 'atlantabraves',
+  'baltimoreorioles': 'baltimoreorioles',
+  'bostonredsox': 'bostonredsox',
+  'chicagocubs': 'chicagocubs',
+  'chicagowhitesox': 'chicagowhitesox',
+  'cincinnatireds': 'cincinnatireds',
+  'clevelandguardians': 'clevelandguardians',
+  'coloradorockies': 'coloradorockies',
+  'detroittigers': 'detroittigers',
+  'houstonastros': 'houstonastros',
+  'kansascityroyals': 'kansascityroyals',
+  'losangelesangels': 'losangelesangels',
+  'losangelesdodgers': 'losangelesdodgers',
+  'miamimarlins': 'miamimarlins',
+  'milwaukeebrewers': 'milwaukeebrewers',
+  'minnesotatwins': 'minnesotatwins',
+  'newyorkmets': 'newyorkmets',
+  'newyorkyankees': 'newyorkyankees',
+  'oaklandathletics': 'oaklandathletics',
+  'philadelphiaphillies': 'philadelphiaphillies',
+  'pittsburghpirates': 'pittsburghpirates',
+  'sandiegopadres': 'sandiegopadres',
+  'sanfranciscogiants': 'sanfranciscogiants',
+  'seattlemariners': 'seattlemariners',
+  'stlouiscardinals': 'stlouiscardinals',
+  'tampabayrays': 'tampabayrays',
+  'texasrangers': 'texasrangers',
+  'torontobluejays': 'torontobluejays',
+  'washingtonnationals': 'washingtonnationals',
+
+  // === NBA (미국 프로농구) ===
+  'atlantahawks': 'atlantahawks',
+  'bostonceltics': 'bostonceltics',
+  'brooklynnets': 'brooklynnets',
+  'charlottehornets': 'charlottehornets',
+  'chicagobulls': 'chicagobulls',
+  'clevelandcavaliers': 'clevelandcavaliers',
+  'dallasmavericks': 'dallasmavericks',
+  'denvernuggets': 'denvernuggets',
+  'detroitpistons': 'detroitpistons',
+  'goldenstatewarriors': 'goldenstatewarriors',
+  'houstonrockets': 'houstonrockets',
+  'indianapacers': 'indianapacers',
+  'laclippers': 'laclippers',
+  'lalakers': 'lalakers',
+  'memphisgrizzlies': 'memphisgrizzlies',
+  'miamiheat': 'miamiheat',
+  'milwaukeebucks': 'milwaukeebucks',
+  'minnesotatimberwolves': 'minnesotatimberwolves',
+  'neworleanspelicans': 'neworleanspelicans',
+  'newyorkknicks': 'newyorkknicks',
+  'oklahomacitythunder': 'oklahomacitythunder',
+  'orlandomagic': 'orlandomagic',
+  'philadelphia76ers': 'philadelphia76ers',
+  'phoenixsuns': 'phoenixsuns',
+  'portlandtrailblazers': 'portlandtrailblazers',
+  'sacramentokings': 'sacramentokings',
+  'sanantoniospurs': 'sanantoniospurs',
+  'torontoraptors': 'torontoraptors',
+  'utahjazz': 'utahjazz',
+  'washingtonwizards': 'washingtonwizards',
+
+  // === KBL (한국 프로농구) ===
+  'seoulskknights': 'seoulskknights',
+  'changwonlgsakers': 'changwonlgsakers',
+  'ulsanhyundaimobisphoebus': 'ulsanhyundaimobisphoebus',
+  'busanktsonicboom': 'busanktsonicboom',
+  'wonjudoosanpromy': 'wonjudoosanpromy',
+  'goyangorion': 'goyangorion',
+  'suwonsamsungthunders': 'suwonsamsungthunders',
+  'jeonjukcc': 'jeonjukcc',
+  'daegukogas': 'daegukogas',
+  'anyangkgc': 'anyangkgc',
+
+  // === 중국 슈퍼리그 (CSL) ===
   'qingdaohainiufc': 'qingdaohainiu',
+  'qingdaohainiu': 'qingdaohainiu',
   'shanghaishenhuafc': 'shanghaishenhua',
+  'shanghaishenhua': 'shanghaishenhua',
   'tianjinjinmentigerfc': 'tianjinjinmentiger',
+  'tianjinjinmentiger': 'tianjinjinmentiger',
   'zhejiang': 'zhejiangprofessional',
   'zhejiangfc': 'zhejiangprofessional',
+  'zhejiangprofessional': 'zhejiangprofessional',
   'beijingguoanfc': 'beijingguoan',
+  'beijingguoan': 'beijingguoan',
   'shandongtaishanfc': 'shandongtaishan',
+  'shandongtaishan': 'shandongtaishan',
   'wuhanthreetownsfc': 'wuhanthreetowns',
+  'wuhanthreetowns': 'wuhanthreetowns',
   'changchunyataifc': 'changchunyatai',
+  'changchunyatai': 'changchunyatai',
   'qingdaowestcoastfc': 'qingdaowestcoast',
+  'qingdaowestcoast': 'qingdaowestcoast',
   'meizhouhakkafc': 'meizhouhakka',
+  'meizhouhakka': 'meizhouhakka',
   'chengdurongchengfc': 'chengdurongcheng',
-  'shenzhenpengcityfc': 'shenzhenpengcity'
+  'chengdurongcheng': 'chengdurongcheng',
+  'shenzhenpengcityfc': 'shenzhenpengcity',
+  'shenzhenpengcity': 'shenzhenpengcity',
+
+  // === 기타 리그들 ===
+  // EPL, 라리가, 분데스리가, 세리에A, J리그 등은 필요시 추가
 };
 
 /**
@@ -43,9 +188,12 @@ function normalizeTeamNameForComparison(team) {
     .replace(/[^a-z0-9가-힣]/g, '')
     .replace(/\s+/g, '');
   
-  // 중국 슈퍼리그 팀명 매핑 적용
-  if (cslTeamMapping[normalized]) {
-    normalized = cslTeamMapping[normalized];
+  // 북메이커 접미사 제거 (FanDuel, DraftKings, BetRivers 등)
+  normalized = normalized.replace(/(fanduel|draftkings|betrivers)$/i, '');
+  
+  // 글로벌 팀명 매핑 적용
+  if (globalTeamMapping[normalized]) {
+    normalized = globalTeamMapping[normalized];
   }
   
   return normalized;
@@ -181,6 +329,122 @@ function parseMainAndSubFromSportKey(sportKey) {
   return normalizeCategoryPair(main, sub);
 }
 
+/**
+ * 레벤슈타인 거리 계산 (편집 거리)
+ * @param {string} str1 
+ * @param {string} str2 
+ * @returns {number} 편집 거리
+ */
+function levenshteinDistance(str1, str2) {
+  const matrix = [];
+  const n = str1.length;
+  const m = str2.length;
+
+  // 초기화
+  for (let i = 0; i <= n; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= m; j++) {
+    matrix[0][j] = j;
+  }
+
+  // 동적 프로그래밍
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,     // 삭제
+        matrix[i][j - 1] + 1,     // 삽입
+        matrix[i - 1][j - 1] + cost // 교체
+      );
+    }
+  }
+
+  return matrix[n][m];
+}
+
+/**
+ * 문자열 유사도 계산 (0-1 사이, 1이 완전 일치)
+ * @param {string} str1 
+ * @param {string} str2 
+ * @returns {number} 유사도 (0-1)
+ */
+function calculateStringSimilarity(str1, str2) {
+  if (!str1 || !str2) return 0;
+  
+  const maxLength = Math.max(str1.length, str2.length);
+  if (maxLength === 0) return 1;
+  
+  const distance = levenshteinDistance(str1.toLowerCase(), str2.toLowerCase());
+  return (maxLength - distance) / maxLength;
+}
+
+/**
+ * 팀명 유사도 매칭 (여러 방식 조합)
+ * @param {string} team1 
+ * @param {string} team2 
+ * @returns {number} 유사도 점수 (0-1)
+ */
+function calculateTeamNameSimilarity(team1, team2) {
+  if (!team1 || !team2) return 0;
+  
+  // 정규화된 팀명으로 비교
+  const norm1 = normalizeTeamNameForComparison(team1);
+  const norm2 = normalizeTeamNameForComparison(team2);
+  
+  // 완전 일치
+  if (norm1 === norm2) return 1.0;
+  
+  // 1. 기본 문자열 유사도
+  const basicSimilarity = calculateStringSimilarity(norm1, norm2);
+  
+  // 2. 단어 기반 유사도 (공백으로 분리)
+  const words1 = norm1.split(/\s+/).filter(w => w.length > 0);
+  const words2 = norm2.split(/\s+/).filter(w => w.length > 0);
+  
+  let wordMatches = 0;
+  const maxWords = Math.max(words1.length, words2.length);
+  
+  if (maxWords > 0) {
+    for (const word1 of words1) {
+      for (const word2 of words2) {
+        if (calculateStringSimilarity(word1, word2) > 0.8) {
+          wordMatches++;
+          break;
+        }
+      }
+    }
+    const wordSimilarity = wordMatches / maxWords;
+    
+    // 3. 조합 점수 (기본 유사도 70% + 단어 유사도 30%)
+    return basicSimilarity * 0.7 + wordSimilarity * 0.3;
+  }
+  
+  return basicSimilarity;
+}
+
+/**
+ * 최적 팀명 매칭 찾기
+ * @param {string} targetTeam 찾고자 하는 팀명
+ * @param {Array} candidateTeams 후보 팀명들
+ * @param {number} threshold 최소 유사도 임계값 (기본 0.8)
+ * @returns {Object|null} {team, similarity} 또는 null
+ */
+function findBestTeamMatch(targetTeam, candidateTeams, threshold = 0.8) {
+  let bestMatch = null;
+  let bestSimilarity = 0;
+  
+  for (const candidate of candidateTeams) {
+    const similarity = calculateTeamNameSimilarity(targetTeam, candidate);
+    if (similarity >= threshold && similarity > bestSimilarity) {
+      bestMatch = candidate;
+      bestSimilarity = similarity;
+    }
+  }
+  
+  return bestMatch ? { team: bestMatch, similarity: bestSimilarity } : null;
+}
+
 export {
   normalizeTeamName,
   normalizeTeamNameForComparison,
@@ -195,4 +459,8 @@ export {
   normalizeSubCategory,
   normalizeCategoryPair,
   parseMainAndSubFromSportKey,
+  levenshteinDistance,
+  calculateStringSimilarity,
+  calculateTeamNameSimilarity,
+  findBestTeamMatch
 }; 

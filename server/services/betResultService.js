@@ -4,7 +4,7 @@ import User from '../models/userModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
 import simplifiedOddsValidation from './simplifiedOddsValidation.js';
 import { Op, fn, col } from 'sequelize';
-import { normalizeTeamName, normalizeTeamNameForComparison, normalizeCategory, normalizeCategoryPair, normalizeOption } from '../normalizeUtils.js';
+import { normalizeTeamName, normalizeTeamNameForComparison, normalizeCategory, normalizeCategoryPair, normalizeOption, calculateTeamNameSimilarity, findBestTeamMatch } from '../normalizeUtils.js';
 
 // 배당률 제공 카테고리만 허용 (gameResultService와 동일하게 유지)
 const allowedCategories = ['baseball', 'soccer', 'basketball'];
@@ -459,27 +459,63 @@ class BetResultService {
           return candidate;
         }
       }
-      // 4차: 팀명만 일치하되 ±24시간 범위 내로 제한 (완전한 시간 무시 방지)
-      const startTime24 = new Date(commenceTime.getTime() - 24 * 60 * 60 * 1000);
-      const endTime24 = new Date(commenceTime.getTime() + 24 * 60 * 60 * 1000);
-      const candidates24 = await GameResult.findAll({
+      // 4차: 팀명만 일치하되 ±48시간 범위 내로 확대 (시간대 오류 대응)
+      const startTime48 = new Date(commenceTime.getTime() - 48 * 60 * 60 * 1000);
+      const endTime48 = new Date(commenceTime.getTime() + 48 * 60 * 60 * 1000);
+      const candidates48 = await GameResult.findAll({
         where: {
-          commenceTime: { [Op.between]: [startTime24, endTime24] }
+          commenceTime: { [Op.between]: [startTime48, endTime48] }
         },
         order: [['commenceTime', 'DESC']]
       });
-      console.log(`[getGameResultByTeams] 후보군(±24시간): ${candidates24.length}개`);
-      for (const candidate of candidates24) {
+      console.log(`[getGameResultByTeams] 후보군(±48시간): ${candidates48.length}개`);
+      for (const candidate of candidates48) {
         const dbHomeNorm = normalizeTeamNameForComparison(candidate.homeTeam);
         const dbAwayNorm = normalizeTeamNameForComparison(candidate.awayTeam);
         if (
           (dbHomeNorm === homeTeamNorm && dbAwayNorm === awayTeamNorm) ||
           (dbHomeNorm === awayTeamNorm && dbAwayNorm === homeTeamNorm)
         ) {
-          console.log(`[getGameResultByTeams] ±24시간 제한 매칭 성공: candidate.id=${candidate.id}, commenceTime=${candidate.commenceTime}`);
+          console.log(`[getGameResultByTeams] ±48시간 제한 매칭 성공: candidate.id=${candidate.id}, commenceTime=${candidate.commenceTime}`);
           return candidate;
         }
       }
+
+      // 5차: 유사도 기반 팀명 매칭 (±48시간 범위)
+      console.log(`[getGameResultByTeams] 유사도 기반 매칭 시도...`);
+      let bestMatch = null;
+      let bestSimilarity = 0;
+      const SIMILARITY_THRESHOLD = 0.8;
+
+      for (const candidate of candidates48) {
+        const dbHomeNorm = normalizeTeamNameForComparison(candidate.homeTeam);
+        const dbAwayNorm = normalizeTeamNameForComparison(candidate.awayTeam);
+        
+        // 정방향 매칭 (home-home, away-away)
+        const homeSimilarity = calculateTeamNameSimilarity(homeTeamNorm, dbHomeNorm);
+        const awaySimilarity = calculateTeamNameSimilarity(awayTeamNorm, dbAwayNorm);
+        const forwardScore = (homeSimilarity + awaySimilarity) / 2;
+        
+        // 역방향 매칭 (home-away, away-home)
+        const homeAwaySimiliarity = calculateTeamNameSimilarity(homeTeamNorm, dbAwayNorm);
+        const awayHomeSimiliarity = calculateTeamNameSimilarity(awayTeamNorm, dbHomeNorm);
+        const reverseScore = (homeAwaySimiliarity + awayHomeSimiliarity) / 2;
+        
+        const similarity = Math.max(forwardScore, reverseScore);
+        
+        console.log(`[getGameResultByTeams] 유사도 검사: ${candidate.homeTeam} vs ${candidate.awayTeam}, 점수: ${similarity.toFixed(3)}`);
+        
+        if (similarity >= SIMILARITY_THRESHOLD && similarity > bestSimilarity) {
+          bestMatch = candidate;
+          bestSimilarity = similarity;
+        }
+      }
+
+      if (bestMatch) {
+        console.log(`[getGameResultByTeams] 유사도 매칭 성공: candidate.id=${bestMatch.id}, 유사도=${bestSimilarity.toFixed(3)}, commenceTime=${bestMatch.commenceTime}`);
+        return bestMatch;
+      }
+
       // 매칭 실패
       console.log(`[getGameResultByTeams] 매칭 실패: desc=${desc}, homeTeamNorm=${homeTeamNorm}, awayTeamNorm=${awayTeamNorm}, selCatNorm=${selCatNorm}, commence_time=${selection.commence_time}`);
       return null;

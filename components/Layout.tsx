@@ -39,8 +39,8 @@ const Layout = memo(({ children }: LayoutProps) => {
         }
         setResetToHome(false); // 특정 스포츠 페이지로 이동 시 리셋 해제
       }
-    } else if (router.pathname === "/") {
-      // 홈페이지일 때는 사이드바 모든 카테고리 닫기
+    } else if (router.pathname === "/" || router.pathname === "/exchange") {
+      // 홈페이지 또는 Exchange 홈페이지일 때는 사이드바 모든 카테고리 닫기
       setResetToHome(true);
       setSelected(""); // 선택 해제
     }
@@ -96,14 +96,22 @@ const Layout = memo(({ children }: LayoutProps) => {
       setSelected("");
     };
 
+    const handleExchangeHomeSelected = () => {
+      // 헤더에서 Exchange 홈 선택 시 사이드바 리셋
+      setResetToHome(true);
+      setSelected("");
+    };
+
     window.addEventListener('bettingAreaSelected', handleBettingAreaSelected);
     window.addEventListener('categorySelected', handleCategorySelected as EventListener);
     window.addEventListener('sportsbookSelected', handleSportsbookSelected);
+    window.addEventListener('exchangeHomeSelected', handleExchangeHomeSelected);
     
     return () => {
       window.removeEventListener('bettingAreaSelected', handleBettingAreaSelected);
       window.removeEventListener('categorySelected', handleCategorySelected as EventListener);
       window.removeEventListener('sportsbookSelected', handleSportsbookSelected);
+      window.removeEventListener('exchangeHomeSelected', handleExchangeHomeSelected);
     };
   }, []);
 

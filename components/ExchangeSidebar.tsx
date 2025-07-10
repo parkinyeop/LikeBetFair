@@ -35,6 +35,15 @@ function OrderPanel() {
       return;
     }
     
+    if (form.amount <= 0) {
+      alert('배팅 금액을 입력해주세요.');
+      return;
+    }
+    
+    if (loading) {
+      return; // 이미 처리 중이면 중복 실행 방지
+    }
+    
     try {
       const orderData = {
         gameId: selectedBet.gameId || selectedGame,
@@ -46,9 +55,25 @@ function OrderPanel() {
         selection: selectedBet.team // 팀명을 selection으로 전달
       };
       
-      await placeOrder(orderData);
+      console.log('주문 요청:', orderData);
+      const result = await placeOrder(orderData);
+      console.log('주문 결과:', result);
+      
+      // 주문 성공 시 처리
+      alert('주문이 성공적으로 등록되었습니다!');
+      
+      // 폼 초기화
+      setForm({ side: 'back', price: 1.91, amount: 10000 });
+      setSelectedBet(null);
+      
+      // 주문 내역 새로고침 (useEffect에서 자동으로 처리되지만 즉시 반영을 위해)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('exchangeOrderPlaced'));
+      }
+      
     } catch (err) {
       console.error('주문 실패:', err);
+      alert('주문 실패: ' + (err instanceof Error ? err.message : '알 수 없는 오류'));
     }
   };
 
@@ -216,7 +241,7 @@ export default function ExchangeSidebar() {
     <aside className="w-80 bg-white text-black p-4 space-y-4 border-l border-gray-200 h-full flex flex-col min-h-0 overflow-y-auto">
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-lg font-bold">EXCHANGE</h2>
-        <span className="text-sm font-semibold text-blue-600">잔액: {balance !== null ? Number(balance).toLocaleString() : '-'}원</span>
+        <span className="text-sm font-semibold text-blue-600">잔액: {balance !== null ? Math.round(Number(balance)).toLocaleString() : '-'}원</span>
       </div>
       <div className="flex space-x-2 mb-2">
         <button

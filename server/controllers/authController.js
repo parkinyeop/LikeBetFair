@@ -5,23 +5,39 @@ import axios from 'axios';
 import Bet from '../models/betModel.js';
 import { Op } from 'sequelize';
 
-// The Odds API를 활용한 경기 결과 판정 함수
+// TheSportsDB API를 활용한 경기 결과 판정 함수 (The Odds API 사용 금지)
 async function getGameResult(sel) {
-  // TODO: 스포츠 종류(sportKey)는 sel.desc 등에서 추출하거나 별도 저장 필요
-  // 여기서는 예시로 baseball_mlb만 사용
-  const apiKey = process.env.ODDS_API_KEY;
-  const url = `https://api.the-odds-api.com/v4/sports/baseball_mlb/scores/?apiKey=${apiKey}&daysFrom=3`;
   try {
+    // TheSportsDB API 사용
+    const sportsDbApiKey = process.env.THESPORTSDB_API_KEY || '3';
+    let cleanApiKey = sportsDbApiKey.replace(/THESPORTSDB_API_KEY=/g, '');
+    if (cleanApiKey.length > 6) {
+      cleanApiKey = cleanApiKey.substring(0, 6);
+    }
+    
+    // MLB 리그 ID 사용 (TheSportsDB)
+    const leagueId = '4424'; // MLB 리그 ID
+    const url = `https://www.thesportsdb.com/api/v1/json/${cleanApiKey}/eventsround.php?id=${leagueId}&r=current`;
+    
     const res = await axios.get(url);
-    const games = res.data;
-    const game = games.find(g =>
-      g.commence_time === sel.commence_time &&
-      (g.home_team === sel.team || g.away_team === sel.team)
-    );
-    if (!game || !game.completed) return 'pending';
-    const isHome = game.home_team === sel.team;
-    const userScore = isHome ? game.scores.home : game.scores.away;
-    const oppScore = isHome ? game.scores.away : game.scores.home;
+    const events = res.data?.events || [];
+    
+    // 경기 매칭
+    const game = events.find(g => {
+      const gameDate = g.dateEvent;
+      const gameTime = g.strTime || '00:00:00';
+      const gameDateTime = `${gameDate}T${gameTime}`;
+      
+      return gameDateTime === sel.commence_time &&
+             (g.strHomeTeam === sel.team || g.strAwayTeam === sel.team);
+    });
+    
+    if (!game || g.strStatus !== 'Match Finished') return 'pending';
+    
+    const isHome = game.strHomeTeam === sel.team;
+    const userScore = isHome ? parseInt(game.intHomeScore) : parseInt(game.intAwayScore);
+    const oppScore = isHome ? parseInt(game.intAwayScore) : parseInt(game.intHomeScore);
+    
     if (userScore > oppScore) return 'won';
     else return 'lost';
   } catch (err) {

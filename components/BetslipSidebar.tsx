@@ -387,7 +387,7 @@ export default function BetslipSidebar({
     <aside className="w-80 bg-white text-black p-4 space-y-4 border-l border-gray-200 h-full flex flex-col min-h-0 overflow-y-auto">
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-lg font-bold">BET</h2>
-        <span className="text-sm font-semibold text-blue-600">잔액: {balance !== null ? Number(balance).toLocaleString() : '-'}원</span>
+        <span className="text-sm font-semibold text-blue-600">잔액: {balance !== null ? Math.round(Number(balance)).toLocaleString() : '-'}원</span>
       </div>
       <div className="flex space-x-2 mb-2">
         <button

@@ -100,6 +100,13 @@ export const useExchange = () => {
     amount: number;
     selection?: string; // 선택한 팀/선수명
   }) => {
+    if (!token) {
+      throw new Error('로그인이 필요합니다.');
+    }
+
+    setLoading(true);
+    setError(null);
+
     try {
       console.log('📝 주문 생성:', orderData);
       const response = await fetch('/api/exchange/orders', {
@@ -112,17 +119,27 @@ export const useExchange = () => {
       });
 
       if (!response.ok) {
-        throw new Error('주문 생성 실패');
+        const errorData = await response.json();
+        throw new Error(errorData.message || `주문 생성 실패 (${response.status})`);
       }
 
       const result = await response.json();
       console.log('✅ 주문 생성 완료:', result);
+      
+      // 주문 성공 후 주문 내역과 잔고 새로고침
+      await fetchOrders();
+      await fetchBalance();
+      
       return result;
     } catch (error) {
       console.error('❌ 주문 생성 오류:', error);
+      const errorMessage = error instanceof Error ? error.message : '주문 생성 중 오류가 발생했습니다.';
+      setError(errorMessage);
       throw error;
+    } finally {
+      setLoading(false);
     }
-  }, [token]);
+  }, [token, fetchOrders, fetchBalance]);
 
   // 매치 주문 (기존 주문과 즉시 매칭 시도)
   const placeMatchOrder = useCallback(async (orderData: {
@@ -193,31 +210,29 @@ export const useExchange = () => {
     }
   }, [token, fetchBalance, fetchOrders]);
 
-  // 호가 조회
+  // 호가 조회 (로그인 없이도 가능)
   const fetchOrderbook = useCallback(async (
     gameId: string,
     market: string,
-    line: number
+    line?: number
   ) => {
-    if (!token) {
-      console.log('fetchOrderbook: 토큰이 없습니다.');
-      return [];
-    }
     
     try {
       const encodedGameId = encodeURIComponent(gameId);
       const encodedMarket = encodeURIComponent(market);
-      const encodedLine = encodeURIComponent(line.toString());
+      const encodedLine = line !== undefined ? encodeURIComponent(line.toString()) : '';
       
       console.log('fetchOrderbook 호출:', {
         original: { gameId, market, line },
         encoded: { encodedGameId, encodedMarket, encodedLine }
       });
       
-      const url = `http://localhost:5050/api/exchange/orderbook?gameId=${encodedGameId}&market=${encodedMarket}&line=${encodedLine}`;
+      const url = line !== undefined 
+        ? `http://localhost:5050/api/exchange/orderbook-test?gameId=${encodedGameId}&market=${encodedMarket}&line=${encodedLine}`
+        : `http://localhost:5050/api/exchange/orderbook-test?gameId=${encodedGameId}&market=${encodedMarket}`;
       console.log('fetchOrderbook URL:', url);
       
-      const response = await fetch(url, { headers });
+      const response = await fetch(url);
       
       console.log('fetchOrderbook 응답 상태:', response.status);
       
@@ -244,6 +259,22 @@ export const useExchange = () => {
       fetchOrders();
     }
   }, [token, fetchBalance, fetchOrders]);
+
+  // Exchange 주문 완료 이벤트 리스너
+  useEffect(() => {
+    const handleExchangeOrderPlaced = () => {
+      if (token) {
+        fetchOrders();
+        fetchBalance();
+      }
+    };
+
+    window.addEventListener('exchangeOrderPlaced', handleExchangeOrderPlaced);
+    
+    return () => {
+      window.removeEventListener('exchangeOrderPlaced', handleExchangeOrderPlaced);
+    };
+  }, [token, fetchOrders, fetchBalance]);
 
   return {
     balance,

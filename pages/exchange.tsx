@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useExchange, ExchangeOrder } from '../hooks/useExchange';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from 'next/router';
-import { getGameInfo } from '../config/sportsMapping';
+import { getGameInfo, getSeasonInfo, getSeasonStatusStyle, getSeasonStatusBadge } from '../config/sportsMapping';
 
 export default function ExchangePage() {
   const { isLoggedIn } = useAuth();
@@ -10,6 +10,65 @@ export default function ExchangePage() {
   const router = useRouter();
   const [orderbook, setOrderbook] = useState<ExchangeOrder[]>([]);
   const [gameInfo, setGameInfo] = useState<any>(null);
+  const [sportGameCounts, setSportGameCounts] = useState<{[key: string]: number}>({});
+
+  // 각 스포츠의 경기 개수 가져오기
+  useEffect(() => {
+    const fetchSportGameCounts = async () => {
+      // 스포츠북의 모든 리그 가져오기 (사이드바 SPORTS_TREE 순서와 일치)
+      const sports = [
+        // 축구
+        { id: 'kleague', sport: 'soccer_korea_kleague1' },
+        { id: 'jleague', sport: 'soccer_japan_j_league' },
+        { id: 'seriea', sport: 'soccer_italy_serie_a' },
+        { id: 'brasileirao', sport: 'soccer_brazil_campeonato' },
+        { id: 'mls', sport: 'soccer_usa_mls' },
+        { id: 'argentina', sport: 'soccer_argentina_primera_division' },
+        { id: 'csl', sport: 'soccer_china_superleague' },
+        { id: 'laliga', sport: 'soccer_spain_primera_division' },
+        { id: 'bundesliga', sport: 'soccer_germany_bundesliga' },
+        // 농구
+        { id: 'nba', sport: 'basketball_nba' },
+        { id: 'kbl', sport: 'basketball_kbl' },
+        // 야구
+        { id: 'mlb', sport: 'baseball_mlb' },
+        { id: 'kbo', sport: 'baseball_kbo' },
+        // 미식축구
+        { id: 'nfl', sport: 'americanfootball_nfl' }
+      ];
+
+      const counts: {[key: string]: number} = {};
+      
+      for (const { id, sport } of sports) {
+        try {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050'}/api/odds/${sport}`);
+          if (response.ok) {
+            const data = await response.json();
+            // 현재 시간 이후의 경기만 카운트
+            const now = new Date();
+            const futureGames = data.filter((game: any) => {
+              const gameTime = new Date(game.commence_time);
+              return gameTime > now;
+            });
+            counts[id] = futureGames.length;
+          } else {
+            counts[id] = 0;
+          }
+        } catch (error) {
+          console.error(`Error fetching ${sport} games:`, error);
+          counts[id] = 0;
+        }
+      }
+      
+      setSportGameCounts(counts);
+    };
+
+    fetchSportGameCounts();
+    
+    // 5분마다 경기 개수 업데이트
+    const interval = setInterval(fetchSportGameCounts, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // 대표 경기의 호가 데이터 로드 (원래 실제 게임 ID)
   useEffect(() => {
@@ -178,26 +237,104 @@ export default function ExchangePage() {
         <div className="text-center mb-4">
           <p className="text-gray-600 text-sm">원하는 스포츠를 선택하여 호가 거래를 시작하세요.</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {/* 스포츠 카테고리 버튼들 */}
-          {[
-            { id: 'kbo', name: 'KBO', sport: 'baseball_kbo', count: 5, emoji: '⚾' },
-            { id: 'kleague', name: 'K리그', sport: 'soccer_korea_kleague1', count: 3, emoji: '⚽' },
-            { id: 'mlb', name: 'MLB', sport: 'baseball_mlb', count: 4, emoji: '⚾' },
-            { id: 'nba', name: 'NBA', sport: 'basketball_nba', count: 6, emoji: '🏀' },
-            { id: 'nfl', name: 'NFL', sport: 'americanfootball_nfl', count: 2, emoji: '🏈' },
-            { id: 'kbl', name: 'KBL', sport: 'basketball_kbl', count: 3, emoji: '🏀' }
-          ].map((sport) => (
-            <button
-              key={sport.id}
-              onClick={() => router.push(`/exchange/${sport.sport}`)}
-              className="p-4 rounded-lg border text-left transition-colors border-gray-200 bg-gray-50 hover:bg-blue-50 hover:border-blue-300 hover:shadow-md"
-            >
-              <div className="text-2xl mb-2">{sport.emoji}</div>
-              <div className="font-semibold text-sm text-blue-600">{sport.name}</div>
-              <div className="text-xs text-gray-500 mt-1">{sport.count}경기</div>
-              <div className="text-xs text-blue-500 mt-1">클릭하여 보기 →</div>
-            </button>
+        <div className="space-y-6">
+          {/* 카테고리별로 그룹핑해서 표시 */}
+          {Object.entries({
+            '축구': [
+              { id: 'kleague', name: 'K리그', sport: 'soccer_korea_kleague1', emoji: '⚽' },
+              { id: 'jleague', name: 'J리그', sport: 'soccer_japan_j_league', emoji: '⚽' },
+              { id: 'seriea', name: '세리에 A', sport: 'soccer_italy_serie_a', emoji: '⚽' },
+              { id: 'brasileirao', name: '브라질 세리에 A', sport: 'soccer_brazil_campeonato', emoji: '⚽' },
+              { id: 'mls', name: 'MLS', sport: 'soccer_usa_mls', emoji: '⚽' },
+              { id: 'argentina', name: '아르헨티나 프리메라', sport: 'soccer_argentina_primera_division', emoji: '⚽' },
+              { id: 'csl', name: '중국 슈퍼리그', sport: 'soccer_china_superleague', emoji: '⚽' },
+              { id: 'laliga', name: '라리가', sport: 'soccer_spain_primera_division', emoji: '⚽' },
+              { id: 'bundesliga', name: '분데스리가', sport: 'soccer_germany_bundesliga', emoji: '⚽' }
+            ],
+            '농구': [
+              { id: 'nba', name: 'NBA', sport: 'basketball_nba', emoji: '🏀' },
+              { id: 'kbl', name: 'KBL', sport: 'basketball_kbl', emoji: '🏀' }
+            ],
+            '야구': [
+              { id: 'mlb', name: 'MLB', sport: 'baseball_mlb', emoji: '⚾' },
+              { id: 'kbo', name: 'KBO', sport: 'baseball_kbo', emoji: '⚾' }
+            ],
+            '미식축구': [
+              { id: 'nfl', name: 'NFL', sport: 'americanfootball_nfl', emoji: '🏈' }
+            ]
+          }).map(([categoryName, sports]) => (
+            <div key={categoryName} className="space-y-3">
+              <h4 className="text-lg font-semibold text-gray-700 border-b border-gray-200 pb-2">
+                {categoryName}
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {sports.map((sport) => {
+                  const count = sportGameCounts[sport.id] ?? 0;
+                  const seasonInfo = getSeasonInfo(sport.sport);
+                  // 시즌 정보와 경기 개수를 모두 고려하여 활성 상태 결정
+                  const isAvailable = count > 0 || (seasonInfo?.status === 'active');
+                  const hasGames = count > 0;
+                  const statusStyle = seasonInfo ? getSeasonStatusStyle(seasonInfo.status) : { color: '#6B7280', backgroundColor: '#F3F4F6' };
+                  const statusBadge = seasonInfo ? getSeasonStatusBadge(seasonInfo.status) : '알 수 없음';
+                  
+                  return (
+                    <button
+                      key={sport.id}
+                      onClick={() => router.push(`/exchange/${sport.sport}`)}
+                      className={`p-4 rounded-lg border text-left transition-colors ${
+                        isAvailable 
+                          ? 'border-gray-200 bg-gray-50 hover:bg-blue-50 hover:border-blue-300 hover:shadow-md' 
+                          : 'border-gray-200 bg-gray-100 opacity-60 cursor-not-allowed'
+                      }`}
+                      disabled={!isAvailable}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="text-2xl">{sport.emoji}</div>
+                        <div 
+                          className="px-2 py-1 rounded text-xs font-medium"
+                          style={statusStyle}
+                        >
+                          {statusBadge}
+                        </div>
+                      </div>
+                      <div className={`font-semibold text-sm ${isAvailable ? 'text-blue-600' : 'text-gray-500'}`}>
+                        {sport.name}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {hasGames 
+                          ? `${count}경기 예정` 
+                          : seasonInfo?.status === 'active' 
+                          ? '경기 일정 확인중...'
+                          : '경기 없음'
+                        }
+                      </div>
+                      {seasonInfo && (
+                        <div className="text-xs text-gray-400 mt-1">
+                          {seasonInfo.status === 'active' 
+                            ? `${seasonInfo.currentSeason}시즌 진행중`
+                            : seasonInfo.status === 'offseason'
+                            ? (seasonInfo.nextSeasonStart && seasonInfo.nextSeasonStart !== 'TBD' 
+                               ? `시즌오프 (${new Date(seasonInfo.nextSeasonStart).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} 시작예정)`
+                               : '시즌오프 (일정 미정)')
+                            : `휴식기${seasonInfo.breakPeriod ? ` (${new Date(seasonInfo.breakPeriod.end).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} 재개)` : ''}`
+                          }
+                        </div>
+                      )}
+                      <div className="text-xs text-blue-500 mt-1">
+                        {hasGames 
+                          ? '클릭하여 보기 →' 
+                          : seasonInfo?.status === 'active' 
+                          ? '클릭하여 보기 →'
+                          : seasonInfo?.status === 'offseason'
+                          ? '시즌 준비중'
+                          : '준비 중'
+                        }
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           ))}
         </div>
       </div>
