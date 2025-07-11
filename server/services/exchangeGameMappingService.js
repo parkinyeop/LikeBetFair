@@ -36,16 +36,16 @@ class ExchangeGameMappingService {
         'baseball_mlb': ['baseball_mlb', 'MLB'],
         'basketball_nba': ['basketball_nba', 'NBA'],
         'basketball_kbl': ['basketball_kbl', 'KBL'],
-        'soccer_k_league': ['soccer_korea_kleague1', 'K리그'],
-        'soccer_j_league': ['soccer_japan_j_league', 'J리그'],
-        'soccer_mls': ['soccer_usa_mls', 'MLS'],
-        'soccer_brasileirao': ['soccer_brazil_campeonato', '브라질 세리에 A', 'BRASILEIRAO'],
-        'soccer_argentina_primera': ['soccer_argentina_primera_division', '아르헨티나 프리메라'],
-        'soccer_chinese_super_league': ['soccer_china_superleague', '중국 슈퍼리그', 'CSL'],
-        'soccer_serie_a': ['soccer_italy_serie_a', '세리에 A'],
-        'soccer_laliga': ['soccer_spain_primera_division', '라리가'],
-        'soccer_bundesliga': ['soccer_germany_bundesliga', '분데스리가'],
-        'americanfootball_nfl': ['americanfootball_nfl', 'NFL']
+        'soccer_korea_kleague1': ['soccer_korea_kleague1', 'K리그', 'KOREA_KLEAGUE1'],
+        'soccer_japan_j_league': ['soccer_japan_j_league', 'J리그', 'JAPAN_J_LEAGUE'],
+        'soccer_usa_mls': ['soccer_usa_mls', 'MLS', 'USA_MLS'],
+        'soccer_brazil_campeonato': ['soccer_brazil_campeonato', '브라질 세리에 A', 'BRASIL_CAMPEONATO'],
+        'soccer_argentina_primera_division': ['soccer_argentina_primera_division', '아르헨티나 프리메라', 'ARGENTINA_PRIMERA_DIVISION'],
+        'soccer_china_superleague': ['soccer_china_superleague', '중국 슈퍼리그', 'CHINA_SUPERLEAGUE'],
+        'soccer_italy_serie_a': ['soccer_italy_serie_a', '세리에 A', 'ITALY_SERIE_A'],
+        'soccer_spain_primera_division': ['soccer_spain_primera_division', '라리가', 'SPAIN_PRIMERA_DIVISION'],
+        'soccer_germany_bundesliga': ['soccer_germany_bundesliga', '분데스리가', 'GERMANY_BUNDESLIGA'],
+        'americanfootball_nfl': ['americanfootball_nfl', 'NFL', 'AMERICANFOOTBALL_NFL']
       };
       
       const possibleKeys = sportKeyMapping[filters.sportKey] || [filters.sportKey];

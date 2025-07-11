@@ -670,24 +670,8 @@ class BetResultService {
     }
     const point = selection.point;
     
-    // 스코어에서 총 점수 계산
-    let totalScore = 0;
-    if (gameResult.score) {
-      let scoreData = gameResult.score;
-      // 문자열인 경우 JSON 파싱
-      if (typeof scoreData === 'string') {
-        try {
-          scoreData = JSON.parse(scoreData);
-        } catch (e) {
-          console.error('Score parsing error:', e, scoreData);
-          return 'pending';
-        }
-      }
-      // 배열인지 확인 후 총점 계산
-      if (Array.isArray(scoreData)) {
-        totalScore = scoreData.reduce((sum, score) => sum + parseInt(score.score || 0), 0);
-      }
-    }
+    // 스코어에서 총 점수 계산 (방어 코드 사용)
+    const totalScore = this.calculateTotalScore(gameResult.score);
 
     // point가 없으면 무효
     if (typeof point !== 'number' || isNaN(point)) {
@@ -730,25 +714,8 @@ class BetResultService {
     const selectedTeam = normalizeTeamNameForComparison(selection.team);
     const handicap = selection.handicap || 0;
     
-    // 스코어 계산
-    let homeScore = 0, awayScore = 0;
-    if (gameResult.score) {
-      let scoreData = gameResult.score;
-      // 문자열인 경우 JSON 파싱
-      if (typeof scoreData === 'string') {
-        try {
-          scoreData = JSON.parse(scoreData);
-        } catch (e) {
-          console.error('Score parsing error:', e, scoreData);
-          return 'pending';
-        }
-      }
-      // 배열인지 확인 후 점수 추출
-      if (Array.isArray(scoreData) && scoreData.length >= 2) {
-        homeScore = parseInt(scoreData[0]?.score || 0);
-        awayScore = parseInt(scoreData[1]?.score || 0);
-      }
-    }
+    // 스코어 계산 (방어 코드 사용)
+    const { homeScore, awayScore } = this.extractHomeAwayScores(gameResult.score, gameResult.homeTeam, gameResult.awayTeam);
 
     // 핸디캡 적용 (팀명 비교용 정규화)
     const homeTeamNorm = normalizeTeamNameForComparison(gameResult.homeTeam);
@@ -763,6 +730,97 @@ class BetResultService {
     }
 
     return 'pending';
+  }
+
+  // 스코어 형식 검증 및 정규화 함수 추가
+  validateAndNormalizeScore(scoreData) {
+    if (!scoreData) {
+      return null;
+    }
+
+    // 문자열인 경우 JSON 파싱 시도
+    if (typeof scoreData === 'string') {
+      try {
+        scoreData = JSON.parse(scoreData);
+      } catch (e) {
+        console.error('[Score Validation] JSON 파싱 실패:', e.message, scoreData);
+        return null;
+      }
+    }
+
+    // 배열이 아닌 경우
+    if (!Array.isArray(scoreData)) {
+      console.error('[Score Validation] 배열이 아님:', scoreData);
+      return null;
+    }
+
+    // 잘못된 형식: ["1", "0"] 형태 감지
+    if (scoreData.length === 2 && 
+        typeof scoreData[0] === 'string' && 
+        typeof scoreData[1] === 'string' &&
+        !scoreData[0].hasOwnProperty('name') && 
+        !scoreData[1].hasOwnProperty('name')) {
+      console.error('[Score Validation] 잘못된 스코어 형식 감지 (The Odds API 형식):', scoreData);
+      console.error('[Score Validation] 올바른 형식: [{"name":"팀명","score":"점수"}]');
+      return null;
+    }
+
+    // 올바른 형식: [{"name":"팀명","score":"점수"}] 형태 검증
+    if (scoreData.length >= 2 && 
+        scoreData[0].hasOwnProperty('name') && 
+        scoreData[0].hasOwnProperty('score') &&
+        scoreData[1].hasOwnProperty('name') && 
+        scoreData[1].hasOwnProperty('score')) {
+      return scoreData;
+    }
+
+    console.error('[Score Validation] 알 수 없는 스코어 형식:', scoreData);
+    return null;
+  }
+
+  // 스코어에서 총 점수 계산 (방어 코드 포함)
+  calculateTotalScore(scoreData) {
+    const normalizedScore = this.validateAndNormalizeScore(scoreData);
+    if (!normalizedScore) {
+      console.error('[Score Calculation] 스코어 형식 검증 실패');
+      return 0;
+    }
+
+    try {
+      return normalizedScore.reduce((sum, score) => {
+        const scoreValue = parseInt(score.score || 0);
+        return sum + (isNaN(scoreValue) ? 0 : scoreValue);
+      }, 0);
+    } catch (error) {
+      console.error('[Score Calculation] 총점 계산 오류:', error.message);
+      return 0;
+    }
+  }
+
+  // 스코어에서 홈/원정 점수 추출 (방어 코드 포함)
+  extractHomeAwayScores(scoreData, homeTeam, awayTeam) {
+    const normalizedScore = this.validateAndNormalizeScore(scoreData);
+    if (!normalizedScore) {
+      console.error('[Score Extraction] 스코어 형식 검증 실패');
+      return { homeScore: 0, awayScore: 0 };
+    }
+
+    try {
+      let homeScore = 0, awayScore = 0;
+      
+      for (const score of normalizedScore) {
+        if (score.name === homeTeam) {
+          homeScore = parseInt(score.score || 0);
+        } else if (score.name === awayTeam) {
+          awayScore = parseInt(score.score || 0);
+        }
+      }
+
+      return { homeScore, awayScore };
+    } catch (error) {
+      console.error('[Score Extraction] 점수 추출 오류:', error.message);
+      return { homeScore: 0, awayScore: 0 };
+    }
   }
 
   // 사용자별 배팅 통계

@@ -345,27 +345,35 @@ router.get('/games', async (req, res) => {
     const { category, sport } = req.query;
     console.log('🎮 Exchange 게임 목록 요청:', { category, sport });
     
-    // 카테고리를 스포츠키로 변환
+    // 카테고리를 스포츠키로 변환 (복합 카테고리 지원)
     let targetSportKey = sport;
     if (category && !sport) {
+      // "축구 > K리그" 형태의 복합 카테고리 처리
+      let actualCategory = category;
+      if (category.includes(' > ')) {
+        const [mainCat, subCat] = category.split(' > ');
+        actualCategory = subCat; // 서브 카테고리만 사용
+        console.log('🔍 복합 카테고리 파싱:', { mainCat, subCat, actualCategory });
+      }
+      
       const categoryToSportKey = {
         'KBO': 'baseball_kbo',
         'MLB': 'baseball_mlb', 
         'NBA': 'basketball_nba',
         'KBL': 'basketball_kbl',
-        'NFL': 'american_football_nfl',
-        'K리그': 'soccer_k_league',
+        'NFL': 'americanfootball_nfl',
+        'K리그': 'soccer_korea_kleague1',
         'EPL': 'soccer_epl',
-        'LaLiga': 'soccer_laliga',
-        'Bundesliga': 'soccer_bundesliga',
-        'Serie A': 'soccer_serie_a',
-        'J리그': 'soccer_j_league',
-        'MLS': 'soccer_mls',
-        '브라질 세리에 A': 'soccer_brasileirao',
-        '아르헨티나 프리메라': 'soccer_argentina_primera',
-        '중국 슈퍼리그': 'soccer_chinese_super_league'
+        'LaLiga': 'soccer_spain_primera_division',
+        'Bundesliga': 'soccer_germany_bundesliga',
+        'Serie A': 'soccer_italy_serie_a',
+        'J리그': 'soccer_japan_j_league',
+        'MLS': 'soccer_usa_mls',
+        '브라질 세리에 A': 'soccer_brazil_campeonato',
+        '아르헨티나 프리메라': 'soccer_argentina_primera_division',
+        '중국 슈퍼리그': 'soccer_china_superleague'
       };
-      targetSportKey = categoryToSportKey[category];
+      targetSportKey = categoryToSportKey[actualCategory];
     }
     
     console.log('🔍 스포츠키 변환:', { category, sport, targetSportKey });

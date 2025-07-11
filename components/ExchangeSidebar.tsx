@@ -166,54 +166,367 @@ function OrderPanel() {
         </div>
       )}
       
-      {/* 디버깅 정보 */}
-      <div className="bg-yellow-50 p-2 rounded mb-3 border border-yellow-200 text-xs">
-        <h4 className="font-semibold text-yellow-700 mb-1">디버깅 정보</h4>
-        <div className="space-y-1">
-          <div>selectedBet 존재: {selectedBet ? 'YES' : 'NO'}</div>
-          <div>selectedBet 타입: {typeof selectedBet}</div>
-          <div>selectedBet 값: {JSON.stringify(selectedBet, null, 2)}</div>
-        </div>
-      </div>
+
     </div>
   );
 }
 
 function OrderHistoryPanel() {
-  const { orders: userOrders } = useExchange();
+  const { orders: userOrders, cancelOrder, loading, fetchOrders } = useExchange();
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
+  const [showCancelConfirm, setShowCancelConfirm] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'date' | 'amount' | 'price'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+
+  // 주문 상태별 한글 표시
+  const getStatusDisplay = (status: string) => {
+    switch (status) {
+      case 'open': return { text: '미체결', color: 'text-yellow-600', bg: 'bg-yellow-50' };
+      case 'matched': return { text: '체결', color: 'text-green-600', bg: 'bg-green-50' };
+      case 'settled': return { text: '정산', color: 'text-blue-600', bg: 'bg-blue-50' };
+      case 'cancelled': return { text: '취소', color: 'text-red-600', bg: 'bg-red-50' };
+      default: return { text: status, color: 'text-gray-600', bg: 'bg-gray-50' };
+    }
+  };
+
+  // 주문 타입별 한글 표시
+  const getSideDisplay = (side: string) => {
+    return side === 'back' 
+      ? { text: 'Back (베팅)', color: 'text-blue-600', bg: 'bg-blue-50' }
+      : { text: 'Lay (레이)', color: 'text-pink-600', bg: 'bg-pink-50' };
+  };
+
+  // 잠재 수익 계산
+  const calculatePotentialProfit = (order: ExchangeOrder) => {
+    if (order.side === 'back') {
+      return Math.round(order.amount * (order.price - 1));
+    } else {
+      return Math.round(order.amount * (order.price - 1) / order.price);
+    }
+  };
+
+  // 날짜 포맷팅
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return {
+      date: date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }),
+      time: date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    };
+  };
+
+  // 주문 취소 핸들러
+  const handleCancelOrder = async (orderId: number) => {
+    if (!confirm('정말로 이 주문을 취소하시겠습니까?')) {
+      return;
+    }
+    
+    try {
+      await cancelOrder(orderId);
+      setShowCancelConfirm(null);
+    } catch (error) {
+      console.error('주문 취소 실패:', error);
+    }
+  };
+
+  // 주문 상세 정보 토글
+  const toggleOrderDetail = (orderId: number) => {
+    setSelectedOrderId(selectedOrderId === orderId ? null : orderId);
+  };
+
+  // 필터링된 주문 목록
+  const filteredOrders = userOrders
+    .filter(order => statusFilter === 'all' || order.status === statusFilter)
+    .sort((a, b) => {
+      let aValue: any, bValue: any;
+      
+      switch (sortBy) {
+        case 'date':
+          aValue = new Date(a.createdAt).getTime();
+          bValue = new Date(b.createdAt).getTime();
+          break;
+        case 'amount':
+          aValue = a.amount;
+          bValue = b.amount;
+          break;
+        case 'price':
+          aValue = a.price;
+          bValue = b.price;
+          break;
+        default:
+          aValue = new Date(a.createdAt).getTime();
+          bValue = new Date(b.createdAt).getTime();
+      }
+      
+      return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
+    });
+
+  // 정렬 방향 토글
+  const toggleSortOrder = () => {
+    setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+  };
+
+  // 실시간 업데이트 (30초마다)
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      fetchOrders();
+      setLastUpdate(new Date());
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [fetchOrders]);
+
+  // 통계 계산
+  const stats = React.useMemo(() => {
+    const total = userOrders.length;
+    const open = userOrders.filter(o => o.status === 'open').length;
+    const matched = userOrders.filter(o => o.status === 'matched').length;
+    const settled = userOrders.filter(o => o.status === 'settled').length;
+    const cancelled = userOrders.filter(o => o.status === 'cancelled').length;
+    
+    const totalAmount = userOrders.reduce((sum, o) => sum + o.amount, 0);
+    const totalPotentialProfit = userOrders.reduce((sum, o) => {
+      const profit = o.side === 'back' 
+        ? o.amount * (o.price - 1)
+        : o.amount * (o.price - 1) / o.price;
+      return sum + profit;
+    }, 0);
+
+    return {
+      total, open, matched, settled, cancelled,
+      totalAmount, totalPotentialProfit
+    };
+  }, [userOrders]);
 
   return (
     <div className="h-full overflow-y-auto">
       <div className="bg-gray-50 p-3 rounded">
-        <h3 className="font-semibold mb-2 text-sm text-gray-700">내 주문 내역</h3>
-        {userOrders.length === 0 ? (
-          <p className="text-gray-500 text-sm">주문 내역이 없습니다.</p>
-        ) : (
-          <div className="space-y-1">
-            {userOrders.slice(0, 15).map((order) => (
-              <div key={order.id} className="flex justify-between items-center p-1 bg-white rounded border text-sm">
-                <div>
-                  <span className={`font-semibold ${order.side === 'back' ? 'text-blue-600' : 'text-pink-600'}`}>
-                    {order.side === 'back' ? 'Back' : 'Lay'}
-                  </span>
-                  <span className="text-gray-500 ml-1">{order.price}</span>
-                </div>
-                <div className="text-right">
-                  <div>{order.amount.toLocaleString()}원</div>
-                  <div className={`${
-                    order.status === 'open' ? 'text-yellow-600' :
-                    order.status === 'matched' ? 'text-green-600' :
-                    order.status === 'settled' ? 'text-blue-600' :
-                    'text-red-600'
-                  }`}>
-                    {order.status === 'open' ? '미체결' :
-                     order.status === 'matched' ? '체결' :
-                     order.status === 'settled' ? '정산' :
-                     '취소'}
-                  </div>
-                </div>
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="font-semibold text-sm text-gray-700">내 주문 내역</h3>
+          <div className="text-right">
+            <div className="text-xs text-gray-500">{filteredOrders.length}/{userOrders.length}개 주문</div>
+            <div className="text-xs text-gray-400">
+              마지막 업데이트: {lastUpdate.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          </div>
+        </div>
+
+        {/* 통계 정보 */}
+        <div className="mb-3 p-2 bg-white rounded border border-gray-200">
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="text-center">
+              <div className="text-gray-500">총 주문</div>
+              <div className="font-bold text-gray-800">{stats.total}개</div>
+            </div>
+            <div className="text-center">
+              <div className="text-gray-500">총 금액</div>
+              <div className="font-bold text-gray-800">{stats.totalAmount.toLocaleString()}원</div>
+            </div>
+            <div className="text-center">
+              <div className="text-gray-500">미체결</div>
+              <div className="font-bold text-yellow-600">{stats.open}개</div>
+            </div>
+            <div className="text-center">
+              <div className="text-gray-500">잠재 수익</div>
+              <div className={`font-bold ${stats.totalPotentialProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {stats.totalPotentialProfit >= 0 ? '+' : ''}{Math.round(stats.totalPotentialProfit).toLocaleString()}원
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 필터 및 정렬 컨트롤 */}
+        <div className="mb-3 space-y-2">
+          {/* 상태 필터 */}
+          <div className="flex flex-wrap gap-1">
+            {[
+              { value: 'all', label: '전체', color: 'bg-gray-200' },
+              { value: 'open', label: '미체결', color: 'bg-yellow-200' },
+              { value: 'matched', label: '체결', color: 'bg-green-200' },
+              { value: 'settled', label: '정산', color: 'bg-blue-200' },
+              { value: 'cancelled', label: '취소', color: 'bg-red-200' }
+            ].map(filter => (
+              <button
+                key={filter.value}
+                onClick={() => setStatusFilter(filter.value)}
+                className={`px-2 py-1 text-xs rounded-full transition-colors ${
+                  statusFilter === filter.value 
+                    ? `${filter.color} text-gray-800 font-medium` 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {filter.label}
+              </button>
             ))}
+          </div>
+
+          {/* 정렬 컨트롤 */}
+          <div className="flex items-center space-x-2">
+            <span className="text-xs text-gray-600">정렬:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'date' | 'amount' | 'price')}
+              className="text-xs border border-gray-300 rounded px-2 py-1"
+            >
+              <option value="date">날짜순</option>
+              <option value="amount">금액순</option>
+              <option value="price">배당순</option>
+            </select>
+            <button
+              onClick={toggleSortOrder}
+              className="text-xs text-gray-600 hover:text-gray-800"
+            >
+              {sortOrder === 'asc' ? '↑' : '↓'}
+            </button>
+          </div>
+        </div>
+        
+        {filteredOrders.length === 0 ? (
+          <div className="text-center py-8">
+            <div className="text-gray-400 text-4xl mb-2">📋</div>
+            <p className="text-gray-500 text-sm">주문 내역이 없습니다.</p>
+            <p className="text-gray-400 text-xs mt-1">중앙에서 Back/Lay 버튼을 클릭하여 주문을 생성하세요.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filteredOrders.slice(0, 10).map((order) => {
+              const statusInfo = getStatusDisplay(order.status);
+              const sideInfo = getSideDisplay(order.side);
+              const dateInfo = formatDate(order.createdAt);
+              const potentialProfit = calculatePotentialProfit(order);
+              
+              return (
+                <div key={order.id} className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-sm transition-shadow">
+                  {/* 헤더: 주문 타입과 상태 */}
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center space-x-2">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${sideInfo.bg} ${sideInfo.color}`}>
+                        {sideInfo.text}
+                      </span>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusInfo.bg} ${statusInfo.color}`}>
+                        {statusInfo.text}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-gray-500">{dateInfo.date}</div>
+                      <div className="text-xs text-gray-400">{dateInfo.time}</div>
+                    </div>
+                  </div>
+
+                  {/* 경기 정보 */}
+                  <div className="mb-2">
+                    <div className="text-sm font-medium text-gray-800 mb-1">
+                      {order.selection || '선택된 팀'}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {order.market} • {order.gameId}
+                    </div>
+                  </div>
+
+                  {/* 배당률과 금액 정보 */}
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="text-center">
+                      <div className="text-xs text-gray-500">배당률</div>
+                      <div className="text-lg font-bold text-gray-800">{order.price.toFixed(2)}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xs text-gray-500">주문 금액</div>
+                      <div className="text-lg font-bold text-gray-800">{order.amount.toLocaleString()}원</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xs text-gray-500">잠재 수익</div>
+                      <div className={`text-lg font-bold ${potentialProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {potentialProfit >= 0 ? '+' : ''}{potentialProfit.toLocaleString()}원
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 주문 ID */}
+                  <div className="text-xs text-gray-400 text-center pt-1 border-t border-gray-100">
+                    주문 ID: {order.id}
+                  </div>
+
+                  {/* 액션 버튼 */}
+                  <div className="flex justify-between items-center pt-2 mt-2 border-t border-gray-100">
+                    <button
+                      onClick={() => toggleOrderDetail(order.id)}
+                      className="text-xs text-blue-600 hover:text-blue-800 transition-colors"
+                    >
+                      {selectedOrderId === order.id ? '상세 숨기기' : '상세보기'}
+                    </button>
+                    
+                    {order.status === 'open' && (
+                      <button
+                        onClick={() => setShowCancelConfirm(order.id)}
+                        disabled={loading}
+                        className="text-xs text-red-600 hover:text-red-800 transition-colors disabled:opacity-50"
+                      >
+                        취소
+                      </button>
+                    )}
+                  </div>
+
+                  {/* 상세 정보 (토글) */}
+                  {selectedOrderId === order.id && (
+                    <div className="mt-3 p-2 bg-gray-50 rounded text-xs">
+                      <div className="space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">생성 시간:</span>
+                          <span>{new Date(order.createdAt).toLocaleString('ko-KR')}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">수정 시간:</span>
+                          <span>{new Date(order.updatedAt).toLocaleString('ko-KR')}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">게임 ID:</span>
+                          <span>{order.gameId}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">마켓:</span>
+                          <span>{order.market}</span>
+                        </div>
+                        {order.line && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">라인:</span>
+                            <span>{order.line}</span>
+                          </div>
+                        )}
+                        {order.matchedOrderId && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">매칭 주문:</span>
+                            <span className="text-green-600">#{order.matchedOrderId}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 취소 확인 모달 */}
+                  {showCancelConfirm === order.id && (
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
+                      <div className="text-xs text-red-700 mb-2">정말로 이 주문을 취소하시겠습니까?</div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleCancelOrder(order.id)}
+                          disabled={loading}
+                          className="flex-1 py-1 px-2 bg-red-600 text-white text-xs rounded hover:bg-red-700 disabled:opacity-50"
+                        >
+                          {loading ? '처리중...' : '확인'}
+                        </button>
+                        <button
+                          onClick={() => setShowCancelConfirm(null)}
+                          className="flex-1 py-1 px-2 bg-gray-300 text-gray-700 text-xs rounded hover:bg-gray-400"
+                        >
+                          취소
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

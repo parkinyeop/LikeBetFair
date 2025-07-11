@@ -220,7 +220,8 @@ class GameResultService {
   }
 
   /**
-   * The Odds API 실패 시 TheSportsDB API를 대체 소스로 사용
+   * The Odds API 사용 금지 - TheSportsDB API만 사용
+   * 경기 결과는 절대로 The Odds API에서 받지 않음
    */
   async fetchResultsWithFallback(sportKey, daysFrom = 7) {
     try {
@@ -251,7 +252,7 @@ class GameResultService {
         response = await axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsround.php`, {
           params: {
             id: leagueId,
-            r: 'current' // 현재 라운드
+            r: 'current'
           },
           timeout: 15000 // 15초 타임아웃
         });
@@ -287,7 +288,7 @@ class GameResultService {
       
       console.log(`[Fallback] 날짜 필터링 결과: ${events.length}개 → ${filteredEvents.length}개 (과거 ${daysFrom}일간)`);
       
-      // TheSportsDB 형식을 The Odds API 형식으로 변환
+      // TheSportsDB 형식을 표준 형식으로 변환 (올바른 스코어 형식)
       const convertedData = filteredEvents.map(event => ({
         id: event.idEvent,
         home_team: event.strHomeTeam,
@@ -306,23 +307,9 @@ class GameResultService {
       console.error(`[Fallback] TheSportsDB API 실패: ${error.message}`);
     }
 
-    try {
-      // 2차: The Odds API 시도 (유료이지만 배당률 API, 게임 결과는 제한적)
-      if (this.oddsApiKey && this.oddsApiKey !== '123') {
-        console.log(`[Fallback] 2차 시도: The Odds API (${sportKey})`);
-        const response = await axios.get(`${this.oddsBaseUrl}/${sportKey}/scores`, {
-          params: {
-            apiKey: this.oddsApiKey,
-            daysFrom: daysFrom
-          },
-          timeout: 10000 // 10초 타임아웃
-        });
-        console.log(`[Fallback] The Odds API 성공: ${response.data.length}개 경기`);
-        return { source: 'the-odds-api', data: response.data };
-      }
-    } catch (error) {
-      console.log(`[Fallback] The Odds API 실패: ${error.message}`);
-    }
+    // 🚫 The Odds API 사용 금지 - 경기 결과는 절대로 받지 않음
+    console.log(`[Fallback] The Odds API 사용 금지 - 경기 결과는 TheSportsDB API에서만 수집`);
+    console.log(`[Fallback] The Odds API는 배당률 전용으로만 사용됨`);
 
     // 3차: 로컬 스케줄 기반 추정 (최후의 수단)
     console.log(`[Fallback] 3차 시도: 로컬 스케줄 기반 추정`);

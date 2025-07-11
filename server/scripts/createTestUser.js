@@ -151,6 +151,7 @@ async function createTestUser() {
   } finally {
     await sequelize.close();
   }
+
 }
 
 createTestUser(); 
