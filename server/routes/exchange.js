@@ -110,7 +110,7 @@ router.post('/order', verifyToken, async (req, res) => {
   }
 });
 
-// 호가(orderbook) 조회 - 테스트용 (로그인 불필요)
+// 호가(orderbook) 조회 - 테스트용 (공개 API)
 router.get('/orderbook-test', async (req, res) => {
   try {
     const { gameId, market, line } = req.query;
@@ -283,20 +283,64 @@ router.get('/balance', verifyToken, async (req, res) => {
   }
 });
 
-// 사용자 주문 내역 조회
+// 사용자 주문 내역 조회 (상태별 필터링 지원)
 router.get('/orders', verifyToken, async (req, res) => {
   try {
     const userId = req.user.userId;
+    const { status } = req.query;
+    
+    // Where 조건 구성
+    const whereCondition = { userId };
+    if (status) {
+      whereCondition.status = status;
+    }
+    
     const orders = await ExchangeOrder.findAll({
-      where: { userId },
+      where: whereCondition,
       order: [['createdAt', 'DESC']],
       limit: 50
     });
     
-    res.json({ orders });
+    res.json(orders);
   } catch (error) {
     console.error('Exchange orders error:', error);
     res.status(500).json({ message: '주문 내역 조회 중 오류가 발생했습니다.' });
+  }
+});
+
+// 전체 오픈 주문 조회 (공개 API - 토큰 불필요)
+router.get('/all-orders', async (req, res) => {
+  try {
+    const orders = await ExchangeOrder.findAll({
+      where: { status: 'open' },
+      order: [['createdAt', 'DESC']],
+      limit: 100
+    });
+    
+    // 게임 정보를 포함한 주문 데이터 구성
+    const ordersWithGameInfo = orders.map(order => ({
+      id: order.id,
+      gameId: order.gameId,
+      userId: order.userId,
+      type: order.side,
+      odds: order.price,
+      amount: order.amount,
+      status: order.status,
+      createdAt: order.createdAt,
+      game: {
+        homeTeam: order.homeTeam,
+        awayTeam: order.awayTeam,
+        startTime: order.commenceTime,
+        sportKey: order.sportKey,
+        subCategory: order.sportKey
+      }
+    }));
+    
+    console.log('전체 오픈 주문 조회:', ordersWithGameInfo.length, '개');
+    res.json(ordersWithGameInfo);
+  } catch (error) {
+    console.error('전체 오픈 주문 조회 오류:', error);
+    res.status(500).json({ message: '전체 주문 조회 중 오류가 발생했습니다.' });
   }
 });
 
@@ -467,8 +511,10 @@ router.post('/match-order', verifyToken, async (req, res) => {
     const oppositeSide = side === 'back' ? 'lay' : 'back';
     let matchingOrders;
 
+    console.log(`🔍 매칭 검색 조건: gameId=${gameId}, market=${market}, line=${line}, side=${side}, price=${price}, userId=${userId}`);
+    
     if (side === 'back') {
-      // Back 주문 → Lay 주문 중 price 이하인 것들과 매칭
+      // Back 주문 → Lay 주문 중 price 이하인 것들과 매칭 (자신의 주문 제외)
       matchingOrders = await ExchangeOrder.findAll({
         where: {
           gameId,
@@ -476,12 +522,14 @@ router.post('/match-order', verifyToken, async (req, res) => {
           line,
           side: 'lay',
           price: { [Op.lte]: price },
-          status: 'open'
+          status: 'open',
+          userId: { [Op.ne]: userId } // 자신의 주문 제외
         },
         order: [['price', 'ASC']] // 낮은 가격부터
       });
+      console.log(`🔍 Back 주문 매칭 검색: ${matchingOrders.length}개 발견`);
     } else {
-      // Lay 주문 → Back 주문 중 price 이상인 것들과 매칭
+      // Lay 주문 → Back 주문 중 price 이상인 것들과 매칭 (자신의 주문 제외)
       matchingOrders = await ExchangeOrder.findAll({
         where: {
           gameId,
@@ -489,13 +537,29 @@ router.post('/match-order', verifyToken, async (req, res) => {
           line,
           side: 'back',
           price: { [Op.gte]: price },
-          status: 'open'
+          status: 'open',
+          userId: { [Op.ne]: userId } // 자신의 주문 제외
         },
         order: [['price', 'DESC']] // 높은 가격부터
       });
+      console.log(`🔍 Lay 주문 매칭 검색: ${matchingOrders.length}개 발견`);
     }
 
     console.log(`📊 매칭 가능한 주문: ${matchingOrders.length}개`);
+    
+    // 매칭 가능한 주문들의 상세 정보 로깅
+    if (matchingOrders.length > 0) {
+      console.log(`📋 매칭 가능한 주문 상세:`);
+      matchingOrders.forEach((order, index) => {
+        console.log(`  ${index + 1}. ID: ${order.id}, User: ${order.userId}, Side: ${order.side}, Price: ${order.price}, Amount: ${order.amount}`);
+      });
+    }
+
+    // 매칭 가능한 주문이 없는 경우 처리
+    if (matchingOrders.length === 0) {
+      console.log(`⚠️ 매칭 가능한 주문이 없습니다. 새 주문만 생성합니다.`);
+      console.log(`🔒 방어 로직: 자신의 주문(${userId})은 매칭에서 제외됨`);
+    }
 
     let remainingAmount = amount;
     const matches = [];
@@ -504,10 +568,16 @@ router.post('/match-order', verifyToken, async (req, res) => {
     for (const existingOrder of matchingOrders) {
       if (remainingAmount <= 0) break;
 
+      // 🔒 추가 방어 로직: 매칭 시점에서도 사용자 ID 재확인
+      if (existingOrder.userId === userId) {
+        console.log(`🚫 방어 로직 작동: 자신의 주문(${existingOrder.id})과 매칭 시도 차단`);
+        continue; // 이 주문은 건너뛰고 다음 주문으로
+      }
+
       const matchAmount = Math.min(remainingAmount, existingOrder.amount);
       const matchPrice = existingOrder.price; // 기존 주문의 가격으로 매칭
 
-      console.log(`🔄 매칭: ${matchAmount}원 at ${matchPrice}`);
+      console.log(`🔄 매칭: ${matchAmount}원 at ${matchPrice} (상대방: ${existingOrder.userId})`);
 
       // 기존 주문 matched 처리
       await existingOrder.update({

@@ -7,7 +7,8 @@ interface AuthContextType {
   isAdmin: boolean;
   adminLevel: number;
   token: string | null;
-  login: (username: string, balance: number, token: string, isAdmin?: boolean, adminLevel?: number) => void;
+  userId: string | null;
+  login: (username: string, balance: number, token: string, isAdmin?: boolean, adminLevel?: number, userId?: string) => void;
   logout: () => void;
   setBalance: (balance: number) => void;
   hasPermission: (permission: string) => boolean;
@@ -26,6 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // 탭별 고유 식별자 생성
   const [tabId, setTabId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -51,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const storedBalance = sessionStorage.getItem(`balance_${tabId}`);
         const storedIsAdmin = sessionStorage.getItem(`isAdmin_${tabId}`);
         const storedAdminLevel = sessionStorage.getItem(`adminLevel_${tabId}`);
+        const storedUserId = sessionStorage.getItem(`userId_${tabId}`);
 
         if (storedToken && storedUsername) {
           console.log('[AuthContext] 저장된 인증 정보 복원:', {
@@ -66,6 +69,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setToken(storedToken);
           setIsAdmin(storedIsAdmin === 'true');
           setAdminLevel(storedAdminLevel ? Number(storedAdminLevel) : 0);
+          if (storedUserId) setUserId(storedUserId);
+          else setUserId(null);
         } else {
           console.log('[AuthContext] 저장된 인증 정보 없음 (tabId:', tabId, ')');
         }
@@ -81,8 +86,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initializeAuth();
   }, [tabId]);
 
-  const login = (username: string, balance: number, token: string, isAdmin = false, adminLevel = 0) => {
-    console.log('[AuthContext] 로그인:', { tabId, username, balance, hasToken: !!token, isAdmin, adminLevel });
+  const login = (username: string, balance: number, token: string, isAdmin = false, adminLevel = 0, userId?: string) => {
+    console.log('[AuthContext] 로그인:', { tabId, username, balance, hasToken: !!token, isAdmin, adminLevel, userId });
     
     if (!tabId) {
       console.error('[AuthContext] tabId가 없습니다.');
@@ -96,6 +101,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionStorage.setItem(`isAdmin_${tabId}`, isAdmin.toString());
     sessionStorage.setItem(`adminLevel_${tabId}`, adminLevel.toString());
     
+    // userId 처리: 직접 받은 userId가 있으면 사용, 없으면 JWT에서 추출
+    let finalUserId: string | null = null;
+    if (userId) {
+      finalUserId = userId;
+      console.log('[AuthContext] 서버에서 받은 userId 사용:', userId);
+    } else {
+      // JWT에서 userId 추출 (fallback)
+      try {
+        console.log('[AuthContext] JWT 토큰 파싱 시작:', token.substring(0, 50) + '...');
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        finalUserId = payload.userId || null; // userId로만 추출
+        console.log('[AuthContext] JWT payload:', payload);
+        console.log('[AuthContext] JWT에서 추출된 userId:', finalUserId);
+        console.log('[AuthContext] payload.userId 타입:', typeof payload.userId);
+      } catch (e) {
+        console.error('[AuthContext] JWT 파싱 오류:', e);
+        finalUserId = username; // fallback
+      }
+    }
+    
+    setUserId(finalUserId);
+    sessionStorage.setItem(`userId_${tabId}`, finalUserId || '');
+
     // 상태 업데이트
     setIsLoggedIn(true);
     setUsername(username);
@@ -119,6 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionStorage.removeItem(`balance_${tabId}`);
     sessionStorage.removeItem(`isAdmin_${tabId}`);
     sessionStorage.removeItem(`adminLevel_${tabId}`);
+    sessionStorage.removeItem(`userId_${tabId}`);
     
     // 상태 초기화
     setIsLoggedIn(false);
@@ -127,6 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setIsAdmin(false);
     setAdminLevel(0);
+    setUserId(null);
   };
 
   const hasPermission = (permission: string): boolean => {
@@ -158,6 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin,
       adminLevel,
       token,
+      userId,
       login, 
       logout, 
       setBalance,

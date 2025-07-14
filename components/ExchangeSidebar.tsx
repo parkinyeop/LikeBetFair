@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useExchange, ExchangeOrder, OrderForm } from '../hooks/useExchange';
 import { useAuth } from '../contexts/AuthContext';
 import { useExchangeContext } from '../contexts/ExchangeContext';
@@ -15,12 +15,12 @@ function OrderPanel() {
   const { selectedBet, setSelectedBet } = useExchangeContext();
   const { balance, username } = useAuth();
   
-  const [form, setForm] = useState<OrderForm>({ side: 'back', price: 1.91, amount: 10000 });
+  const [form, setForm] = useState<OrderForm>({ side: 'back', price: 0, amount: 0 });
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   
-  // selectedBet이 변경될 때 form의 price 업데이트
-  React.useEffect(() => {
-    if (selectedBet) {
+  // selectedBet이 변경될 때 form의 price를 자동으로 설정
+  useEffect(() => {
+    if (selectedBet && selectedBet.price) {
       setForm(prev => ({ ...prev, price: selectedBet.price }));
     }
   }, [selectedBet]);
@@ -37,6 +37,10 @@ function OrderPanel() {
 
   // 통계 계산
   const stats = React.useMemo(() => {
+    if (!userOrders || !Array.isArray(userOrders)) {
+      return { total: 0, open: 0, matched: 0, totalAmount: 0, totalPotentialProfit: 0 };
+    }
+    
     const total = userOrders.length;
     const open = userOrders.filter(order => order.status === 'open').length;
     const matched = userOrders.filter(order => order.status === 'matched').length;
@@ -89,7 +93,7 @@ function OrderPanel() {
       alert('주문이 성공적으로 등록되었습니다!');
       
       // 폼 초기화
-      setForm({ side: 'back', price: 1.91, amount: 10000 });
+      setForm({ side: 'back', price: 0, amount: 0 });
       setSelectedBet(null);
       
       // 주문 내역 새로고침 (useEffect에서 자동으로 처리되지만 즉시 반영을 위해)
@@ -275,7 +279,7 @@ function OrderHistoryPanel() {
   };
 
   // 필터링된 주문 목록
-  const filteredOrders = userOrders
+  const filteredOrders = (userOrders || [])
     .filter(order => statusFilter === 'all' || order.status === statusFilter)
     .sort((a, b) => {
       let aValue: any, bValue: any;
@@ -318,6 +322,10 @@ function OrderHistoryPanel() {
 
   // 통계 계산
   const stats = React.useMemo(() => {
+    if (!userOrders || !Array.isArray(userOrders)) {
+      return { total: 0, open: 0, matched: 0, totalAmount: 0, totalPotentialProfit: 0 };
+    }
+    
     const total = userOrders.length;
     const open = userOrders.filter(order => order.status === 'open').length;
     const matched = userOrders.filter(order => order.status === 'matched').length;
@@ -339,7 +347,7 @@ function OrderHistoryPanel() {
         <div className="flex justify-between items-center mb-3">
           <h3 className="font-semibold text-sm text-gray-700">내 주문 내역</h3>
           <div className="text-right">
-            <div className="text-xs text-gray-500">{filteredOrders.length}/{userOrders.length}개 주문</div>
+            <div className="text-xs text-gray-500">{filteredOrders.length}/{(userOrders || []).length}개 주문</div>
             <div className="text-xs text-gray-400">
               마지막 업데이트: {lastUpdate.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
             </div>

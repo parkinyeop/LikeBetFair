@@ -33,14 +33,63 @@ const oddsController = {
       const weekLater = new Date(today);
       weekLater.setUTCDate(today.getUTCDate() + 7);
 
-      // DB에서 오늘~7일 후까지 경기만 조회 (여러 sportKey 포함)
-      const cachedData = await OddsCache.findAll({
+      console.log(`[oddsController] 필터링 조건:`, {
+        sport,
+        possibleKeys,
+        today: today.toISOString(),
+        weekLater: weekLater.toISOString(),
+        now: now.toISOString()
+      });
+
+      // DB에서 모든 데이터를 먼저 조회 (필터링 전)
+      const allData = await OddsCache.findAll({
         where: {
-          sportKey: { [Op.in]: possibleKeys },
-          commenceTime: { [Op.gte]: today, [Op.lt]: weekLater }
+          sportKey: { [Op.in]: possibleKeys }
         },
         order: [['commenceTime', 'ASC']]
       });
+
+      console.log(`[oddsController] 필터링 전 전체 데이터 수:`, allData.length);
+
+      // 필터링 적용
+      const cachedData = allData.filter(game => {
+        const gameTime = new Date(game.commenceTime);
+        const isValid = gameTime >= today && gameTime < weekLater;
+        if (!isValid) {
+          console.log(`[oddsController] 필터링 제외: ${game.homeTeam} vs ${game.awayTeam} - ${game.commenceTime} (${gameTime.toISOString()})`);
+        }
+        return isValid;
+      });
+
+      console.log(`[oddsController] 필터링 후 데이터 수:`, cachedData.length);
+
+      if (cachedData.length > 0) {
+        console.log(`[oddsController] 첫 번째 경기:`, {
+          homeTeam: cachedData[0].homeTeam,
+          awayTeam: cachedData[0].awayTeam,
+          commenceTime: cachedData[0].commenceTime,
+          sportKey: cachedData[0].sportKey
+        });
+        console.log(`[oddsController] 마지막 경기:`, {
+          homeTeam: cachedData[cachedData.length-1].homeTeam,
+          awayTeam: cachedData[cachedData.length-1].awayTeam,
+          commenceTime: cachedData[cachedData.length-1].commenceTime,
+          sportKey: cachedData[cachedData.length-1].sportKey
+        });
+      }
+
+      // 필터링 조건을 만족하지 않는 데이터가 있는지 확인
+      const invalidData = cachedData.filter(game => {
+        const gameTime = new Date(game.commenceTime);
+        return gameTime < today || gameTime >= weekLater;
+      });
+      
+      if (invalidData.length > 0) {
+        console.log(`[oddsController] ⚠️ 필터링 조건을 만족하지 않는 데이터 ${invalidData.length}개 발견:`);
+        invalidData.slice(0, 3).forEach((game, i) => {
+          console.log(`  ${i+1}. ${game.homeTeam} vs ${game.awayTeam} - ${game.commenceTime}`);
+        });
+      }
 
       // 동일 경기 중복 제거 (최신 odds만)
       const uniqueGames = [];

@@ -31,8 +31,8 @@ const Toast = ({ message, type = 'info', onClose }: { message: string; type?: 'i
 };
 
 export default function ExchangePage() {
-  const { isLoggedIn } = useAuth();
-  const { fetchOrderbook, placeMatchOrder } = useExchange();
+  const { isLoggedIn, token, userId } = useAuth(); // userId 포함
+  const { fetchOrderbook, placeMatchOrder, orders } = useExchange();
   const router = useRouter();
   const [orderbook, setOrderbook] = useState<ExchangeOrder[]>([]);
   const [gameInfo, setGameInfo] = useState<any>(null);
@@ -41,10 +41,15 @@ export default function ExchangePage() {
 
   // 취소된 주문 확인 및 알림
   const checkCancelledOrders = async () => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn || !token) return;
     
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050'}/api/exchange/orders?status=cancelled`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050'}/api/exchange/orders?status=cancelled`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       if (response.ok) {
         const orders = await response.json();
         
@@ -127,25 +132,91 @@ export default function ExchangePage() {
 
   // 대표 경기의 호가 데이터 로드 (실제 데이터가 있는 게임 ID)
   useEffect(() => {
-    if (isLoggedIn) {
-      const gameId = 'bae04692-964e-46f5-bc45-386225b7ec50';
-      const info = getGameInfo(gameId);
-      setGameInfo(info);
+    if (isLoggedIn && token) {
+      // 실제 오픈 상태인 주문들의 게임 ID를 동적으로 가져오기
+      const fetchActiveGameId = async () => {
+        try {
+          // 먼저 사용자의 열린 주문을 확인
+          const userOpenOrders = orders.filter(order => order.status === 'open');
+          
+          if (userOpenOrders.length > 0) {
+            // 사용자의 열린 주문이 있으면 해당 gameId 사용
+            const activeGameId = userOpenOrders[0].gameId;
+            console.log('🏠 Exchange 홈 - 사용자 열린 주문에서 활성 게임 ID:', activeGameId);
+            const info = getGameInfo(activeGameId);
+            setGameInfo(info);
+            
+            fetchOrderbook(activeGameId, '승패', 0).then((orders) => {
+              console.log('🏠 Exchange 홈 - 호가 데이터 로드:', orders);
+              setOrderbook(orders);
+            });
+          } else {
+            // 사용자의 열린 주문이 없으면 전체 열린 주문 조회
+            console.log('🏠 Exchange 홈 - 사용자 열린 주문 없음, 전체 열린 주문 조회');
+            
+            // 전체 열린 주문 조회
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050'}/api/exchange/all-orders`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (response.ok) {
+              const allOrders = await response.json();
+              if (allOrders.length > 0) {
+                const activeGameId = allOrders[0].gameId;
+                console.log('🏠 Exchange 홈 - 전체 열린 주문에서 활성 게임 ID:', activeGameId);
+                const info = getGameInfo(activeGameId);
+                setGameInfo(info);
+                
+                fetchOrderbook(activeGameId, '승패', 0).then((orders) => {
+                  console.log('🏠 Exchange 홈 - 호가 데이터 로드:', orders);
+                  setOrderbook(orders);
+                });
+              } else {
+                console.log('🏠 Exchange 홈 - 전체 열린 주문도 없음');
+                setOrderbook([]);
+                setGameInfo(null);
+              }
+            } else {
+              console.log('🏠 Exchange 홈 - 전체 열린 주문 조회 실패');
+              setOrderbook([]);
+              setGameInfo(null);
+            }
+          }
+        } catch (error) {
+          console.error('활성 게임 ID 가져오기 실패:', error);
+          // 에러 시 기본 게임 ID 사용
+          const defaultGameId = 'bae04692-964e-46f5-bc45-386225b7ec50';
+          const info = getGameInfo(defaultGameId);
+          setGameInfo(info);
+          
+          fetchOrderbook(defaultGameId, '승패', 0).then((orders) => {
+            console.log('🏠 Exchange 홈 - 기본 호가 데이터 로드:', orders);
+            setOrderbook(orders);
+          });
+        }
+      };
       
-      fetchOrderbook(gameId, '승패', 0).then((orders) => {
-        console.log('🏠 Exchange 홈 - 호가 데이터 로드:', orders);
-        setOrderbook(orders);
-      });
+      fetchActiveGameId();
     } else {
       setOrderbook([]);
       setGameInfo(null);
     }
-  }, [isLoggedIn, fetchOrderbook]);
+  }, [isLoggedIn, token, fetchOrderbook, orders]);
 
   // 매치 주문 핸들러
   const handleMatchOrder = async (existingOrder: ExchangeOrder) => {
-    if (!isLoggedIn) {
+    if (!isLoggedIn || !token) {
       alert('로그인이 필요합니다.');
+      return;
+    }
+
+    // 프론트엔드에서도 자기 주문인지 한 번 더 확인
+    if (String(userId) === String(existingOrder.userId)) {
+      alert('자신의 주문과는 매칭할 수 없습니다.');
+      console.log('🚫 프론트엔드 방어: 자기 주문 매칭 시도 차단');
       return;
     }
 
@@ -164,16 +235,31 @@ export default function ExchangePage() {
       };
 
       console.log('🎯 홈에서 매치 주문 실행:', orderData);
+      console.log('🎯 매칭 대상 주문 userId:', existingOrder.userId, '내 userId:', userId);
       
       const result = await placeMatchOrder(orderData);
       
       if (result.success) {
         alert(`✅ 매치 성공!\n매치된 금액: ${result.totalMatched.toLocaleString()}원\n매치 개수: ${result.matches}개`);
         
-        // 호가창 데이터 새로고침
-        const gameId = 'bae04692-964e-46f5-bc45-386225b7ec50';
-        const updatedOrderbook = await fetchOrderbook(gameId, '승패', 0);
-        setOrderbook(updatedOrderbook);
+        // 호가창 데이터 새로고침 (동적으로 활성 게임 ID 가져오기)
+        try {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050'}/api/exchange/orderbook-test?gameId=bae04692-964e-46f5-bc45-386225b7ec50&market=승패&line=0`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          if (response.ok) {
+            const data = await response.json();
+            const orders = data.orders || [];
+            const activeGameId = orders.length > 0 ? orders[0].gameId : 'bae04692-964e-46f5-bc45-386225b7ec50';
+            const updatedOrderbook = await fetchOrderbook(activeGameId, '승패', 0);
+            setOrderbook(updatedOrderbook);
+          }
+        } catch (error) {
+          console.error('호가창 새로고침 실패:', error);
+        }
       } else {
         alert('매치 실패: ' + (result.error || '알 수 없는 오류'));
       }
@@ -185,7 +271,14 @@ export default function ExchangePage() {
 
   if (orderbook.length > 0) {
     const order = orderbook[0];
-    const info = getGameInfo(order.gameId) || {};
+    // order 객체에서 직접 정보 추출
+    const info = {
+      homeTeam: order.homeTeam || 'Unknown',
+      awayTeam: order.awayTeam || 'Unknown',
+      gameDate: order.commenceTime ? new Date(order.commenceTime).toLocaleString('ko-KR') : 'Unknown',
+      sport: order.sportKey ? order.sportKey.split('_')[0] : 'Unknown',
+      displayName: `${order.homeTeam || 'Unknown'} vs ${order.awayTeam || 'Unknown'}`
+    };
     console.log('실제 order 객체:', JSON.stringify(order, null, 2));
     console.log('getGameInfo 반환:', info);
   }
@@ -217,94 +310,118 @@ export default function ExchangePage() {
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="text-sm text-gray-600 mb-3">
               {orderbook.length > 0 ? (() => {
-                const order = orderbook[0];
-                const info = getGameInfo(order.gameId) || {};
-                const homeTeam = (!info.homeTeam || info.homeTeam === 'Unknown') ? order.homeTeam ?? "Unknown" : info.homeTeam;
-                const awayTeam = (!info.awayTeam || info.awayTeam === 'Unknown') ? order.awayTeam ?? "Unknown" : info.awayTeam;
-                const commenceTime = order.commenceTime ?? null;
-                const displayName = (info.displayName && !info.displayName.startsWith('Unknown'))
-                  ? info.displayName
-                  : ((homeTeam && awayTeam && homeTeam !== "Unknown" && awayTeam !== "Unknown")
-                      ? `${homeTeam} vs ${awayTeam}`
-                      : "Unknown Game");
+                const backOrder = orderbook.find(o => o.side === 'back' && o.status === 'open');
+                const layOrder = orderbook.find(o => o.side === 'lay' && o.status === 'open');
+                // 경기 정보(팀명, 시간 등)는 Back/Lay 중 하나에서 가져옴
+                const gameInfo = backOrder || layOrder;
+                if (!backOrder && !layOrder) {
+                  return <div className="text-center text-gray-400 py-8">현재 오픈된 호가가 없습니다.</div>;
+                }
                 return (
-                  <>
-                    <strong>🏀 {displayName} - 승패 마켓</strong>
-                    <div className="text-xs text-gray-500 mt-1">
-                      📅 {commenceTime ? new Date(commenceTime).toLocaleString('ko-KR', {
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      }) : '경기일 미정'}
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gray-50 border border-gray-200 rounded p-4 shadow mt-4">
+                    {/* 경기 정보 */}
+                    <div className="flex-1 min-w-[180px]">
+                      <div className="font-semibold text-base text-gray-800">{gameInfo.homeTeam} vs {gameInfo.awayTeam}</div>
+                      <div className="text-xs text-gray-500">{gameInfo.commenceTime ? new Date(gameInfo.commenceTime).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '시간 미정'}</div>
                     </div>
-                    <div className="text-xs text-blue-500 mt-1">
-                      🏀 {homeTeam} vs {awayTeam}
+                    {/* Back 정보 */}
+                    <div className="flex flex-col items-center min-w-[120px]">
+                      <div className="text-xs text-blue-600 font-semibold mb-1">Back</div>
+                      {backOrder ? (
+                        <>
+                          <div className="font-bold text-blue-700 text-lg">{backOrder.price.toFixed(2)}</div>
+                          <div className="text-blue-600">{backOrder.amount.toLocaleString()}원</div>
+                        </>
+                      ) : (
+                        <div className="text-gray-400">-</div>
+                      )}
                     </div>
-                  </>
+                    {/* Lay 정보 */}
+                    <div className="flex flex-col items-center min-w-[120px]">
+                      <div className="text-xs text-pink-600 font-semibold mb-1">Lay</div>
+                      {layOrder ? (
+                        <>
+                          <div className="font-bold text-pink-700 text-lg">{layOrder.price.toFixed(2)}</div>
+                          <div className="text-pink-600">{layOrder.amount.toLocaleString()}원</div>
+                        </>
+                      ) : (
+                        <div className="text-gray-400">-</div>
+                      )}
+                    </div>
+                    {/* 매칭 버튼 */}
+                    <div className="flex flex-col items-center min-w-[120px]">
+                      {/* Back만 있을 때 → Lay로 배팅 */}
+                      {backOrder && !layOrder && (
+                        (() => {
+                          console.log('매칭 버튼 상태 (Lay로 배팅):', {
+                            userId,
+                            orderUserId: backOrder.userId,
+                            disabled: !userId || String(userId) === String(backOrder.userId)
+                          });
+                          return (
+                            <button
+                              onClick={() => {
+                                if (!userId || String(userId) === String(backOrder.userId)) {
+                                  alert('자신의 주문과는 매칭할 수 없습니다.');
+                                  return;
+                                }
+                                handleMatchOrder(backOrder);
+                              }}
+                              className={`px-4 py-2 text-white text-xs rounded transition-colors ${
+                                !userId || String(userId) === String(backOrder.userId)
+                                  ? 'bg-gray-300 cursor-not-allowed'
+                                  : 'bg-pink-500 hover:bg-pink-600'
+                              }`}
+                              disabled={!userId || String(userId) === String(backOrder.userId)}
+                            >
+                              Lay로 배팅{String(userId) === String(backOrder.userId) ? ' (내 주문)' : ''}
+                            </button>
+                          );
+                        })()
+                      )}
+                      {/* Lay만 있을 때 → Back으로 배팅 */}
+                      {layOrder && !backOrder && (
+                        (() => {
+                          console.log('매칭 버튼 상태 (Back으로 배팅):', {
+                            userId,
+                            orderUserId: layOrder.userId,
+                            disabled: !userId || String(userId) === String(layOrder.userId)
+                          });
+                          return (
+                            <button
+                              onClick={() => {
+                                if (!userId || String(userId) === String(layOrder.userId)) {
+                                  alert('자신의 주문과는 매칭할 수 없습니다.');
+                                  return;
+                                }
+                                handleMatchOrder(layOrder);
+                              }}
+                              className={`px-4 py-2 text-white text-xs rounded transition-colors ${
+                                !userId || String(userId) === String(layOrder.userId)
+                                  ? 'bg-gray-300 cursor-not-allowed'
+                                  : 'bg-blue-500 hover:bg-blue-600'
+                              }`}
+                              disabled={!userId || String(userId) === String(layOrder.userId)}
+                            >
+                              Back으로 배팅{String(userId) === String(layOrder.userId) ? ' (내 주문)' : ''}
+                            </button>
+                          );
+                        })()
+                      )}
+                      {/* 둘 다 있을 때는 매칭 버튼 없음 (이미 매칭됨) */}
+                      {backOrder && layOrder && (
+                        <div className="text-xs text-gray-400">매칭 대기 없음</div>
+                      )}
+                    </div>
+                  </div>
                 );
               })() : (
                 <strong>🏀 경기 정보 로딩 중...</strong>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              {/* Back 주문들 */}
-              <div>
-                <h4 className="text-sm font-semibold text-blue-600 mb-2 text-center">Back (베팅)</h4>
-                <div className="space-y-1">
-                  {orderbook
-                    .filter(order => order.side === 'back' && order.status === 'open')
-                    .sort((a, b) => b.price - a.price) // 높은 가격부터
-                    .slice(0, 3) // 상위 3개만 표시
-                    .map((order) => (
-                      <div key={order.id} className="bg-blue-50 border border-blue-200 rounded p-2 text-sm">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="font-bold text-blue-700">{order.price.toFixed(2)}</span>
-                          <span className="text-right text-blue-600">{order.amount.toLocaleString()}원</span>
-                        </div>
-                        <div className="flex justify-center">
-                          <button
-                            onClick={() => handleMatchOrder(order)}
-                            className="px-2 py-1 bg-pink-500 text-white text-xs rounded hover:bg-pink-600 transition-colors"
-                          >
-                            Lay로 매치
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-              
-              {/* Lay 주문들 */}
-              <div>
-                <h4 className="text-sm font-semibold text-pink-600 mb-2 text-center">Lay (레이)</h4>
-                <div className="space-y-1">
-                  {orderbook
-                    .filter(order => order.side === 'lay' && order.status === 'open')
-                    .sort((a, b) => a.price - b.price) // 낮은 가격부터
-                    .slice(0, 3) // 상위 3개만 표시
-                    .map((order) => (
-                      <div key={order.id} className="bg-pink-50 border border-pink-200 rounded p-2 text-sm">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="font-bold text-pink-700">{order.price.toFixed(2)}</span>
-                          <span className="text-right text-pink-600">{order.amount.toLocaleString()}원</span>
-                        </div>
-                        <div className="flex justify-center">
-                          <button
-                            onClick={() => handleMatchOrder(order)}
-                            className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors"
-                          >
-                            Back으로 매치
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            </div>
             <div className="mt-3 text-center">
               <button
-                onClick={() => router.push('/exchange/basketball_nba')}
+                onClick={() => router.push('/exchange/orderbook')}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
               >
                 전체 호가 보기 →

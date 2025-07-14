@@ -147,6 +147,7 @@ const authController = {
       // username, email, balance, 관리자 정보도 함께 반환
       res.json({ 
         token, 
+        userId: user.id, // userId 직접 포함
         username: user.username, 
         email: user.email, 
         balance: Number(user.balance),

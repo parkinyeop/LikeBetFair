@@ -27,7 +27,8 @@ export default function LoginForm({ onClose }: { onClose: () => void }) {
           Number(data.balance), 
           data.token,
           data.isAdmin || false, 
-          data.adminLevel || 0
+          data.adminLevel || 0,
+          data.userId // userId 추가
         );
         onClose();
       } else {

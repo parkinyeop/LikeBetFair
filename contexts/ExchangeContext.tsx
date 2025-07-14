@@ -7,6 +7,9 @@ export interface SelectedBet {
   gameId?: string;
   market?: string;
   line?: number;
+  homeTeam?: string;
+  awayTeam?: string;
+  commenceTime?: string;
 }
 
 interface ExchangeContextType {

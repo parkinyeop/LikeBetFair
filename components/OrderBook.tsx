@@ -27,16 +27,16 @@ export default function OrderBook({ gameId, market, line, onOrderClick }: OrderB
     }
   };
 
-  // 초기 로드 및 주기적 업데이트
+  // 초기 로드 및 주기적 업데이트 (로그인 상태와 관계없이 호가창 표시)
   useEffect(() => {
-    if (isLoggedIn && gameId) {
+    if (gameId) {
       loadOrderbook();
       
       // 10초마다 호가창 업데이트
       const interval = setInterval(loadOrderbook, 10000);
       return () => clearInterval(interval);
     }
-  }, [isLoggedIn, gameId, market, line]);
+  }, [gameId, market, line]);
 
   // 내 주문 취소 핸들러
   const handleCancelOrder = async (orderId: number) => {

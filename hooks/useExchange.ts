@@ -19,6 +19,7 @@ export interface ExchangeOrder {
   homeTeam?: string;
   awayTeam?: string;
   commenceTime?: string;
+  sportKey?: string; // 스포츠 키 추가
 }
 
 export interface ExchangeBalance {
@@ -87,9 +88,11 @@ export const useExchange = () => {
       const response = await fetch('http://localhost:5050/api/exchange/orders', { headers });
       if (!response.ok) throw new Error('주문 내역 조회 실패');
       
-      const data: { orders: ExchangeOrder[] } = await response.json();
-      setOrders(data.orders);
+      const data: ExchangeOrder[] = await response.json();
+      console.log('📋 주문 내역 조회 성공:', data.length, '개 주문');
+      setOrders(data);
     } catch (err) {
+      console.error('❌ 주문 내역 조회 오류:', err);
       setError(err instanceof Error ? err.message : '주문 내역 조회 중 오류 발생');
     } finally {
       setLoading(false);
@@ -216,7 +219,7 @@ export const useExchange = () => {
     }
   }, [token, fetchBalance, fetchOrders]);
 
-  // 호가 조회 (로그인 없이도 가능)
+  // 호가 조회 (공개 API - 토큰 불필요)
   const fetchOrderbook = useCallback(async (
     gameId: string,
     market: string,
@@ -238,7 +241,11 @@ export const useExchange = () => {
         : `http://localhost:5050/api/exchange/orderbook-test?gameId=${encodedGameId}&market=${encodedMarket}`;
       console.log('fetchOrderbook URL:', url);
       
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
       
       console.log('fetchOrderbook 응답 상태:', response.status);
       
@@ -254,6 +261,30 @@ export const useExchange = () => {
     } catch (err) {
       console.error('fetchOrderbook 에러:', err);
       setError(err instanceof Error ? err.message : '호가 조회 중 오류 발생');
+      return [];
+    }
+  }, []);
+
+  // 전체 오픈 주문 조회 (공개 API - 토큰 불필요)
+  const fetchAllOpenOrders = useCallback(async () => {
+    try {
+      const response = await fetch('http://localhost:5050/api/exchange/all-orders', {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`전체 주문 조회 실패: ${response.status} ${errorText}`);
+      }
+      
+      const data: ExchangeOrder[] = await response.json();
+      console.log('fetchAllOpenOrders 성공:', data.length, '개 주문');
+      return data;
+    } catch (err) {
+      console.error('fetchAllOpenOrders 에러:', err);
+      setError(err instanceof Error ? err.message : '전체 주문 조회 중 오류 발생');
       return [];
     }
   }, []);
@@ -295,6 +326,7 @@ export const useExchange = () => {
     placeMatchOrder,
     cancelOrder,
     fetchOrderbook,
+    fetchAllOpenOrders,
     clearError: () => setError(null),
   };
 }; 
