@@ -21,7 +21,7 @@ export default function LoginForm({ onClose }: { onClose: () => void }) {
       console.log('로그인 응답:', data);
       console.log('로그인 응답 balance:', data.balance, typeof data.balance);
       if (res.ok) {
-        localStorage.setItem('token', data.token);
+        // localStorage 직접 조작 제거 - AuthContext의 login 함수가 처리
         login(
           data.username || data.email, 
           Number(data.balance), 
@@ -39,33 +39,56 @@ export default function LoginForm({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
-      <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow w-80">
-        <h2 className="text-xl font-bold mb-4">로그인</h2>
-        <input
-          className="w-full mb-2 p-2 border rounded text-black"
-          placeholder="Email"
-          type="email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          required
-        />
-        <input
-          className="w-full mb-4 p-2 border rounded text-black"
-          placeholder="Password"
-          type="password"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          required
-        />
-        <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded mb-2">
-          로그인
-        </button>
-        <button type="button" className="w-full bg-gray-300 py-2 rounded" onClick={onClose}>
-          닫기
-        </button>
-        {message && <div className="mt-2 text-center text-sm text-red-500">{message}</div>}
-      </form>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white p-8 rounded-lg shadow-lg w-96">
+        <h2 className="text-2xl font-bold mb-6 text-center">로그인</h2>
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2">
+              이메일 또는 사용자명
+            </label>
+            <input
+              type="text"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              required
+            />
+          </div>
+          <div className="mb-6">
+            <label className="block text-gray-700 text-sm font-bold mb-2">
+              비밀번호
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              required
+            />
+          </div>
+          {message && (
+            <div className="mb-4 p-2 bg-red-100 border border-red-400 text-red-700 rounded">
+              {message}
+            </div>
+          )}
+          <div className="flex items-center justify-between">
+            <button
+              type="submit"
+              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+            >
+              로그인
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+            >
+              취소
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 } 

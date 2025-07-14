@@ -8,17 +8,15 @@ function OrderPanel() {
     loading, 
     error, 
     placeOrder, 
-    clearError
+    clearError,
+    orders: userOrders,
+    fetchOrders
   } = useExchange();
   const { selectedBet, setSelectedBet } = useExchangeContext();
-  const { balance } = useAuth();
-  
-  // 디버깅용 로그
-  console.log('OrderPanel selectedBet:', selectedBet);
-  console.log('OrderPanel selectedBet type:', typeof selectedBet);
-  console.log('OrderPanel selectedBet keys:', selectedBet ? Object.keys(selectedBet) : 'null');
+  const { balance, username } = useAuth();
   
   const [form, setForm] = useState<OrderForm>({ side: 'back', price: 1.91, amount: 10000 });
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   
   // selectedBet이 변경될 때 form의 price 업데이트
   React.useEffect(() => {
@@ -26,8 +24,33 @@ function OrderPanel() {
       setForm(prev => ({ ...prev, price: selectedBet.price }));
     }
   }, [selectedBet]);
-  const [selectedGame, setSelectedGame] = useState('xxx');
-  const [selectedLine, setSelectedLine] = useState(8.5);
+
+  // 실시간 업데이트 (30초마다)
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      fetchOrders();
+      setLastUpdate(new Date());
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [fetchOrders]);
+
+  // 통계 계산
+  const stats = React.useMemo(() => {
+    const total = userOrders.length;
+    const open = userOrders.filter(order => order.status === 'open').length;
+    const matched = userOrders.filter(order => order.status === 'matched').length;
+    const totalAmount = userOrders.reduce((sum, order) => sum + order.amount, 0);
+    const totalPotentialProfit = userOrders.reduce((sum, order) => {
+      if (order.side === 'back') {
+        return sum + (order.amount * (order.price - 1));
+      } else {
+        return sum + (order.amount * (order.price - 1) / order.price);
+      }
+    }, 0);
+
+    return { total, open, matched, totalAmount, totalPotentialProfit };
+  }, [userOrders]);
 
   const handleOrder = async () => {
     if (!selectedBet) {
@@ -46,13 +69,16 @@ function OrderPanel() {
     
     try {
       const orderData = {
-        gameId: selectedBet.gameId || selectedGame,
-        market: selectedBet.market || 'totals',
-        line: selectedBet.line || selectedLine,
+        gameId: selectedBet.gameId || '',
+        market: selectedBet.market || 'h2h',
+        line: selectedBet.line || 0,
         side: selectedBet.type,
         price: selectedBet.price,
         amount: form.amount,
-        selection: selectedBet.team // 팀명을 selection으로 전달
+        selection: selectedBet.team,
+        homeTeam: selectedBet.homeTeam, // 추가
+        awayTeam: selectedBet.awayTeam, // 추가
+        commenceTime: selectedBet.commenceTime // 추가
       };
       
       console.log('주문 요청:', orderData);
@@ -79,6 +105,21 @@ function OrderPanel() {
 
   return (
     <div className="h-full overflow-y-auto">
+      {/* 마지막 업데이트 정보 */}
+      <div className="bg-blue-50 p-2 rounded mb-3 border border-blue-200">
+        <div className="flex justify-between items-center">
+          <h3 className="font-semibold text-sm text-blue-800">실시간 업데이트</h3>
+          <div className="text-xs text-blue-600">
+            {lastUpdate.toLocaleTimeString('ko-KR', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            })}
+          </div>
+        </div>
+      </div>
+
+
+
       {/* 선택된 배팅 정보 */}
       <div className="bg-gray-50 p-3 rounded mb-3 border border-gray-200">
         <h3 className="font-semibold mb-2 text-sm text-gray-700">선택된 배팅</h3>
@@ -165,8 +206,6 @@ function OrderPanel() {
           <button onClick={clearError} className="float-right font-bold">&times;</button>
         </div>
       )}
-      
-
     </div>
   );
 }
@@ -280,23 +319,18 @@ function OrderHistoryPanel() {
   // 통계 계산
   const stats = React.useMemo(() => {
     const total = userOrders.length;
-    const open = userOrders.filter(o => o.status === 'open').length;
-    const matched = userOrders.filter(o => o.status === 'matched').length;
-    const settled = userOrders.filter(o => o.status === 'settled').length;
-    const cancelled = userOrders.filter(o => o.status === 'cancelled').length;
-    
-    const totalAmount = userOrders.reduce((sum, o) => sum + o.amount, 0);
-    const totalPotentialProfit = userOrders.reduce((sum, o) => {
-      const profit = o.side === 'back' 
-        ? o.amount * (o.price - 1)
-        : o.amount * (o.price - 1) / o.price;
-      return sum + profit;
+    const open = userOrders.filter(order => order.status === 'open').length;
+    const matched = userOrders.filter(order => order.status === 'matched').length;
+    const totalAmount = userOrders.reduce((sum, order) => sum + order.amount, 0);
+    const totalPotentialProfit = userOrders.reduce((sum, order) => {
+      if (order.side === 'back') {
+        return sum + (order.amount * (order.price - 1));
+      } else {
+        return sum + (order.amount * (order.price - 1) / order.price);
+      }
     }, 0);
 
-    return {
-      total, open, matched, settled, cancelled,
-      totalAmount, totalPotentialProfit
-    };
+    return { total, open, matched, totalAmount, totalPotentialProfit };
   }, [userOrders]);
 
   return (
@@ -339,46 +373,50 @@ function OrderHistoryPanel() {
         {/* 필터 및 정렬 컨트롤 */}
         <div className="mb-3 space-y-2">
           {/* 상태 필터 */}
-          <div className="flex flex-wrap gap-1">
-            {[
-              { value: 'all', label: '전체', color: 'bg-gray-200' },
-              { value: 'open', label: '미체결', color: 'bg-yellow-200' },
-              { value: 'matched', label: '체결', color: 'bg-green-200' },
-              { value: 'settled', label: '정산', color: 'bg-blue-200' },
-              { value: 'cancelled', label: '취소', color: 'bg-red-200' }
-            ].map(filter => (
+          <div className="flex space-x-1">
+            {['all', 'open', 'matched', 'cancelled'].map(status => (
               <button
-                key={filter.value}
-                onClick={() => setStatusFilter(filter.value)}
-                className={`px-2 py-1 text-xs rounded-full transition-colors ${
-                  statusFilter === filter.value 
-                    ? `${filter.color} text-gray-800 font-medium` 
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`flex-1 py-1 px-2 text-xs rounded ${
+                  statusFilter === status
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               >
-                {filter.label}
+                {status === 'all' ? '전체' : 
+                 status === 'open' ? '미체결' :
+                 status === 'matched' ? '체결' : '취소'}
               </button>
             ))}
           </div>
-
+          
           {/* 정렬 컨트롤 */}
-          <div className="flex items-center space-x-2">
-            <span className="text-xs text-gray-600">정렬:</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as 'date' | 'amount' | 'price')}
-              className="text-xs border border-gray-300 rounded px-2 py-1"
-            >
-              <option value="date">날짜순</option>
-              <option value="amount">금액순</option>
-              <option value="price">배당순</option>
-            </select>
-            <button
-              onClick={toggleSortOrder}
-              className="text-xs text-gray-600 hover:text-gray-800"
-            >
-              {sortOrder === 'asc' ? '↑' : '↓'}
-            </button>
+          <div className="flex space-x-1">
+            {[
+              { key: 'date', label: '날짜' },
+              { key: 'amount', label: '금액' },
+              { key: 'price', label: '배당' }
+            ].map(item => (
+              <button
+                key={item.key}
+                onClick={() => {
+                  if (sortBy === item.key) {
+                    toggleSortOrder();
+                  } else {
+                    setSortBy(item.key as any);
+                    setSortOrder('desc');
+                  }
+                }}
+                className={`flex-1 py-1 px-2 text-xs rounded ${
+                  sortBy === item.key
+                    ? 'bg-green-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {item.label} {sortBy === item.key && (sortOrder === 'asc' ? '↑' : '↓')}
+              </button>
+            ))}
           </div>
         </div>
         
@@ -535,12 +573,8 @@ function OrderHistoryPanel() {
 }
 
 export default function ExchangeSidebar() {
+  const [activeTab, setActiveTab] = useState<'order' | 'history'>('order');
   const { isLoggedIn, balance } = useAuth();
-  const [tab, setTab] = useState<'order' | 'history'>('order');
-
-  const handleTabChange = (newTab: 'order' | 'history') => {
-    setTab(newTab);
-  };
 
   if (!isLoggedIn) {
     return (
@@ -556,22 +590,33 @@ export default function ExchangeSidebar() {
         <h2 className="text-lg font-bold">EXCHANGE</h2>
         <span className="text-sm font-semibold text-blue-600">잔액: {balance !== null ? Math.round(Number(balance)).toLocaleString() : '-'}원</span>
       </div>
-      <div className="flex space-x-2 mb-2">
+      
+      {/* 탭 네비게이션 */}
+      <div className="flex space-x-1 mb-3">
         <button
-          className={`flex-1 py-1 rounded ${tab === 'order' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
-          onClick={() => handleTabChange('order')}
+          onClick={() => setActiveTab('order')}
+          className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg transition-colors ${
+            activeTab === 'order'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+          }`}
         >
-          주문
+          주문하기
         </button>
         <button
-          className={`flex-1 py-1 rounded ${tab === 'history' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
-          onClick={() => handleTabChange('history')}
+          onClick={() => setActiveTab('history')}
+          className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg transition-colors ${
+            activeTab === 'history'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+          }`}
         >
           주문내역
         </button>
       </div>
+      
       <div className="flex-1 min-h-0 flex flex-col">
-        {tab === 'order' ? <OrderPanel /> : <OrderHistoryPanel />}
+        {activeTab === 'order' ? <OrderPanel /> : <OrderHistoryPanel />}
       </div>
     </aside>
   );

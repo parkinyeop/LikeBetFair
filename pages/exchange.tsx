@@ -70,14 +70,14 @@ export default function ExchangePage() {
     return () => clearInterval(interval);
   }, []);
 
-  // 대표 경기의 호가 데이터 로드 (원래 실제 게임 ID)
+  // 대표 경기의 호가 데이터 로드 (실제 데이터가 있는 게임 ID)
   useEffect(() => {
     if (isLoggedIn) {
-      const gameId = '8818fb84-7b44-4cfa-a406-83f8bf1457d1';
+      const gameId = 'bae04692-964e-46f5-bc45-386225b7ec50';
       const info = getGameInfo(gameId);
       setGameInfo(info);
       
-      fetchOrderbook(gameId, '승패', 8.5).then((orders) => {
+      fetchOrderbook(gameId, '승패', 0).then((orders) => {
         console.log('🏠 Exchange 홈 - 호가 데이터 로드:', orders);
         setOrderbook(orders);
       });
@@ -116,8 +116,8 @@ export default function ExchangePage() {
         alert(`✅ 매치 성공!\n매치된 금액: ${result.totalMatched.toLocaleString()}원\n매치 개수: ${result.matches}개`);
         
         // 호가창 데이터 새로고침
-        const gameId = '8818fb84-7b44-4cfa-a406-83f8bf1457d1';
-        const updatedOrderbook = await fetchOrderbook(gameId, '승패', 8.5);
+        const gameId = 'bae04692-964e-46f5-bc45-386225b7ec50';
+        const updatedOrderbook = await fetchOrderbook(gameId, '승패', 0);
         setOrderbook(updatedOrderbook);
       } else {
         alert('매치 실패: ' + (result.error || '알 수 없는 오류'));
@@ -127,6 +127,13 @@ export default function ExchangePage() {
       alert('매치 주문 중 오류가 발생했습니다: ' + (error as Error).message);
     }
   };
+
+  if (orderbook.length > 0) {
+    const order = orderbook[0];
+    const info = getGameInfo(order.gameId) || {};
+    console.log('실제 order 객체:', JSON.stringify(order, null, 2));
+    console.log('getGameInfo 반환:', info);
+  }
 
   return (
     <div className="h-full flex flex-col">
@@ -145,22 +152,34 @@ export default function ExchangePage() {
         ) : (
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="text-sm text-gray-600 mb-3">
-              {gameInfo ? (
-                <>
-                  <strong>🏀 {gameInfo.displayName} - 승패 마켓</strong>
-                  <div className="text-xs text-gray-500 mt-1">
-                    📅 {new Date(gameInfo.gameDate).toLocaleString('ko-KR', {
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </div>
-                  <div className="text-xs text-blue-500 mt-1">
-                    🏀 {gameInfo.homeTeam} vs {gameInfo.awayTeam}
-                  </div>
-                </>
-              ) : (
+              {orderbook.length > 0 ? (() => {
+                const order = orderbook[0];
+                const info = getGameInfo(order.gameId) || {};
+                const homeTeam = (!info.homeTeam || info.homeTeam === 'Unknown') ? order.homeTeam ?? "Unknown" : info.homeTeam;
+                const awayTeam = (!info.awayTeam || info.awayTeam === 'Unknown') ? order.awayTeam ?? "Unknown" : info.awayTeam;
+                const commenceTime = order.commenceTime ?? null;
+                const displayName = (info.displayName && !info.displayName.startsWith('Unknown'))
+                  ? info.displayName
+                  : ((homeTeam && awayTeam && homeTeam !== "Unknown" && awayTeam !== "Unknown")
+                      ? `${homeTeam} vs ${awayTeam}`
+                      : "Unknown Game");
+                return (
+                  <>
+                    <strong>🏀 {displayName} - 승패 마켓</strong>
+                    <div className="text-xs text-gray-500 mt-1">
+                      📅 {commenceTime ? new Date(commenceTime).toLocaleString('ko-KR', {
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      }) : '경기일 미정'}
+                    </div>
+                    <div className="text-xs text-blue-500 mt-1">
+                      🏀 {homeTeam} vs {awayTeam}
+                    </div>
+                  </>
+                );
+              })() : (
                 <strong>🏀 경기 정보 로딩 중...</strong>
               )}
             </div>
@@ -170,7 +189,7 @@ export default function ExchangePage() {
                 <h4 className="text-sm font-semibold text-blue-600 mb-2 text-center">Back (베팅)</h4>
                 <div className="space-y-1">
                   {orderbook
-                    .filter(order => order.side === 'back')
+                    .filter(order => order.side === 'back' && order.status === 'open')
                     .sort((a, b) => b.price - a.price) // 높은 가격부터
                     .slice(0, 3) // 상위 3개만 표시
                     .map((order) => (
@@ -197,7 +216,7 @@ export default function ExchangePage() {
                 <h4 className="text-sm font-semibold text-pink-600 mb-2 text-center">Lay (레이)</h4>
                 <div className="space-y-1">
                   {orderbook
-                    .filter(order => order.side === 'lay')
+                    .filter(order => order.side === 'lay' && order.status === 'open')
                     .sort((a, b) => a.price - b.price) // 낮은 가격부터
                     .slice(0, 3) // 상위 3개만 표시
                     .map((order) => (

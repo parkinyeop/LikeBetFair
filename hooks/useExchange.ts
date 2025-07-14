@@ -16,6 +16,9 @@ export interface ExchangeOrder {
   matchedOrderId?: number;
   createdAt: string;
   updatedAt: string;
+  homeTeam?: string;
+  awayTeam?: string;
+  commenceTime?: string;
 }
 
 export interface ExchangeBalance {
@@ -35,6 +38,9 @@ export interface SelectedBet {
   gameId?: string;
   market?: string;
   line?: number;
+  homeTeam?: string; // 추가
+  awayTeam?: string; // 추가
+  commenceTime?: string; // 추가
 }
 
 export const useExchange = () => {
@@ -250,7 +256,7 @@ export const useExchange = () => {
       setError(err instanceof Error ? err.message : '호가 조회 중 오류 발생');
       return [];
     }
-  }, [token]);
+  }, []);
 
   // 초기 데이터 로드
   useEffect(() => {

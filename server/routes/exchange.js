@@ -509,26 +509,50 @@ router.post('/match-order', verifyToken, async (req, res) => {
 
       console.log(`🔄 매칭: ${matchAmount}원 at ${matchPrice}`);
 
-      // 기존 주문 업데이트
-      if (existingOrder.amount === matchAmount) {
-        // 완전 매칭 - 주문 완료 처리
-        await existingOrder.update({
-          status: 'matched',
-          matchedOrderId: null // 매치된 주문 ID는 별도 처리 필요
-        });
-      } else {
-        // 부분 매칭 - 남은 금액으로 업데이트 (부분 매칭은 복잡하므로 현재는 지원하지 않음)
-        // 전체 매칭만 지원
-        await existingOrder.update({
-          status: 'matched',
-          matchedOrderId: null
-        });
-      }
+      // 기존 주문 matched 처리
+      await existingOrder.update({
+        status: 'matched',
+        matchedOrderId: null // 이후에 본인 주문 id로 연결
+      });
+
+      // 게임 데이터 매핑 (본인 matched 주문용)
+      const orderData = await exchangeGameMappingService.mapGameDataToOrder({
+        gameId, market, line, side, price, amount: matchAmount, selection, homeTeam, awayTeam, commenceTime, userId
+      });
+
+      // 본인 matched 주문 생성
+      const myMatchedOrder = await ExchangeOrder.create({
+        userId,
+        gameId,
+        market,
+        line,
+        side,
+        price,
+        amount: matchAmount,
+        selection,
+        status: 'matched',
+        matchedOrderId: existingOrder.id,
+        homeTeam: orderData.homeTeam,
+        awayTeam: orderData.awayTeam,
+        commenceTime: orderData.commenceTime,
+        sportKey: orderData.sportKey,
+        gameResultId: orderData.gameResultId,
+        selectionDetails: orderData.selectionDetails,
+        stakeAmount: side === 'back' ? matchAmount : Math.floor((price - 1) * matchAmount),
+        potentialProfit: side === 'back' ? Math.floor((price - 1) * matchAmount) : matchAmount,
+        autoSettlement: true
+      });
+
+      // 기존 주문에도 matchedOrderId 연결
+      await existingOrder.update({
+        matchedOrderId: myMatchedOrder.id
+      });
 
       remainingAmount -= matchAmount;
       
       matches.push({
         matchedOrderId: existingOrder.id,
+        myOrderId: myMatchedOrder.id,
         matchAmount,
         matchPrice,
         counterpartyUserId: existingOrder.userId

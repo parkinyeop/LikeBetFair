@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
 interface AuthContextType {
   isLoggedIn: boolean;
@@ -22,8 +22,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminLevel, setAdminLevel] = useState(0);
   const [token, setToken] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // 페이지 로드 시 localStorage에서 인증 정보 복원
+  useEffect(() => {
+    const initializeAuth = () => {
+      try {
+        const storedToken = localStorage.getItem('token');
+        const storedUsername = localStorage.getItem('username');
+        const storedBalance = localStorage.getItem('balance');
+        const storedIsAdmin = localStorage.getItem('isAdmin');
+        const storedAdminLevel = localStorage.getItem('adminLevel');
+
+        if (storedToken && storedUsername) {
+          console.log('[AuthContext] 저장된 인증 정보 복원:', {
+            username: storedUsername,
+            hasToken: !!storedToken,
+            balance: storedBalance
+          });
+          
+          setIsLoggedIn(true);
+          setUsername(storedUsername);
+          setBalance(storedBalance ? Number(storedBalance) : null);
+          setToken(storedToken);
+          setIsAdmin(storedIsAdmin === 'true');
+          setAdminLevel(storedAdminLevel ? Number(storedAdminLevel) : 0);
+        } else {
+          console.log('[AuthContext] 저장된 인증 정보 없음');
+        }
+      } catch (error) {
+        console.error('[AuthContext] 인증 정보 복원 중 오류:', error);
+        // 오류 발생 시 모든 인증 정보 초기화
+        logout();
+      } finally {
+        setIsInitialized(true);
+      }
+    };
+
+    initializeAuth();
+  }, []);
 
   const login = (username: string, balance: number, token: string, isAdmin = false, adminLevel = 0) => {
+    console.log('[AuthContext] 로그인:', { username, balance, hasToken: !!token, isAdmin, adminLevel });
+    
+    // localStorage에 저장
+    localStorage.setItem('token', token);
+    localStorage.setItem('username', username);
+    localStorage.setItem('balance', balance.toString());
+    localStorage.setItem('isAdmin', isAdmin.toString());
+    localStorage.setItem('adminLevel', adminLevel.toString());
+    
+    // 상태 업데이트
     setIsLoggedIn(true);
     setUsername(username);
     setBalance(balance);
@@ -33,6 +82,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    console.log('[AuthContext] 로그아웃');
+    
+    // localStorage에서 제거
+    localStorage.removeItem('token');
+    localStorage.removeItem('username');
+    localStorage.removeItem('balance');
+    localStorage.removeItem('isAdmin');
+    localStorage.removeItem('adminLevel');
+    
+    // 상태 초기화
     setIsLoggedIn(false);
     setUsername(null);
     setBalance(null);
@@ -56,6 +115,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const permissions = ADMIN_PERMISSIONS[adminLevel] || [];
     return permissions.includes('*') || permissions.includes(permission);
   };
+
+  // 초기화가 완료될 때까지 로딩 표시
+  if (!isInitialized) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <AuthContext.Provider value={{ 

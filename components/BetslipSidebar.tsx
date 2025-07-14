@@ -16,19 +16,29 @@ function MyBetsPanel() {
   const [openBetIds, setOpenBetIds] = useState<{ [id: string]: boolean }>({});
   const [filter, setFilter] = useState<'all' | 'pending' | 'won' | 'lost'>('pending');
   const [hidePastResults, setHidePastResults] = useState(false);
-  const { setBalance } = useAuth();
+  const { setBalance, token, username } = useAuth(); // token과 username 추가
 
   const fetchBets = async () => {
     console.log('[클라이언트] 베팅 내역 fetch 시작');
+    console.log('[클라이언트] 현재 사용자:', username);
+    console.log('[클라이언트] 토큰 존재:', !!token);
+    
     setLoading(true);
     setError('');
     try {
-      const token = localStorage.getItem('token');
-      console.log('[클라이언트] 토큰 확인:', token ? '있음' : '없음');
+      // 토큰이 없으면 요청하지 않음
+      if (!token) {
+        console.log('[클라이언트] 토큰이 없어서 요청 중단');
+        setBets([]);
+        return;
+      }
       
       console.log('[클라이언트] API 요청 시작: http://localhost:5050/api/bet/history');
       const res = await fetch('http://localhost:5050/api/bet/history', {
-        headers: { 'x-auth-token': token || '' },
+        headers: { 
+          'x-auth-token': token,
+          'Content-Type': 'application/json'
+        },
       });
       
       console.log('[클라이언트] API 응답 상태:', res.status, res.statusText);
@@ -79,18 +89,25 @@ function MyBetsPanel() {
   };
 
   useEffect(() => {
-    fetchBets();
+    // 토큰이 있을 때만 fetch 실행
+    if (token) {
+      fetchBets();
+    } else {
+      setBets([]); // 토큰이 없으면 빈 배열로 초기화
+    }
     
     // 30초마다 배팅 내역 새로고침 (진행중인 배팅이 있을 때만)
     const interval = setInterval(() => {
-      const hasPendingBets = bets.some(bet => bet.status === 'pending');
-      if (hasPendingBets) {
-        fetchBets();
+      if (token) { // 토큰이 있을 때만 실행
+        const hasPendingBets = bets.some(bet => bet.status === 'pending');
+        if (hasPendingBets) {
+          fetchBets();
+        }
       }
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [bets.length]); // bets.length를 의존성으로 추가하여 배팅이 추가/제거될 때마다 새로고침
+  }, [token, username]); // token과 username을 의존성으로 추가
 
   // 전역 이벤트 리스너로 배팅 완료 시 새로고침
   useEffect(() => {

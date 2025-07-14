@@ -65,7 +65,7 @@ const OddsChangeModal = ({
 
 const BetSelectionPanel = () => {
   const { selections, stake, setStake, removeSelection, clearAll, updateSelection } = useBetStore();
-  const { isLoggedIn, setBalance } = useAuth();
+  const { isLoggedIn, setBalance, token } = useAuth();
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   
@@ -113,7 +113,6 @@ const BetSelectionPanel = () => {
     
     // 즉시 새로운 배당율로 베팅 요청
     try {
-      const token = localStorage.getItem('token');
       const res = await fetch('http://localhost:5050/api/bet/', {
         method: 'POST',
         headers: {
@@ -156,7 +155,6 @@ const BetSelectionPanel = () => {
   // 실제 베팅 제출
   const submitBet = async () => {
     try {
-      const token = localStorage.getItem('token');
       const res = await fetch('http://localhost:5050/api/bet/', {
         method: 'POST',
         headers: {
