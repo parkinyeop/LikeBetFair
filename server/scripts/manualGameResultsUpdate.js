@@ -47,6 +47,18 @@ async function main() {
         const res = await axios.get(url);
         const events = res.data.events || [];
         for (const event of events) {
+          // 자동 판정 로직 추가
+          let result = null;
+          const scoreArr = [event.intHomeScore, event.intAwayScore];
+          if (event.intHomeScore != null && event.intAwayScore != null) {
+            const homeScore = parseInt(event.intHomeScore);
+            const awayScore = parseInt(event.intAwayScore);
+            if (!isNaN(homeScore) && !isNaN(awayScore)) {
+              if (homeScore > awayScore) result = 'home_win';
+              else if (homeScore < awayScore) result = 'away_win';
+              else result = 'draw';
+            }
+          }
           await GameResult.upsert({
             mainCategory: category,
             subCategory: leagueId,
@@ -54,8 +66,8 @@ async function main() {
             awayTeam: event.strAwayTeam,
             commenceTime: new Date(event.dateEvent + ' ' + (event.strTime || '00:00:00')),
             status: mapStatus(event.strStatus),
-            score: [event.intHomeScore, event.intAwayScore],
-            result: null, // 판정 로직 필요시 추가
+            score: scoreArr,
+            result: result,
             eventId: event.idEvent,
             lastUpdated: new Date()
           });

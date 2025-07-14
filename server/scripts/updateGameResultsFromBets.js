@@ -222,6 +222,19 @@ async function updateGameResultsFromBets() {
         const mainCategory = estimateSportCategory(gameInfo.homeTeam, gameInfo.awayTeam);
         
         // GameResults에 저장
+        // 자동 판정 로직 추가
+        let result = 'pending';
+        let score = null;
+        if (gameInfo.score && Array.isArray(gameInfo.score) && gameInfo.score.length === 2) {
+          const homeScore = parseInt(gameInfo.score[0].score);
+          const awayScore = parseInt(gameInfo.score[1].score);
+          score = gameInfo.score;
+          if (!isNaN(homeScore) && !isNaN(awayScore)) {
+            if (homeScore > awayScore) result = 'home_win';
+            else if (homeScore < awayScore) result = 'away_win';
+            else result = 'draw';
+          }
+        }
         await GameResult.create({
           mainCategory,
           subCategory: mainCategory, // 기본값으로 mainCategory 사용
@@ -229,7 +242,8 @@ async function updateGameResultsFromBets() {
           awayTeam: gameInfo.awayTeam,
           commenceTime: gameInfo.commenceTime,
           status: 'scheduled',
-          result: 'pending',
+          score: score,
+          result: result,
           lastUpdated: new Date()
         });
         
