@@ -56,16 +56,40 @@ export default function Home() {
               
               const now = new Date();
               const tomorrow = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+              const bettingDeadlineMinutes = 10; // 경기 시작 10분 전까지 베팅 가능
+              
+              // 1. 기본 필터링: 현재부터 내일까지의 경기
               const filteredGames = data.filter((game: any) => {
                 const gameTime = new Date(game.commence_time);
                 return gameTime >= now && gameTime <= tomorrow;
               });
               
-              if (filteredGames.length > 0) {
-                filteredGames.sort((a: any, b: any) => 
-                  new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime()
-                );
-                gamesData[displayName] = filteredGames;
+              // 2. 베팅 가능 여부 분류 및 정렬
+              const categorizedGames = filteredGames.map((game: any) => {
+                const gameTime = new Date(game.commence_time);
+                const bettingDeadline = new Date(gameTime.getTime() - bettingDeadlineMinutes * 60 * 1000);
+                const isBettable = now < bettingDeadline;
+                
+                return {
+                  ...game,
+                  isBettable,
+                  gameTime,
+                  bettingDeadline
+                };
+              });
+              
+              // 3. 정렬: 베팅 가능한 경기 우선, 그 다음 시간순
+              const sortedGames = categorizedGames.sort((a, b) => {
+                // 베팅 가능한 경기가 우선
+                if (a.isBettable && !b.isBettable) return -1;
+                if (!a.isBettable && b.isBettable) return 1;
+                
+                // 둘 다 베팅 가능하거나 둘 다 불가능한 경우, 시간순 정렬
+                return a.gameTime.getTime() - b.gameTime.getTime();
+              });
+              
+              if (sortedGames.length > 0) {
+                gamesData[displayName] = sortedGames;
               }
             }
           } catch (err) {
@@ -110,11 +134,15 @@ export default function Home() {
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
         const maxDate = new Date(now.getTime() + TIME_CONFIG.BETTING_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+        const bettingDeadlineMinutes = 10; // 경기 시작 10분 전까지 베팅 가능
+        
+        // 1. 기본 필터링: 오늘부터 7일 후까지의 경기
         const filteredGames = data.filter((game: any) => {
           const gameTime = new Date(game.commence_time);
           return gameTime >= startOfToday && gameTime <= maxDate;
         });
         
+        // 2. 중복 제거
         const uniqueGamesMap = new Map();
         filteredGames.forEach((game: any) => {
           const key = `${game.home_team}|${game.away_team}|${game.commence_time}`;
@@ -131,14 +159,35 @@ export default function Home() {
           }
         });
         const uniqueGames = Array.from(uniqueGamesMap.values());
-        uniqueGames.sort((a: any, b: any) => {
-          return new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime();
+        
+        // 3. 베팅 가능 여부 분류 및 정렬
+        const categorizedGames = uniqueGames.map((game: any) => {
+          const gameTime = new Date(game.commence_time);
+          const bettingDeadline = new Date(gameTime.getTime() - bettingDeadlineMinutes * 60 * 1000);
+          const isBettable = now < bettingDeadline;
+          
+          return {
+            ...game,
+            isBettable,
+            gameTime,
+            bettingDeadline
+          };
+        });
+        
+        // 4. 정렬: 베팅 가능한 경기 우선, 그 다음 시간순
+        const sortedGames = categorizedGames.sort((a, b) => {
+          // 베팅 가능한 경기가 우선
+          if (a.isBettable && !b.isBettable) return -1;
+          if (!a.isBettable && b.isBettable) return 1;
+          
+          // 둘 다 베팅 가능하거나 둘 다 불가능한 경우, 시간순 정렬
+          return a.gameTime.getTime() - b.gameTime.getTime();
         });
         
         if (selectedCategory === "KBO" && filteredGames.length > 0) {
           console.log("KBO bookmakers 구조 sample:", filteredGames[0].bookmakers);
         }
-        setGames(uniqueGames);
+        setGames(sortedGames);
         setCurrentSportKey(selectedCategory);
         setLoading(false);
       } catch (err) {
@@ -298,12 +347,13 @@ export default function Home() {
               {todayGames[leagueName].map((game, index) => {
                 const mainMarket = game.bookmakers?.[0]?.markets?.find((m: any) => m.key === 'h2h');
                 const totalsMarket = game.bookmakers?.[0]?.markets?.find((m: any) => m.key === 'totals');
+                const isBettable = game.isBettable !== undefined ? game.isBettable : true;
                 
                 return (
                   <div 
                     key={`${leagueName}-${index}`} 
                     onClick={() => handleGameClick(game, leagueName)}
-                    className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
+                    className={`bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer ${!isBettable ? 'opacity-60' : ''}`}
                   >
                     <div className="space-y-3">
                       {/* 경기 정보 */}
@@ -319,6 +369,11 @@ export default function Home() {
                             time={game.commence_time} 
                             showStatus={true} 
                           />
+                          {!isBettable && (
+                            <div className="text-xs text-red-500 mt-1">
+                              ⏰ 베팅 마감
+                            </div>
+                          )}
                         </div>
                       </div>
                       

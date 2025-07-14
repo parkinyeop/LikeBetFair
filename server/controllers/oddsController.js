@@ -39,7 +39,7 @@ const oddsController = {
           sportKey: { [Op.in]: possibleKeys },
           commenceTime: { [Op.gte]: today, [Op.lt]: weekLater }
         },
-        order: [['commenceTime', 'DESC']]
+        order: [['commenceTime', 'ASC']]
       });
 
       // 동일 경기 중복 제거 (최신 odds만)

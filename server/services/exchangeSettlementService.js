@@ -342,6 +342,101 @@ class ExchangeSettlementService {
   }
 
   /**
+   * 경기 시작 시점에 매칭되지 않은 주문 자동 취소
+   */
+  async cancelUnmatchedOrdersAtKickoff() {
+    try {
+      console.log('🔄 경기 시작 시점 매칭되지 않은 주문 자동 취소 시작...');
+      
+      // 매칭되지 않은 주문들 조회 (경기 시작 시간이 지난 주문들)
+      const unmatchedOrders = await ExchangeOrder.findAll({
+        where: {
+          status: 'open',
+          matchedOrderId: null,
+          commenceTime: {
+            [Op.lte]: new Date() // 경기 시작 시간이 지난 주문
+          }
+        }
+      });
+
+      console.log(`📊 매칭되지 않은 주문 수: ${unmatchedOrders.length}`);
+
+      if (unmatchedOrders.length === 0) {
+        console.log('✅ 취소할 주문이 없습니다.');
+        return { cancelledCount: 0, totalRefund: 0 };
+      }
+
+      let cancelledCount = 0;
+      let totalRefund = 0;
+
+      for (const order of unmatchedOrders) {
+        try {
+          console.log(`\n🎯 주문 취소 처리: ID ${order.id}`);
+          console.log(`   경기: ${order.homeTeam} vs ${order.awayTeam}`);
+          console.log(`   사이드: ${order.side}, 금액: ${order.amount}원`);
+          console.log(`   스테이크: ${order.stakeAmount}원`);
+
+          const transaction = await sequelize.transaction();
+
+          try {
+            // 1. 주문 상태 업데이트
+            await order.update({
+              status: 'cancelled',
+              settlementNote: '경기 시작 시점에 매칭되지 않아 자동 취소',
+              settledAt: new Date()
+            }, { transaction });
+
+            // 2. 사용자 잔액 환불
+            await User.increment('balance', {
+              by: order.stakeAmount,
+              where: { id: order.userId }
+            }, { transaction });
+
+            // 환불 후 잔액 조회
+            const user = await User.findByPk(order.userId, { transaction });
+
+            // 3. 환불 내역 기록
+            await PaymentHistory.create({
+              userId: order.userId,
+              betId: null,
+              amount: order.stakeAmount,
+              type: 'refund',
+              memo: 'Exchange 주문 매칭 실패로 인한 환불',
+              status: 'completed',
+              balanceAfter: user.balance,
+              paidAt: new Date()
+            }, { transaction });
+
+            await transaction.commit();
+
+            cancelledCount++;
+            totalRefund += order.stakeAmount;
+
+            console.log(`   ✅ 취소 완료 - 환불: ${order.stakeAmount}원`);
+
+          } catch (error) {
+            await transaction.rollback();
+            console.error(`   ❌ 주문 ${order.id} 취소 실패:`, error.message);
+          }
+
+        } catch (error) {
+          console.error(`❌ 주문 ${order.id} 처리 중 오류:`, error.message);
+        }
+      }
+
+      console.log(`\n📈 자동 취소 완료:`);
+      console.log(`   - 취소된 주문: ${cancelledCount}개`);
+      console.log(`   - 총 환불 금액: ${totalRefund}원`);
+
+      return { cancelledCount, totalRefund };
+
+    } catch (error) {
+      console.error('❌ 매칭되지 않은 주문 자동 취소 중 오류:', error);
+      throw error;
+    }
+  }
+
+  /**
    * 모든 완료된 경기 자동 정산
    */
   async settleAllFinishedGames() {

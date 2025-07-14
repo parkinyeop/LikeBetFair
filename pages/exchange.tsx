@@ -4,6 +4,32 @@ import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from 'next/router';
 import { getGameInfo, getSeasonInfo, getSeasonStatusStyle, getSeasonStatusBadge } from '../config/sportsMapping';
 
+// 간단한 Toast 알림 컴포넌트
+const Toast = ({ message, type = 'info', onClose }: { message: string; type?: 'info' | 'warning' | 'success'; onClose: () => void }) => {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 5000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const bgColor = type === 'warning' ? 'bg-yellow-100 border-yellow-400' : 
+                  type === 'success' ? 'bg-green-100 border-green-400' : 
+                  'bg-blue-100 border-blue-400';
+  const textColor = type === 'warning' ? 'text-yellow-800' : 
+                   type === 'success' ? 'text-green-800' : 
+                   'text-blue-800';
+
+  return (
+    <div className={`fixed top-4 right-4 z-50 p-4 border rounded-lg shadow-lg ${bgColor} ${textColor} max-w-sm`}>
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium">{message}</span>
+        <button onClick={onClose} className="ml-2 text-gray-500 hover:text-gray-700">
+          ×
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export default function ExchangePage() {
   const { isLoggedIn } = useAuth();
   const { fetchOrderbook, placeMatchOrder } = useExchange();
@@ -11,6 +37,35 @@ export default function ExchangePage() {
   const [orderbook, setOrderbook] = useState<ExchangeOrder[]>([]);
   const [gameInfo, setGameInfo] = useState<any>(null);
   const [sportGameCounts, setSportGameCounts] = useState<{[key: string]: number}>({});
+  const [toast, setToast] = useState<{ message: string; type: 'info' | 'warning' | 'success' } | null>(null);
+
+  // 취소된 주문 확인 및 알림
+  const checkCancelledOrders = async () => {
+    if (!isLoggedIn) return;
+    
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050'}/api/exchange/orders?status=cancelled`);
+      if (response.ok) {
+        const orders = await response.json();
+        
+        orders.forEach((order: any) => {
+          if (order.settlementNote?.includes('매칭되지 않아')) {
+            setToast({
+              type: 'warning',
+              message: `${order.homeTeam} vs ${order.awayTeam} 주문이 매칭되지 않아 취소되었습니다.`
+            });
+          }
+        });
+      }
+    } catch (error) {
+      console.error('취소된 주문 확인 중 오류:', error);
+    }
+  };
+
+  // 페이지 로드 시 취소된 주문 확인
+  useEffect(() => {
+    checkCancelledOrders();
+  }, [isLoggedIn]);
 
   // 각 스포츠의 경기 개수 가져오기
   useEffect(() => {
@@ -137,6 +192,15 @@ export default function ExchangePage() {
 
   return (
     <div className="h-full flex flex-col">
+      {/* Toast 알림 */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+      
       {/* 실시간 호가 현황 - 상단 */}
       <div className="bg-white rounded shadow p-6 mb-4">
         <h3 className="text-lg font-bold mb-4">🔥 실시간 호가 현황</h3>

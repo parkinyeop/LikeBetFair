@@ -24,18 +24,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // 페이지 로드 시 localStorage에서 인증 정보 복원
+  // 탭별 고유 식별자 생성
+  const [tabId, setTabId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      let existingTabId = sessionStorage.getItem('tabId');
+      if (!existingTabId) {
+        existingTabId = Math.random().toString(36).substr(2, 9);
+        sessionStorage.setItem('tabId', existingTabId);
+      }
+      setTabId(existingTabId);
+    }
+  }, []);
+
+  // 페이지 로드 시 sessionStorage에서 인증 정보 복원
   useEffect(() => {
     const initializeAuth = () => {
       try {
-        const storedToken = localStorage.getItem('token');
-        const storedUsername = localStorage.getItem('username');
-        const storedBalance = localStorage.getItem('balance');
-        const storedIsAdmin = localStorage.getItem('isAdmin');
-        const storedAdminLevel = localStorage.getItem('adminLevel');
+        if (!tabId) {
+          console.error('[AuthContext] tabId가 없습니다.');
+          return;
+        }
+        const storedToken = sessionStorage.getItem(`token_${tabId}`);
+        const storedUsername = sessionStorage.getItem(`username_${tabId}`);
+        const storedBalance = sessionStorage.getItem(`balance_${tabId}`);
+        const storedIsAdmin = sessionStorage.getItem(`isAdmin_${tabId}`);
+        const storedAdminLevel = sessionStorage.getItem(`adminLevel_${tabId}`);
 
         if (storedToken && storedUsername) {
           console.log('[AuthContext] 저장된 인증 정보 복원:', {
+            tabId,
             username: storedUsername,
             hasToken: !!storedToken,
             balance: storedBalance
@@ -48,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsAdmin(storedIsAdmin === 'true');
           setAdminLevel(storedAdminLevel ? Number(storedAdminLevel) : 0);
         } else {
-          console.log('[AuthContext] 저장된 인증 정보 없음');
+          console.log('[AuthContext] 저장된 인증 정보 없음 (tabId:', tabId, ')');
         }
       } catch (error) {
         console.error('[AuthContext] 인증 정보 복원 중 오류:', error);
@@ -60,17 +79,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     initializeAuth();
-  }, []);
+  }, [tabId]);
 
   const login = (username: string, balance: number, token: string, isAdmin = false, adminLevel = 0) => {
-    console.log('[AuthContext] 로그인:', { username, balance, hasToken: !!token, isAdmin, adminLevel });
+    console.log('[AuthContext] 로그인:', { tabId, username, balance, hasToken: !!token, isAdmin, adminLevel });
     
-    // localStorage에 저장
-    localStorage.setItem('token', token);
-    localStorage.setItem('username', username);
-    localStorage.setItem('balance', balance.toString());
-    localStorage.setItem('isAdmin', isAdmin.toString());
-    localStorage.setItem('adminLevel', adminLevel.toString());
+    if (!tabId) {
+      console.error('[AuthContext] tabId가 없습니다.');
+      return;
+    }
+
+    // sessionStorage에 저장 (탭별 독립)
+    sessionStorage.setItem(`token_${tabId}`, token);
+    sessionStorage.setItem(`username_${tabId}`, username);
+    sessionStorage.setItem(`balance_${tabId}`, balance.toString());
+    sessionStorage.setItem(`isAdmin_${tabId}`, isAdmin.toString());
+    sessionStorage.setItem(`adminLevel_${tabId}`, adminLevel.toString());
     
     // 상태 업데이트
     setIsLoggedIn(true);
@@ -82,14 +106,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    console.log('[AuthContext] 로그아웃');
+    console.log('[AuthContext] 로그아웃 (tabId:', tabId, ')');
     
-    // localStorage에서 제거
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
-    localStorage.removeItem('balance');
-    localStorage.removeItem('isAdmin');
-    localStorage.removeItem('adminLevel');
+    if (!tabId) {
+      console.error('[AuthContext] tabId가 없습니다.');
+      return;
+    }
+
+    // sessionStorage에서 제거
+    sessionStorage.removeItem(`token_${tabId}`);
+    sessionStorage.removeItem(`username_${tabId}`);
+    sessionStorage.removeItem(`balance_${tabId}`);
+    sessionStorage.removeItem(`isAdmin_${tabId}`);
+    sessionStorage.removeItem(`adminLevel_${tabId}`);
     
     // 상태 초기화
     setIsLoggedIn(false);

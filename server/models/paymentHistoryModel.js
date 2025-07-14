@@ -13,7 +13,7 @@ const PaymentHistory = sequelize.define('PaymentHistory', {
   },
   betId: {
     type: DataTypes.UUID,
-    allowNull: false
+    allowNull: true
   },
   amount: {
     type: DataTypes.DECIMAL(10, 2),

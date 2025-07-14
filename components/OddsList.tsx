@@ -58,16 +58,36 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
         const maxDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7일 후
+        const bettingDeadlineMinutes = 10; // 경기 시작 10분 전까지 베팅 가능
+        
+        // 1. 기본 필터링: 오늘부터 7일 후까지의 경기
         const filteredGames = data.filter((game: Game) => {
           const gameTime = new Date(game.commence_time);
           return gameTime >= startOfToday && gameTime <= maxDate;
         });
         
-        // 경기 시간 기준으로 최신순 정렬 (가장 빠른 경기부터)
-        const sortedGames = filteredGames.sort((a: Game, b: Game) => {
-          const timeA = new Date(a.commence_time).getTime();
-          const timeB = new Date(b.commence_time).getTime();
-          return timeA - timeB;
+        // 2. 베팅 가능 여부 분류 및 정렬
+        const categorizedGames = filteredGames.map((game: Game) => {
+          const gameTime = new Date(game.commence_time);
+          const bettingDeadline = new Date(gameTime.getTime() - bettingDeadlineMinutes * 60 * 1000);
+          const isBettable = now < bettingDeadline;
+          
+          return {
+            ...game,
+            isBettable,
+            gameTime,
+            bettingDeadline
+          };
+        });
+        
+        // 3. 정렬: 베팅 가능한 경기 우선, 그 다음 시간순
+        const sortedGames = categorizedGames.sort((a, b) => {
+          // 베팅 가능한 경기가 우선
+          if (a.isBettable && !b.isBettable) return -1;
+          if (!a.isBettable && b.isBettable) return 1;
+          
+          // 둘 다 베팅 가능하거나 둘 다 불가능한 경우, 시간순 정렬
+          return a.gameTime.getTime() - b.gameTime.getTime();
         });
         
         setGames(sortedGames);
@@ -136,25 +156,28 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
 
   return (
     <div className="space-y-4 h-full flex-1 min-h-0 px-1 overflow-y-auto">
-      {games.map((game) => {
+      {games.map((game: any) => {
         if (game.sport_key === "baseball_kbo") {
           console.log("[KBO] 렌더링 map에서 만난 경기:", game);
         }
-        const gameTime = new Date(game.commence_time); // 현지 시간 기준
-        const now = new Date();
-        const marginMinutes = 10;
-        const maxDays = 7;
-        const maxDate = new Date(now.getTime() + maxDays * 24 * 60 * 60 * 1000);
-        const isBettable = gameTime > new Date(now.getTime() + marginMinutes * 60000) && gameTime <= maxDate;
-        const isTooFar = gameTime > maxDate;
+        const gameTime = game.gameTime || new Date(game.commence_time); // 새로운 로직 사용
+        const isBettable = game.isBettable !== undefined ? game.isBettable : true; // 새로운 로직 사용
         const selectedMarket = selectedMarkets[game.id] || '승/패';
         const marketKey = marketKeyMap[selectedMarket];
         const market = game.bookmakers[0]?.markets.find(m => m.key === marketKey);
+        
         return (
-          <div key={game.id} className="bg-white rounded-lg shadow p-4">
+          <div key={game.id} className={`bg-white rounded-lg shadow p-4 ${!isBettable ? 'opacity-60' : ''}`}>
             <div className="flex justify-between items-center mb-1">
               <span className="text-lg font-bold">🏟️ {game.home_team} vs {game.away_team}</span>
-              <span className="text-sm">📅 {gameTime.toLocaleDateString()} {gameTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} [{game.sport_title}]</span>
+              <div className="text-right">
+                <span className="text-sm">📅 {gameTime.toLocaleDateString()} {gameTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} [{game.sport_title}]</span>
+                {!isBettable && (
+                  <div className="text-xs text-red-500 mt-1">
+                    ⏰ 베팅 마감 (경기 시작 10분 전)
+                  </div>
+                )}
+              </div>
             </div>
             {/* 마켓 탭 */}
             <div className="flex gap-2 mb-3">
@@ -494,8 +517,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                         <div className="text-sm">
                           {homeBest ? homeBest.price : 'N/A'}
                         </div>
-                        {!isBettable && !isTooFar && <div className="text-xs text-red-500 mt-1">마감</div>}
-                        {isTooFar && <div className="text-xs text-gray-400 mt-1">오픈 예정</div>}
+                                        {!isBettable && <div className="text-xs text-red-500 mt-1">베팅 마감</div>}
                       </button>
                       <button
                         onClick={() => {
@@ -526,8 +548,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                         <div className="text-sm">
                           {awayBest ? awayBest.price : 'N/A'}
                         </div>
-                        {!isBettable && !isTooFar && <div className="text-xs text-red-500 mt-1">마감</div>}
-                        {isTooFar && <div className="text-xs text-gray-400 mt-1">오픈 예정</div>}
+                                                  {!isBettable && <div className="text-xs text-red-500 mt-1">베팅 마감</div>}
                       </button>
                     </>
                   );
