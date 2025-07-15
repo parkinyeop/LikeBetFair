@@ -96,7 +96,15 @@ async function collectKBLSeasonData() {
             // 경기 시간 설정
             let commenceTime;
             if (event.strTime && event.strTime !== '00:00:00') {
-              commenceTime = new Date(`${event.dateEvent}T${event.strTime}`);
+              // strTimestamp가 UTC 시간이므로 이를 사용
+        if (event.strTimestamp) {
+          commenceTime = new Date(event.strTimestamp);
+        } else if (event.dateEvent && event.strTime) {
+          commenceTime = new Date(`${event.dateEvent}T${event.strTime}`);
+        } else {
+          console.log(`⚠️ 시간 정보 없음: ${event.strHomeTeam} vs ${event.strAwayTeam}`);
+          continue;
+        }
             } else {
               commenceTime = new Date(`${event.dateEvent}T10:00:00`); // KBL 기본 시간 (KST 19:00)
             }

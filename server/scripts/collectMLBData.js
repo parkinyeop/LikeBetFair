@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Op } from 'sequelize';
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName, normalizeCategoryPair } from '../normalizeUtils.js';
 
@@ -209,7 +210,18 @@ async function collectMLBData() {
       try {
         const homeTeam = normalizeMLBTeamName(event.strHomeTeam);
         const awayTeam = normalizeMLBTeamName(event.strAwayTeam);
-        const commenceTime = new Date(`${event.dateEvent}T${event.strTime || '00:00:00'}`);
+        
+        // strTimestamp가 UTC 시간이므로 이를 사용
+        let commenceTime;
+        if (event.strTimestamp) {
+          commenceTime = new Date(event.strTimestamp);
+        } else if (event.dateEvent && event.strTime) {
+          // strTimestamp가 없는 경우 fallback으로 dateEvent + strTime 사용
+          commenceTime = new Date(`${event.dateEvent}T${event.strTime}`);
+        } else {
+          console.log(`⚠️ 시간 정보 없음: ${event.strHomeTeam} vs ${event.strAwayTeam}`);
+          continue;
+        }
         
         // 미래 경기는 제외
         if (commenceTime > new Date()) {
@@ -247,21 +259,54 @@ async function collectMLBData() {
           result = 'postponed';
         }
         
-        // DB에 저장 (단순 create 방식으로 변경)
-        const gameResult = await GameResult.create({
-          mainCategory: 'baseball',
-          subCategory: 'MLB',
-          homeTeam,
-          awayTeam,
-          commenceTime,
-          status,
-          score,
-          result,
-          eventId: event.idEvent || null,
-          lastUpdated: new Date()
+        // 중복 체크 (eventId 또는 팀명+날짜로)
+        const existingGame = await GameResult.findOne({
+          where: {
+            [Op.or]: [
+              { eventId: event.idEvent },
+              {
+                mainCategory: 'baseball',
+                subCategory: 'MLB',
+                homeTeam,
+                awayTeam,
+                commenceTime: {
+                  [Op.between]: [
+                    new Date(commenceTime.getTime() - 24 * 60 * 60 * 1000), // 24시간 전
+                    new Date(commenceTime.getTime() + 24 * 60 * 60 * 1000)  // 24시간 후
+                  ]
+                }
+              }
+            ]
+          }
         });
         
-        const created = true; // 항상 새로 생성
+        if (existingGame) {
+          // 기존 경기 업데이트
+          await existingGame.update({
+            status,
+            score,
+            result,
+            lastUpdated: new Date()
+          });
+          updatedCount++;
+          console.log(`🔄 경기 업데이트: ${homeTeam} vs ${awayTeam} (${commenceTime.toISOString().slice(0,10)}) - ${result}`);
+        } else {
+          // 새 경기 저장
+          await GameResult.create({
+            mainCategory: 'baseball',
+            subCategory: 'MLB',
+            homeTeam,
+            awayTeam,
+            commenceTime,
+            status,
+            score,
+            result,
+            eventId: event.idEvent || null,
+            lastUpdated: new Date()
+          });
+          savedCount++;
+          console.log(`✅ 새 경기 저장: ${homeTeam} vs ${awayTeam} (${commenceTime.toISOString().slice(0,10)}) - ${result}`);
+        }
         
         if (created) {
           savedCount++;

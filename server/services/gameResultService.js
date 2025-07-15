@@ -181,18 +181,29 @@ class GameResultService {
       
       console.log(`[GameResult] 날짜 필터링 결과: ${events.length}개 → ${filteredEvents.length}개 (과거 ${daysFrom}일간)`);
       
-      // TheSportsDB 형식을 표준 형식으로 변환
-      const convertedData = filteredEvents.map(event => ({
-        id: event.idEvent,
-        home_team: event.strHomeTeam,
-        away_team: event.strAwayTeam,
-        commence_time: event.dateEvent ? `${event.dateEvent}T${event.strTime || '00:00:00'}` : null,
-        completed: event.strStatus === 'Match Finished',
-        scores: event.intHomeScore !== null && event.intAwayScore !== null ? [
-          { name: event.strHomeTeam, score: event.intHomeScore?.toString() || '0' },
-          { name: event.strAwayTeam, score: event.intAwayScore?.toString() || '0' }
-        ] : null
-      })).filter(game => game.commence_time);
+      // TheSportsDB 형식을 표준 형식으로 변환 (UTC 시간 사용)
+      const convertedData = filteredEvents.map(event => {
+        // strTimestamp가 UTC 시간이므로 이를 사용
+        let commenceTime = null;
+        if (event.strTimestamp) {
+          commenceTime = event.strTimestamp;
+        } else if (event.dateEvent && event.strTime) {
+          // strTimestamp가 없는 경우 fallback으로 dateEvent + strTime 사용
+          commenceTime = `${event.dateEvent}T${event.strTime}`;
+        }
+        
+        return {
+          id: event.idEvent,
+          home_team: event.strHomeTeam,
+          away_team: event.strAwayTeam,
+          commence_time: commenceTime,
+          completed: event.strStatus === 'Match Finished',
+          scores: event.intHomeScore !== null && event.intAwayScore !== null ? [
+            { name: event.strHomeTeam, score: event.intHomeScore?.toString() || '0' },
+            { name: event.strAwayTeam, score: event.intAwayScore?.toString() || '0' }
+          ] : null
+        };
+      }).filter(game => game.commence_time);
 
       return { source: 'thesportsdb', data: convertedData };
 
@@ -288,18 +299,29 @@ class GameResultService {
       
       console.log(`[Fallback] 날짜 필터링 결과: ${events.length}개 → ${filteredEvents.length}개 (과거 ${daysFrom}일간)`);
       
-      // TheSportsDB 형식을 표준 형식으로 변환 (올바른 스코어 형식)
-      const convertedData = filteredEvents.map(event => ({
-        id: event.idEvent,
-        home_team: event.strHomeTeam,
-        away_team: event.strAwayTeam,
-        commence_time: event.dateEvent ? `${event.dateEvent}T${event.strTime || '00:00:00'}` : null,
-        completed: event.strStatus === 'Match Finished',
-        scores: event.intHomeScore !== null && event.intAwayScore !== null ? [
-          { name: event.strHomeTeam, score: event.intHomeScore?.toString() || '0' },
-          { name: event.strAwayTeam, score: event.intAwayScore?.toString() || '0' }
-        ] : null
-      })).filter(game => game.commence_time); // 시간 정보 있는 것만
+      // TheSportsDB 형식을 표준 형식으로 변환 (UTC 시간 사용)
+      const convertedData = filteredEvents.map(event => {
+        // strTimestamp가 UTC 시간이므로 이를 사용
+        let commenceTime = null;
+        if (event.strTimestamp) {
+          commenceTime = event.strTimestamp;
+        } else if (event.dateEvent && event.strTime) {
+          // strTimestamp가 없는 경우 fallback으로 dateEvent + strTime 사용
+          commenceTime = `${event.dateEvent}T${event.strTime}`;
+        }
+        
+        return {
+          id: event.idEvent,
+          home_team: event.strHomeTeam,
+          away_team: event.strAwayTeam,
+          commence_time: commenceTime,
+          completed: event.strStatus === 'Match Finished',
+          scores: event.intHomeScore !== null && event.intAwayScore !== null ? [
+            { name: event.strHomeTeam, score: event.intHomeScore?.toString() || '0' },
+            { name: event.strAwayTeam, score: event.intAwayScore?.toString() || '0' }
+          ] : null
+        };
+      }).filter(game => game.commence_time); // 시간 정보 있는 것만
 
       return { source: 'thesportsdb', data: convertedData };
 

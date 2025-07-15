@@ -58,7 +58,16 @@ async function collectKLeagueData() {
         // 기본 정보 추출
         const homeTeam = normalizeTeamName(event.strHomeTeam, 'KLEAGUE1');
         const awayTeam = normalizeTeamName(event.strAwayTeam, 'KLEAGUE1');
-        const commenceTime = new Date(event.dateEvent + 'T' + (event.strTime || '00:00:00'));
+        // strTimestamp가 UTC 시간이므로 이를 사용
+        let commenceTime;
+        if (event.strTimestamp) {
+          commenceTime = new Date(event.strTimestamp);
+        } else if (event.dateEvent && event.strTime) {
+          commenceTime = new Date(event.dateEvent + 'T' + (event.strTime || '00:00:00'));
+        } else {
+          console.log(`⚠️ 시간 정보 없음: ${event.strHomeTeam} vs ${event.strAwayTeam}`);
+          continue;
+        }
         
         // 경기 상태 결정
         let status = 'scheduled';

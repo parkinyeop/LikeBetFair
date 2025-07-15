@@ -3,6 +3,33 @@ import { useExchange, ExchangeOrder, OrderForm } from '../hooks/useExchange';
 import { useAuth } from '../contexts/AuthContext';
 import { useExchangeContext } from '../contexts/ExchangeContext';
 
+// GameResults 타입 정의 (간단 버전)
+type GameResult = {
+  id: string;
+  homeTeam: string | null;
+  awayTeam: string | null;
+  commenceTime: string | null;
+};
+
+// GameResults를 가져오는 mock 훅 (실제 프로젝트에서는 API 호출로 대체)
+function useGameResults(gameIds: string[]): Record<string, GameResult> {
+  const [gameResults, setGameResults] = useState<Record<string, GameResult>>({});
+
+  useEffect(() => {
+    if (gameIds.length === 0) return;
+    // 실제로는 API 호출 필요
+    fetch(`/api/exchange/game-results?ids=${gameIds.join(',')}`)
+      .then(res => res.json())
+      .then((data: GameResult[]) => {
+        const map: Record<string, GameResult> = {};
+        data.forEach(gr => { map[gr.id] = gr; });
+        setGameResults(map);
+      });
+  }, [gameIds.join(',')]);
+
+  return gameResults;
+}
+
 function OrderPanel() {
   const { 
     loading, 
@@ -243,10 +270,15 @@ function OrderHistoryPanel() {
 
   // 잠재 수익 계산
   const calculatePotentialProfit = (order: ExchangeOrder) => {
+    // 올바른 배당률 사용
+    const odds = order.side === 'back' 
+      ? (order.backOdds || order.price) 
+      : (order.layOdds || order.price);
+    
     if (order.side === 'back') {
-      return Math.round(order.amount * (order.price - 1));
+      return Math.round(order.amount * (odds - 1));
     } else {
-      return Math.round(order.amount * (order.price - 1) / order.price);
+      return Math.round(order.amount * (odds - 1) / odds);
     }
   };
 
@@ -339,6 +371,36 @@ function OrderHistoryPanel() {
     }, 0);
 
     return { total, open, matched, totalAmount, totalPotentialProfit };
+  }, [userOrders]);
+
+  // 주문에 필요한 gameId 목록 추출
+  const gameIds = React.useMemo(() => {
+    return (userOrders || [])
+      .map(order => order.gameId)
+      .filter((id, idx, arr) => id && arr.indexOf(id) === idx);
+  }, [userOrders]);
+
+  // GameResults fetch
+  const gameResults = useGameResults(gameIds);
+
+  // gameId별로 정보가 가장 많이 채워진 주문을 맵으로 저장
+  const bestOrderInfoByGameId = React.useMemo(() => {
+    const map: Record<string, Partial<ExchangeOrder>> = {};
+    (userOrders || []).forEach(order => {
+      if (!order.gameId) return;
+      const prev = map[order.gameId];
+      // 정보가 더 많이 채워진 주문을 우선 저장
+      const prevScore = prev ? [prev.homeTeam, prev.awayTeam, prev.commenceTime].filter(Boolean).length : 0;
+      const currScore = [order.homeTeam, order.awayTeam, order.commenceTime].filter(Boolean).length;
+      if (!prev || currScore > prevScore) {
+        map[order.gameId] = {
+          homeTeam: order.homeTeam,
+          awayTeam: order.awayTeam,
+          commenceTime: order.commenceTime
+        };
+      }
+    });
+    return map;
   }, [userOrders]);
 
   return (
@@ -442,6 +504,13 @@ function OrderHistoryPanel() {
               const dateInfo = formatDate(order.createdAt);
               const potentialProfit = calculatePotentialProfit(order);
               
+              // 보완된 경기 정보
+              const gr = order.gameId ? gameResults[order.gameId] : undefined;
+              const bestOrder = order.gameId ? bestOrderInfoByGameId[order.gameId] : undefined;
+              const homeTeam = order.homeTeam || bestOrder?.homeTeam || gr?.homeTeam || '';
+              const awayTeam = order.awayTeam || bestOrder?.awayTeam || gr?.awayTeam || '';
+              const commenceTime = order.commenceTime || bestOrder?.commenceTime || gr?.commenceTime || null;
+              
               return (
                 <div key={order.id} className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-sm transition-shadow">
                   {/* 헤더: 주문 타입과 상태 */}
@@ -463,18 +532,39 @@ function OrderHistoryPanel() {
                   {/* 경기 정보 */}
                   <div className="mb-2">
                     <div className="text-sm font-medium text-gray-800 mb-1">
-                      {order.selection || '선택된 팀'}
+                      {homeTeam && awayTeam 
+                        ? `${homeTeam} vs ${awayTeam}`
+                        : order.selection || '선택된 팀'
+                      }
                     </div>
                     <div className="text-xs text-gray-500">
-                      {order.market} • {order.gameId}
+                      {order.market} • {commenceTime 
+                        ? new Date(commenceTime).toLocaleString('ko-KR', { 
+                            month: 'short', 
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })
+                        : '시간 미정'
+                      }
                     </div>
+                    {order.selection && (
+                      <div className="text-xs text-blue-600 mt-1">
+                        선택: {order.selection} ({order.side === 'back' ? '이길 것' : '질 것'})
+                      </div>
+                    )}
                   </div>
 
                   {/* 배당률과 금액 정보 */}
                   <div className="flex justify-between items-center mb-2">
                     <div className="text-center">
                       <div className="text-xs text-gray-500">배당률</div>
-                      <div className="text-lg font-bold text-gray-800">{order.price.toFixed(2)}</div>
+                      <div className="text-lg font-bold text-gray-800">
+                        {(order.side === 'back' 
+                          ? (order.backOdds || order.price) 
+                          : (order.layOdds || order.price)
+                        ).toFixed(2)}
+                      </div>
                     </div>
                     <div className="text-center">
                       <div className="text-xs text-gray-500">주문 금액</div>

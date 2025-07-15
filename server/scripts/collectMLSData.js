@@ -49,7 +49,16 @@ async function collectMLSData() {
       }
       
       // 경기 날짜 파싱 (UTC 기준)
-      const commenceTime = new Date(event.dateEvent + 'T' + (event.strTime || '00:00:00') + 'Z');
+              // strTimestamp가 UTC 시간이므로 이를 사용
+        let commenceTime;
+        if (event.strTimestamp) {
+          commenceTime = new Date(event.strTimestamp);
+        } else if (event.dateEvent && event.strTime) {
+          commenceTime = new Date(event.dateEvent + 'T' + (event.strTime || '00:00:00') + 'Z');
+        } else {
+          console.log(`⚠️ 시간 정보 없음: ${event.strHomeTeam} vs ${event.strAwayTeam}`);
+          continue;
+        }
       
       // 스코어 파싱 (완료된 경기만)
       let homeScore = null;
