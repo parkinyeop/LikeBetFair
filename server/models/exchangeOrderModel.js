@@ -50,7 +50,28 @@ const ExchangeOrder = sequelize.define('ExchangeOrder', {
   },
   // 자동 정산 관련
   autoSettlement: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
-  settlementNote: { type: DataTypes.TEXT, allowNull: true }
+  settlementNote: { type: DataTypes.TEXT, allowNull: true },
+  // 🆕 배당율 정보 추가
+  backOdds: { 
+    type: DataTypes.FLOAT, 
+    allowNull: true,
+    comment: 'Back 배당율 (1.0 이상)'
+  },
+  layOdds: { 
+    type: DataTypes.FLOAT, 
+    allowNull: true,
+    comment: 'Lay 배당율 (1.0 이상)'
+  },
+  oddsSource: { 
+    type: DataTypes.STRING, 
+    allowNull: true,
+    comment: '배당율 출처 (bookmaker 이름)'
+  },
+  oddsUpdatedAt: { 
+    type: DataTypes.DATE, 
+    allowNull: true,
+    comment: '배당율 업데이트 시간'
+  }
 }, { timestamps: true });
 
 // 관계 설정을 위한 import (순환 참조 방지)

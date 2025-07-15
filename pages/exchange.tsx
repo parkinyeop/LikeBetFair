@@ -321,16 +321,27 @@ export default function ExchangePage() {
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gray-50 border border-gray-200 rounded p-4 shadow mt-4">
                     {/* 경기 정보 */}
                     <div className="flex-1 min-w-[180px]">
-                      <div className="font-semibold text-base text-gray-800">{gameInfo.homeTeam} vs {gameInfo.awayTeam}</div>
-                      <div className="text-xs text-gray-500">{gameInfo.commenceTime ? new Date(gameInfo.commenceTime).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '시간 미정'}</div>
+                      {gameInfo ? (
+                        <>
+                          <div className="font-semibold text-base text-gray-800">{gameInfo.homeTeam} vs {gameInfo.awayTeam}</div>
+                          <div className="text-xs text-gray-500">{gameInfo.commenceTime ? new Date(gameInfo.commenceTime).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '시간 미정'}</div>
+                        </>
+                      ) : (
+                        <div className="text-gray-400">경기 정보 없음</div>
+                      )}
                     </div>
                     {/* Back 정보 */}
                     <div className="flex flex-col items-center min-w-[120px]">
                       <div className="text-xs text-blue-600 font-semibold mb-1">Back</div>
                       {backOrder ? (
                         <>
-                          <div className="font-bold text-blue-700 text-lg">{backOrder.price.toFixed(2)}</div>
+                          <div className="font-bold text-blue-700 text-lg">{(backOrder.backOdds || backOrder.price).toFixed(2)}</div>
                           <div className="text-blue-600">{backOrder.amount.toLocaleString()}원</div>
+                        </>
+                      ) : layOrder ? (
+                        <>
+                          <div className="font-bold text-blue-700 text-lg">{(layOrder.backOdds || 'N/A')}</div>
+                          <div className="text-blue-600">매칭 대기</div>
                         </>
                       ) : (
                         <div className="text-gray-400">-</div>
@@ -341,7 +352,7 @@ export default function ExchangePage() {
                       <div className="text-xs text-pink-600 font-semibold mb-1">Lay</div>
                       {layOrder ? (
                         <>
-                          <div className="font-bold text-pink-700 text-lg">{layOrder.price.toFixed(2)}</div>
+                          <div className="font-bold text-pink-700 text-lg">{(layOrder.layOdds || layOrder.price).toFixed(2)}</div>
                           <div className="text-pink-600">{layOrder.amount.toLocaleString()}원</div>
                         </>
                       ) : (

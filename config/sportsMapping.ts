@@ -176,13 +176,12 @@ export const SEASON_SCHEDULES: Record<string, SeasonInfo> = {
     nextSeasonStart: '2025-03-01',
     description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (1경기))'
   },
-  'soccer_japan_j_league': {
+    'soccer_japan_j_league': {
     name: 'J리그',
-    status: 'offseason',
+    status: 'active',
     currentSeason: '2025',
-    seasonEnd: '2025-07-06',
-    nextSeasonStart: 'TBD',
-    description: '시즌오프 (자동 감지: 최근 경기 없음, 예정 경기 없음, 배당율 미제공)'
+    nextSeasonStart: '2025-03-01',
+    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (10경기))'
   },
   'soccer_italy_serie_a': {
     name: '세리에 A',

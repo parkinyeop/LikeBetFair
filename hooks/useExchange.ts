@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useExchangeContext } from '../contexts/ExchangeContext';
 
-export interface ExchangeOrder {
+export type ExchangeOrder = {
   id: number;
   userId: number;
   gameId: string;
@@ -20,7 +20,9 @@ export interface ExchangeOrder {
   awayTeam?: string;
   commenceTime?: string;
   sportKey?: string; // 스포츠 키 추가
-}
+  backOdds?: number;
+  layOdds?: number;
+};
 
 export interface ExchangeBalance {
   balance: number;

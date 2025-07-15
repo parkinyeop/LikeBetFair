@@ -15,6 +15,47 @@ export default function OrderBook({ gameId, market, line, onOrderClick }: OrderB
   const [orderbook, setOrderbook] = useState<ExchangeOrder[]>([]);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [showCancelConfirm, setShowCancelConfirm] = useState<number | null>(null);
+  const [sportsbookOdds, setSportsbookOdds] = useState<any>(null);
+
+  // 스포츠북 배당율 가져오기
+  const fetchSportsbookOdds = async () => {
+    try {
+      // gameId에서 스포츠키 추출 (예: gameId가 "soccer_korea_kleague1_123" 형태라면)
+      const sportKey = gameId.split('_').slice(0, -1).join('_');
+      if (!sportKey) return;
+
+      const response = await fetch(`http://localhost:5050/api/odds/${sportKey}`);
+      if (!response.ok) return;
+      
+      const data = await response.json();
+      
+      // 현재 게임과 매칭되는 스포츠북 경기 찾기
+      const matchedGame = data.find((game: any) => {
+        // 간단한 매칭 로직 (실제로는 더 정교한 매칭이 필요할 수 있음)
+        return game.id === gameId || game.sport_key === sportKey;
+      });
+      
+      if (matchedGame) {
+        setSportsbookOdds(matchedGame);
+      }
+    } catch (error) {
+      console.error('스포츠북 배당율 가져오기 실패:', error);
+    }
+  };
+
+  // 스포츠북에서 특정 팀의 배당율 가져오기
+  const getSportsbookOdds = (teamName: string) => {
+    if (!sportsbookOdds || !sportsbookOdds.bookmakers) return null;
+    
+    const bookmaker = sportsbookOdds.bookmakers[0];
+    if (!bookmaker || !bookmaker.markets) return null;
+    
+    const h2hMarket = bookmaker.markets.find((m: any) => m.key === 'h2h');
+    if (!h2hMarket || !h2hMarket.outcomes) return null;
+    
+    const outcome = h2hMarket.outcomes.find((o: any) => o.name === teamName);
+    return outcome ? outcome.price : null;
+  };
 
   // 호가창 데이터 로드
   const loadOrderbook = async () => {
@@ -31,9 +72,13 @@ export default function OrderBook({ gameId, market, line, onOrderClick }: OrderB
   useEffect(() => {
     if (gameId) {
       loadOrderbook();
+      fetchSportsbookOdds();
       
       // 10초마다 호가창 업데이트
-      const interval = setInterval(loadOrderbook, 10000);
+      const interval = setInterval(() => {
+        loadOrderbook();
+        fetchSportsbookOdds();
+      }, 10000);
       return () => clearInterval(interval);
     }
   }, [gameId, market, line]);
@@ -94,7 +139,38 @@ export default function OrderBook({ gameId, market, line, onOrderClick }: OrderB
         {/* 헤더: 가격과 상태 */}
         <div className="flex justify-between items-start mb-2">
           <div className="flex items-center space-x-2">
-            <span className="text-lg font-bold text-gray-900">{order.price.toFixed(2)}</span>
+            <div>
+              <span className="text-lg font-bold text-gray-900">{order.price.toFixed(2)}</span>
+              {/* 배당율 정보 표시 */}
+              {(() => {
+                console.log('🔍 주문 배당율 데이터:', {
+                  id: order.id,
+                  backOdds: order.backOdds,
+                  layOdds: order.layOdds,
+                  backOddsType: typeof order.backOdds,
+                  layOddsType: typeof order.layOdds
+                });
+                
+                // 스포츠북 배당율 가져오기
+                const sportsbookBackOdds = order.selection ? getSportsbookOdds(order.selection) : null;
+                const sportsbookLayOdds = order.selection ? getSportsbookOdds(order.selection) : null;
+                
+                return (
+                  <div className="text-xs text-gray-600 mt-1">
+                    <div className="flex justify-between">
+                      <span>주문 Back: {typeof order.backOdds === 'number' ? order.backOdds.toFixed(2) : 'N/A'}</span>
+                      <span>주문 Lay: {typeof order.layOdds === 'number' ? order.layOdds.toFixed(2) : 'N/A'}</span>
+                    </div>
+                    {sportsbookBackOdds && (
+                      <div className="flex justify-between mt-1 text-blue-600">
+                        <span>스포츠북: {sportsbookBackOdds.toFixed(2)}</span>
+                        <span>참고 배당</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
             <div className="flex space-x-1">
               {isMine && (
                 <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full font-medium">내 주문</span>

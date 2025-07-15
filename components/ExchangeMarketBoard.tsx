@@ -177,7 +177,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
 
   // Levenshtein 거리 계산 함수
   const levenshteinDistance = (str1: string, str2: string): number => {
-    const matrix = [];
+    const matrix: number[][] = [];
     for (let i = 0; i <= str2.length; i++) {
       matrix[i] = [i];
     }
@@ -266,7 +266,10 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
       price,
       type,
       gameId: selectedGame.id,
-      market: selectedMarket
+      market: selectedMarket,
+      homeTeam: selectedGame.homeTeam,
+      awayTeam: selectedGame.awayTeam,
+      commenceTime: selectedGame.commenceTime
     });
   };
 

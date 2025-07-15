@@ -13,14 +13,14 @@ const router = express.Router();
 // 주문 등록 (게임 데이터 연동 포함)
 router.post('/order', verifyToken, async (req, res) => {
   try {
-    const { gameId, market, line, side, price, amount, selection, homeTeam, awayTeam, commenceTime } = req.body;
+    const { gameId, market, line, side, price, amount, selection } = req.body;
     const userId = req.user.userId;
     
     console.log('🎯 Exchange 주문 생성 요청:', { gameId, market, line, side, price, amount, selection });
     
     // 게임 데이터 매핑
     const orderData = await exchangeGameMappingService.mapGameDataToOrder({
-      gameId, market, line, side, price, amount, selection, homeTeam, awayTeam, commenceTime, userId
+      gameId, market, line, side, price, amount, selection, userId
     });
     
     console.log('📊 매핑된 게임 데이터:', {
@@ -51,6 +51,8 @@ router.post('/order', verifyToken, async (req, res) => {
     const potentialProfit = side === 'back' ? Math.floor((price - 1) * amount) : amount;
     
     let order;
+    // 🆕 배당율 정보 준비
+    const now = new Date();
     const orderCreateData = {
       userId, 
       gameId, 
@@ -69,16 +71,31 @@ router.post('/order', verifyToken, async (req, res) => {
       sportKey: orderData.sportKey,
       gameResultId: orderData.gameResultId,
       selectionDetails: orderData.selectionDetails,
-      autoSettlement: true
+      autoSettlement: true,
+      // 🆕 스포츠북 배당율 정보 사용
+      backOdds: orderData.backOdds,
+      layOdds: orderData.layOdds,
+      oddsSource: orderData.oddsSource || 'exchange',
+      oddsUpdatedAt: orderData.oddsUpdatedAt || now
     };
     
     if (match) {
       match.status = 'matched';
+      // 🆕 매칭된 주문의 배당율 정보도 채움
+      match.backOdds = orderData.backOdds;
+      match.layOdds = orderData.layOdds;
+      match.oddsSource = orderData.oddsSource || 'exchange';
+      match.oddsUpdatedAt = orderData.oddsUpdatedAt || now;
       await match.save();
       order = await ExchangeOrder.create({
         ...orderCreateData,
         status: 'matched', 
-        matchedOrderId: match.id
+        matchedOrderId: match.id,
+        // 🆕 매칭된 주문과 동일하게 스포츠북 배당율 사용
+        backOdds: orderData.backOdds,
+        layOdds: orderData.layOdds,
+        oddsSource: orderData.oddsSource || 'exchange',
+        oddsUpdatedAt: orderData.oddsUpdatedAt || now
       });
       match.matchedOrderId = order.id;
       await match.save();
@@ -134,7 +151,10 @@ router.get('/orderbook-test', async (req, res) => {
       line: o.line,
       side: o.side,
       price: o.price,
-      amount: o.amount
+      amount: o.amount,
+      backOdds: o.backOdds,
+      layOdds: o.layOdds,
+      oddsSource: o.oddsSource
     })));
     
     res.json({ orders });
@@ -500,7 +520,7 @@ router.get('/markets/:gameId', verifyToken, async (req, res) => {
 
 // 새로운 주문 생성 (기존 주문과 즉시 매칭 시도)
 router.post('/match-order', verifyToken, async (req, res) => {
-  const { gameId, market, line, side, price, amount, selection, homeTeam, awayTeam, commenceTime } = req.body;
+  const { gameId, market, line, side, price, amount, selection } = req.body;
   const userId = req.user.userId; // 수정: userId 사용
 
   try {
@@ -587,7 +607,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
 
       // 게임 데이터 매핑 (본인 matched 주문용)
       const orderData = await exchangeGameMappingService.mapGameDataToOrder({
-        gameId, market, line, side, price, amount: matchAmount, selection, homeTeam, awayTeam, commenceTime, userId
+        gameId, market, line, side, price, amount: matchAmount, selection, userId
       });
 
       // 본인 matched 주문 생성
@@ -610,7 +630,12 @@ router.post('/match-order', verifyToken, async (req, res) => {
         selectionDetails: orderData.selectionDetails,
         stakeAmount: side === 'back' ? matchAmount : Math.floor((price - 1) * matchAmount),
         potentialProfit: side === 'back' ? Math.floor((price - 1) * matchAmount) : matchAmount,
-        autoSettlement: true
+        autoSettlement: true,
+        // 🆕 스포츠북 배당율 정보 사용
+        backOdds: orderData.backOdds,
+        layOdds: orderData.layOdds,
+        oddsSource: orderData.oddsSource || 'exchange',
+        oddsUpdatedAt: orderData.oddsUpdatedAt || new Date()
       });
 
       // 기존 주문에도 matchedOrderId 연결
@@ -635,8 +660,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
       console.log(`🔧 게임 매핑 시작...`);
       // 게임 데이터 매핑
       const orderData = await exchangeGameMappingService.mapGameDataToOrder({
-        gameId, market, line, side, price, amount: remainingAmount, selection, 
-        homeTeam, awayTeam, commenceTime, userId
+        gameId, market, line, side, price, amount: remainingAmount, selection, userId
       });
       console.log(`✅ 게임 매핑 완료:`, { 
         gameResultId: orderData.gameResultId, 
@@ -665,7 +689,12 @@ router.post('/match-order', verifyToken, async (req, res) => {
         selectionDetails: orderData.selectionDetails,
         stakeAmount: side === 'back' ? remainingAmount : Math.floor((price - 1) * remainingAmount),
         potentialProfit: side === 'back' ? Math.floor((price - 1) * remainingAmount) : remainingAmount,
-        autoSettlement: true
+        autoSettlement: true,
+        // 🆕 스포츠북 배당율 정보 사용
+        backOdds: orderData.backOdds,
+        layOdds: orderData.layOdds,
+        oddsSource: orderData.oddsSource || 'exchange',
+        oddsUpdatedAt: orderData.oddsUpdatedAt || new Date()
       });
       console.log(`📝 새 주문 생성: ${remainingAmount}원 (부분 매칭)`);
     } else {

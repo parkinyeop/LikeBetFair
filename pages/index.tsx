@@ -590,12 +590,8 @@ export default function Home() {
                       <div className="flex items-center gap-2">
                         <span>{category}</span>
                         {statusBadge && seasonInfo && seasonInfo.status !== 'active' && (
-                          <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                            selectedCategory === category 
-                              ? 'bg-white/20 text-white' 
-                              : statusBadge.className
-                          }`}>
-                            {seasonInfo.status === 'break' ? '휴식' : '오프'}
+                          <span className="text-xs px-2 py-1 rounded-full" style={statusStyle || undefined}>
+                            {statusBadge}
                           </span>
                         )}
                       </div>
@@ -618,8 +614,8 @@ export default function Home() {
                 const statusStyle = seasonInfo ? getSeasonStatusStyle(seasonInfo.status) : null;
                 
                 return statusBadge ? (
-                  <span className={`text-xs px-2 py-1 rounded-full ${statusBadge.className}`}>
-                    {statusBadge.text}
+                  <span className="text-xs px-2 py-1 rounded-full" style={statusStyle || undefined}>
+                    {statusBadge}
                   </span>
                 ) : null;
               })()}

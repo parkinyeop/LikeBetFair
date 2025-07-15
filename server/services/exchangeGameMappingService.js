@@ -9,6 +9,24 @@ import { Op } from 'sequelize';
  * - 자동 정산을 위한 매핑 관리
  */
 class ExchangeGameMappingService {
+  constructor() {
+    this.sportKeyMap = {
+      'soccer_korea_kleague1': 'K리그',
+      'soccer_japan_j_league': 'J리그',
+      'soccer_italy_serie_a': '세리에 A',
+      'soccer_brazil_campeonato': '브라질 세리에 A',
+      'soccer_usa_mls': 'MLS',
+      'soccer_argentina_primera_division': '아르헨티나 프리메라',
+      'soccer_china_superleague': '중국 슈퍼리그',
+      'soccer_spain_primera_division': '라리가',
+      'soccer_germany_bundesliga': '분데스리가',
+      'basketball_nba': 'NBA',
+      'basketball_kbl': 'KBL',
+      'baseball_mlb': 'MLB',
+      'baseball_kbo': 'KBO',
+      'americanfootball_nfl': 'NFL'
+    };
+  }
 
   /**
    * OddsCache에서 Exchange 가능한 게임 목록 조회 (플레이북 데이터 활용)
@@ -79,78 +97,231 @@ class ExchangeGameMappingService {
   }
 
   /**
-   * Exchange Order 생성 시 게임 정보 자동 매핑
+   * OddsCache에서 경기 정보 및 배당율 조회 (GameResult 의존성 제거)
+   * @param {string} gameId - 게임 ID
+   * @param {string} selection - 선택한 팀명
+   * @param {string} side - 주문 타입 (back/lay)
+   * @returns {Object} - { homeTeam, awayTeam, commenceTime, mainCategory, subCategory, backOdds, layOdds, oddsSource }
+   */
+  async getOddsCacheData(gameId, selection, side = 'back') {
+    try {
+      // 1. OddsCache에서 경기 정보 조회 (gameId로 직접 검색)
+      const oddsCache = await OddsCache.findOne({
+        where: {
+          [Op.or]: [
+            { id: gameId },
+            { sportKey: gameId }
+          ]
+        },
+        order: [['lastUpdated', 'DESC']]
+      });
+
+      // 2. gameId로 직접 찾지 못하면, GameResult에서 경기 정보를 가져와서 OddsCache 검색
+      if (!oddsCache) {
+        const gameResult = await GameResult.findOne({
+          where: {
+            [Op.or]: [
+              { id: gameId },
+              { eventId: gameId }
+            ]
+          }
+        });
+
+        if (gameResult) {
+          // GameResult 정보로 OddsCache 검색
+          const foundOddsCache = await OddsCache.findOne({
+            where: {
+              mainCategory: gameResult.mainCategory,
+              subCategory: gameResult.subCategory,
+              homeTeam: gameResult.homeTeam,
+              awayTeam: gameResult.awayTeam,
+              commenceTime: {
+                [Op.between]: [
+                  new Date(gameResult.commenceTime.getTime() - 12 * 60 * 60 * 1000), // 12시간 전
+                  new Date(gameResult.commenceTime.getTime() + 12 * 60 * 60 * 1000)  // 12시간 후
+                ]
+              }
+            },
+            order: [['lastUpdated', 'DESC']]
+          });
+
+          if (foundOddsCache) {
+            // OddsCache에서 경기 정보 반환
+            return {
+              homeTeam: foundOddsCache.homeTeam,
+              awayTeam: foundOddsCache.awayTeam,
+              commenceTime: foundOddsCache.commenceTime,
+              mainCategory: foundOddsCache.mainCategory,
+              subCategory: foundOddsCache.subCategory,
+              gameResultId: gameResult.id,
+              ...await this.extractOddsFromCache(foundOddsCache, selection, side)
+            };
+          }
+        }
+
+        console.log('⚠️ OddsCache에서 경기 정보를 찾을 수 없음:', gameId);
+        return { 
+          homeTeam: null, 
+          awayTeam: null, 
+          commenceTime: null, 
+          mainCategory: null, 
+          subCategory: null,
+          backOdds: null, 
+          layOdds: null, 
+          oddsSource: null 
+        };
+      }
+
+      // 3. OddsCache에서 경기 정보 및 배당율 추출
+      const oddsData = await this.extractOddsFromCache(oddsCache, selection, side);
+      
+      return {
+        homeTeam: oddsCache.homeTeam,
+        awayTeam: oddsCache.awayTeam,
+        commenceTime: oddsCache.commenceTime,
+        mainCategory: oddsCache.mainCategory,
+        subCategory: oddsCache.subCategory,
+        gameResultId: null, // OddsCache에서 직접 가져온 경우
+        ...oddsData
+      };
+
+    } catch (error) {
+      console.error('❌ OddsCache 데이터 조회 중 오류:', error);
+      return { 
+        homeTeam: null, 
+        awayTeam: null, 
+        commenceTime: null, 
+        mainCategory: null, 
+        subCategory: null,
+        backOdds: null, 
+        layOdds: null, 
+        oddsSource: null 
+      };
+    }
+  }
+
+  /**
+   * OddsCache에서 배당율 추출
+   * @param {Object} oddsCache - OddsCache 객체
+   * @param {string} selection - 선택한 팀명
+   * @param {string} side - 주문 타입 (back/lay)
+   * @returns {Object} - { backOdds, layOdds, oddsSource }
+   */
+  async extractOddsFromCache(oddsCache, selection, side = 'back') {
+    try {
+      if (!oddsCache || !oddsCache.bookmakers) {
+        console.log('⚠️ OddsCache에 북메이커 데이터 없음');
+        return { backOdds: null, layOdds: null, oddsSource: null };
+      }
+
+      // 첫 번째 북메이커 사용
+      const bookmaker = oddsCache.bookmakers[0];
+      if (!bookmaker || !bookmaker.markets) {
+        console.log('⚠️ 북메이커 마켓 데이터 없음');
+        return { backOdds: null, layOdds: null, oddsSource: null };
+      }
+
+      // h2h 마켓에서 배당율 찾기
+      const h2hMarket = bookmaker.markets.find(market => market.key === 'h2h');
+      if (!h2hMarket || !h2hMarket.outcomes) {
+        console.log('⚠️ h2h 마켓 데이터 없음');
+        return { backOdds: null, layOdds: null, oddsSource: null };
+      }
+
+      // 선택한 팀의 배당율 찾기
+      const selectedOutcome = h2hMarket.outcomes.find(outcome => 
+        outcome.name === selection || 
+        outcome.name.includes(selection) || 
+        selection.includes(outcome.name)
+      );
+
+      if (!selectedOutcome) {
+        console.log('⚠️ 선택한 팀의 배당율을 찾을 수 없음:', { selection, outcomes: h2hMarket.outcomes.map(o => o.name) });
+        return { backOdds: null, layOdds: null, oddsSource: null };
+      }
+
+      // 상대팀 outcome 찾기
+      const opposingOutcome = h2hMarket.outcomes.find(outcome => outcome.name !== selectedOutcome.name);
+      
+      let backOdds, layOdds;
+      
+      if (side === 'lay') {
+        // Lay 주문: 선택한 팀을 Lay, 상대팀을 Back
+        backOdds = opposingOutcome ? opposingOutcome.price : null;
+        layOdds = selectedOutcome.price;
+      } else {
+        // Back 주문: 선택한 팀을 Back, 상대팀을 Lay
+        backOdds = selectedOutcome.price;
+        layOdds = opposingOutcome ? opposingOutcome.price : null;
+      }
+
+      console.log('✅ OddsCache에서 배당율 추출 성공:', {
+        selection,
+        side,
+        backOdds,
+        layOdds,
+        oddsSource: bookmaker.title
+      });
+
+      return {
+        backOdds: backOdds !== null ? parseFloat(backOdds.toFixed(2)) : null,
+        layOdds: layOdds !== null ? parseFloat(layOdds.toFixed(2)) : null,
+        oddsSource: bookmaker.title
+      };
+
+    } catch (error) {
+      console.error('❌ 배당율 추출 중 오류:', error);
+      return { backOdds: null, layOdds: null, oddsSource: null };
+    }
+  }
+
+  /**
+   * Exchange Order 생성 시 게임 정보 자동 매핑 (OddsCache 우선)
    * @param {Object} orderData - 주문 데이터
    * @returns {Object} 매핑된 주문 데이터
    */
   async mapGameDataToOrder(orderData) {
     try {
-      // 1. gameId로 GameResult 찾기
-      let gameResult = null;
-      
-      if (orderData.gameId) {
-        gameResult = await GameResult.findOne({
-          where: {
-            [Op.or]: [
-              { id: orderData.gameId },
-              { eventId: orderData.gameId }
-            ]
-          }
-        });
-      }
-
-      // 2. 팀명으로 게임 찾기 (fallback) - 정확한 매칭을 위해 조건 완화
-      if (!gameResult && (orderData.homeTeam || orderData.awayTeam || orderData.selection)) {
-        const searchConditions = {
-          [Op.or]: []
-        };
-        
-        // homeTeam, awayTeam이 있으면 정확히 매칭
-        if (orderData.homeTeam && orderData.awayTeam) {
-          searchConditions[Op.or].push({
-            homeTeam: orderData.homeTeam,
-            awayTeam: orderData.awayTeam
-          });
-        }
-        
-        // selection이 있으면 팀명 중 하나와 매칭
-        if (orderData.selection) {
-          searchConditions[Op.or].push({
-            [Op.or]: [
-              { homeTeam: { [Op.iLike]: `%${orderData.selection}%` } },
-              { awayTeam: { [Op.iLike]: `%${orderData.selection}%` } }
-            ]
-          });
-        }
-        
-        // gameId가 eventId로 사용되는 경우도 체크
-        if (orderData.gameId) {
-          searchConditions[Op.or].push({
-            eventId: orderData.gameId
-          });
-        }
-        
-        gameResult = await GameResult.findOne({
-          where: searchConditions,
-          order: [['commenceTime', 'DESC']] // 최신 경기부터
-        });
-      }
-
-      // 3. 게임 정보 매핑
+      // 1. OddsCache에서 경기 정보 및 배당율 조회 (GameResult 의존성 제거)
       const mappedData = { ...orderData };
+      
+      if (orderData.gameId && orderData.selection) {
+        const oddsCacheData = await this.getOddsCacheData(orderData.gameId, orderData.selection, orderData.side);
+        
+        // OddsCache에서 경기 정보 매핑
+        if (oddsCacheData.homeTeam && oddsCacheData.awayTeam) {
+          mappedData.homeTeam = oddsCacheData.homeTeam;
+          mappedData.awayTeam = oddsCacheData.awayTeam;
+          mappedData.commenceTime = oddsCacheData.commenceTime;
+          mappedData.gameResultId = oddsCacheData.gameResultId;
+          mappedData.sportKey = this.getSportKeyFromCategories(
+            oddsCacheData.mainCategory, 
+            oddsCacheData.subCategory
+          );
+          
+          // 배당율 설정
+          mappedData.backOdds = oddsCacheData.backOdds;
+          mappedData.layOdds = oddsCacheData.layOdds;
+          mappedData.oddsSource = oddsCacheData.oddsSource;
+          mappedData.oddsUpdatedAt = new Date();
 
-      if (gameResult) {
-        mappedData.gameResultId = gameResult.id;
-        mappedData.homeTeam = gameResult.homeTeam;
-        mappedData.awayTeam = gameResult.awayTeam;
-        mappedData.commenceTime = gameResult.commenceTime;
-        mappedData.sportKey = this.getSportKeyFromCategories(
-          gameResult.mainCategory, 
-          gameResult.subCategory
-        );
+          console.log('✅ OddsCache 기반 게임 매핑 성공:', {
+            gameId: orderData.gameId,
+            homeTeam: mappedData.homeTeam,
+            awayTeam: mappedData.awayTeam,
+            sportKey: mappedData.sportKey,
+            selection: orderData.selection,
+            side: orderData.side,
+            backOdds: mappedData.backOdds,
+            layOdds: mappedData.layOdds,
+            oddsSource: mappedData.oddsSource
+          });
+        } else {
+          console.log('⚠️ OddsCache에서 경기 정보를 찾을 수 없음:', orderData.gameId);
+        }
       }
 
-      // 4. selectionDetails 구조화
+      // 2. selectionDetails 구조화
       mappedData.selectionDetails = this.createSelectionDetails(mappedData);
 
       return mappedData;
@@ -264,8 +435,9 @@ class ExchangeGameMappingService {
       'soccer_serie_a': 'soccer_serie_a',
       'soccer_세리에 a': 'soccer_serie_a',
       'soccer_mls': 'soccer_mls',
-      'soccer_brasileirao': 'soccer_brasileirao',
-      'soccer_브라질 세리에 a': 'soccer_brasileirao',
+      'soccer_brasileirao': 'soccer_brazil_campeonato',
+      'soccer_브라질 세리에 a': 'soccer_brazil_campeonato',
+      'soccer_brazil_campeonato': 'soccer_brazil_campeonato',
       'soccer_argentina_primera': 'soccer_argentina_primera',
       'soccer_아르헨티나 프리메라': 'soccer_argentina_primera',
       'soccer_csl': 'soccer_chinese_super_league',
