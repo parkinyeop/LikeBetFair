@@ -562,42 +562,45 @@ export default function Home() {
         <TodayBettingView />
       ) : (
         <>
-          <div className="mb-6 flex flex-wrap gap-2">
+          {/* 카테고리별 그룹 UI로 변경 */}
+          <div className="mb-6 space-y-6">
             {Object.entries(SPORTS_TREE).map(([mainCategory, subCategories]) => (
-              <div key={mainCategory} className="flex flex-wrap gap-1">
-                {subCategories.map((category) => {
-                  const sportKey = getSportKey(category);
-                  const seasonInfo = getSeasonInfo(sportKey);
-                  const statusBadge = seasonInfo ? getSeasonStatusBadge(seasonInfo.status) : null;
-                  const statusStyle = seasonInfo ? getSeasonStatusStyle(seasonInfo.status) : null;
-                  
-                  return (
-                    <button
-                      key={category}
-                      onClick={() => handleCategoryChange(category)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors relative border-2 shadow-sm ${
-                        selectedCategory === category
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : seasonInfo 
-                            ? (seasonInfo.status === 'active' 
-                                ? 'bg-blue-50 border-blue-400 text-blue-900 hover:bg-blue-100 hover:border-blue-500'
-                                : seasonInfo.status === 'break'
-                                ? 'bg-yellow-50 border-yellow-400 text-yellow-900 hover:bg-yellow-100 hover:border-yellow-500'
-                                : 'bg-gray-50 border-gray-400 text-gray-700 hover:bg-gray-100 hover:border-gray-500')
-                            : 'bg-gray-200 border-gray-400 text-gray-700 hover:bg-gray-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{category}</span>
-                        {statusBadge && seasonInfo && seasonInfo.status !== 'active' && (
-                          <span className="text-xs px-2 py-1 rounded-full" style={statusStyle || undefined}>
-                            {statusBadge}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
+              <div key={mainCategory} className="mb-4">
+                <div className="text-lg font-bold mb-2 text-blue-800">{mainCategory}</div>
+                <div className="flex flex-wrap gap-2">
+                  {subCategories.map((category) => {
+                    const sportKey = getSportKey(category);
+                    const seasonInfo = getSeasonInfo(sportKey);
+                    const statusBadge = seasonInfo ? getSeasonStatusBadge(seasonInfo.status) : null;
+                    const statusStyle = seasonInfo ? getSeasonStatusStyle(seasonInfo.status) : null;
+                    return (
+                      <button
+                        key={category}
+                        onClick={() => handleCategoryChange(category)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors relative border-2 shadow-sm ${
+                          selectedCategory === category
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : seasonInfo 
+                              ? (seasonInfo.status === 'active' 
+                                  ? 'bg-blue-50 border-blue-400 text-blue-900 hover:bg-blue-100 hover:border-blue-500'
+                                  : seasonInfo.status === 'break'
+                                  ? 'bg-yellow-50 border-yellow-400 text-yellow-900 hover:bg-yellow-100 hover:border-yellow-500'
+                                  : 'bg-gray-50 border-gray-400 text-gray-700 hover:bg-gray-100 hover:border-gray-500')
+                              : 'bg-gray-200 border-gray-400 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span>{category}</span>
+                          {statusBadge && seasonInfo && seasonInfo.status !== 'active' && (
+                            <span className="text-xs px-2 py-1 rounded-full" style={statusStyle || undefined}>
+                              {statusBadge}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             ))}
           </div>
