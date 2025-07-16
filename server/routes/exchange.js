@@ -605,10 +605,19 @@ router.post('/match-order', verifyToken, async (req, res) => {
         matchedOrderId: null // 이후에 본인 주문 id로 연결
       });
 
+      // 원본 오더 정보 추출
+      const baseSelection = existingOrder.selection;
+      const baseHomeTeam = existingOrder.homeTeam;
+      const baseAwayTeam = existingOrder.awayTeam;
+
       // 게임 데이터 매핑 (본인 matched 주문용)
-      const orderData = await exchangeGameMappingService.mapGameDataToOrder({
-        gameId, market, line, side, price, amount: matchAmount, selection, userId
+      let orderData = await exchangeGameMappingService.mapGameDataToOrder({
+        gameId, market, line, side, price, amount: matchAmount, selection: selection || baseSelection, userId
       });
+      // selection, homeTeam, awayTeam을 항상 원본 오더 우선 복사
+      orderData.selection = selection || baseSelection;
+      orderData.homeTeam = orderData.homeTeam || baseHomeTeam;
+      orderData.awayTeam = orderData.awayTeam || baseAwayTeam;
 
       // 본인 matched 주문 생성
       const myMatchedOrder = await ExchangeOrder.create({
@@ -619,7 +628,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
         side,
         price,
         amount: matchAmount,
-        selection,
+        selection: orderData.selection,
         status: 'matched',
         matchedOrderId: existingOrder.id,
         homeTeam: orderData.homeTeam,

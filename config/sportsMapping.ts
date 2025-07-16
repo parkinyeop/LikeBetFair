@@ -95,6 +95,12 @@ export const SPORT_CATEGORIES: Record<string, SportCategory> = {
     backendCategory: "BUNDESLIGA",
     sportTitle: "Bundesliga"
   },
+  "프리미어리그": {
+    displayName: "프리미어리그",
+    sportKey: "soccer_england_premier_league",
+    backendCategory: "EPL",
+    sportTitle: "English Premier League"
+  },
   
   // 농구 추가
   "KBL": {
@@ -116,7 +122,8 @@ export const SPORTS_TREE = {
     "아르헨티나 프리메라",
     "중국 슈퍼리그",
     "라리가",
-    "분데스리가"
+    "분데스리가",
+    "프리미어리그"
   ],
   농구: ["NBA", "KBL"],
   야구: ["MLB", "KBO"], 
@@ -232,6 +239,15 @@ export const SEASON_SCHEDULES: Record<string, SeasonInfo> = {
     currentSeason: '2025',
     nextSeasonStart: '2025-03-01',
     description: '시즌오프 (자동 감지: 시즌 시작 예정, 배당율 조기 제공 중)'
+  },
+  'soccer_england_premier_league': {
+    name: '프리미어리그',
+    status: 'offseason',
+    currentSeason: '2025-26',
+    seasonStart: '2025-08-15',
+    seasonEnd: '2026-05-25',
+    nextSeasonStart: '2026-08-15',
+    description: '2025-26 시즌 8월 15일 개막 예정'
   },
 
   // 농구

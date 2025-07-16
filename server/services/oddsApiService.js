@@ -18,6 +18,7 @@ const clientSportKeyMap = {
   '중국 슈퍼리그': 'soccer_china_superleague',
   '라리가': 'soccer_spain_primera_division',
   '분데스리가': 'soccer_germany_bundesliga',
+  '프리미어리그': 'soccer_england_premier_league',
   
   // 농구 (Basketball)
   'NBA': 'basketball_nba',

@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { collectPremierLeagueData } from '../scripts/collectPremierLeagueData.js';
 
 const execAsync = promisify(exec);
 
@@ -14,7 +15,7 @@ let lastUpdateTime = null;
 
 // 리그별 우선순위 설정 (API 사용량 최적화)
 const highPriorityCategories = new Set([
-  'NBA', 'MLB', 'KBO', 'NFL' // 활발한 시즌 또는 높은 베팅 볼륨
+  'NBA', 'MLB', 'KBO', 'NFL', '프리미어리그' // 활발한 시즌 또는 높은 베팅 볼륨
 ]);
 
 const mediumPriorityCategories = new Set([
@@ -538,6 +539,17 @@ cron.schedule('*/5 18-23 * * *', async () => {
   } catch (error) {
     // 긴급 감사 실패는 조용히 로깅 (너무 많은 알림 방지)
     console.log('⚠️ [Emergency Audit] 감사 실패:', error.message);
+  }
+});
+
+// EPL 경기 결과/odds 별도 10분마다 강제 실행 (시즌중 여부 무관)
+cron.schedule('*/10 * * * *', async () => {
+  saveUpdateLog('epl', 'start', { message: 'EPL 프리미어리그 데이터 강제 업데이트' });
+  try {
+    await collectPremierLeagueData();
+    saveUpdateLog('epl', 'success', { message: 'EPL 프리미어리그 데이터 업데이트 완료' });
+  } catch (error) {
+    saveUpdateLog('epl', 'error', { message: 'EPL 프리미어리그 데이터 업데이트 실패', error: error.message });
   }
 });
 
