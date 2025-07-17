@@ -18,6 +18,14 @@ const sequelize = new Sequelize({
   logging: false
 });
 
+// 환경 변수 디버깅 (비밀번호는 마스킹)
+console.log('[DB 연결] 환경 변수 확인:');
+console.log('[DB 연결] DB_HOST:', process.env.DB_HOST);
+console.log('[DB 연결] DB_PORT:', process.env.DB_PORT);
+console.log('[DB 연결] DB_NAME:', process.env.DB_NAME);
+console.log('[DB 연결] DB_USER:', process.env.DB_USER);
+console.log('[DB 연결] DB_PASSWORD:', process.env.DB_PASSWORD ? '***' : 'undefined');
+
 // 라우트 임포트
 import oddsRoutes from './routes/oddsRoutes.js';
 import gameResultRoutes from './routes/gameResultRoutes.js';
