@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: likebetfair-api
+    env: node
+    plan: free
+    buildCommand: cd server && npm install
+    startCommand: cd server && node app.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5050
+    healthCheckPath: /api/odds/kbo 
