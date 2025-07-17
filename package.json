@@ -12,6 +12,9 @@
   },
   "dependencies": {
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^20.11.19",
+    "@types/react": "^18.2.57",
+    "@types/react-dom": "^18.2.19",
     "axios": "^1.9.0",
     "bcryptjs": "^2.4.3",
     "cheerio": "^1.1.0",
@@ -30,20 +33,17 @@
     "react-resizable-panels": "^3.0.3",
     "sequelize": "^6.37.7",
     "sqlite3": "^5.1.7",
+    "typescript": "^5.3.3",
     "ws": "^8.18.3",
     "zustand": "^5.0.5"
   },
   "devDependencies": {
-    "@types/node": "^20.11.19",
-    "@types/react": "^18.2.57",
-    "@types/react-dom": "^18.2.19",
     "autoprefixer": "^10.4.17",
     "concurrently": "^9.1.2",
     "eslint": "^8.56.0",
     "eslint-config-next": "14.1.0",
     "postcss": "^8.4.35",
-    "tailwindcss": "^3.4.1",
-    "typescript": "^5.3.3"
+    "tailwindcss": "^3.4.1"
   },
   "type": "module"
 }
