@@ -97,7 +97,7 @@ import { setupSeasonStatusScheduler } from './services/seasonStatusUpdater.js';
 import exchangeWebSocketService from './services/exchangeWebSocketService.js';
 
 // 데이터베이스 연결 및 서버 시작
-const PORT = process.env.API_PORT || 3001;
+const PORT = process.env.PORT || process.env.API_PORT || 3001;
 
 // 설정 초기화 후 서버 시작
 async function startServer() {
