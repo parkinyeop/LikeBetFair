@@ -6,8 +6,9 @@
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd server && node app.js",
     "client": "next dev",
-    "build": "next build",
+    "build": "next build && npm run migrate",
     "start": "concurrently \"npm run server\" \"next start\"",
+    "migrate": "cd server && node runMigrations.js",
     "lint": "next lint"
   },
   "dependencies": {
