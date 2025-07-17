@@ -27,6 +27,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("KBO");
+  const [selectedMainCategory, setSelectedMainCategory] = useState<string>("야구");
   const [currentSportKey, setCurrentSportKey] = useState<string>("");
   const [viewMode, setViewMode] = useState<'today' | 'league'>('today');
   const [todayGames, setTodayGames] = useState<Record<string, any[]>>({});
@@ -384,7 +385,7 @@ export default function Home() {
                         {Object.keys(h2hOdds).length > 0 && (
                           <div>
                             <div className="text-sm font-medium text-gray-700 mb-2">⚔️ 승부 배당</div>
-                            <div className="flex gap-2">
+                            <div className="space-y-2">
                               {(() => {
                                 // 리그명에서 sportKey 추출 (K리그 -> soccer_korea_kleague1 등)
                                 const isSoccer = leagueName.includes('리그') || leagueName.includes('세리에') || 
@@ -406,20 +407,39 @@ export default function Home() {
                                     { name: game.away_team, odds: awayOdds }
                                   ].filter(outcome => outcome.odds);
                                   
-                                  return outcomes.map((outcome: any, idx: number) => (
-                                    <div key={idx} className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-2 text-center hover:border-blue-400 transition-colors">
-                                      <div className="text-xs text-gray-600 truncate">{outcome.name}</div>
-                                      <div className="text-lg font-bold text-blue-600">{outcome.odds.averagePrice.toFixed(2)}</div>
+                                  return (
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-16 text-base font-bold text-gray-800 text-center">
+                                        승/패
+                                      </div>
+                                      {outcomes.map((outcome: any, idx: number) => (
+                                        <div key={idx} className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center">
+                                          <div className="text-sm text-gray-600 font-medium truncate">{outcome.name}</div>
+                                          <div className="text-sm font-bold text-blue-600">{outcome.odds.averagePrice.toFixed(2)}</div>
+                                        </div>
+                                      ))}
                                     </div>
-                                  ));
+                                  );
                                 } else {
                                   // 다른 스포츠: 기존 방식 (순서대로 표시)
-                                  return Object.entries(h2hOdds).map(([name, oddsData]: [string, any], idx: number) => (
-                                    <div key={idx} className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-2 text-center hover:border-blue-400 transition-colors">
-                                      <div className="text-xs text-gray-600 truncate">{name}</div>
-                                      <div className="text-lg font-bold text-blue-600">{oddsData.averagePrice.toFixed(2)}</div>
+                                  const outcomes = Object.entries(h2hOdds).map(([name, oddsData]: [string, any]) => ({
+                                    name,
+                                    odds: oddsData
+                                  }));
+                                  
+                                  return (
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-16 text-base font-bold text-gray-800 text-center">
+                                        승/패
+                                      </div>
+                                      {outcomes.map((outcome: any, idx: number) => (
+                                        <div key={idx} className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center">
+                                          <div className="text-sm text-gray-600 font-medium truncate">{outcome.name}</div>
+                                          <div className="text-sm font-bold text-blue-600">{outcome.odds.averagePrice.toFixed(2)}</div>
+                                        </div>
+                                      ))}
                                     </div>
-                                  ));
+                                  );
                                 }
                               })()}
                             </div>
@@ -429,13 +449,44 @@ export default function Home() {
                         {Object.keys(totalsOdds).length > 0 && (
                           <div>
                             <div className="text-sm font-medium text-gray-700 mb-2">📊 오버/언더</div>
-                            <div className="flex gap-2">
-                              {Object.entries(totalsOdds).slice(0, 2).map(([name, oddsData]: [string, any], idx: number) => (
-                                <div key={idx} className="flex-1 bg-white border-2 border-green-200 rounded-lg p-2 text-center hover:border-green-400 transition-colors">
-                                  <div className="text-xs text-gray-600">{name}</div>
-                                  <div className="text-lg font-bold text-green-600">{oddsData.averagePrice.toFixed(2)}</div>
-                                </div>
-                              ))}
+                            <div className="space-y-2">
+                              {(() => {
+                                // Over/Under 쌍으로 그룹화
+                                const groupedTotals: { [point: string]: { over?: any, under?: any } } = {};
+                                
+                                Object.entries(totalsOdds).forEach(([outcomeName, oddsData]) => {
+                                  if (outcomeName.startsWith('Over ')) {
+                                    const point = outcomeName.replace('Over ', '');
+                                    if (!groupedTotals[point]) groupedTotals[point] = {};
+                                    groupedTotals[point].over = oddsData;
+                                  } else if (outcomeName.startsWith('Under ')) {
+                                    const point = outcomeName.replace('Under ', '');
+                                    if (!groupedTotals[point]) groupedTotals[point] = {};
+                                    groupedTotals[point].under = oddsData;
+                                  }
+                                });
+                                
+                                return Object.entries(groupedTotals).map(([point, oddsPair], idx: number) => {
+                                  const overOdds = oddsPair.over?.averagePrice;
+                                  const underOdds = oddsPair.under?.averagePrice;
+                                  
+                                  return (
+                                    <div key={idx} className="flex items-center gap-2">
+                                      <div className="w-16 text-base font-bold text-gray-800 text-center">
+                                        {point}
+                                      </div>
+                                      <div className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center">
+                                        <div className="text-sm text-gray-600 font-medium">오버</div>
+                                        <div className="text-sm font-bold text-blue-600">{overOdds ? overOdds.toFixed(2) : 'N/A'}</div>
+                                      </div>
+                                      <div className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center">
+                                        <div className="text-sm text-gray-600 font-medium">언더</div>
+                                        <div className="text-sm font-bold text-blue-600">{underOdds ? underOdds.toFixed(2) : 'N/A'}</div>
+                                      </div>
+                                    </div>
+                                  );
+                                });
+                              })()}
                             </div>
                           </div>
                         )}
@@ -562,13 +613,30 @@ export default function Home() {
         <TodayBettingView />
       ) : (
         <>
-          {/* 카테고리별 그룹 UI로 변경 */}
-          <div className="mb-6 space-y-6">
-            {Object.entries(SPORTS_TREE).map(([mainCategory, subCategories]) => (
-              <div key={mainCategory} className="mb-4">
-                <div className="text-lg font-bold mb-2 text-blue-800">{mainCategory}</div>
+          {/* 상위 카테고리 탭 */}
+          <div className="mb-6">
+            <div className="flex gap-2 mb-4">
+              {Object.keys(SPORTS_TREE).map((mainCategory) => (
+                <button
+                  key={mainCategory}
+                  onClick={() => setSelectedMainCategory(mainCategory)}
+                  className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                    selectedMainCategory === mainCategory
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  {mainCategory}
+                </button>
+              ))}
+            </div>
+            
+            {/* 하위 카테고리 버튼들 */}
+            {selectedMainCategory && (
+              <div className="mb-6">
+                <div className="text-lg font-bold mb-3 text-blue-800">{selectedMainCategory}</div>
                 <div className="flex flex-wrap gap-2">
-                  {subCategories.map((category) => {
+                  {SPORTS_TREE[selectedMainCategory].map((category) => {
                     const sportKey = getSportKey(category);
                     const seasonInfo = getSeasonInfo(sportKey);
                     const statusBadge = seasonInfo ? getSeasonStatusBadge(seasonInfo.status) : null;
@@ -602,7 +670,7 @@ export default function Home() {
                   })}
                 </div>
               </div>
-            ))}
+            )}
           </div>
 
           <div className="mb-4">
@@ -632,20 +700,147 @@ export default function Home() {
             {games.length === 0 ? (
               <SeasonInfoDisplay category={selectedCategory} />
             ) : (
-              games.map((game, index) => (
-                <div key={index} onClick={() => handleGameClick(game)} style={{ cursor: 'pointer' }}>
-                  <GameCard 
-                    teams={`${game.home_team} vs ${game.away_team}`}
-                    time={game.commence_time}
-                    selectedTeam={""}
-                    onSelect={() => {}}
-                    bookmakers={game.bookmakers}
-                    infoOnly={true}
-                    sportKey={currentSportKey}
-                    onCategorySelect={handleCategorySelect}
-                  />
-                </div>
-              ))
+              <div className="space-y-4">
+                {games.map((game, index) => (
+                  <div key={index} className="bg-white rounded-lg shadow p-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-lg font-bold">🏟️ {game.home_team} vs {game.away_team}</span>
+                      <div className="text-right">
+                        <span className="text-sm">📅 {new Date(game.commence_time).toLocaleDateString()} {new Date(game.commence_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                    </div>
+                    
+                    {/* 승/패 배당 */}
+                    {game.officialOdds?.h2h && Object.keys(game.officialOdds.h2h).length > 0 && (
+                      <div className="mb-3">
+                        <div className="text-sm font-medium text-gray-700 mb-2">🏆 승/패</div>
+                        <div className="space-y-2">
+                          {(() => {
+                            const h2hOdds = game.officialOdds.h2h;
+                            const outcomes = Object.entries(h2hOdds).map(([name, oddsData]: [string, any]) => ({
+                              name,
+                              odds: oddsData
+                            }));
+                            
+                            return (
+                              <div className="flex items-center gap-2">
+                                <div className="w-16 text-base font-bold text-gray-800 text-center">
+                                  승/패
+                                </div>
+                                {outcomes.map((outcome: any, idx: number) => {
+                                  let label = outcome.name;
+                                  if (outcome.name.toLowerCase() === 'draw') label = '무승부';
+                                  else if (outcome.name === game.home_team) label = game.home_team;
+                                  else if (outcome.name === game.away_team) label = game.away_team;
+                                  
+                                  return (
+                                    <div key={idx} className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center">
+                                      <div className="text-sm text-gray-600 font-medium truncate">{label}</div>
+                                      <div className="text-sm font-bold text-blue-600">{outcome.odds.averagePrice.toFixed(2)}</div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* 언더/오버 배당 */}
+                    {game.officialOdds?.totals && Object.keys(game.officialOdds.totals).length > 0 && (
+                      <div className="mb-3">
+                        <div className="text-sm font-medium text-gray-700 mb-2">📊 오버/언더</div>
+                        <div className="space-y-2">
+                          {(() => {
+                            const totalsOdds = game.officialOdds.totals;
+                            const groupedTotals: { [point: string]: { over?: any, under?: any } } = {};
+                            
+                            Object.entries(totalsOdds).forEach(([outcomeName, oddsData]) => {
+                              if (outcomeName.startsWith('Over ')) {
+                                const point = outcomeName.replace('Over ', '');
+                                if (!groupedTotals[point]) groupedTotals[point] = {};
+                                groupedTotals[point].over = oddsData;
+                              } else if (outcomeName.startsWith('Under ')) {
+                                const point = outcomeName.replace('Under ', '');
+                                if (!groupedTotals[point]) groupedTotals[point] = {};
+                                groupedTotals[point].under = oddsData;
+                              }
+                            });
+                            
+                            return Object.entries(groupedTotals).map(([point, oddsPair], idx: number) => {
+                              const overOdds = oddsPair.over?.averagePrice;
+                              const underOdds = oddsPair.under?.averagePrice;
+                              
+                              return (
+                                <div key={idx} className="flex items-center gap-2">
+                                  <div className="w-16 text-base font-bold text-gray-800 text-center">
+                                    {point}
+                                  </div>
+                                  <div className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center">
+                                    <div className="text-sm text-gray-600 font-medium">오버</div>
+                                    <div className="text-sm font-bold text-blue-600">{overOdds ? overOdds.toFixed(2) : 'N/A'}</div>
+                                  </div>
+                                  <div className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center">
+                                    <div className="text-sm text-gray-600 font-medium">언더</div>
+                                    <div className="text-sm font-bold text-blue-600">{underOdds ? underOdds.toFixed(2) : 'N/A'}</div>
+                                  </div>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* 핸디캡 배당 */}
+                    {game.officialOdds?.spreads && Object.keys(game.officialOdds.spreads).length > 0 && (
+                      <div>
+                        <div className="text-sm font-medium text-gray-700 mb-2">⚖️ 핸디캡</div>
+                        <div className="space-y-2">
+                          {(() => {
+                            const spreadsOdds = game.officialOdds.spreads;
+                            const groupedSpreads: { [point: string]: { home?: any, away?: any } } = {};
+                            
+                            Object.entries(spreadsOdds).forEach(([outcomeName, oddsData]) => {
+                              if (outcomeName.includes(' -')) {
+                                const point = outcomeName.split(' -')[1];
+                                if (!groupedSpreads[point]) groupedSpreads[point] = {};
+                                groupedSpreads[point].home = oddsData;
+                              } else if (outcomeName.includes(' +')) {
+                                const point = outcomeName.split(' +')[1];
+                                if (!groupedSpreads[point]) groupedSpreads[point] = {};
+                                groupedSpreads[point].away = oddsData;
+                              }
+                            });
+                            
+                            return Object.entries(groupedSpreads).map(([point, oddsPair], idx: number) => {
+                              const homeOdds = oddsPair.home?.averagePrice;
+                              const awayOdds = oddsPair.away?.averagePrice;
+                              
+                              return (
+                                <div key={idx} className="flex items-center gap-2">
+                                  <div className="w-16 text-base font-bold text-gray-800 text-center">
+                                    {point}
+                                  </div>
+                                  <div className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center">
+                                    <div className="text-sm text-gray-600 font-medium">홈</div>
+                                    <div className="text-sm font-bold text-blue-600">{homeOdds ? homeOdds.toFixed(2) : 'N/A'}</div>
+                                  </div>
+                                  <div className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center">
+                                    <div className="text-sm text-gray-600 font-medium">원정</div>
+                                    <div className="text-sm font-bold text-blue-600">{awayOdds ? awayOdds.toFixed(2) : 'N/A'}</div>
+                                  </div>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </>
