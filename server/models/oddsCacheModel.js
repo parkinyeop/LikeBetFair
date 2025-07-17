@@ -39,6 +39,11 @@ const OddsCache = sequelize.define('OddsCache', {
     type: DataTypes.JSONB,
     allowNull: false
   },
+  officialOdds: {
+    type: DataTypes.JSONB,
+    allowNull: true,
+    comment: '공식 평균 배당률 (모든 북메이커의 outcome별 평균)'
+  },
   lastUpdated: {
     type: DataTypes.DATE,
     allowNull: false

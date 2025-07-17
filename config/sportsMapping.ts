@@ -269,13 +269,12 @@ export const SEASON_SCHEDULES: Record<string, SeasonInfo> = {
   },
 
   // 야구
-    'baseball_kbo': {
+      'baseball_kbo': {
     name: 'KBO',
-    status: 'offseason',
+    status: 'active',
     currentSeason: '2025',
-    seasonEnd: '2025-07-11',
-    nextSeasonStart: 'TBD',
-    description: '시즌오프 (자동 감지: 최근 경기 없음, 예정 경기 없음, 배당율 미제공)'
+    nextSeasonStart: '2025-03-01',
+    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (5경기))'
   },
   'baseball_mlb': {
     name: 'MLB',

@@ -14,18 +14,14 @@ interface Game {
   commence_time: string;
   home_team: string;
   away_team: string;
-  bookmakers: Array<{
-    key: string;
-    title: string;
-    markets: Array<{
-      key: string;
-      outcomes: Array<{
-        name: string;
-        price: number;
-        point?: number;
-      }>;
-    }>;
-  }>;
+  officialOdds?: {
+    [marketKey: string]: {
+      [outcomeName: string]: {
+        averagePrice: number;
+        count: number;
+      };
+    };
+  };
 }
 
 const marketKeyMap = { 
@@ -157,14 +153,14 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
   return (
     <div className="space-y-4 h-full flex-1 min-h-0 px-1 overflow-y-auto">
       {games.map((game: any) => {
-        if (game.sport_key === "baseball_kbo") {
-          console.log("[KBO] 렌더링 map에서 만난 경기:", game);
-        }
-        const gameTime = game.gameTime || new Date(game.commence_time); // 새로운 로직 사용
-        const isBettable = game.isBettable !== undefined ? game.isBettable : true; // 새로운 로직 사용
+        const gameTime = game.gameTime || new Date(game.commence_time);
+        const isBettable = game.isBettable !== undefined ? game.isBettable : true;
         const selectedMarket = selectedMarkets[game.id] || '승/패';
         const marketKey = marketKeyMap[selectedMarket];
-        const market = game.bookmakers[0]?.markets.find(m => m.key === marketKey);
+        
+        // officialOdds에서 해당 마켓의 평균 배당률 가져오기
+        const officialOdds = game.officialOdds || {};
+        const marketOdds = officialOdds[marketKey] || {};
         
         return (
           <div key={game.id} className={`bg-white rounded-lg shadow p-4 ${!isBettable ? 'opacity-60' : ''}`}>
@@ -179,6 +175,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                 )}
               </div>
             </div>
+            
             {/* 마켓 탭 */}
             <div className="flex gap-2 mb-3">
               {['승/패', '언더/오버', '핸디캡'].map(marketTab => (
@@ -191,370 +188,68 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                 </button>
               ))}
             </div>
+            
             {/* 마켓별 선택 영역 */}
-            {selectedMarket === '핸디캡' && (!market || !market.outcomes || market.outcomes.length === 0) ? (
-              <div className="text-center text-gray-500 py-6">
-                현재 핸디캡 배당 정보가 제공되지 않습니다.
-              </div>
-            ) : selectedMarket === '언더/오버' && (!market || !market.outcomes || market.outcomes.length === 0) ? (
-              <div className="text-center text-gray-500 py-6">
-                현재 언더/오버 배당 정보가 제공되지 않습니다.
-              </div>
-            ) : (selectedMarket === '언더/오버' || selectedMarket === '핸디캡') && market ? (
-              <div className="overflow-x-auto">
+            {selectedMarket === '승/패' && (
+              <div className="grid grid-cols-3 gap-2">
                 {(() => {
-                  // 모든 bookmaker의 해당 마켓 outcomes를 합침
-                  const allOutcomes: any[] = [];
-                  game.bookmakers.forEach(bm => {
-                    const m = bm.markets.find(m => m.key === marketKey);
-                    if (m && m.outcomes) {
-                      m.outcomes.forEach(outcome => {
-                        allOutcomes.push({ ...outcome, bookmaker: bm.title });
-                      });
-                    }
-                  });
-                  // point별로 그룹핑 (Over/Under 또는 Home/Away 쌍)
-                  const grouped = Object.values(
-                    allOutcomes.reduce((acc, cur) => {
-                      const key = cur.point ?? 'none';
-                      acc[key] = acc[key] || [];
-                      acc[key].push(cur);
-                      return acc;
-                    }, {} as Record<string, typeof allOutcomes>)
-                  );
-                  // 라인(point) 기준 오름차순 정렬
-                  grouped.sort((a, b) => {
-                    const pa = (a as any[])[0]?.point ?? 0;
-                    const pb = (b as any[])[0]?.point ?? 0;
-                    return pa - pb;
-                  });
-                  // 최고 배당 추출 및 payout 계산
-                  const getBest = (arr: any[], type: string) => {
-                    const filtered = arr.filter(o => o.name.toLowerCase().includes(type));
-                    if (!filtered.length) return null;
-                    return filtered.reduce((best, cur) => (cur.price > best.price ? cur : best), filtered[0]);
-                  };
-                  const calcPayout = (over: any, under: any) => {
-                    if (!over || !under) return '-';
-                    // payout = 1 / (1/over + 1/under)
-                    const payout = 1 / (1/over.price + 1/under.price);
-                    return (payout * 100).toFixed(1) + '%';
-                  };
-                  return (
-                    <table className="min-w-full text-center border">
-                      <thead>
-                        <tr>
-                          <th className="px-2 py-1 border">라인</th>
-                          {selectedMarket === '언더/오버' ? (
-                            <>
-                              <th className="px-2 py-1 border">Over (최고배당)</th>
-                              <th className="px-2 py-1 border">Under (최고배당)</th>
-                            </>
-                          ) : selectedMarket === '핸디캡' ? (
-                            <>
-                              <th className="px-2 py-1 border">Home ({game.home_team})</th>
-                              <th className="px-2 py-1 border">Away ({game.away_team})</th>
-                            </>
-                          ) : (
-                            <>
-                              <th className="px-2 py-1 border">Home ({game.home_team})</th>
-                              <th className="px-2 py-1 border">Away ({game.away_team})</th>
-                            </>
-                          )}
-                          <th className="px-2 py-1 border">Payout</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {grouped.length > 0 ? grouped.map((arr: any[], idx: number) => {
-                          const point = arr[0]?.point ?? '-';
-                          if (selectedMarket === '언더/오버') {
-                            const bestOver = getBest(arr, 'over');
-                            const bestUnder = getBest(arr, 'under');
-                            return (
-                              <tr key={idx}>
-                                <td className="border px-2 py-1 font-semibold">{point}</td>
-                                <td className="border px-2 py-1">
-                                  {bestOver ? (
-                                    <button
-                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestOver.name), selectedMarket, game.id, bestOver.point) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                                      disabled={!isBettable || !bestOver.price}
-                                      onClick={() => {
-                                        if (isBettable && bestOver.price) {
-                                                                    toggleSelection({
-                            team: normalizeTeamName(bestOver.name),
-                            odds: bestOver.price,
-                            desc: `${game.home_team} vs ${game.away_team}`,
-                            commence_time: game.commence_time,
-                            market: selectedMarket,
-                            gameId: game.id,
-                            point: bestOver.point,
-                            sport_key: game.sport_key
-                          });
-                                          handleBettingAreaSelect();
-                                        }
-                                      }}
-                                    >
-                                      {bestOver.price}
-                                    </button>
-                                  ) : '-'}
-                                </td>
-                                <td className="border px-2 py-1">
-                                  {bestUnder ? (
-                                    <button
-                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestUnder.name), selectedMarket, game.id, bestUnder.point) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                                      disabled={!isBettable || !bestUnder.price}
-                                      onClick={() => {
-                                        if (isBettable && bestUnder.price) {
-                                                                    toggleSelection({
-                            team: normalizeTeamName(bestUnder.name),
-                            odds: bestUnder.price,
-                            desc: `${game.home_team} vs ${game.away_team}`,
-                            commence_time: game.commence_time,
-                            market: selectedMarket,
-                            gameId: game.id,
-                            point: bestUnder.point,
-                            sport_key: game.sport_key
-                          });
-                                          handleBettingAreaSelect();
-                                        }
-                                      }}
-                                    >
-                                      {bestUnder.price}
-                                    </button>
-                                  ) : '-'}
-                                </td>
-                                <td className="border px-2 py-1">{calcPayout(bestOver, bestUnder)}</td>
-                              </tr>
-                            );
-                          } else if (selectedMarket === '핸디캡') {
-                            const bestHome = getBest(arr, 'home');
-                            const bestAway = getBest(arr, 'away');
-                            if (!bestHome && !bestAway) {
-                              return (
-                                <tr key={idx}>
-                                  <td colSpan={4} className="border px-2 py-1 text-center text-gray-500">
-                                    현재 핸디캡 배당 정보가 제공되지 않습니다.
-                                  </td>
-                                </tr>
-                              );
-                            }
-                            return (
-                              <tr key={idx}>
-                                <td className="border px-2 py-1 font-semibold">{point}</td>
-                                <td className="border px-2 py-1">
-                                  {bestHome ? (
-                                    <button
-                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestHome.name), selectedMarket, game.id, bestHome.point) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                                      disabled={!isBettable || !bestHome.price}
-                                      onClick={() => {
-                                        if (isBettable && bestHome.price) {
-                                          toggleSelection({
-                                            team: normalizeTeamName(bestHome.name),
-                                            odds: bestHome.price,
-                                            desc: `${game.home_team} vs ${game.away_team}`,
-                                            commence_time: game.commence_time,
-                                            market: selectedMarket,
-                                            gameId: game.id,
-                                            point: bestHome.point,
-                                            sport_key: game.sport_key
-                                          });
-                                          handleBettingAreaSelect();
-                                        }
-                                      }}
-                                    >
-                                      {bestHome.price}
-                                    </button>
-                                  ) : '-'}
-                                </td>
-                                <td className="border px-2 py-1">
-                                  {bestAway ? (
-                                    <button
-                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestAway.name), selectedMarket, game.id, bestAway.point) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                                      disabled={!isBettable || !bestAway.price}
-                                      onClick={() => {
-                                        if (isBettable && bestAway.price) {
-                                          toggleSelection({
-                                            team: normalizeTeamName(bestAway.name),
-                                            odds: bestAway.price,
-                                            desc: `${game.home_team} vs ${game.away_team}`,
-                                            commence_time: game.commence_time,
-                                            market: selectedMarket,
-                                            gameId: game.id,
-                                            point: bestAway.point,
-                                            sport_key: game.sport_key
-                                          });
-                                          handleBettingAreaSelect();
-                                        }
-                                      }}
-                                    >
-                                      {bestAway.price}
-                                    </button>
-                                  ) : '-'}
-                                </td>
-                                <td className="border px-2 py-1">{calcPayout(bestHome, bestAway)}</td>
-                              </tr>
-                            );
-                          } else {
-                            const bestHome = getBest(arr, 'home');
-                            const bestAway = getBest(arr, 'away');
-                            return (
-                              <tr key={idx}>
-                                <td className="border px-2 py-1 font-semibold">{point}</td>
-                                <td className="border px-2 py-1">
-                                  {bestHome ? (
-                                    <button
-                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestHome.name), selectedMarket, game.id, bestHome.point) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                                      disabled={!isBettable || !bestHome.price}
-                                      onClick={() => {
-                                        if (isBettable && bestHome.price) {
-                                          toggleSelection({
-                                            team: normalizeTeamName(bestHome.name),
-                                            odds: bestHome.price,
-                                            desc: `${game.home_team} vs ${game.away_team}`,
-                                            commence_time: game.commence_time,
-                                            market: selectedMarket,
-                                            gameId: game.id,
-                                            point: bestHome.point,
-                                            sport_key: game.sport_key
-                                          });
-                                          handleBettingAreaSelect();
-                                        }
-                                      }}
-                                    >
-                                      {bestHome.price}
-                                    </button>
-                                  ) : '-'}
-                                </td>
-                                <td className="border px-2 py-1">
-                                  {bestAway ? (
-                                    <button
-                                      className={`w-full py-1 rounded ${isTeamSelected(normalizeTeamName(bestAway.name), selectedMarket, game.id, bestAway.point) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                                      disabled={!isBettable || !bestAway.price}
-                                      onClick={() => {
-                                        if (isBettable && bestAway.price) {
-                                          toggleSelection({
-                                            team: normalizeTeamName(bestAway.name),
-                                            odds: bestAway.price,
-                                            desc: `${game.home_team} vs ${game.away_team}`,
-                                            commence_time: game.commence_time,
-                                            market: selectedMarket,
-                                            gameId: game.id,
-                                            point: bestAway.point,
-                                            sport_key: game.sport_key
-                                          });
-                                          handleBettingAreaSelect();
-                                        }
-                                      }}
-                                    >
-                                      {bestAway.price}
-                                    </button>
-                                  ) : '-'}
-                                </td>
-                                <td className="border px-2 py-1">{calcPayout(bestHome, bestAway)}</td>
-                              </tr>
-                            );
-                          }
-                        }) : (
-                          <tr>
-                            <td colSpan={4} className="border px-2 py-1 text-center text-gray-500">
-                              {selectedMarket === '핸디캡' 
-                                ? '현재 핸디캡 배당 정보가 제공되지 않습니다.'
-                                : '현재 배당 정보가 제공되지 않습니다.'}
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  );
-                })()}
-              </div>
-            ) : selectedMarket === '승/패' ? (
-              <div className="grid grid-cols-2 gap-2">
-                {(() => {
-                  // 모든 bookmaker의 h2h outcomes를 합침
-                  const allOutcomes: any[] = [];
-                  game.bookmakers.forEach(bm => {
-                    const m = bm.markets.find(m => m.key === 'h2h');
-                    if (m && m.outcomes) {
-                      m.outcomes.forEach(outcome => {
-                        allOutcomes.push({ ...outcome, bookmaker: bm.title });
-                      });
-                    }
-                  });
-                  // 팀별로 최고 배당 추출
-                  const homeBest = allOutcomes.filter(o => o.name === game.home_team)
-                    .sort((a, b) => b.price - a.price)[0];
-                  const awayBest = allOutcomes.filter(o => o.name === game.away_team)
-                    .sort((a, b) => b.price - a.price)[0];
-                  return (
-                    <>
+                  const h2hOdds = officialOdds.h2h || {};
+                  const outcomes = Object.entries(h2hOdds).map(([outcomeName, oddsData]: [string, any]) => ({
+                    name: outcomeName,
+                    price: oddsData.averagePrice
+                  }));
+                  
+                  return outcomes.map((outcome) => {
+                    let label = outcome.name;
+                    if (outcome.name.toLowerCase() === 'draw') label = '무';
+                    else if (outcome.name === game.home_team) label = game.home_team;
+                    else if (outcome.name === game.away_team) label = game.away_team;
+                    
+                    return (
                       <button
+                        key={outcome.name}
                         onClick={() => {
-                          if (isBettable && homeBest) {
+                          if (isBettable && outcome.price) {
                             toggleSelection({
-                              team: normalizeTeamName(homeBest.name),
-                              odds: homeBest.price,
+                              team: normalizeTeamName(outcome.name),
+                              odds: outcome.price,
                               desc: `${game.home_team} vs ${game.away_team}`,
                               commence_time: game.commence_time,
                               market: selectedMarket,
                               gameId: game.id,
-                              sport_key: game.sport_key,
-                              ...(homeBest.point && { point: homeBest.point })
+                              sport_key: game.sport_key
                             });
                             handleBettingAreaSelect();
                           }
                         }}
                         className={`w-full p-3 rounded-lg text-center transition-colors ${
-                          isTeamSelected(normalizeTeamName(homeBest?.name), selectedMarket, game.id, homeBest.point)
+                          isTeamSelected(normalizeTeamName(outcome.name), selectedMarket, game.id)
                             ? 'bg-yellow-500 hover:bg-yellow-600'
                             : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                         } text-white`}
-                        disabled={!isBettable || !homeBest}
+                        disabled={!isBettable || !outcome.price}
                       >
-                        <div className="font-bold">
-                          {game.home_team}
-                        </div>
-                        <div className="text-sm">
-                          {homeBest ? homeBest.price : 'N/A'}
-                        </div>
-                                        {!isBettable && <div className="text-xs text-red-500 mt-1">베팅 마감</div>}
+                        <div className="font-bold">{label}</div>
+                        <div className="text-sm">{outcome.price ? outcome.price.toFixed(2) : 'N/A'}</div>
+                        {!isBettable && <div className="text-xs text-red-500 mt-1">베팅 마감</div>}
                       </button>
-                      <button
-                        onClick={() => {
-                          if (isBettable && awayBest) {
-                            toggleSelection({
-                              team: normalizeTeamName(awayBest.name),
-                              odds: awayBest.price,
-                              desc: `${game.home_team} vs ${game.away_team}`,
-                              commence_time: game.commence_time,
-                              market: selectedMarket,
-                              gameId: game.id,
-                              sport_key: game.sport_key,
-                              ...(awayBest.point && { point: awayBest.point })
-                            });
-                            handleBettingAreaSelect();
-                          }
-                        }}
-                        className={`w-full p-3 rounded-lg text-center transition-colors ${
-                          isTeamSelected(normalizeTeamName(awayBest?.name), selectedMarket, game.id, awayBest.point)
-                            ? 'bg-yellow-500 hover:bg-yellow-600'
-                            : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
-                        } text-white`}
-                        disabled={!isBettable || !awayBest}
-                      >
-                        <div className="font-bold">
-                          {game.away_team}
-                        </div>
-                        <div className="text-sm">
-                          {awayBest ? awayBest.price : 'N/A'}
-                        </div>
-                                                  {!isBettable && <div className="text-xs text-red-500 mt-1">베팅 마감</div>}
-                      </button>
-                    </>
-                  );
+                    );
+                  });
                 })()}
               </div>
-            ) : null}
+            )}
+            
+            {selectedMarket === '언더/오버' && (
+              <div className="text-center text-gray-500 py-6">
+                언더/오버 배당 정보가 준비 중입니다.
+              </div>
+            )}
+            
+            {selectedMarket === '핸디캡' && (
+              <div className="text-center text-gray-500 py-6">
+                핸디캡 배당 정보가 준비 중입니다.
+              </div>
+            )}
           </div>
         );
       })}

@@ -55,13 +55,14 @@ export default function Home() {
               const data = await response.json();
               
               const now = new Date();
-              const tomorrow = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+              const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+              const maxDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7일 후
               const bettingDeadlineMinutes = 10; // 경기 시작 10분 전까지 베팅 가능
               
-              // 1. 기본 필터링: 현재부터 내일까지의 경기
+              // 1. 기본 필터링: 오늘부터 7일 후까지의 경기
               const filteredGames = data.filter((game: any) => {
                 const gameTime = new Date(game.commence_time);
-                return gameTime >= now && gameTime <= tomorrow;
+                return gameTime >= startOfToday && gameTime <= maxDate;
               });
               
               // 2. 베팅 가능 여부 분류 및 정렬
@@ -345,8 +346,9 @@ export default function Home() {
             </div>
             <div className="grid grid-cols-1 gap-3">
               {todayGames[leagueName].map((game, index) => {
-                const mainMarket = game.bookmakers?.[0]?.markets?.find((m: any) => m.key === 'h2h');
-                const totalsMarket = game.bookmakers?.[0]?.markets?.find((m: any) => m.key === 'totals');
+                // officialOdds 사용 (백엔드에서 반환하는 형태)
+                const h2hOdds = game.officialOdds?.h2h || {};
+                const totalsOdds = game.officialOdds?.totals || {};
                 const isBettable = game.isBettable !== undefined ? game.isBettable : true;
                 
                 return (
@@ -379,7 +381,7 @@ export default function Home() {
                       
                       {/* 메인 배당율 정보 - 크고 눈에 띄게 */}
                       <div className="space-y-3 bg-gray-50 rounded-lg p-3">
-                        {mainMarket && mainMarket.outcomes && (
+                        {Object.keys(h2hOdds).length > 0 && (
                           <div>
                             <div className="text-sm font-medium text-gray-700 mb-2">⚔️ 승부 배당</div>
                             <div className="flex gap-2">
@@ -392,32 +394,30 @@ export default function Home() {
                                 
                                 if (isSoccer) {
                                   // 축구: Home-Draw-Away 순서로 정렬
-                                  const homeBest = mainMarket.outcomes.find((o: any) => o.name === game.home_team);
-                                  const drawBest = mainMarket.outcomes.find((o: any) => 
-                                    o.name.toLowerCase().includes('draw') || o.name === 'Draw' || o.name === 'Tie'
+                                  const homeOdds = h2hOdds[game.home_team];
+                                  const awayOdds = h2hOdds[game.away_team];
+                                  const drawOdds = Object.entries(h2hOdds).find(([name, _]) => 
+                                    name.toLowerCase().includes('draw') || name === 'Draw' || name === 'Tie'
                                   );
-                                  const awayBest = mainMarket.outcomes.find((o: any) => o.name === game.away_team);
                                   
-                                  const sortedOutcomes = [homeBest, drawBest, awayBest].filter(Boolean);
+                                  const outcomes = [
+                                    { name: game.home_team, odds: homeOdds },
+                                    { name: '무승부', odds: drawOdds?.[1] },
+                                    { name: game.away_team, odds: awayOdds }
+                                  ].filter(outcome => outcome.odds);
                                   
-                                  return sortedOutcomes.map((outcome: any, idx: number) => {
-                                    const isDrawOutcome = outcome.name.toLowerCase().includes('draw') || 
-                                                         outcome.name === 'Draw' || outcome.name === 'Tie';
-                                    const teamDisplayName = isDrawOutcome ? '무승부' : outcome.name;
-                                    
-                                    return (
-                                      <div key={idx} className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-2 text-center hover:border-blue-400 transition-colors">
-                                        <div className="text-xs text-gray-600 truncate">{teamDisplayName}</div>
-                                        <div className="text-lg font-bold text-blue-600">{outcome.price}</div>
-                                      </div>
-                                    );
-                                  });
-                                } else {
-                                  // 다른 스포츠: 기존 방식 (순서대로 표시)
-                                  return mainMarket.outcomes.map((outcome: any, idx: number) => (
+                                  return outcomes.map((outcome: any, idx: number) => (
                                     <div key={idx} className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-2 text-center hover:border-blue-400 transition-colors">
                                       <div className="text-xs text-gray-600 truncate">{outcome.name}</div>
-                                      <div className="text-lg font-bold text-blue-600">{outcome.price}</div>
+                                      <div className="text-lg font-bold text-blue-600">{outcome.odds.averagePrice.toFixed(2)}</div>
+                                    </div>
+                                  ));
+                                } else {
+                                  // 다른 스포츠: 기존 방식 (순서대로 표시)
+                                  return Object.entries(h2hOdds).map(([name, oddsData]: [string, any], idx: number) => (
+                                    <div key={idx} className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-2 text-center hover:border-blue-400 transition-colors">
+                                      <div className="text-xs text-gray-600 truncate">{name}</div>
+                                      <div className="text-lg font-bold text-blue-600">{oddsData.averagePrice.toFixed(2)}</div>
                                     </div>
                                   ));
                                 }
@@ -426,14 +426,14 @@ export default function Home() {
                           </div>
                         )}
                         
-                        {totalsMarket && totalsMarket.outcomes && (
+                        {Object.keys(totalsOdds).length > 0 && (
                           <div>
-                            <div className="text-sm font-medium text-gray-700 mb-2">📊 오버/언더 {totalsMarket.outcomes[0]?.point || ''}</div>
+                            <div className="text-sm font-medium text-gray-700 mb-2">📊 오버/언더</div>
                             <div className="flex gap-2">
-                              {totalsMarket.outcomes.slice(0, 2).map((outcome: any, idx: number) => (
+                              {Object.entries(totalsOdds).slice(0, 2).map(([name, oddsData]: [string, any], idx: number) => (
                                 <div key={idx} className="flex-1 bg-white border-2 border-green-200 rounded-lg p-2 text-center hover:border-green-400 transition-colors">
-                                  <div className="text-xs text-gray-600">{outcome.name} {outcome.point}</div>
-                                  <div className="text-lg font-bold text-green-600">{outcome.price}</div>
+                                  <div className="text-xs text-gray-600">{name}</div>
+                                  <div className="text-lg font-bold text-green-600">{oddsData.averagePrice.toFixed(2)}</div>
                                 </div>
                               ))}
                             </div>

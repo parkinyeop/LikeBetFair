@@ -108,6 +108,68 @@ class OddsApiService {
     }
   }
 
+  // 🆕 공식 평균 배당률 계산 (모든 북메이커의 outcome별 평균)
+  calculateAverageOdds(bookmakers) {
+    if (!bookmakers || !Array.isArray(bookmakers) || bookmakers.length === 0) {
+      return null;
+    }
+
+    const officialOdds = {};
+
+    // 모든 북메이커의 markets를 순회
+    for (const bookmaker of bookmakers) {
+      if (!bookmaker.markets || !Array.isArray(bookmaker.markets)) continue;
+
+      for (const market of bookmaker.markets) {
+        const marketKey = market.key; // h2h, totals, spreads 등
+        if (!market.outcomes || !Array.isArray(market.outcomes)) continue;
+
+        // 각 market별로 outcome 그룹화
+        if (!officialOdds[marketKey]) {
+          officialOdds[marketKey] = {};
+        }
+
+        for (const outcome of market.outcomes) {
+          const outcomeKey = outcome.name; // 팀명, Over, Under, Draw 등
+          const point = outcome.point; // 핸디캡, 언더/오버 기준점
+          
+          // point가 있는 경우 outcomeKey에 포함 (예: "Over 2.5", "Under 2.5")
+          const finalKey = point !== undefined ? `${outcomeKey} ${point}` : outcomeKey;
+
+          if (!officialOdds[marketKey][finalKey]) {
+            officialOdds[marketKey][finalKey] = {
+              prices: [],
+              averagePrice: 0,
+              count: 0
+            };
+          }
+
+          // 유효한 배당률만 수집
+          if (outcome.price && typeof outcome.price === 'number' && outcome.price > 1.0) {
+            officialOdds[marketKey][finalKey].prices.push(outcome.price);
+            officialOdds[marketKey][finalKey].count++;
+          }
+        }
+      }
+    }
+
+    // 각 outcome별 평균 배당률 계산
+    for (const marketKey in officialOdds) {
+      for (const outcomeKey in officialOdds[marketKey]) {
+        const outcome = officialOdds[marketKey][outcomeKey];
+        if (outcome.prices.length > 0) {
+          outcome.averagePrice = outcome.prices.reduce((sum, price) => sum + price, 0) / outcome.prices.length;
+          // 소수점 3자리까지 반올림
+          outcome.averagePrice = Math.round(outcome.averagePrice * 1000) / 1000;
+        }
+        // prices 배열은 제거 (최종 결과만 유지)
+        delete outcome.prices;
+      }
+    }
+
+    return officialOdds;
+  }
+
   // 스마트 캐싱: 경기 시작 시간에 따른 우선순위 결정
   filterGamesByPriority(games, priorityLevel = 'medium') {
     const now = new Date();
@@ -219,6 +281,7 @@ class OddsApiService {
                 awayTeam: game.away_team,
                 commenceTime: new Date(game.commence_time),
                 bookmakers: game.bookmakers,
+                officialOdds: this.calculateAverageOdds(game.bookmakers), // 🆕 공식 평균 배당률 추가
                 lastUpdated: new Date()
               };
               
@@ -335,6 +398,7 @@ class OddsApiService {
                 awayTeam: game.away_team,
                 commenceTime: new Date(game.commence_time),
                 bookmakers: game.bookmakers,
+                officialOdds: this.calculateAverageOdds(game.bookmakers), // 🆕 공식 평균 배당률 추가
                 lastUpdated: new Date()
               }, {
                 returning: true
@@ -680,7 +744,7 @@ class OddsApiService {
         home_team: oddsRecord.homeTeam,
         away_team: oddsRecord.awayTeam,
         commence_time: oddsRecord.commenceTime,
-        bookmakers: oddsRecord.bookmakers,
+        officialOdds: oddsRecord.officialOdds, // 🆕 공식 평균 배당률만 전달 (북메이커 정보 제외)
         lastUpdated: oddsRecord.lastUpdated
       }));
       

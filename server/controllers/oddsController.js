@@ -9,33 +9,71 @@ const oddsController = {
       
       // sportKey 매핑 (여러 형태의 키를 처리)
       const sportKeyMapping = {
-        'soccer_korea_kleague1': ['soccer_korea_kleague1', 'K리그'],
-        'soccer_japan_j_league': ['soccer_japan_j_league', 'J리그'],
-        'soccer_italy_serie_a': ['soccer_italy_serie_a', '세리에 A'],
-        'soccer_brazil_campeonato': ['soccer_brazil_campeonato', '브라질 세리에 A'],
-        'soccer_usa_mls': ['soccer_usa_mls', 'MLS'],
-        'soccer_argentina_primera_division': ['soccer_argentina_primera_division', '아르헨티나 프리메라'],
-        'soccer_china_superleague': ['soccer_china_superleague', '중국 슈퍼리그'],
-        'soccer_spain_primera_division': ['soccer_spain_primera_division', '라리가'],
-        'soccer_germany_bundesliga': ['soccer_germany_bundesliga', '분데스리가'],
-        'basketball_nba': ['basketball_nba', 'NBA'],
-        'basketball_kbl': ['basketball_kbl', 'KBL'],
+        // 야구
         'baseball_mlb': ['baseball_mlb', 'MLB'],
+        'MLB': ['MLB', 'baseball_mlb'],
         'baseball_kbo': ['baseball_kbo', 'KBO'],
-        'americanfootball_nfl': ['americanfootball_nfl', 'americansoccer_nfl', 'americansoccer', 'NFL']
+        'KBO': ['KBO', 'baseball_kbo'],
+        'baseball': ['baseball_mlb', 'MLB', 'baseball_kbo', 'KBO'],
+        // 미식축구
+        'americanfootball_nfl': ['americanfootball_nfl', 'NFL'],
+        'NFL': ['NFL', 'americanfootball_nfl'],
+        'americanfootball': ['americanfootball_nfl', 'NFL'],
+        // 농구
+        'basketball_nba': ['basketball_nba', 'NBA'],
+        'NBA': ['NBA', 'basketball_nba'],
+        'basketball_kbl': ['basketball_kbl', 'KBL'],
+        'KBL': ['KBL', 'basketball_kbl'],
+        'basketball': ['basketball_nba', 'NBA', 'basketball_kbl', 'KBL'],
+        // 축구 (영문/한글/코드 모두 포함)
+        'soccer_usa_mls': ['soccer_usa_mls', 'MLS'],
+        'MLS': ['MLS', 'soccer_usa_mls'],
+        'soccer_korea_kleague1': ['soccer_korea_kleague1', 'K리그'],
+        'K리그': ['K리그', 'soccer_korea_kleague1'],
+        'soccer_japan_j_league': ['soccer_japan_j_league', 'J리그'],
+        'J리그': ['J리그', 'soccer_japan_j_league'],
+        'soccer_italy_serie_a': ['soccer_italy_serie_a', '세리에 A', 'SERIE_A'],
+        '세리에A': ['세리에 A', 'SERIE_A', 'soccer_italy_serie_a'],
+        'SERIE_A': ['SERIE_A', '세리에 A', 'soccer_italy_serie_a'],
+        'soccer_brazil_campeonato': ['soccer_brazil_campeonato', '브라질 세리에 A', 'BRASILEIRAO'],
+        '브라질 세리에 A': ['브라질 세리에 A', 'BRASILEIRAO', 'soccer_brazil_campeonato'],
+        'BRASILEIRAO': ['BRASILEIRAO', '브라질 세리에 A', 'soccer_brazil_campeonato'],
+        'soccer_argentina_primera_division': ['soccer_argentina_primera_division', '아르헨티나 프리메라', 'ARGENTINA_PRIMERA'],
+        '아르헨티나 프리메라': ['아르헨티나 프리메라', 'ARGENTINA_PRIMERA', 'soccer_argentina_primera_division'],
+        'ARGENTINA_PRIMERA': ['ARGENTINA_PRIMERA', '아르헨티나 프리메라', 'soccer_argentina_primera_division'],
+        'soccer_china_superleague': ['soccer_china_superleague', '중국 슈퍼리그'],
+        '중국 슈퍼리그': ['중국 슈퍼리그', 'soccer_china_superleague'],
+        'soccer_spain_primera_division': ['soccer_spain_primera_division', '라리가'],
+        '라리가': ['라리가', 'soccer_spain_primera_division'],
+        'soccer_germany_bundesliga': ['soccer_germany_bundesliga', '분데스리가'],
+        '분데스리가': ['분데스리가', 'soccer_germany_bundesliga'],
+        'soccer': [
+          'soccer_usa_mls', 'MLS',
+          'soccer_korea_kleague1', 'K리그',
+          'soccer_japan_j_league', 'J리그',
+          'soccer_italy_serie_a', '세리에 A', 'SERIE_A',
+          'soccer_brazil_campeonato', '브라질 세리에 A', 'BRASILEIRAO',
+          'soccer_argentina_primera_division', '아르헨티나 프리메라', 'ARGENTINA_PRIMERA',
+          'soccer_china_superleague', '중국 슈퍼리그',
+          'soccer_spain_primera_division', '라리가',
+          'soccer_germany_bundesliga', '분데스리가'
+        ]
       };
       
       const possibleKeys = sportKeyMapping[sport] || [sport];
       
-      // 오늘~7일 후까지 범위 계산 (UTC 기준)
+      // 7일 전~7일 후까지 범위 계산 (UTC 기준)
       const now = new Date();
       const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      const weekAgo = new Date(today);
+      weekAgo.setUTCDate(today.getUTCDate() - 7);
       const weekLater = new Date(today);
       weekLater.setUTCDate(today.getUTCDate() + 7);
 
       console.log(`[oddsController] 필터링 조건:`, {
         sport,
         possibleKeys,
+        weekAgo: weekAgo.toISOString(),
         today: today.toISOString(),
         weekLater: weekLater.toISOString(),
         now: now.toISOString()
@@ -54,7 +92,7 @@ const oddsController = {
       // 필터링 적용
       const cachedData = allData.filter(game => {
         const gameTime = new Date(game.commenceTime);
-        const isValid = gameTime >= today && gameTime < weekLater;
+        const isValid = gameTime >= weekAgo && gameTime < weekLater;
         if (!isValid) {
           console.log(`[oddsController] 필터링 제외: ${game.homeTeam} vs ${game.awayTeam} - ${game.commenceTime} (${gameTime.toISOString()})`);
         }
@@ -81,7 +119,7 @@ const oddsController = {
       // 필터링 조건을 만족하지 않는 데이터가 있는지 확인
       const invalidData = cachedData.filter(game => {
         const gameTime = new Date(game.commenceTime);
-        return gameTime < today || gameTime >= weekLater;
+        return gameTime < weekAgo || gameTime >= weekLater;
       });
       
       if (invalidData.length > 0) {
@@ -140,8 +178,7 @@ const oddsController = {
           home_team: game.homeTeam,
           away_team: game.awayTeam,
           commence_time: game.commenceTime,
-          odds: game.odds,
-          bookmakers: game.bookmakers
+          odds: game.officialOdds
         };
       });
 

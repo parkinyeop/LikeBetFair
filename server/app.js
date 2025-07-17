@@ -113,8 +113,8 @@ async function startServer() {
       // Exchange WebSocket 서비스 초기화
       exchangeWebSocketService.initialize(server);
       
-      // 시즌 상태 자동 체크 스케줄러 시작
-      setupSeasonStatusScheduler();
+      // 시즌 상태 자동 체크 스케줄러 시작 (일시 비활성화)
+      // setupSeasonStatusScheduler();
     });
     
   } catch (err) {
