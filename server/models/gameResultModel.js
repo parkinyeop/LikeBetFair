@@ -12,6 +12,14 @@ const GameResult = sequelize.define('GameResult', {
     allowNull: true,
     unique: true
   },
+  sportKey: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  sportTitle: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
   mainCategory: {
     type: DataTypes.STRING,
     allowNull: false
