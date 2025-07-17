@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { SEASON_SCHEDULES } from '../../config/sportsMapping.ts';
+import { SEASON_SCHEDULES } from '../config/sportsMapping.js';
 import { updateSeasonStatus } from './seasonStatusUpdater.js';
 
 class SeasonStatusChecker {

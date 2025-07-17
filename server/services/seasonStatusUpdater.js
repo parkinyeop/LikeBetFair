@@ -7,7 +7,7 @@ import schedule from 'node-schedule';
  */
 async function updateSeasonStatus(sportKey, statusInfo) {
   try {
-    const configPath = path.join(process.cwd(), '../config/sportsMapping.ts');
+    const configPath = path.join(process.cwd(), 'config/sportsMapping.js');
     
     // 현재 설정 파일 읽기
     let configContent = await fs.readFile(configPath, 'utf8');

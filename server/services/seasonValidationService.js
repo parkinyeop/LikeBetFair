@@ -1,4 +1,4 @@
-import { SEASON_SCHEDULES } from '../../config/sportsMapping.ts';
+import { SEASON_SCHEDULES } from '../config/sportsMapping.js';
 import GameResult from '../models/gameResultModel.js';
 import { Op } from 'sequelize';
 
