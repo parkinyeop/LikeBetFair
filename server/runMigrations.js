@@ -42,9 +42,9 @@ async function runMigrations() {
       console.log(`실행 중: ${file}`);
       
       try {
-        // CommonJS 모듈을 동적으로 import
+        // CommonJS 모듈을 require로 로드
         const migrationPath = join(migrationsDir, file);
-        const migration = await import(migrationPath);
+        const migration = require(migrationPath);
         
         if (migration.up) {
           await migration.up(sequelize.getQueryInterface(), Sequelize);
