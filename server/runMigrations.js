@@ -30,9 +30,10 @@ async function runMigrations() {
     // 마이그레이션 디렉토리 경로
     const migrationsDir = join(__dirname, 'migrations');
     
-    // 마이그레이션 파일들 읽기
+    // 마이그레이션 파일들 읽기 (중복 파일 제외)
     const migrationFiles = fs.readdirSync(migrationsDir)
       .filter(file => file.endsWith('.cjs') && !file.endsWith('.bak'))
+      .filter(file => !file.includes('recreate-tables-fix')) // 중복 파일 제외
       .sort();
 
     console.log(`발견된 마이그레이션 파일: ${migrationFiles.length}개`);
@@ -52,8 +53,15 @@ async function runMigrations() {
           console.log(`⚠️  ${file}에 up 함수가 없음`);
         }
       } catch (error) {
-        console.error(`❌ ${file} 실행 실패:`, error.message);
-        // 계속 진행
+        // 중복 제약조건 오류는 무시하고 계속 진행
+        if (error.message.includes('already exists') || 
+            error.message.includes('duplicate key') ||
+            error.message.includes('relation') && error.message.includes('already exists')) {
+          console.log(`⚠️  ${file} - 이미 존재하는 객체 무시: ${error.message}`);
+        } else {
+          console.error(`❌ ${file} 실행 실패:`, error.message);
+          // 심각한 오류가 아니면 계속 진행
+        }
       }
     }
 
