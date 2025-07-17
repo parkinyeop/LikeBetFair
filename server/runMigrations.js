@@ -32,7 +32,7 @@ async function runMigrations() {
     
     // 마이그레이션 파일들 읽기 (중복 파일 제외)
     const migrationFiles = fs.readdirSync(migrationsDir)
-      .filter(file => file.endsWith('.cjs') && !file.endsWith('.bak'))
+      .filter(file => (file.endsWith('.js') || file.endsWith('.cjs')) && !file.endsWith('.bak'))
       .filter(file => !file.includes('recreate-tables-fix')) // 중복 파일 제외
       .sort();
 
@@ -42,9 +42,9 @@ async function runMigrations() {
       console.log(`실행 중: ${file}`);
       
       try {
-        // CommonJS 모듈을 require로 로드
+        // CommonJS 모듈을 동적으로 import
         const migrationPath = join(migrationsDir, file);
-        const migration = require(migrationPath);
+        const migration = await import(migrationPath + '?update=' + Date.now());
         
         if (migration.up) {
           await migration.up(sequelize.getQueryInterface(), Sequelize);
