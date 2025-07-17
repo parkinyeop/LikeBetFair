@@ -337,8 +337,10 @@ function MyBetsPanel() {
                             }}
                             disabled={bet.status === 'cancelled' || bet.selections.some((sel: any) => {
                               if (!sel.commence_time) return false;
+                              // UTC 시간을 로컬 시간으로 변환하여 비교
                               const gameTime = new Date(sel.commence_time);
-                              return gameTime <= new Date(Date.now() + 10 * 60 * 1000);
+                              const localGameTime = new Date(gameTime.getTime() + (gameTime.getTimezoneOffset() * 60 * 1000));
+                              return localGameTime <= new Date(Date.now() + 10 * 60 * 1000);
                             })}
                           >
                             베팅취소

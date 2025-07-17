@@ -1,6 +1,7 @@
 import React, { useEffect, useState, memo, useMemo, useCallback } from 'react';
 import { useBetStore } from '../stores/useBetStore';
 import { normalizeTeamName } from '../server/normalizeUtils';
+import { convertUtcToLocal, getBettingStatus } from '../utils/timeUtils';
 
 interface OddsListProps {
   sportKey: string;
@@ -56,23 +57,24 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
         const maxDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7일 후
         const bettingDeadlineMinutes = 10; // 경기 시작 10분 전까지 베팅 가능
         
-        // 1. 기본 필터링: 오늘부터 7일 후까지의 경기
+        // 1. 기본 필터링: 오늘부터 7일 후까지의 경기 (UTC 시간을 로컬 시간으로 변환하여 비교)
         const filteredGames = data.filter((game: Game) => {
-          const gameTime = new Date(game.commence_time);
-          return gameTime >= startOfToday && gameTime <= maxDate;
+          // timeUtils를 사용하여 UTC 시간을 로컬 시간으로 변환
+          const localGameTime = convertUtcToLocal(game.commence_time);
+          return localGameTime >= startOfToday && localGameTime <= maxDate;
         });
         
         // 2. 베팅 가능 여부 분류 및 정렬
         const categorizedGames = filteredGames.map((game: Game) => {
-          const gameTime = new Date(game.commence_time);
-          const bettingDeadline = new Date(gameTime.getTime() - bettingDeadlineMinutes * 60 * 1000);
-          const isBettable = now < bettingDeadline;
+          // timeUtils를 사용하여 베팅 상태 확인
+          const bettingStatus = getBettingStatus(game.commence_time);
+          const localGameTime = convertUtcToLocal(game.commence_time);
           
           return {
             ...game,
-            isBettable,
-            gameTime,
-            bettingDeadline
+            isBettable: bettingStatus.isBettingAllowed,
+            gameTime: localGameTime,
+            bettingDeadline: bettingStatus.timeUntilCutoff
           };
         });
         

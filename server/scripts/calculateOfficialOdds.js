@@ -1,3 +1,4 @@
+import { Op } from 'sequelize';
 import OddsCache from '../models/oddsCacheModel.js';
 import oddsApiService from '../services/oddsApiService.js';
 
@@ -5,10 +6,13 @@ async function calculateOfficialOdds() {
   try {
     console.log('🔧 officialOdds 계산 스크립트 시작...');
     
-    // officialOdds가 NULL인 모든 레코드 조회
+    // officialOdds가 NULL이거나 빈 객체인 모든 레코드 조회
     const oddsRecords = await OddsCache.findAll({
       where: {
-        officialOdds: null
+        [Op.or]: [
+          { officialOdds: null },
+          { officialOdds: {} }
+        ]
       }
     });
     
@@ -53,10 +57,4 @@ async function calculateOfficialOdds() {
   }
 }
 
-// 스크립트 실행
-calculateOfficialOdds().then(() => {
-  process.exit(0);
-}).catch((error) => {
-  console.error('❌ 스크립트 실행 실패:', error);
-  process.exit(1);
-}); 
+calculateOfficialOdds(); 

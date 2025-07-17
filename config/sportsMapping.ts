@@ -44,43 +44,43 @@ export const SPORT_CATEGORIES: Record<string, SportCategory> = {
   "K리그": {
     displayName: "K리그",
     sportKey: "soccer_korea_kleague1", 
-    backendCategory: "KLEAGUE1",
+    backendCategory: "KOREA_KLEAGUE1",
     sportTitle: "K-League"
   },
   "J리그": {
     displayName: "J리그",
     sportKey: "soccer_japan_j_league",
-    backendCategory: "J_LEAGUE", 
+    backendCategory: "JAPAN_J_LEAGUE", 
     sportTitle: "J-League"
   },
   "세리에 A": {
     displayName: "세리에 A",
     sportKey: "soccer_italy_serie_a",
-    backendCategory: "SERIE_A",
+    backendCategory: "ITALY_SERIE_A",
     sportTitle: "Serie A"
   },
   "브라질 세리에 A": {
     displayName: "브라질 세리에 A", 
     sportKey: "soccer_brazil_campeonato",
-    backendCategory: "BRASILEIRAO",
+    backendCategory: "BRAZIL_CAMPEONATO",
     sportTitle: "Brasileirao"
   },
   "MLS": {
     displayName: "MLS",
     sportKey: "soccer_usa_mls",
-    backendCategory: "MLS", 
+    backendCategory: "USA_MLS", 
     sportTitle: "MLS"
   },
   "아르헨티나 프리메라": {
     displayName: "아르헨티나 프리메라",
     sportKey: "soccer_argentina_primera_division",
-    backendCategory: "ARGENTINA_PRIMERA",
+    backendCategory: "ARGENTINA_PRIMERA_DIVISION",
     sportTitle: "Argentina Primera"
   },
   "중국 슈퍼리그": {
     displayName: "중국 슈퍼리그", 
     sportKey: "soccer_china_superleague",
-    backendCategory: "CSL",
+    backendCategory: "CHINA_SUPERLEAGUE",
     sportTitle: "Chinese Super League"
   },
   "라리가": {

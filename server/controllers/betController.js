@@ -86,7 +86,7 @@ export async function placeBet(req, res) {
       }
     }
 
-    // 베팅 가능 시간 체크 (경기 시작 10분 전 마감)
+    // 베팅 가능 시간 체크 (경기 시작 10분 전 마감) - UTC 기준
     const now = new Date();
     const marginMinutes = 10;
     const maxDays = 7;
@@ -243,7 +243,7 @@ export async function cancelBet(req, res) {
       await t.rollback();
       return res.status(400).json({ message: '이미 일부 경기가 시작되어 취소할 수 없습니다.' });
     }
-    // 경기 시작 10분 전 이후에는 취소 불가
+    // 경기 시작 10분 전 이후에는 취소 불가 - UTC 기준
     const now = new Date();
     const marginMinutes = 10;
     for (const sel of bet.selections) {

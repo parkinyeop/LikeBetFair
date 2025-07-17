@@ -167,7 +167,8 @@ const oddsController = {
       // 데이터 포맷 변환
       const formattedData = uniqueGames.map(game => {
         const standardSportKey = sport;
-        const sportTitle = sportTitleMapping[sport] || game.subCategory || sport;
+        // DB의 sportTitle을 그대로 사용 (이미 영어로 통일됨)
+        const sportTitle = game.sportTitle || game.subCategory || sport;
         
         console.log(`[oddsController] sport: ${sport}, sportTitle: ${sportTitle}, game.subCategory: ${game.subCategory}`);
         
