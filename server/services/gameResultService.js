@@ -22,6 +22,7 @@ const clientSportKeyMap = {
   '중국 슈퍼리그': 'soccer_china_superleague',
   '라리가': 'soccer_spain_primera_division',
   '분데스리가': 'soccer_germany_bundesliga',
+  '프리미어리그': 'soccer_england_premier_league',
   'NBA': 'basketball_nba',
   'KBL': 'basketball_kbl',
   'MLB': 'baseball_mlb',
@@ -41,6 +42,7 @@ const sportsDbLeagueMap = {
   'soccer_china_superleague': '4359',   // 중국 슈퍼리그
   'soccer_spain_primera_division': '4335', // 라리가
   'soccer_germany_bundesliga': '4331',  // 분데스리가
+  'soccer_england_premier_league': '4328', // 프리미어리그
   // 농구 (Basketball)
   'basketball_nba': '4387',             // NBA - 수정 필요
   'basketball_kbl': '5124',             // KBL
@@ -65,6 +67,7 @@ const standardizedCategoryMap = {
   'soccer_china_superleague': { main: 'soccer', sub: 'CSL' },
   'soccer_spain_primera_division': { main: 'soccer', sub: '라리가' },
   'soccer_germany_bundesliga': { main: 'soccer', sub: '분데스리가' },
+  'soccer_england_premier_league': { main: 'soccer', sub: '프리미어리그' },
   
   // 농구
   'basketball_nba': { main: 'basketball', sub: 'NBA' },
@@ -784,6 +787,27 @@ class GameResultService {
     return sportsDbLeagueMap[sportKey] || null;
   }
 
+  getSportTitleFromSportKey(sportKey) {
+    const sportTitleMap = {
+      'soccer_korea_kleague1': 'K-League',
+      'soccer_japan_j_league': 'J-League',
+      'soccer_italy_serie_a': 'Serie A',
+      'soccer_brazil_campeonato': 'Brasileirao',
+      'soccer_usa_mls': 'MLS',
+      'soccer_argentina_primera_division': 'Argentina Primera',
+      'soccer_china_superleague': 'Chinese Super League',
+      'soccer_spain_primera_division': 'La Liga',
+      'soccer_germany_bundesliga': 'Bundesliga',
+      'soccer_england_premier_league': 'English Premier League',
+      'basketball_nba': 'NBA',
+      'basketball_kbl': 'KBL',
+      'baseball_mlb': 'MLB',
+      'baseball_kbo': 'KBO',
+      'americanfootball_nfl': 'NFL'
+    };
+    return sportTitleMap[sportKey] || sportKey;
+  }
+
   // 전체 카테고리 업데이트 (기존 메서드)
   async fetchAndUpdateResults() {
     try {
@@ -823,6 +847,8 @@ class GameResultService {
               }
 
               await GameResult.upsert({
+                sportKey: sportKey,
+                sportTitle: this.getSportTitleFromSportKey(sportKey),
                 mainCategory,
                 subCategory,
                 homeTeam: game.home_team,
