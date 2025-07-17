@@ -21,7 +21,15 @@ module.exports = {
   up: async (queryInterface, Sequelize) => {
     const t = await sequelize.transaction();
     try {
-      console.log('Creating basic tables...');
+      console.log('Dropping existing tables...');
+      
+      // 기존 테이블 삭제 (순서 주의)
+      await queryInterface.dropTable('Bets', { transaction: t, force: true });
+      await queryInterface.dropTable('Users', { transaction: t, force: true });
+      await queryInterface.dropTable('GameResults', { transaction: t, force: true });
+      await queryInterface.dropTable('OddsCaches', { transaction: t, force: true });
+      
+      console.log('Creating corrected tables...');
 
       // OddsCaches 테이블 생성
       await queryInterface.createTable('OddsCaches', {
@@ -85,13 +93,14 @@ module.exports = {
       // GameResults 테이블 생성
       await queryInterface.createTable('GameResults', {
         id: {
-          type: DataTypes.INTEGER,
-          primaryKey: true,
-          autoIncrement: true
+          type: DataTypes.UUID,
+          defaultValue: DataTypes.UUIDV4,
+          primaryKey: true
         },
         eventId: {
           type: DataTypes.STRING,
-          allowNull: true
+          allowNull: true,
+          unique: true
         },
         sportKey: {
           type: DataTypes.STRING,
@@ -267,9 +276,9 @@ module.exports = {
 
       console.log('Committing transaction...');
       await t.commit();
-      console.log('Basic tables created successfully');
+      console.log('Tables recreated successfully');
     } catch (error) {
-      console.error('Error creating basic tables:', error);
+      console.error('Error recreating tables:', error);
       await t.rollback();
       throw error;
     }
