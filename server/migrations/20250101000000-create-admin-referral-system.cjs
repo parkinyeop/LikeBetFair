@@ -174,13 +174,8 @@ module.exports = {
           },
           betId: {
             type: Sequelize.UUID,
-            allowNull: false,
-            references: {
-              model: 'Bets',
-              key: 'id'
-            },
-            onUpdate: 'CASCADE',
-            onDelete: 'CASCADE'
+            allowNull: false
+            // 외래키 제약조건은 나중에 추가
           },
           betAmount: {
             type: Sequelize.DECIMAL(10, 2),

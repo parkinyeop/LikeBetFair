@@ -111,7 +111,16 @@ async function startServer() {
     await sequelize.authenticate();
     console.log('Database connection has been established successfully.');
     
-    await sequelize.sync();
+    // 데이터베이스 동기화 및 초기화
+    console.log('[시작] 데이터베이스 테이블 동기화...');
+    await sequelize.sync({ alter: true });
+    console.log('Database tables synchronized successfully.');
+    
+    // 기본 계정 생성 (Render 환경에서만)
+    if (process.env.NODE_ENV === 'production') {
+      console.log('[시작] 기본 계정 생성 확인...');
+      await createDefaultAccounts();
+    }
     
     // 서버 시작
     const server = app.listen(PORT, () => {
@@ -121,6 +130,12 @@ async function startServer() {
       // Exchange WebSocket 서비스 초기화
       exchangeWebSocketService.initialize(server);
       
+      // Render 환경에서 초기 배당율 수집
+      if (process.env.NODE_ENV === 'production') {
+        console.log('[시작] 초기 배당율 수집 시작...');
+        collectInitialOdds();
+      }
+      
       // 시즌 상태 자동 체크 스케줄러 시작 (일시 비활성화)
       // setupSeasonStatusScheduler();
     });
@@ -128,6 +143,78 @@ async function startServer() {
   } catch (err) {
     console.error('서버 시작 실패:', err);
     process.exit(1);
+  }
+}
+
+// 기본 계정 생성 함수
+async function createDefaultAccounts() {
+  try {
+    const User = (await import('./models/userModel.js')).default;
+    const bcrypt = await import('bcryptjs');
+    
+    // 관리자 계정 확인 및 생성
+    const adminCount = await User.count({ where: { isAdmin: true } });
+    if (adminCount === 0) {
+      console.log('[계정] 기본 관리자 계정 생성...');
+      const salt = await bcrypt.default.genSalt(10);
+      const hashedPassword = await bcrypt.default.hash('admin123', salt);
+      
+      await User.create({
+        username: 'admin',
+        email: 'admin@likebetfair.com',
+        password: hashedPassword,
+        balance: 1000000,
+        isAdmin: true,
+        adminLevel: 5
+      });
+      console.log('[계정] 관리자 계정 생성 완료 (admin/admin123)');
+    }
+    
+    // 테스트 사용자 계정 확인 및 생성
+    const testUser = await User.findOne({ where: { username: 'testuser' } });
+    if (!testUser) {
+      console.log('[계정] 테스트 사용자 계정 생성...');
+      const salt = await bcrypt.default.genSalt(10);
+      const hashedPassword = await bcrypt.default.hash('test123', salt);
+      
+      await User.create({
+        username: 'testuser',
+        email: 'test@likebetfair.com',
+        password: hashedPassword,
+        balance: 100000
+      });
+      console.log('[계정] 테스트 사용자 계정 생성 완료 (testuser/test123)');
+    }
+  } catch (error) {
+    console.error('[계정] 기본 계정 생성 실패:', error.message);
+  }
+}
+
+// 초기 배당율 수집 함수
+async function collectInitialOdds() {
+  try {
+    const oddsApiService = (await import('./services/oddsApiService.js')).default;
+    const gameResultService = (await import('./services/gameResultService.js')).default;
+    
+    const activeCategories = [
+      'NBA', 'MLB', 'KBO', 'NFL', 'MLS', 'K리그', 'J리그', 
+      '세리에 A', '브라질 세리에 A', '아르헨티나 프리메라', 
+      '중국 슈퍼리그', '라리가', '분데스리가'
+    ];
+    
+    console.log('[배당율] 초기 배당율 수집 시작...');
+    
+    // 배당율 수집
+    const oddsResult = await oddsApiService.fetchAndCacheOddsForCategories(activeCategories, 'high');
+    console.log(`[배당율] 배당율 수집 완료: ${oddsResult.updatedCount}개`);
+    
+    // 경기 결과 수집
+    const resultsResult = await gameResultService.fetchAndUpdateResultsForCategories(activeCategories);
+    console.log(`[배당율] 경기 결과 수집 완료: ${resultsResult?.updatedCount || 0}개`);
+    
+    console.log('[배당율] 초기 데이터 수집 완료!');
+  } catch (error) {
+    console.error('[배당율] 초기 데이터 수집 실패:', error.message);
   }
 }
 
