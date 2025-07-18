@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { API_CONFIG } from '../config/apiConfig';
 
 export default function LoginForm({ onClose }: { onClose: () => void }) {
   const [email, setEmail] = useState('');
@@ -12,7 +13,7 @@ export default function LoginForm({ onClose }: { onClose: () => void }) {
     e.preventDefault();
     setMessage('');
     try {
-      const res = await fetch('http://localhost:5050/api/auth/login', {
+      const res = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGIN}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

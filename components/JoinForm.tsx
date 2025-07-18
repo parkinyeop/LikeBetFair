@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { API_CONFIG } from '../config/apiConfig';
 
 export default function JoinForm({ onClose }: { onClose: () => void }) {
   const [username, setUsername] = useState('');
@@ -17,7 +18,7 @@ export default function JoinForm({ onClose }: { onClose: () => void }) {
         requestBody.referralCode = referralCode.trim();
       }
 
-      const res = await fetch('http://localhost:5050/api/auth/register', {
+      const res = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.REGISTER}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),

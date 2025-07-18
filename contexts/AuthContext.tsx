@@ -29,62 +29,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [tabId, setTabId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
 
+  // tabId 생성 함수
+  const generateTabId = () => {
+    return Math.random().toString(36).substr(2, 9);
+  };
+
+  // AuthContext에서 tabId 초기화 로직
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      let existingTabId = sessionStorage.getItem('tabId');
-      if (!existingTabId) {
-        existingTabId = Math.random().toString(36).substr(2, 9);
-        sessionStorage.setItem('tabId', existingTabId);
-      }
-      setTabId(existingTabId);
+      const tabId = sessionStorage.getItem('tabId') || generateTabId();
+      sessionStorage.setItem('tabId', tabId);
+      setTabId(tabId);
+      
+      // tabId 설정 후 인증 정보 복원
+      const initializeAuth = () => {
+        try {
+          console.log('[AuthContext] tabId 설정됨:', tabId);
+          const storedToken = sessionStorage.getItem(`token_${tabId}`);
+          const storedUsername = sessionStorage.getItem(`username_${tabId}`);
+          const storedBalance = sessionStorage.getItem(`balance_${tabId}`);
+          const storedIsAdmin = sessionStorage.getItem(`isAdmin_${tabId}`);
+          const storedAdminLevel = sessionStorage.getItem(`adminLevel_${tabId}`);
+          const storedUserId = sessionStorage.getItem(`userId_${tabId}`);
+
+          if (storedToken && storedUsername) {
+            console.log('[AuthContext] 저장된 인증 정보 복원:', {
+              tabId,
+              username: storedUsername,
+              hasToken: !!storedToken,
+              balance: storedBalance
+            });
+            
+            setIsLoggedIn(true);
+            setUsername(storedUsername);
+            setBalance(storedBalance ? Number(storedBalance) : null);
+            setToken(storedToken);
+            setIsAdmin(storedIsAdmin === 'true');
+            setAdminLevel(storedAdminLevel ? Number(storedAdminLevel) : 0);
+            if (storedUserId) setUserId(storedUserId);
+            else setUserId(null);
+          } else {
+            console.log('[AuthContext] 저장된 인증 정보 없음 (tabId:', tabId, ')');
+          }
+        } catch (error) {
+          console.error('[AuthContext] 인증 정보 복원 중 오류:', error);
+          // 오류 발생 시 모든 인증 정보 초기화
+          setIsLoggedIn(false);
+          setUsername(null);
+          setBalance(null);
+          setToken(null);
+          setIsAdmin(false);
+          setAdminLevel(0);
+          setUserId(null);
+        } finally {
+          setIsInitialized(true);
+        }
+      };
+
+      initializeAuth();
+    } else {
+      // SSR 환경에서는 초기화만 완료
+      setIsInitialized(true);
     }
   }, []);
-
-  // 페이지 로드 시 sessionStorage에서 인증 정보 복원
-  useEffect(() => {
-    const initializeAuth = () => {
-      try {
-        if (!tabId) {
-          console.error('[AuthContext] tabId가 없습니다.');
-          return;
-        }
-        const storedToken = sessionStorage.getItem(`token_${tabId}`);
-        const storedUsername = sessionStorage.getItem(`username_${tabId}`);
-        const storedBalance = sessionStorage.getItem(`balance_${tabId}`);
-        const storedIsAdmin = sessionStorage.getItem(`isAdmin_${tabId}`);
-        const storedAdminLevel = sessionStorage.getItem(`adminLevel_${tabId}`);
-        const storedUserId = sessionStorage.getItem(`userId_${tabId}`);
-
-        if (storedToken && storedUsername) {
-          console.log('[AuthContext] 저장된 인증 정보 복원:', {
-            tabId,
-            username: storedUsername,
-            hasToken: !!storedToken,
-            balance: storedBalance
-          });
-          
-          setIsLoggedIn(true);
-          setUsername(storedUsername);
-          setBalance(storedBalance ? Number(storedBalance) : null);
-          setToken(storedToken);
-          setIsAdmin(storedIsAdmin === 'true');
-          setAdminLevel(storedAdminLevel ? Number(storedAdminLevel) : 0);
-          if (storedUserId) setUserId(storedUserId);
-          else setUserId(null);
-        } else {
-          console.log('[AuthContext] 저장된 인증 정보 없음 (tabId:', tabId, ')');
-        }
-      } catch (error) {
-        console.error('[AuthContext] 인증 정보 복원 중 오류:', error);
-        // 오류 발생 시 모든 인증 정보 초기화
-        logout();
-      } finally {
-        setIsInitialized(true);
-      }
-    };
-
-    initializeAuth();
-  }, [tabId]);
 
   const login = (username: string, balance: number, token: string, isAdmin = false, adminLevel = 0, userId?: string) => {
     console.log('[AuthContext] 로그인:', { tabId, username, balance, hasToken: !!token, isAdmin, adminLevel, userId });

@@ -4,7 +4,7 @@
 // ===== API 설정 =====
 export const API_CONFIG = {
   // 기본 URL 설정
-  BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050',
+  BASE_URL: process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5050'),
   
   // API 엔드포인트
   ENDPOINTS: {
