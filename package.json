@@ -6,11 +6,12 @@
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd server && node app.js",
     "client": "next dev",
-    "build": "next build && echo 'Next.js build completed'",
-    "start": "npm run build && npm run server",
+    "build": "next build",
+    "start": "cd server && node app.js",
     "start:server": "cd server && node app.js",
     "migrate": "cd server && node runMigrations.js",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "cd server && npm install --only=production"
   },
   "dependencies": {
     "@types/jsonwebtoken": "^9.0.10",

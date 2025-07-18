@@ -4,9 +4,15 @@ services:
     env: node
     plan: free
     rootDir: .
-    buildCommand: npm install
+    buildCommand: npm ci --only=production
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
-    healthCheckPath: /health 
+    healthCheckPath: /
+    buildFilter:
+      paths:
+        - server/**
+        - package.json
+        - package-lock.json
+    autoDeploy: true 
