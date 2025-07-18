@@ -2,7 +2,7 @@ import axios from 'axios';
 import GameResult from '../models/gameResultModel.js';
 import sportsConfig from '../config/sportsConfig.js';
 import Bet from '../models/betModel.js';
-import { Op } from 'sequelize';
+import { Op, sequelize } from 'sequelize';
 import betResultService from './betResultService.js';
 import OddsCache from '../models/oddsCacheModel.js';
 import { normalizeTeamName, normalizeCategory, normalizeCommenceTime, normalizeCategoryPair } from '../normalizeUtils.js';
@@ -684,6 +684,8 @@ class GameResultService {
                 const gameData = {
                   mainCategory,
                   subCategory,
+                  sportKey: sportKey,
+                  sportTitle: this.getSportTitleFromSportKey(sportKey),
                   homeTeam: event.home_team,
                   awayTeam: event.away_team,
                   commenceTime: new Date(event.commence_time),
@@ -1071,8 +1073,7 @@ class GameResultService {
           'subCategory',
           'status',
           'result',
-          [Op.count(Op.col('id'))],
-          'count'
+          [sequelize.fn('COUNT', sequelize.col('id')), 'count']
         ],
         group: ['mainCategory', 'subCategory', 'status', 'result'],
         raw: true
@@ -1118,7 +1119,19 @@ class GameResultService {
       console.log(`[GameResultService] 비허용 카테고리(${mainCategory}) 저장 skip:`, data.homeTeam, data.awayTeam, data.commenceTime);
       return null;
     }
-    const saveData = { ...data, mainCategory, subCategory };
+    
+    // sportKey와 sportTitle 설정
+    const sportKey = data.sportKey || this.getSportKeyForCategory(subCategory);
+    const sportTitle = data.sportTitle || this.getSportTitleFromSportKey(sportKey);
+    
+    const saveData = { 
+      ...data, 
+      mainCategory, 
+      subCategory,
+      sportKey: sportKey || null,
+      sportTitle: sportTitle || null
+    };
+    
     return GameResult.upsert(saveData);
   }
 }
