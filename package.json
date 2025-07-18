@@ -6,8 +6,7 @@
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd server && node app.js",
     "client": "next dev",
-    "build": "next build && npm run copy-static && echo 'Next.js build completed'",
-    "copy-static": "cp -r .next/static out/static 2>/dev/null || mkdir -p out && cp -r .next/static out/ 2>/dev/null || echo 'Static files copied'",
+    "build": "next build && echo 'Next.js build completed'",
     "start": "cd server && node app.js",
     "migrate": "cd server && node runMigrations.js",
     "lint": "next lint"
