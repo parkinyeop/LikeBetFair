@@ -97,10 +97,10 @@ app.get('/health', (req, res) => {
   });
 });
 
-// 루트 경로에 대한 간단한 응답 (Render 감지용)
-app.get('/', (req, res) => {
-  res.send("Server is running");
-});
+// 루트 경로는 Next.js로 처리 (프론트엔드 서빙)
+// app.get('/', (req, res) => {
+//   res.send("Server is running");
+// });
 
 // API Routes (순서 중요!)
 app.use('/api/auth', authRoutes);
