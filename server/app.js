@@ -118,19 +118,96 @@ if (staticPath && fs.existsSync(indexPath)) {
     if (req.path.startsWith('/api/')) {
       res.status(404).json({ message: 'API endpoint not found' });
     } else {
-      res.status(404).send(`
-        <html>
-          <head><title>Frontend Not Available</title></head>
-          <body>
-            <h1>Frontend Not Available</h1>
-            <p>Next.js build files not found. Please check the build process.</p>
-            <p>Checked paths:</p>
-            <ul>
-              ${possiblePaths.map(p => `<li>${p}</li>`).join('')}
-            </ul>
-            <p>Current directory: ${process.cwd()}</p>
-            <p>Server directory: ${__dirname}</p>
-          </body>
+      // 간단한 프론트엔드 제공 (빌드 파일이 없을 때)
+      res.send(`
+        <!DOCTYPE html>
+        <html lang="ko">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>LikeBetFair - 베팅 플랫폼</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+            .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            h1 { color: #2c3e50; text-align: center; }
+            .status { background: #e8f5e8; padding: 15px; border-radius: 5px; margin: 20px 0; }
+            .error { background: #ffe6e6; padding: 15px; border-radius: 5px; margin: 20px 0; }
+            .api-test { background: #f0f8ff; padding: 15px; border-radius: 5px; margin: 20px 0; }
+            button { background: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+            button:hover { background: #2980b9; }
+            .info { font-size: 14px; color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>🏈 LikeBetFair 베팅 플랫폼</h1>
+            
+            <div class="status">
+              <h3>✅ 서버 상태</h3>
+              <p>Express 서버가 정상적으로 실행 중입니다.</p>
+              <p>포트: ${process.env.PORT || 3001}</p>
+              <p>환경: ${process.env.NODE_ENV || 'development'}</p>
+            </div>
+            
+            <div class="error">
+              <h3>⚠️ 프론트엔드 상태</h3>
+              <p>Next.js 빌드 파일을 찾을 수 없습니다.</p>
+              <p>확인된 경로:</p>
+              <ul>
+                ${possiblePaths.map(p => `<li>${p}</li>`).join('')}
+              </ul>
+              <p>현재 디렉토리: ${process.cwd()}</p>
+              <p>서버 디렉토리: ${__dirname}</p>
+            </div>
+            
+            <div class="api-test">
+              <h3>🔧 API 테스트</h3>
+              <p>API 엔드포인트가 정상 작동하는지 확인해보세요:</p>
+              <button onclick="testAPI()">MLB 배당율 테스트</button>
+              <button onclick="testAuth()">인증 API 테스트</button>
+              <div id="api-result"></div>
+            </div>
+            
+            <div class="info">
+              <p><strong>해결 방법:</strong></p>
+              <ol>
+                <li>Render 대시보드에서 Build Command가 'npm run build'로 설정되어 있는지 확인</li>
+                <li>빌드 로그에서 Next.js 빌드가 성공했는지 확인</li>
+                <li>환경변수 NODE_ENV=production이 설정되어 있는지 확인</li>
+              </ol>
+            </div>
+          </div>
+          
+          <script>
+            async function testAPI() {
+              const result = document.getElementById('api-result');
+              result.innerHTML = '테스트 중...';
+              try {
+                const response = await fetch('/api/odds/MLB');
+                const data = await response.json();
+                result.innerHTML = '<strong>✅ API 정상:</strong> ' + JSON.stringify(data).substring(0, 100) + '...';
+              } catch (error) {
+                result.innerHTML = '<strong>❌ API 오류:</strong> ' + error.message;
+              }
+            }
+            
+            async function testAuth() {
+              const result = document.getElementById('api-result');
+              result.innerHTML = '테스트 중...';
+              try {
+                const response = await fetch('/api/auth/register', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({username: 'test', email: 'test@test.com', password: 'test123'})
+                });
+                const data = await response.json();
+                result.innerHTML = '<strong>✅ 인증 API 정상:</strong> ' + JSON.stringify(data).substring(0, 100) + '...';
+              } catch (error) {
+                result.innerHTML = '<strong>❌ 인증 API 오류:</strong> ' + error.message;
+              }
+            }
+          </script>
+        </body>
         </html>
       `);
     }
