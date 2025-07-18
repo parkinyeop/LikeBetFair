@@ -1,26 +1,73 @@
+# Dependencies
 node_modules
-npm-debug.log
-.git
-.gitignore
-README.md
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Production builds
+.next
+out
+dist
+build
+
+# Environment files
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
-.next
-out
-.DS_Store
-*.log
-logs
-*.tmp
-*.temp
+
+# IDE files
 .vscode
 .idea
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Logs
+logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
 coverage
 .nyc_output
+
+# Cache directories
 .cache
-dist
-build
-*.tgz
-*.tar.gz 
+.parcel-cache
+.npm
+.eslintcache
+
+# Temporary folders
+tmp
+temp
+*.tmp
+*.temp
+
+# Documentation
+README.md
+docs
+
+# Test files
+test
+tests
+*.test.js
+*.spec.js
+
+# Development files
+scripts
+migrations
+*.md 

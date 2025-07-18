@@ -4,15 +4,20 @@ services:
     env: node
     plan: free
     rootDir: .
-    buildCommand: npm ci --only=production
+    buildCommand: npm ci --only=production && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=4096
     healthCheckPath: /
     buildFilter:
       paths:
         - server/**
         - package.json
         - package-lock.json
+        - next.config.cjs
+        - tailwind.config.cjs
+        - postcss.config.cjs
     autoDeploy: true 

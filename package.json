@@ -6,12 +6,16 @@
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd server && node app.js",
     "client": "next dev",
-    "build": "next build",
+    "build": "NODE_OPTIONS='--max-old-space-size=4096' npm run build:optimized",
+    "build:optimized": "next build",
+    "build:fast": "./scripts/optimize-build.sh",
     "start": "cd server && node app.js",
     "start:server": "cd server && node app.js",
     "migrate": "cd server && node runMigrations.js",
     "lint": "next lint",
-    "postinstall": "cd server && npm install --only=production"
+    "postinstall": "cd server && npm install --only=production",
+    "clean": "npm cache clean --force && npm prune --production",
+    "optimize": "npm run clean && npm run build:fast"
   },
   "dependencies": {
     "@types/jsonwebtoken": "^9.0.10",
