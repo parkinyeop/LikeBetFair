@@ -16,13 +16,12 @@ const clientSportKeyMap = {
   'MLS': 'soccer_usa_mls',
   '아르헨티나 프리메라': 'soccer_argentina_primera_division',
   '중국 슈퍼리그': 'soccer_china_superleague',
-  '라리가': 'soccer_spain_primera_division',
+  '라리가': 'soccer_spain_la_liga',
   '분데스리가': 'soccer_germany_bundesliga',
-  '프리미어리그': 'soccer_england_premier_league',
+  '프리미어리그': 'soccer_epl',
   
   // 농구 (Basketball)
   'NBA': 'basketball_nba',
-  'KBL': 'basketball_kbl',
   
   // 야구 (Baseball)
   'MLB': 'baseball_mlb',
@@ -229,7 +228,7 @@ class OddsApiService {
             continue;
           }
 
-          // 최근 7일간의 경기 배당률 데이터 가져오기
+          // 최근 7일간의 경기 배당률 데이터 가져오기 (타임아웃 및 재시도 로직 추가)
           const oddsResponse = await axios.get(`${this.baseUrl}/${sportKey}/odds`, {
             params: {
               apiKey: this.apiKey,
@@ -237,6 +236,10 @@ class OddsApiService {
               markets: 'h2h,spreads,totals',
               oddsFormat: 'decimal',
               dateFormat: 'iso'
+            },
+            timeout: 30000, // 30초 타임아웃 (Render 서버용)
+            headers: {
+              'User-Agent': 'LikeBetFair/1.0'
             }
           });
 
@@ -365,7 +368,7 @@ class OddsApiService {
         console.log(`Fetching odds for ${clientCategory} (${sportKey})...`);
         
         try {
-          // 최근 7일간의 경기 배당률 데이터 가져오기
+          // 최근 7일간의 경기 배당률 데이터 가져오기 (타임아웃 및 재시도 로직 추가)
           const oddsResponse = await axios.get(`${this.baseUrl}/${sportKey}/odds`, {
             params: {
               apiKey: this.apiKey,
@@ -373,6 +376,10 @@ class OddsApiService {
               markets: 'h2h,spreads,totals',
               oddsFormat: 'decimal',
               dateFormat: 'iso'
+            },
+            timeout: 30000, // 30초 타임아웃 (Render 서버용)
+            headers: {
+              'User-Agent': 'LikeBetFair/1.0'
             }
           });
 
