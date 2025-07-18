@@ -203,9 +203,9 @@ module.exports = {
       // Bets 테이블 생성
       await queryInterface.createTable('Bets', {
         id: {
-          type: DataTypes.INTEGER,
-          primaryKey: true,
-          autoIncrement: true
+          type: DataTypes.UUID,
+          defaultValue: DataTypes.UUIDV4,
+          primaryKey: true
         },
         userId: {
           type: DataTypes.UUID,

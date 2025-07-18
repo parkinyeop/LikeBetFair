@@ -60,10 +60,10 @@ export const TIME_CONFIG = {
 // ===== 데이터베이스 설정 =====
 export const DB_CONFIG = {
   // 테이블명
-  TABLES: {
-    ODDS_CACHE: 'odds_cache',
-    GAME_RESULTS: 'game_results', 
-    BETS: 'bets',
+      TABLES: {
+      ODDS_CACHE: 'OddsCaches',
+      GAME_RESULTS: 'GameResults', 
+      BETS: 'Bets',
     USERS: 'users'
   },
   

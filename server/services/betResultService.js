@@ -38,7 +38,7 @@ class BetResultService {
       // pending 상태의 배팅들 조회
       const pendingBets = await Bet.findAll({
         where: { status: 'pending' },
-        include: [{ model: User, attributes: ['email'] }]
+        include: [{ model: User, attributes: ['email', 'username'] }]
       });
 
       console.log(`Found ${pendingBets.length} pending bets to process`);
