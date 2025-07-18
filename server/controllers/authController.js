@@ -69,31 +69,62 @@ async function checkAndUpdatePendingBets(userId) {
 const authController = {
   register: async (req, res) => {
     try {
+      console.log('[회원가입] 요청 시작');
+      console.log('[회원가입] 요청 헤더:', req.headers);
+      console.log('[회원가입] 요청 바디:', req.body);
+      
       const { username, email, password } = req.body;
 
-      console.log('[회원가입] 요청 데이터:', { username, email, hasPassword: !!password });
+      console.log('[회원가입] 파싱된 데이터:', { 
+        username: username ? `${username.substring(0, 3)}***` : null, 
+        email: email ? `${email.substring(0, 3)}***` : null, 
+        hasPassword: !!password,
+        passwordLength: password ? password.length : 0
+      });
 
       // 필수 필드 검증
       if (!username || !email || !password) {
+        console.log('[회원가입] 필수 필드 누락:', { 
+          hasUsername: !!username, 
+          hasEmail: !!email, 
+          hasPassword: !!password 
+        });
         return res.status(400).json({ 
-          message: 'Username, email, and password are required' 
+          error: '모든 필수 필드를 입력해주세요',
+          details: {
+            username: !username ? '사용자명이 필요합니다' : null,
+            email: !email ? '이메일이 필요합니다' : null,
+            password: !password ? '비밀번호가 필요합니다' : null
+          }
+        });
+      }
+
+      // 사용자명 길이 검증
+      if (username.length < 2 || username.length > 50) {
+        console.log('[회원가입] 사용자명 길이 오류:', username.length);
+        return res.status(400).json({ 
+          error: '사용자명은 2-50자 사이여야 합니다' 
         });
       }
 
       // 이메일 형식 검증
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
+        console.log('[회원가입] 이메일 형식 오류:', email);
         return res.status(400).json({ 
-          message: 'Invalid email format' 
+          error: '올바른 이메일 형식을 입력해주세요' 
         });
       }
 
       // 비밀번호 길이 검증
       if (password.length < 6) {
+        console.log('[회원가입] 비밀번호 길이 오류:', password.length);
         return res.status(400).json({ 
-          message: 'Password must be at least 6 characters long' 
+          error: '비밀번호는 최소 6자 이상이어야 합니다' 
         });
       }
+
+      console.log('[회원가입] 기본 검증 통과');
 
       // Check if user already exists by email
       const existingUserByEmail = await User.findOne({
@@ -101,7 +132,10 @@ const authController = {
       });
       
       if (existingUserByEmail) {
-        return res.status(400).json({ message: 'Email already exists' });
+        console.log('[회원가입] 이메일 중복:', email);
+        return res.status(400).json({ 
+          error: '이미 존재하는 이메일입니다' 
+        });
       }
 
       // Check if user already exists by username
@@ -110,12 +144,27 @@ const authController = {
       });
       
       if (existingUserByUsername) {
-        return res.status(400).json({ message: 'Username already exists' });
+        console.log('[회원가입] 사용자명 중복:', username);
+        return res.status(400).json({ 
+          error: '이미 존재하는 사용자명입니다' 
+        });
       }
+
+      console.log('[회원가입] 중복 검사 통과');
 
       // Hash password
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
+
+      console.log('[회원가입] 비밀번호 해시 완료');
+
+      // JWT_SECRET 확인
+      if (!process.env.JWT_SECRET) {
+        console.error('[회원가입] JWT_SECRET 환경변수가 설정되지 않음');
+        return res.status(500).json({ 
+          error: '서버 설정 오류가 발생했습니다' 
+        });
+      }
 
       console.log('[회원가입] 사용자 생성 시작...');
 
@@ -132,12 +181,6 @@ const authController = {
 
       console.log('[회원가입] 사용자 생성 완료:', user.id);
 
-      // JWT_SECRET 확인
-      if (!process.env.JWT_SECRET) {
-        console.error('[회원가입] JWT_SECRET 환경변수가 설정되지 않음');
-        return res.status(500).json({ message: 'Server configuration error' });
-      }
-
       // Create token
       const token = jwt.sign(
         { userId: user.id },
@@ -148,27 +191,51 @@ const authController = {
       console.log('[회원가입] 토큰 생성 완료');
 
       res.status(201).json({ 
+        success: true,
         token,
-        message: 'User registered successfully'
+        message: '회원가입이 완료되었습니다',
+        user: { 
+          id: user.id, 
+          username: user.username, 
+          email: user.email,
+          balance: Number(user.balance)
+        }
       });
+      
     } catch (err) {
-      console.error('[회원가입] 오류:', err);
+      console.error('[회원가입] 오류 발생:', err);
+      console.error('[회원가입] 오류 스택:', err.stack);
       
       // Sequelize 오류 처리
       if (err.name === 'SequelizeValidationError') {
+        console.log('[회원가입] Sequelize 검증 오류:', err.errors);
         return res.status(400).json({ 
-          message: 'Validation error', 
-          details: err.errors.map(e => e.message) 
+          error: '입력 데이터가 올바르지 않습니다',
+          details: err.errors.map(e => ({
+            field: e.path,
+            message: e.message
+          }))
         });
       }
       
       if (err.name === 'SequelizeUniqueConstraintError') {
+        console.log('[회원가입] Sequelize 중복 제약 오류:', err.errors);
         return res.status(400).json({ 
-          message: 'Username or email already exists' 
+          error: '이미 존재하는 사용자명 또는 이메일입니다' 
         });
       }
       
-      res.status(500).json({ message: 'Server error' });
+      if (err.name === 'SequelizeConnectionError') {
+        console.error('[회원가입] 데이터베이스 연결 오류:', err);
+        return res.status(500).json({ 
+          error: '데이터베이스 연결 오류가 발생했습니다' 
+        });
+      }
+      
+      res.status(500).json({ 
+        error: '서버 오류가 발생했습니다',
+        message: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+      });
     }
   },
 
