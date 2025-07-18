@@ -141,6 +141,8 @@ async function startServer() {
     console.log('- DB_NAME:', process.env.DB_NAME);
     console.log('- DB_USER:', process.env.DB_USER);
     console.log('- DB_PASSWORD:', process.env.DB_PASSWORD ? '***' : 'undefined');
+    console.log('- JWT_SECRET:', process.env.JWT_SECRET ? '***' : 'undefined');
+    console.log('- JWT_EXPIRES_IN:', process.env.JWT_EXPIRES_IN || '24h');
     
     // 중앙화된 설정 초기화
     console.log('[시작] 중앙화된 설정 초기화...');

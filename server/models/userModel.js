@@ -10,20 +10,26 @@ const User = sequelize.define('User', {
   },
   username: {
     type: DataTypes.STRING(50),
-    allowNull: true,
-    unique: true
+    allowNull: false,
+    unique: true,
+    validate: {
+      len: [2, 50]
+    }
   },
   email: {
     type: DataTypes.STRING,
-    allowNull: true,
-    unique: false,
+    allowNull: false,
+    unique: true,
     validate: {
       isEmail: true
     }
   },
   password: {
     type: DataTypes.STRING,
-    allowNull: false
+    allowNull: false,
+    validate: {
+      len: [6, 255]
+    }
   },
   balance: {
     type: DataTypes.DECIMAL(10, 2),

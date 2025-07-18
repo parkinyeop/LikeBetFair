@@ -71,36 +71,103 @@ const authController = {
     try {
       const { username, email, password } = req.body;
 
-      // Check if user already exists
-      const existingUser = await User.findOne({
+      console.log('[회원가입] 요청 데이터:', { username, email, hasPassword: !!password });
+
+      // 필수 필드 검증
+      if (!username || !email || !password) {
+        return res.status(400).json({ 
+          message: 'Username, email, and password are required' 
+        });
+      }
+
+      // 이메일 형식 검증
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ 
+          message: 'Invalid email format' 
+        });
+      }
+
+      // 비밀번호 길이 검증
+      if (password.length < 6) {
+        return res.status(400).json({ 
+          message: 'Password must be at least 6 characters long' 
+        });
+      }
+
+      // Check if user already exists by email
+      const existingUserByEmail = await User.findOne({
         where: { email }
       });
       
-      if (existingUser) {
-        return res.status(400).json({ message: 'User already exists' });
+      if (existingUserByEmail) {
+        return res.status(400).json({ message: 'Email already exists' });
+      }
+
+      // Check if user already exists by username
+      const existingUserByUsername = await User.findOne({
+        where: { username }
+      });
+      
+      if (existingUserByUsername) {
+        return res.status(400).json({ message: 'Username already exists' });
       }
 
       // Hash password
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
 
+      console.log('[회원가입] 사용자 생성 시작...');
+
       // Create new user
       const user = await User.create({
         username,
         email,
-        password: hashedPassword
+        password: hashedPassword,
+        balance: 0.00, // 기본 잔액
+        isAdmin: false,
+        adminLevel: 0,
+        isActive: true
       });
+
+      console.log('[회원가입] 사용자 생성 완료:', user.id);
+
+      // JWT_SECRET 확인
+      if (!process.env.JWT_SECRET) {
+        console.error('[회원가입] JWT_SECRET 환경변수가 설정되지 않음');
+        return res.status(500).json({ message: 'Server configuration error' });
+      }
 
       // Create token
       const token = jwt.sign(
         { userId: user.id },
         process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN }
+        { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
       );
 
-      res.status(201).json({ token });
+      console.log('[회원가입] 토큰 생성 완료');
+
+      res.status(201).json({ 
+        token,
+        message: 'User registered successfully'
+      });
     } catch (err) {
-      console.error(err);
+      console.error('[회원가입] 오류:', err);
+      
+      // Sequelize 오류 처리
+      if (err.name === 'SequelizeValidationError') {
+        return res.status(400).json({ 
+          message: 'Validation error', 
+          details: err.errors.map(e => e.message) 
+        });
+      }
+      
+      if (err.name === 'SequelizeUniqueConstraintError') {
+        return res.status(400).json({ 
+          message: 'Username or email already exists' 
+        });
+      }
+      
       res.status(500).json({ message: 'Server error' });
     }
   },
