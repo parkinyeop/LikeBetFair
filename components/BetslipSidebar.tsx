@@ -33,8 +33,14 @@ function MyBetsPanel() {
         return;
       }
       
-      console.log('[클라이언트] API 요청 시작: http://localhost:5050/api/bet/history');
-      const res = await fetch('http://localhost:5050/api/bet/history', {
+      // API URL 결정
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
+                    (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+                     ? 'http://localhost:5050' 
+                     : 'https://likebetfair-api.onrender.com');
+      
+      console.log('[클라이언트] API 요청 시작:', `${apiUrl}/api/bet/history`);
+      const res = await fetch(`${apiUrl}/api/bet/history`, {
         headers: { 
           'x-auth-token': token,
           'Content-Type': 'application/json'

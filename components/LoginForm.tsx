@@ -23,7 +23,7 @@ export default function LoginForm({ onClose }: { onClose: () => void }) {
       console.log('로그인 응답 balance:', data.balance, typeof data.balance);
       if (res.ok) {
         // localStorage 직접 조작 제거 - AuthContext의 login 함수가 처리
-        login(
+        await login(
           data.username || data.email, 
           Number(data.balance), 
           data.token,

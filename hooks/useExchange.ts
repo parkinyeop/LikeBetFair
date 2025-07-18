@@ -71,7 +71,13 @@ export const useExchange = () => {
     if (!token) return;
     
     try {
-      const response = await fetch('http://localhost:5050/api/exchange/balance', { headers });
+      // API URL 결정
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
+                    (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+                     ? 'http://localhost:5050' 
+                     : 'https://likebetfair-api.onrender.com');
+      
+      const response = await fetch(`${apiUrl}/api/exchange/balance`, { headers });
       if (!response.ok) throw new Error('잔고 조회 실패');
       
       const data: ExchangeBalance = await response.json();
@@ -87,7 +93,13 @@ export const useExchange = () => {
     
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:5050/api/exchange/orders', { headers });
+      // API URL 결정
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
+                    (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+                     ? 'http://localhost:5050' 
+                     : 'https://likebetfair-api.onrender.com');
+      
+      const response = await fetch(`${apiUrl}/api/exchange/orders`, { headers });
       if (!response.ok) throw new Error('주문 내역 조회 실패');
       
       const data: ExchangeOrder[] = await response.json();
@@ -192,7 +204,13 @@ export const useExchange = () => {
     
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:5050/api/exchange/cancel/${orderId}`, {
+      // API URL 결정
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
+                    (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+                     ? 'http://localhost:5050' 
+                     : 'https://likebetfair-api.onrender.com');
+      
+      const response = await fetch(`${apiUrl}/api/exchange/cancel/${orderId}`, {
         method: 'POST',
         headers,
       });
@@ -270,7 +288,13 @@ export const useExchange = () => {
   // 전체 오픈 주문 조회 (공개 API - 토큰 불필요)
   const fetchAllOpenOrders = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:5050/api/exchange/all-orders', {
+      // API URL 결정
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
+                    (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+                     ? 'http://localhost:5050' 
+                     : 'https://likebetfair-api.onrender.com');
+      
+      const response = await fetch(`${apiUrl}/api/exchange/all-orders`, {
         headers: {
           'Content-Type': 'application/json'
         }

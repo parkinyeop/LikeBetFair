@@ -14,7 +14,8 @@ export const API_CONFIG = {
     GAME_RESULTS: '/api/game-results',
     HISTORY: '/api/bet/history',
     LOGIN: '/api/auth/login',
-    REGISTER: '/api/auth/register'
+    REGISTER: '/api/auth/register',
+    BALANCE: '/api/auth/balance'
   },
   
   // 요청 설정

@@ -25,6 +25,9 @@ const sequelize = new Sequelize({
   logging: false
 });
 
+// 글로벌 변수로 DB 연결 상태 관리
+global.dbConnected = false;
+
 // 환경 변수 디버깅 (비밀번호는 마스킹)
 console.log('[DB 연결] 환경 변수 확인:');
 console.log('[DB 연결] DB_HOST:', process.env.DB_HOST);
@@ -47,6 +50,10 @@ const handle = nextApp.getRequestHandler();
 
 const app = express();
 
+// 기본 미들웨어 설정
+app.use(cors());
+app.use(express.json());
+
 // 모든 응답에 CORS 헤더를 강제 추가
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -59,29 +66,34 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(cors());
-app.use(express.json());
-
-// API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/bet', betRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/game-results', gameResultRoutes);
-app.use('/api/exchange', exchangeRoutes);
-app.use('/api', oddsRoutes);
-
-// Next.js SSR 핸들러로 나머지 모든 요청 전달
-app.all('*', (req, res) => {
-  return handle(req, res);
+// 요청 로깅 미들웨어
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    console.log(`[API] ${req.method} ${req.path}`, req.body);
+  }
+  next();
 });
 
-// Render 헬스체크 엔드포인트 (중요)
+// DB 연결 상태 확인 미들웨어
+app.use('/api/*', (req, res, next) => {
+  if (!global.dbConnected) {
+    console.error('[API] 데이터베이스 연결되지 않음');
+    return res.status(500).json({ 
+      error: '데이터베이스 연결 오류',
+      details: '서버가 아직 준비되지 않았습니다'
+    });
+  }
+  next();
+});
+
+// Render 헬스체크 엔드포인트 (API 라우트보다 먼저)
 app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'ok', 
     message: 'Server is running',
     timestamp: new Date().toISOString(),
-    port: process.env.PORT || 3001
+    port: process.env.PORT || 3001,
+    dbConnected: global.dbConnected
   });
 });
 
@@ -90,16 +102,38 @@ app.get('/', (req, res) => {
   res.send("Server is running");
 });
 
-// Error handling middleware
+// API Routes (순서 중요!)
+app.use('/api/auth', authRoutes);
+app.use('/api/bet', betRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/game-results', gameResultRoutes);
+app.use('/api/exchange', exchangeRoutes);
+app.use('/api', oddsRoutes);
+
+// API 라우트 디버깅
+app.use('/api/*', (req, res, next) => {
+  console.log(`[API] 처리되지 않은 요청: ${req.method} ${req.path}`);
+  res.status(404).json({ error: 'API 엔드포인트를 찾을 수 없습니다' });
+});
+
+// Error handling middleware (API 라우트 이후)
 app.use((err, req, res, next) => {
+  console.error('[Error Middleware] 오류 발생:', err);
+  console.error('[Error Middleware] 스택:', err.stack);
+  
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-auth-token');
-  console.error(err.stack);
+  
   res.status(err.status || 500).json({
-    message: err.message || 'Something broke!',
-    error: err.stack,
+    error: err.message || '서버 내부 오류',
+    details: process.env.NODE_ENV === 'development' ? err.stack : undefined,
   });
+});
+
+// Next.js SSR 핸들러로 나머지 모든 요청 전달 (마지막에)
+app.all('*', (req, res) => {
+  return handle(req, res);
 });
 
 // 스케줄러 초기화
@@ -148,20 +182,20 @@ async function startServer() {
     console.log('- JWT_SECRET:', process.env.JWT_SECRET ? '***' : 'undefined');
     console.log('- JWT_EXPIRES_IN:', process.env.JWT_EXPIRES_IN);
     
-    // 중앙화된 설정 초기화 (비동기로 병렬 처리)
-    console.log('[시작] 중앙화된 설정 초기화...');
-    const initPromise = initializeCentralizedConfig();
-    
     // 데이터베이스 연결
     console.log('[시작] 데이터베이스 연결 중...');
     await sequelize.authenticate();
     console.log('✅ Database connection has been established successfully.');
     
-    // 설정 초기화 완료 대기
-    await initPromise;
+    // 글로벌 DB 연결 상태 업데이트
+    global.dbConnected = true;
+    
+    // 중앙화된 설정 초기화
+    console.log('[시작] 중앙화된 설정 초기화...');
+    await initializeCentralizedConfig();
     console.log('✅ 중앙화된 설정 초기화 완료');
     
-    // 데이터베이스 동기화 및 초기화 (간소화)
+    // 데이터베이스 동기화 및 초기화
     console.log('[시작] 데이터베이스 테이블 동기화...');
     await sequelize.sync({ alter: true });
     console.log('✅ Database tables synchronized successfully.');
@@ -235,19 +269,12 @@ async function startServer() {
       }
     }
     
-    // 기본 계정 생성 (Render 환경에서만, 비동기로 처리)
-    if (process.env.NODE_ENV === 'production') {
-      console.log('[시작] 기본 계정 생성 확인...');
-      createDefaultAccounts().catch(error => {
-        console.error('[계정] 기본 계정 생성 실패:', error.message);
-      });
-    }
-    
-    // Next.js 준비 (비동기로 처리)
+    // Next.js 준비
     console.log('[시작] Next.js 앱 준비 중...');
-    const nextPromise = nextApp.prepare();
+    await nextApp.prepare();
+    console.log('✅ Next.js 앱 준비 완료');
     
-    // 서버 시작 (Next.js 준비와 병렬로 처리)
+    // 서버 시작
     console.log(`[시작] Express 서버 시작 중... (포트: ${PORT})`);
     const server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`✅ Server listening on port ${PORT}`);
@@ -258,20 +285,21 @@ async function startServer() {
       exchangeWebSocketService.initialize(server);
       console.log('✅ Exchange WebSocket 서비스 초기화 완료');
       
-      // Next.js 준비 완료 대기 후 초기 데이터 수집
-      nextPromise.then(() => {
-        console.log('✅ Next.js 앱 준비 완료');
-        
-        // Render 환경에서 초기 배당율 수집 (비동기로 처리)
-        if (process.env.NODE_ENV === 'production') {
-          console.log('[시작] 초기 배당율 수집 시작...');
-          collectInitialOdds().catch(error => {
-            console.error('[배당율] 초기 데이터 수집 실패:', error.message);
-          });
-        }
-      }).catch(error => {
-        console.error('❌ Next.js 앱 준비 실패:', error);
-      });
+      // 기본 계정 생성 (비동기로 처리)
+      if (process.env.NODE_ENV === 'production') {
+        console.log('[시작] 기본 계정 생성 확인...');
+        createDefaultAccounts().catch(error => {
+          console.error('[계정] 기본 계정 생성 실패:', error.message);
+        });
+      }
+      
+      // Render 환경에서 초기 배당율 수집 (비동기로 처리)
+      if (process.env.NODE_ENV === 'production') {
+        console.log('[시작] 초기 배당율 수집 시작...');
+        collectInitialOdds().catch(error => {
+          console.error('[배당율] 초기 데이터 수집 실패:', error.message);
+        });
+      }
     });
     
     // 서버 오류 처리
@@ -283,9 +311,20 @@ async function startServer() {
       process.exit(1);
     });
     
+    // 프로세스 종료 처리
+    process.on('SIGTERM', () => {
+      console.log('[종료] SIGTERM 신호 수신');
+      global.dbConnected = false;
+      server.close(() => {
+        console.log('[종료] 서버 종료 완료');
+        process.exit(0);
+      });
+    });
+    
   } catch (err) {
     console.error('❌ 서버 시작 실패:', err);
     console.error('스택 트레이스:', err.stack);
+    global.dbConnected = false;
     process.exit(1);
   }
 }

@@ -11,6 +11,7 @@ interface AuthContextType {
   login: (username: string, balance: number, token: string, isAdmin?: boolean, adminLevel?: number, userId?: string) => void;
   logout: () => void;
   setBalance: (balance: number) => void;
+  refreshBalance: () => Promise<void>;
   hasPermission: (permission: string) => boolean;
 }
 
@@ -93,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const login = (username: string, balance: number, token: string, isAdmin = false, adminLevel = 0, userId?: string) => {
+  const login = async (username: string, balance: number, token: string, isAdmin = false, adminLevel = 0, userId?: string) => {
     console.log('[AuthContext] 로그인:', { tabId, username, balance, hasToken: !!token, isAdmin, adminLevel, userId });
     
     if (!tabId) {
@@ -138,6 +139,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(token);
     setIsAdmin(isAdmin);
     setAdminLevel(adminLevel);
+
+    // 로그인 후 잔액 새로고침 (서버에서 최신 잔액 가져오기)
+    setTimeout(async () => {
+      try {
+        console.log('[AuthContext] 로그인 후 잔액 새로고침 시작');
+        await refreshBalance();
+      } catch (error) {
+        console.error('[AuthContext] 로그인 후 잔액 새로고침 실패:', error);
+        // 실패 시에도 기본 잔액은 유지
+        console.log('[AuthContext] 기본 잔액 유지:', balance);
+      }
+    }, 2000); // 2초 후 실행 (서버 준비 시간 고려)
   };
 
   const logout = () => {
@@ -164,6 +177,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsAdmin(false);
     setAdminLevel(0);
     setUserId(null);
+  };
+
+  const refreshBalance = async (): Promise<void> => {
+    if (!token || !tabId) {
+      console.log('[AuthContext] 토큰 또는 tabId가 없어서 잔액 새로고침 건너뜀');
+      return;
+    }
+
+    try {
+      console.log('[AuthContext] 잔액 새로고침 시작');
+      
+      // API URL 결정
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
+                    (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+                     ? 'http://localhost:5050' 
+                     : 'https://likebetfair-api.onrender.com');
+      
+      console.log('[AuthContext] API URL:', apiUrl);
+      
+      const response = await fetch(`${apiUrl}/api/auth/balance`, {
+        headers: {
+          'x-auth-token': token,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('[AuthContext] 잔액 조회 응답 상태:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[AuthContext] 잔액 새로고침 성공:', data.balance);
+        setBalance(Number(data.balance));
+        sessionStorage.setItem(`balance_${tabId}`, data.balance.toString());
+      } else {
+        const errorText = await response.text();
+        console.error('[AuthContext] 잔액 새로고침 실패:', response.status, errorText);
+        
+        // 실패 시 기존 잔액 유지
+        console.log('[AuthContext] 기존 잔액 유지');
+      }
+    } catch (error) {
+      console.error('[AuthContext] 잔액 새로고침 오류:', error);
+      // 오류 시 기존 잔액 유지
+      console.log('[AuthContext] 오류로 인해 기존 잔액 유지');
+    }
   };
 
   const hasPermission = (permission: string): boolean => {
@@ -199,6 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login, 
       logout, 
       setBalance,
+      refreshBalance,
       hasPermission
     }}>
       {children}
