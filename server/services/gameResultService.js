@@ -119,6 +119,10 @@ class GameResultService {
     if (!/^\d+$/.test(cleanApiKey)) {
       cleanApiKey = '3';
     }
+    // API 키가 비어있으면 기본값 사용
+    if (!cleanApiKey || cleanApiKey === '') {
+      cleanApiKey = '3';
+    }
     this.sportsDbApiKey = cleanApiKey;
     this.sportsDbBaseUrl = 'https://www.thesportsdb.com/api/v1/json';
     

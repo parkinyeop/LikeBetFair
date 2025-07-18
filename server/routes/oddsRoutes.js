@@ -27,4 +27,47 @@ router.get('/odds/:sportKey', async (req, res) => {
   }
 });
 
+// 테스트용 odds 데이터 가져오기
+router.get('/test-odds', async (req, res) => {
+  try {
+    const odds = await oddsApiService.getCachedOdds('soccer', null, 10);
+    res.json(odds);
+  } catch (error) {
+    console.error('Error fetching test odds:', error);
+    res.status(500).json({ error: 'Failed to fetch test odds' });
+  }
+});
+
+// odds 업데이트 엔드포인트
+router.post('/update-odds', async (req, res) => {
+  try {
+    const { priority = 'high' } = req.body;
+    console.log(`[API] Odds 업데이트 요청 - priority: ${priority}`);
+    
+    const result = await oddsApiService.updateOdds(priority);
+    res.json({
+      success: true,
+      message: 'Odds updated successfully',
+      result
+    });
+  } catch (error) {
+    console.error('Error updating odds:', error);
+    res.status(500).json({ error: 'Failed to update odds' });
+  }
+});
+
+// odds 상태 확인
+router.get('/status', async (req, res) => {
+  try {
+    const count = await oddsApiService.getOddsCount();
+    res.json({
+      totalOdds: count,
+      lastUpdate: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error getting odds status:', error);
+    res.status(500).json({ error: 'Failed to get odds status' });
+  }
+});
+
 export default router; 

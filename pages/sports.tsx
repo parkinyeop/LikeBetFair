@@ -61,7 +61,13 @@ export default function SportsPage() {
     setLoading(prev => ({ ...prev, [leagueKey]: true }));
     
     try {
-      const response = await fetch(`http://localhost:5050/api/odds/${leagueKey}`);
+      // API URL 결정
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
+                    (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+                     ? 'http://localhost:5050' 
+                     : 'https://likebetfair-api.onrender.com');
+      
+      const response = await fetch(`${apiUrl}/api/odds/${leagueKey}`);
       if (response.ok) {
         const data = await response.json();
         

@@ -16,32 +16,61 @@ class OddsHistoryService {
   async saveOddsSnapshot(oddsData) {
     try {
       if (!oddsData || !oddsData.bookmakers) {
+        console.log('[OddsHistory] oddsData 또는 bookmakers가 없음');
+        return 0;
+      }
+
+      // oddsData.id가 UUID인지 확인
+      if (!oddsData.id) {
+        console.error('[OddsHistory] oddsData.id가 없음:', oddsData);
         return 0;
       }
 
       let savedCount = 0;
       const snapshotTime = new Date();
 
-      for (const bookmaker of oddsData.bookmakers) {
+      // bookmakers가 JSON 문자열인 경우 파싱
+      let bookmakers = oddsData.bookmakers;
+      if (typeof bookmakers === 'string') {
+        try {
+          bookmakers = JSON.parse(bookmakers);
+        } catch (e) {
+          console.error('[OddsHistory] bookmakers JSON 파싱 오류:', e);
+          return 0;
+        }
+      }
+
+      if (!Array.isArray(bookmakers)) {
+        console.error('[OddsHistory] bookmakers가 배열이 아님:', typeof bookmakers);
+        return 0;
+      }
+
+      for (const bookmaker of bookmakers) {
         if (!bookmaker.markets) continue;
 
         for (const market of bookmaker.markets) {
           if (!market.outcomes) continue;
 
           for (const outcome of market.outcomes) {
-            await OddsHistory.create({
-              oddsCacheId: oddsData.id,
-              homeTeam: oddsData.homeTeam,
-              awayTeam: oddsData.awayTeam,
-              commenceTime: oddsData.commenceTime,
-              marketType: market.key,
-              outcomeName: outcome.name,
-              outcomePoint: outcome.point || null,
-              oddsValue: outcome.price,
-              bookmakerName: bookmaker.title,
-              snapshotTime: snapshotTime
-            });
-            savedCount++;
+            try {
+              await OddsHistory.create({
+                oddsCacheId: oddsData.id,
+                homeTeam: oddsData.homeTeam,
+                awayTeam: oddsData.awayTeam,
+                commenceTime: oddsData.commenceTime,
+                marketType: market.key,
+                outcomeName: outcome.name,
+                outcomePoint: outcome.point || null,
+                oddsValue: outcome.price,
+                bookmakerName: bookmaker.title,
+                snapshotTime: snapshotTime
+              });
+              savedCount++;
+            } catch (createError) {
+              console.error('[OddsHistory] 개별 히스토리 저장 오류:', createError.message);
+              // 개별 오류가 전체를 중단시키지 않도록 계속 진행
+              continue;
+            }
           }
         }
       }

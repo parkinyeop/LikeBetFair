@@ -303,10 +303,14 @@ class OddsApiService {
                   try {
                     const updatedOdds = await OddsCache.findByPk(existingOdds.id);
                     if (updatedOdds) {
-                      await oddsHistoryService.saveOddsSnapshot(updatedOdds);
+                      const historyCount = await oddsHistoryService.saveOddsSnapshot(updatedOdds);
+                      if (historyCount > 0) {
+                        console.log(`[OddsHistory] ${clientCategory} 업데이트 히스토리 ${historyCount}개 저장됨`);
+                      }
                     }
                   } catch (historyError) {
                     console.error(`[OddsHistory] 히스토리 저장 실패 (${clientCategory}):`, historyError.message);
+                    // 히스토리 저장 실패가 전체 프로세스를 중단시키지 않도록 계속 진행
                   }
                 }
               } else {
@@ -318,9 +322,13 @@ class OddsApiService {
                 
                 // 새 배당률 히스토리 저장
                 try {
-                  await oddsHistoryService.saveOddsSnapshot(newOdds);
+                  const historyCount = await oddsHistoryService.saveOddsSnapshot(newOdds);
+                  if (historyCount > 0) {
+                    console.log(`[OddsHistory] ${clientCategory} 새 히스토리 ${historyCount}개 저장됨`);
+                  }
                 } catch (historyError) {
                   console.error(`[OddsHistory] 히스토리 저장 실패 (${clientCategory}):`, historyError.message);
+                  // 히스토리 저장 실패가 전체 프로세스를 중단시키지 않도록 계속 진행
                 }
               }
             } else {
@@ -414,7 +422,10 @@ class OddsApiService {
               // 배당율 히스토리 저장 (새로 생성되거나 업데이트된 경우)
               if (oddsRecord) {
                 try {
-                  await oddsHistoryService.saveOddsSnapshot(oddsRecord);
+                  const historyCount = await oddsHistoryService.saveOddsSnapshot(oddsRecord);
+                  if (historyCount > 0) {
+                    console.log(`[OddsHistory] ${clientCategory} 히스토리 ${historyCount}개 저장됨`);
+                  }
                 } catch (historyError) {
                   console.error(`[OddsHistory] 히스토리 저장 실패 (${clientCategory}):`, historyError.message);
                   // 히스토리 저장 실패가 전체 프로세스를 중단시키지 않도록 계속 진행
@@ -751,7 +762,8 @@ class OddsApiService {
         home_team: oddsRecord.homeTeam,
         away_team: oddsRecord.awayTeam,
         commence_time: oddsRecord.commenceTime,
-        officialOdds: oddsRecord.officialOdds, // 🆕 공식 평균 배당률만 전달 (북메이커 정보 제외)
+        bookmakers: oddsRecord.bookmakers, // 북메이커 정보 포함
+        officialOdds: oddsRecord.officialOdds, // 공식 평균 배당률
         lastUpdated: oddsRecord.lastUpdated
       }));
       
@@ -772,6 +784,17 @@ class OddsApiService {
       return; // 저장 skip
     }
     return OddsCache.upsert(saveData);
+  }
+
+  // OddsCache 테이블의 총 레코드 수 반환
+  async getOddsCount() {
+    try {
+      const count = await OddsCache.count();
+      return count;
+    } catch (error) {
+      console.error('[OddsApiService] getOddsCount 오류:', error);
+      throw error;
+    }
   }
 }
 

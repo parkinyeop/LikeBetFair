@@ -188,11 +188,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log('[AuthContext] 잔액 새로고침 시작');
       
-      // API URL 결정
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
-                    (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+      // API URL 결정 (apiConfig 사용)
+      const apiUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
                      ? 'http://localhost:5050' 
-                     : 'https://likebetfair-api.onrender.com');
+                     : window.location.origin;
       
       console.log('[AuthContext] API URL:', apiUrl);
       

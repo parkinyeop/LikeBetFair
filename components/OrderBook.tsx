@@ -24,7 +24,13 @@ export default function OrderBook({ gameId, market, line, onOrderClick }: OrderB
       const sportKey = gameId.split('_').slice(0, -1).join('_');
       if (!sportKey) return;
 
-      const response = await fetch(`http://localhost:5050/api/odds/${sportKey}`);
+      // API URL 결정
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
+                    (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+                     ? 'http://localhost:5050' 
+                     : 'https://likebetfair-api.onrender.com');
+      
+      const response = await fetch(`${apiUrl}/api/odds/${sportKey}`);
       if (!response.ok) return;
       
       const data = await response.json();
