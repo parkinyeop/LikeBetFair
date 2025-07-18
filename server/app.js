@@ -76,7 +76,10 @@ const possiblePaths = [
   path.join(__dirname, '../../.next'),
   path.join(process.cwd(), 'out'),
   path.join(process.cwd(), '.next'),
-  path.join(process.cwd(), '.next/static')
+  path.join(process.cwd(), '.next/static'),
+  path.join(process.cwd(), '../out'),
+  path.join(process.cwd(), '../.next'),
+  path.join(process.cwd(), '../.next/static')
 ];
 
 let staticPath = null;

@@ -3,7 +3,7 @@ services:
     name: likebetfair-api
     env: node
     plan: free
-    buildCommand: npm install && npm run build
+    buildCommand: npm install && npm run build && ls -la && ls -la .next/ 2>/dev/null || echo "Next.js build files not found"
     startCommand: cd server && node app.js
     envVars:
       - key: NODE_ENV
