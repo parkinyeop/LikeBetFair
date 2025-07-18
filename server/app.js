@@ -66,16 +66,37 @@ app.use('/api/game-results', gameResultRoutes);
 app.use('/api/exchange', exchangeRoutes);
 
 // Serve Next.js static files
-const staticPath = path.join(__dirname, '../out');
-const indexPath = path.join(staticPath, 'index.html');
-
-console.log('[서버] 정적 파일 경로:', staticPath);
-console.log('[서버] 인덱스 파일 경로:', indexPath);
-
-// Check if build files exist
 import fs from 'fs';
-if (fs.existsSync(staticPath)) {
+
+// 여러 가능한 빌드 경로 시도
+const possiblePaths = [
+  path.join(__dirname, '../out'),
+  path.join(__dirname, '../.next'),
+  path.join(__dirname, '../../out'),
+  path.join(__dirname, '../../.next'),
+  path.join(process.cwd(), 'out'),
+  path.join(process.cwd(), '.next')
+];
+
+let staticPath = null;
+let indexPath = null;
+
+console.log('[서버] 빌드 파일 경로 확인 중...');
+for (const testPath of possiblePaths) {
+  console.log('[서버] 확인 중:', testPath);
+  if (fs.existsSync(testPath)) {
+    staticPath = testPath;
+    indexPath = path.join(testPath, 'index.html');
+    console.log('[서버] 빌드 파일 발견:', staticPath);
+    break;
+  }
+}
+
+if (staticPath && fs.existsSync(indexPath)) {
   console.log('[서버] Next.js 빌드 파일 발견!');
+  console.log('[서버] 정적 파일 경로:', staticPath);
+  console.log('[서버] 인덱스 파일 경로:', indexPath);
+  
   app.use(express.static(staticPath));
   
   // Serve Next.js pages
@@ -86,21 +107,32 @@ if (fs.existsSync(staticPath)) {
     }
     
     // Serve Next.js pages
-    if (fs.existsSync(indexPath)) {
-      res.sendFile(indexPath);
-    } else {
-      res.status(404).send('Next.js build files not found. Please check the build process.');
-    }
+    res.sendFile(indexPath);
   });
 } else {
-  console.log('[서버] Next.js 빌드 파일이 없습니다. API만 서빙합니다.');
+  console.log('[서버] Next.js 빌드 파일을 찾을 수 없습니다.');
+  console.log('[서버] 확인한 경로들:', possiblePaths);
   
-  // API routes only
+  // API routes only with better error message
   app.get('*', (req, res) => {
     if (req.path.startsWith('/api/')) {
       res.status(404).json({ message: 'API endpoint not found' });
     } else {
-      res.status(404).send('Frontend not available. Please check the build process.');
+      res.status(404).send(`
+        <html>
+          <head><title>Frontend Not Available</title></head>
+          <body>
+            <h1>Frontend Not Available</h1>
+            <p>Next.js build files not found. Please check the build process.</p>
+            <p>Checked paths:</p>
+            <ul>
+              ${possiblePaths.map(p => `<li>${p}</li>`).join('')}
+            </ul>
+            <p>Current directory: ${process.cwd()}</p>
+            <p>Server directory: ${__dirname}</p>
+          </body>
+        </html>
+      `);
     }
   });
 }
