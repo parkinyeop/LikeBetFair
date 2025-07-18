@@ -143,6 +143,8 @@ async function startServer() {
     console.log('- DB_PASSWORD:', process.env.DB_PASSWORD ? '***' : 'undefined');
     console.log('- JWT_SECRET:', process.env.JWT_SECRET ? '***' : 'undefined');
     console.log('- JWT_EXPIRES_IN:', process.env.JWT_EXPIRES_IN || '24h');
+    console.log('- THESPORTSDB_API_KEY:', process.env.THESPORTSDB_API_KEY ? '***' : 'undefined');
+    console.log('- ODDS_API_KEY:', process.env.ODDS_API_KEY ? '***' : 'undefined');
     
     // 중앙화된 설정 초기화
     console.log('[시작] 중앙화된 설정 초기화...');
@@ -158,6 +160,62 @@ async function startServer() {
     console.log('[시작] 데이터베이스 테이블 동기화...');
     await sequelize.sync({ alter: true });
     console.log('✅ Database tables synchronized successfully.');
+    
+    // 데이터베이스 스키마 자동 수정 (Render 환경에서만)
+    if (process.env.NODE_ENV === 'production') {
+      console.log('[시작] 데이터베이스 스키마 자동 수정...');
+      try {
+        // adminLevel 컬럼 추가
+        await sequelize.query(`
+          ALTER TABLE "Users" 
+          ADD COLUMN IF NOT EXISTS "adminLevel" INTEGER DEFAULT 0;
+        `);
+        console.log('✅ adminLevel 컬럼 확인/추가 완료');
+        
+        // gameResultId 컬럼 타입 수정
+        await sequelize.query(`
+          ALTER TABLE "ExchangeOrders" 
+          DROP COLUMN IF EXISTS "gameResultId";
+        `);
+        await sequelize.query(`
+          ALTER TABLE "ExchangeOrders" 
+          ADD COLUMN IF NOT EXISTS "gameResultId" UUID REFERENCES "GameResults"(id) ON UPDATE CASCADE ON DELETE SET NULL;
+        `);
+        console.log('✅ gameResultId 컬럼 타입 수정 완료');
+        
+        // 기타 누락된 컬럼들 추가
+        const exchangeColumns = [
+          'homeTeam VARCHAR(255)',
+          'awayTeam VARCHAR(255)', 
+          'commenceTime TIMESTAMP',
+          'sportKey VARCHAR(255)',
+          'selectionDetails JSONB',
+          'autoSettlement BOOLEAN DEFAULT true',
+          'settlementNote TEXT',
+          'backOdds FLOAT',
+          'layOdds FLOAT',
+          'oddsSource VARCHAR(255)',
+          'oddsUpdatedAt TIMESTAMP',
+          'stakeAmount INTEGER DEFAULT 0',
+          'potentialProfit INTEGER DEFAULT 0',
+          'actualProfit INTEGER',
+          'settledAt TIMESTAMP'
+        ];
+        
+        for (const columnDef of exchangeColumns) {
+          const [name, ...rest] = columnDef.split(' ');
+          const type = rest.join(' ');
+          await sequelize.query(`
+            ALTER TABLE "ExchangeOrders" 
+            ADD COLUMN IF NOT EXISTS "${name}" ${type};
+          `);
+        }
+        console.log('✅ ExchangeOrders 테이블 컬럼 확인/추가 완료');
+        
+      } catch (error) {
+        console.error('[스키마 수정] 오류:', error.message);
+      }
+    }
     
     // 기본 계정 생성 (Render 환경에서만)
     if (process.env.NODE_ENV === 'production') {

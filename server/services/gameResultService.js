@@ -109,12 +109,20 @@ class GameResultService {
     
     // TheSportsDB API는 게임 결과 전용
     const rawApiKey = process.env.THESPORTSDB_API_KEY || '3';
-    let cleanApiKey = rawApiKey.replace(/THESPORTSDB_API_KEY=/g, '');
-    if (cleanApiKey.length > 6) {
-      cleanApiKey = cleanApiKey.substring(0, 6);
+    // API 키 정리: 환경 변수에서 불필요한 문자 제거
+    let cleanApiKey = rawApiKey.replace(/THESPORTSDB_API_KEY=/g, '').trim();
+    // API 키가 너무 길면 잘라내기 (TheSportsDB는 보통 6자리)
+    if (cleanApiKey.length > 10) {
+      cleanApiKey = cleanApiKey.substring(0, 10);
+    }
+    // API 키가 숫자가 아니면 기본값 사용
+    if (!/^\d+$/.test(cleanApiKey)) {
+      cleanApiKey = '3';
     }
     this.sportsDbApiKey = cleanApiKey;
     this.sportsDbBaseUrl = 'https://www.thesportsdb.com/api/v1/json';
+    
+    console.log(`[GameResult] TheSportsDB API 키 설정: ${this.sportsDbApiKey} (원본: ${rawApiKey})`);
   }
 
   /**
