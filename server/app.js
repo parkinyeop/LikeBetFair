@@ -66,18 +66,44 @@ app.use('/api/game-results', gameResultRoutes);
 app.use('/api/exchange', exchangeRoutes);
 
 // Serve Next.js static files
-app.use(express.static(path.join(__dirname, '../out')));
+const staticPath = path.join(__dirname, '../out');
+const indexPath = path.join(staticPath, 'index.html');
 
-// Serve Next.js pages
-app.get('*', (req, res) => {
-  // Skip API routes
-  if (req.path.startsWith('/api/')) {
-    return res.status(404).json({ message: 'API endpoint not found' });
-  }
+console.log('[서버] 정적 파일 경로:', staticPath);
+console.log('[서버] 인덱스 파일 경로:', indexPath);
+
+// Check if build files exist
+import fs from 'fs';
+if (fs.existsSync(staticPath)) {
+  console.log('[서버] Next.js 빌드 파일 발견!');
+  app.use(express.static(staticPath));
   
   // Serve Next.js pages
-  res.sendFile(path.join(__dirname, '../out/index.html'));
-});
+  app.get('*', (req, res) => {
+    // Skip API routes
+    if (req.path.startsWith('/api/')) {
+      return res.status(404).json({ message: 'API endpoint not found' });
+    }
+    
+    // Serve Next.js pages
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).send('Next.js build files not found. Please check the build process.');
+    }
+  });
+} else {
+  console.log('[서버] Next.js 빌드 파일이 없습니다. API만 서빙합니다.');
+  
+  // API routes only
+  app.get('*', (req, res) => {
+    if (req.path.startsWith('/api/')) {
+      res.status(404).json({ message: 'API endpoint not found' });
+    } else {
+      res.status(404).send('Frontend not available. Please check the build process.');
+    }
+  });
+}
 
 // Error handling middleware
 app.use((err, req, res, next) => {

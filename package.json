@@ -7,7 +7,7 @@
     "server": "cd server && node app.js",
     "client": "next dev",
     "build": "next build",
-    "start": "npm run build && cd server && node app.js",
+    "start": "cd server && node app.js",
     "migrate": "cd server && node runMigrations.js",
     "lint": "next lint"
   },
