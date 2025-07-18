@@ -21,11 +21,10 @@ const clientSportKeyMap = {
   'MLS': 'soccer_usa_mls',
   '아르헨티나 프리메라': 'soccer_argentina_primera_division',
   '중국 슈퍼리그': 'soccer_china_superleague',
-  '라리가': 'soccer_spain_primera_division',
+  '라리가': 'soccer_spain_la_liga',
   '분데스리가': 'soccer_germany_bundesliga',
-  '프리미어리그': 'soccer_england_premier_league',
+  '프리미어리그': 'soccer_epl',
   'NBA': 'basketball_nba',
-  'KBL': 'basketball_kbl',
   'MLB': 'baseball_mlb',
   'KBO': 'baseball_kbo',
   'NFL': 'americanfootball_nfl'

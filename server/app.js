@@ -61,9 +61,9 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/bet', betRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api', oddsRoutes);
 app.use('/api/game-results', gameResultRoutes);
 app.use('/api/exchange', exchangeRoutes);
+app.use('/api', oddsRoutes);
 
 // Serve Next.js static files
 import fs from 'fs';
