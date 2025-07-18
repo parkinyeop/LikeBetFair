@@ -2,7 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import { Sequelize } from 'sequelize';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // 중앙화된 설정 import
 import { initializeCentralizedConfig, API_CONFIG } from './config/centralizedConfig.js';
@@ -51,13 +57,27 @@ app.use((req, res, next) => {
 app.use(cors());
 app.use(express.json());
 
-// Routes
+// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/bet', betRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api', oddsRoutes);
 app.use('/api/game-results', gameResultRoutes);
 app.use('/api/exchange', exchangeRoutes);
+
+// Serve Next.js static files
+app.use(express.static(path.join(__dirname, '../out')));
+
+// Serve Next.js pages
+app.get('*', (req, res) => {
+  // Skip API routes
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ message: 'API endpoint not found' });
+  }
+  
+  // Serve Next.js pages
+  res.sendFile(path.join(__dirname, '../out/index.html'));
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {
