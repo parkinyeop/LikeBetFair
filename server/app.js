@@ -135,12 +135,18 @@ async function startServer() {
   try {
     console.log('🚀 서버 시작 프로세스 시작...');
     
-    // 환경 변수 확인 (간소화)
+    // 환경 변수 확인 (상세)
     console.log('📋 환경 변수 확인:');
     console.log('- NODE_ENV:', process.env.NODE_ENV);
     console.log('- PORT:', process.env.PORT);
     console.log('- DB_HOST:', process.env.DB_HOST ? '***' : 'undefined');
+    console.log('- DB_PORT:', process.env.DB_PORT);
+    console.log('- DB_NAME:', process.env.DB_NAME);
+    console.log('- DB_USER:', process.env.DB_USER ? '***' : 'undefined');
+    console.log('- DB_PASSWORD:', process.env.DB_PASSWORD ? '***' : 'undefined');
+    console.log('- DB_CONNECTION_STRING:', process.env.DB_CONNECTION_STRING ? '설정됨' : '미설정');
     console.log('- JWT_SECRET:', process.env.JWT_SECRET ? '***' : 'undefined');
+    console.log('- JWT_EXPIRES_IN:', process.env.JWT_EXPIRES_IN);
     
     // 중앙화된 설정 초기화 (비동기로 병렬 처리)
     console.log('[시작] 중앙화된 설정 초기화...');
@@ -164,12 +170,54 @@ async function startServer() {
     if (process.env.NODE_ENV === 'production') {
       console.log('[시작] 데이터베이스 스키마 자동 수정...');
       try {
+        // balance 컬럼을 INTEGER에서 DECIMAL(10,2)로 변경
+        await sequelize.query(`
+          ALTER TABLE "Users" 
+          ALTER COLUMN "balance" TYPE DECIMAL(10,2) USING "balance"::DECIMAL(10,2);
+        `);
+        console.log('✅ balance 컬럼 타입 수정 완료');
+        
         // adminLevel 컬럼 추가
         await sequelize.query(`
           ALTER TABLE "Users" 
           ADD COLUMN IF NOT EXISTS "adminLevel" INTEGER DEFAULT 0;
         `);
         console.log('✅ adminLevel 컬럼 확인/추가 완료');
+        
+        // referralCode 컬럼 추가
+        await sequelize.query(`
+          ALTER TABLE "Users" 
+          ADD COLUMN IF NOT EXISTS "referralCode" VARCHAR(20) UNIQUE;
+        `);
+        console.log('✅ referralCode 컬럼 확인/추가 완료');
+        
+        // referredBy 컬럼 추가
+        await sequelize.query(`
+          ALTER TABLE "Users" 
+          ADD COLUMN IF NOT EXISTS "referredBy" VARCHAR(20);
+        `);
+        console.log('✅ referredBy 컬럼 확인/추가 완료');
+        
+        // referrerAdminId 컬럼 추가
+        await sequelize.query(`
+          ALTER TABLE "Users" 
+          ADD COLUMN IF NOT EXISTS "referrerAdminId" UUID REFERENCES "Users"(id);
+        `);
+        console.log('✅ referrerAdminId 컬럼 확인/추가 완료');
+        
+        // lastLogin 컬럼 추가
+        await sequelize.query(`
+          ALTER TABLE "Users" 
+          ADD COLUMN IF NOT EXISTS "lastLogin" TIMESTAMP;
+        `);
+        console.log('✅ lastLogin 컬럼 확인/추가 완료');
+        
+        // isActive 컬럼 추가
+        await sequelize.query(`
+          ALTER TABLE "Users" 
+          ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN DEFAULT true;
+        `);
+        console.log('✅ isActive 컬럼 확인/추가 완료');
         
         // gameResultId 컬럼 타입 수정
         await sequelize.query(`

@@ -4,6 +4,7 @@ import User from '../models/userModel.js';
 import axios from 'axios';
 import Bet from '../models/betModel.js';
 import { Op } from 'sequelize';
+import sequelize from '../models/sequelize.js';
 
 // TheSportsDB API를 활용한 경기 결과 판정 함수 (The Odds API 사용 금지)
 async function getGameResult(sel) {
@@ -69,13 +70,13 @@ async function checkAndUpdatePendingBets(userId) {
 const authController = {
   register: async (req, res) => {
     try {
-      console.log('[회원가입] 요청 시작');
-      console.log('[회원가입] 요청 헤더:', req.headers);
-      console.log('[회원가입] 요청 바디:', req.body);
+      console.log('[Register] 요청 시작');
+      console.log('[Register] 요청 헤더:', req.headers);
+      console.log('[Register] 요청 바디:', req.body);
       
       const { username, email, password } = req.body;
 
-      console.log('[회원가입] 파싱된 데이터:', { 
+      console.log('[Register] 파싱된 데이터:', { 
         username: username ? `${username.substring(0, 3)}***` : null, 
         email: email ? `${email.substring(0, 3)}***` : null, 
         hasPassword: !!password,
@@ -84,13 +85,18 @@ const authController = {
 
       // 필수 필드 검증
       if (!username || !email || !password) {
-        console.log('[회원가입] 필수 필드 누락:', { 
+        console.log('[Register] 필수 필드 누락:', { 
           hasUsername: !!username, 
           hasEmail: !!email, 
           hasPassword: !!password 
         });
         return res.status(400).json({ 
           error: '모든 필수 필드를 입력해주세요',
+          missing: {
+            username: !username,
+            email: !email,
+            password: !password
+          },
           details: {
             username: !username ? '사용자명이 필요합니다' : null,
             email: !email ? '이메일이 필요합니다' : null,
@@ -101,7 +107,7 @@ const authController = {
 
       // 사용자명 길이 검증
       if (username.length < 2 || username.length > 50) {
-        console.log('[회원가입] 사용자명 길이 오류:', username.length);
+        console.log('[Register] 사용자명 길이 오류:', username.length);
         return res.status(400).json({ 
           error: '사용자명은 2-50자 사이여야 합니다' 
         });
@@ -110,7 +116,7 @@ const authController = {
       // 이메일 형식 검증
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
-        console.log('[회원가입] 이메일 형식 오류:', email);
+        console.log('[Register] 이메일 형식 오류:', email);
         return res.status(400).json({ 
           error: '올바른 이메일 형식을 입력해주세요' 
         });
@@ -118,21 +124,37 @@ const authController = {
 
       // 비밀번호 길이 검증
       if (password.length < 6) {
-        console.log('[회원가입] 비밀번호 길이 오류:', password.length);
+        console.log('[Register] 비밀번호 길이 오류:', password.length);
         return res.status(400).json({ 
           error: '비밀번호는 최소 6자 이상이어야 합니다' 
         });
       }
 
-      console.log('[회원가입] 기본 검증 통과');
+      console.log('[Register] 기본 검증 통과');
 
+      console.log('[Register] 데이터베이스 연결 확인 중...');
+      
+      // 데이터베이스 연결 상태 확인
+      try {
+        await sequelize.authenticate();
+        console.log('[Register] 데이터베이스 연결 확인 완료');
+      } catch (dbError) {
+        console.error('[Register] 데이터베이스 연결 오류:', dbError);
+        return res.status(500).json({ 
+          error: '데이터베이스 연결 오류가 발생했습니다',
+          details: process.env.NODE_ENV === 'development' ? dbError.message : undefined
+        });
+      }
+
+      console.log('[Register] 사용자 중복 확인 중...');
+      
       // Check if user already exists by email
       const existingUserByEmail = await User.findOne({
         where: { email }
       });
       
       if (existingUserByEmail) {
-        console.log('[회원가입] 이메일 중복:', email);
+        console.log('[Register] 이미 존재하는 이메일:', email);
         return res.status(400).json({ 
           error: '이미 존재하는 이메일입니다' 
         });
@@ -144,29 +166,29 @@ const authController = {
       });
       
       if (existingUserByUsername) {
-        console.log('[회원가입] 사용자명 중복:', username);
+        console.log('[Register] 이미 존재하는 사용자명:', username);
         return res.status(400).json({ 
           error: '이미 존재하는 사용자명입니다' 
         });
       }
 
-      console.log('[회원가입] 중복 검사 통과');
+      console.log('[Register] 중복 검사 통과');
 
       // Hash password
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
 
-      console.log('[회원가입] 비밀번호 해시 완료');
+      console.log('[Register] 비밀번호 해시 완료');
 
       // JWT_SECRET 확인
       if (!process.env.JWT_SECRET) {
-        console.error('[회원가입] JWT_SECRET 환경변수가 설정되지 않음');
+        console.error('[Register] JWT_SECRET 환경변수가 설정되지 않음');
         return res.status(500).json({ 
           error: '서버 설정 오류가 발생했습니다' 
         });
       }
 
-      console.log('[회원가입] 사용자 생성 시작...');
+      console.log('[Register] 사용자 생성 중...');
 
       // Create new user
       const user = await User.create({
@@ -179,7 +201,7 @@ const authController = {
         isActive: true
       });
 
-      console.log('[회원가입] 사용자 생성 완료:', user.id);
+      console.log('[Register] 사용자 생성 완료:', user.id);
 
       // Create token
       const token = jwt.sign(
@@ -188,7 +210,12 @@ const authController = {
         { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
       );
 
-      console.log('[회원가입] 토큰 생성 완료');
+      console.log('[Register] 토큰 생성 완료');
+      console.log('[Register] 회원가입 성공:', { 
+        userId: user.id, 
+        username: user.username, 
+        email: user.email 
+      });
 
       res.status(201).json({ 
         success: true,
@@ -203,12 +230,14 @@ const authController = {
       });
       
     } catch (err) {
-      console.error('[회원가입] 오류 발생:', err);
-      console.error('[회원가입] 오류 스택:', err.stack);
+      console.error('[Register] 서버 오류:', err);
+      console.error('[Register] 오류 스택:', err.stack);
+      console.error('[Register] 오류 타입:', err.name);
+      console.error('[Register] 오류 메시지:', err.message);
       
       // Sequelize 오류 처리
       if (err.name === 'SequelizeValidationError') {
-        console.log('[회원가입] Sequelize 검증 오류:', err.errors);
+        console.log('[Register] Sequelize 검증 오류:', err.errors);
         return res.status(400).json({ 
           error: '입력 데이터가 올바르지 않습니다',
           details: err.errors.map(e => ({
@@ -219,22 +248,40 @@ const authController = {
       }
       
       if (err.name === 'SequelizeUniqueConstraintError') {
-        console.log('[회원가입] Sequelize 중복 제약 오류:', err.errors);
+        console.log('[Register] Sequelize 중복 제약 오류:', err.errors);
         return res.status(400).json({ 
           error: '이미 존재하는 사용자명 또는 이메일입니다' 
         });
       }
       
       if (err.name === 'SequelizeConnectionError') {
-        console.error('[회원가입] 데이터베이스 연결 오류:', err);
+        console.error('[Register] 데이터베이스 연결 오류:', err);
         return res.status(500).json({ 
-          error: '데이터베이스 연결 오류가 발생했습니다' 
+          error: '데이터베이스 연결 오류가 발생했습니다',
+          details: process.env.NODE_ENV === 'development' ? err.message : undefined
         });
       }
       
+      if (err.name === 'SequelizeDatabaseError') {
+        console.error('[Register] 데이터베이스 스키마 오류:', err);
+        return res.status(500).json({ 
+          error: '데이터베이스 스키마 오류가 발생했습니다. 관리자에게 문의하세요.',
+          details: process.env.NODE_ENV === 'development' ? err.message : undefined
+        });
+      }
+      
+      if (err.name === 'SequelizeForeignKeyConstraintError') {
+        console.error('[Register] 외래키 제약 오류:', err);
+        return res.status(500).json({ 
+          error: '데이터베이스 관계 오류가 발생했습니다. 관리자에게 문의하세요.' 
+        });
+      }
+      
+      // 구체적인 오류 정보 반환
       res.status(500).json({ 
         error: '서버 오류가 발생했습니다',
-        message: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+        details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+        type: err.name
       });
     }
   },

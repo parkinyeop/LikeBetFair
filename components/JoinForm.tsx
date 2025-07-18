@@ -53,6 +53,7 @@ export default function JoinForm({ onClose }: { onClose: () => void }) {
 
       console.log('[회원가입] API 요청 시작');
       console.log('[회원가입] 요청 URL:', `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.REGISTER}`);
+      console.log('[회원가입] 요청 바디:', requestBody);
 
       const res = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.REGISTER}`, {
         method: 'POST',
@@ -66,7 +67,21 @@ export default function JoinForm({ onClose }: { onClose: () => void }) {
       console.log('[회원가입] API 응답 상태:', res.status);
       console.log('[회원가입] API 응답 헤더:', Object.fromEntries(res.headers.entries()));
 
-      const data = await res.json();
+      // 응답을 텍스트로 먼저 읽기
+      const responseText = await res.text();
+      console.log('[회원가입] API 응답 텍스트:', responseText);
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('[회원가입] JSON 파싱 실패:', parseError);
+        console.error('[회원가입] 원본 응답 텍스트:', responseText);
+        setError('서버 응답 형식 오류가 발생했습니다');
+        setIsLoading(false);
+        return;
+      }
+
       console.log('[회원가입] API 응답 데이터:', data);
 
       if (res.ok) {
@@ -79,22 +94,29 @@ export default function JoinForm({ onClose }: { onClose: () => void }) {
         setMessage(data.message || '회원가입이 완료되었습니다');
       } else {
         console.log('[회원가입] 실패:', data);
+        console.error('[회원가입] HTTP 상태:', res.status);
+        console.error('[회원가입] 응답 데이터:', data);
+        
         // 서버에서 반환한 오류 메시지 처리
         if (data.error) {
           setError(data.error);
         } else if (data.message) {
           setError(data.message);
         } else {
-          setError('회원가입에 실패했습니다');
+          setError(`회원가입에 실패했습니다 (${res.status})`);
         }
 
         // 상세 오류 정보가 있으면 콘솔에 출력
         if (data.details) {
           console.error('[회원가입] 상세 오류:', data.details);
         }
+        if (data.missing) {
+          console.error('[회원가입] 누락된 필드:', data.missing);
+        }
       }
     } catch (err) {
       console.error('[회원가입] 네트워크 오류:', err);
+      console.error('[회원가입] 전체 오류:', err);
       setError('서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       setIsLoading(false);
