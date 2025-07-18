@@ -84,19 +84,35 @@ const possiblePaths = [
   path.join(process.cwd(), '../../src/.next'),
   path.join(process.cwd(), '../../src/out'),
   path.join(process.cwd(), '../../.next'),
-  path.join(process.cwd(), '../../out')
+  path.join(process.cwd(), '../../out'),
+  // 추가 경로들
+  path.join(process.cwd(), '../../../src/.next'),
+  path.join(process.cwd(), '../../../src/out'),
+  path.join(process.cwd(), '../../../.next'),
+  path.join(process.cwd(), '../../../out')
 ];
 
 let staticPath = null;
 let indexPath = null;
 
 console.log('[서버] 빌드 파일 경로 확인 중...');
+console.log('[서버] 현재 작업 디렉토리:', process.cwd());
+console.log('[서버] 서버 파일 디렉토리:', __dirname);
+
 for (const testPath of possiblePaths) {
   console.log('[서버] 확인 중:', testPath);
   if (fs.existsSync(testPath)) {
     staticPath = testPath;
     indexPath = path.join(testPath, 'index.html');
     console.log('[서버] 빌드 파일 발견:', staticPath);
+    
+    // 디렉토리 내용 확인
+    try {
+      const files = fs.readdirSync(testPath);
+      console.log('[서버] 발견된 파일들:', files.slice(0, 10)); // 처음 10개만
+    } catch (err) {
+      console.log('[서버] 디렉토리 읽기 실패:', err.message);
+    }
     break;
   }
 }
