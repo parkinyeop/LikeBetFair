@@ -79,7 +79,12 @@ const possiblePaths = [
   path.join(process.cwd(), '.next/static'),
   path.join(process.cwd(), '../out'),
   path.join(process.cwd(), '../.next'),
-  path.join(process.cwd(), '../.next/static')
+  path.join(process.cwd(), '../.next/static'),
+  // Render 환경에서 서버가 /src/server에서 실행될 때 Next.js는 /src에 있음
+  path.join(process.cwd(), '../../src/.next'),
+  path.join(process.cwd(), '../../src/out'),
+  path.join(process.cwd(), '../../.next'),
+  path.join(process.cwd(), '../../out')
 ];
 
 let staticPath = null;
