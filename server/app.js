@@ -4,6 +4,7 @@ import { Sequelize } from 'sequelize';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import next from 'next';
 
 dotenv.config();
 
@@ -40,6 +41,10 @@ import betRoutes from './routes/bet.js';
 import adminRoutes from './routes/admin.js';
 import exchangeRoutes from './routes/exchange.js';
 
+const dev = process.env.NODE_ENV !== 'production';
+const nextApp = next({ dev, dir: path.join(__dirname, '..') });
+const handle = nextApp.getRequestHandler();
+
 const app = express();
 
 // 모든 응답에 CORS 헤더를 강제 추가
@@ -65,179 +70,18 @@ app.use('/api/game-results', gameResultRoutes);
 app.use('/api/exchange', exchangeRoutes);
 app.use('/api', oddsRoutes);
 
-// Serve Next.js static files
-import fs from 'fs';
-
-// 여러 가능한 빌드 경로 시도
-const possiblePaths = [
-  path.join(__dirname, '../out'),
-  path.join(__dirname, '../.next'),
-  path.join(__dirname, '../../out'),
-  path.join(__dirname, '../../.next'),
-  path.join(process.cwd(), 'out'),
-  path.join(process.cwd(), '.next'),
-  path.join(process.cwd(), '.next/static'),
-  path.join(process.cwd(), '../out'),
-  path.join(process.cwd(), '../.next'),
-  path.join(process.cwd(), '../.next/static'),
-  // Render 환경에서 서버가 /src/server에서 실행될 때 Next.js는 /src에 있음
-  path.join(process.cwd(), '../../src/.next'),
-  path.join(process.cwd(), '../../src/out'),
-  path.join(process.cwd(), '../../.next'),
-  path.join(process.cwd(), '../../out'),
-  // 추가 경로들
-  path.join(process.cwd(), '../../../src/.next'),
-  path.join(process.cwd(), '../../../src/out'),
-  path.join(process.cwd(), '../../../.next'),
-  path.join(process.cwd(), '../../../out')
-];
-
-let staticPath = null;
-let indexPath = null;
-
-console.log('[서버] 빌드 파일 경로 확인 중...');
-console.log('[서버] 현재 작업 디렉토리:', process.cwd());
-console.log('[서버] 서버 파일 디렉토리:', __dirname);
-
-for (const testPath of possiblePaths) {
-  console.log('[서버] 확인 중:', testPath);
-  if (fs.existsSync(testPath)) {
-    staticPath = testPath;
-    indexPath = path.join(testPath, 'index.html');
-    console.log('[서버] 빌드 파일 발견:', staticPath);
-    
-    // 디렉토리 내용 확인
-    try {
-      const files = fs.readdirSync(testPath);
-      console.log('[서버] 발견된 파일들:', files.slice(0, 10)); // 처음 10개만
-    } catch (err) {
-      console.log('[서버] 디렉토리 읽기 실패:', err.message);
-    }
-    break;
-  }
-}
-
-if (staticPath && fs.existsSync(indexPath)) {
-  console.log('[서버] Next.js 빌드 파일 발견!');
-  console.log('[서버] 정적 파일 경로:', staticPath);
-  console.log('[서버] 인덱스 파일 경로:', indexPath);
-  
-  app.use(express.static(staticPath));
-  
-  // Serve Next.js pages
-  app.get('*', (req, res) => {
-    // Skip API routes
-    if (req.path.startsWith('/api/')) {
-      return res.status(404).json({ message: 'API endpoint not found' });
-    }
-    
-    // Serve Next.js pages
-    res.sendFile(indexPath);
+// Next.js SSR 핸들러로 나머지 모든 요청 전달
+nextApp.prepare().then(() => {
+  app.all('*', (req, res) => {
+    return handle(req, res);
   });
-} else {
-  console.log('[서버] Next.js 빌드 파일을 찾을 수 없습니다.');
-  console.log('[서버] 확인한 경로들:', possiblePaths);
-  
-  // API routes only with better error message
-  app.get('*', (req, res) => {
-    if (req.path.startsWith('/api/')) {
-      res.status(404).json({ message: 'API endpoint not found' });
-    } else {
-      // 간단한 프론트엔드 제공 (빌드 파일이 없을 때)
-      res.send(`
-        <!DOCTYPE html>
-        <html lang="ko">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>LikeBetFair - 베팅 플랫폼</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-            .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-            h1 { color: #2c3e50; text-align: center; }
-            .status { background: #e8f5e8; padding: 15px; border-radius: 5px; margin: 20px 0; }
-            .error { background: #ffe6e6; padding: 15px; border-radius: 5px; margin: 20px 0; }
-            .api-test { background: #f0f8ff; padding: 15px; border-radius: 5px; margin: 20px 0; }
-            button { background: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
-            button:hover { background: #2980b9; }
-            .info { font-size: 14px; color: #666; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h1>🏈 LikeBetFair 베팅 플랫폼</h1>
-            
-            <div class="status">
-              <h3>✅ 서버 상태</h3>
-              <p>Express 서버가 정상적으로 실행 중입니다.</p>
-              <p>포트: ${process.env.PORT || 3001}</p>
-              <p>환경: ${process.env.NODE_ENV || 'development'}</p>
-            </div>
-            
-            <div class="error">
-              <h3>⚠️ 프론트엔드 상태</h3>
-              <p>Next.js 빌드 파일을 찾을 수 없습니다.</p>
-              <p>확인된 경로:</p>
-              <ul>
-                ${possiblePaths.map(p => `<li>${p}</li>`).join('')}
-              </ul>
-              <p>현재 디렉토리: ${process.cwd()}</p>
-              <p>서버 디렉토리: ${__dirname}</p>
-            </div>
-            
-            <div class="api-test">
-              <h3>🔧 API 테스트</h3>
-              <p>API 엔드포인트가 정상 작동하는지 확인해보세요:</p>
-              <button onclick="testAPI()">MLB 배당율 테스트</button>
-              <button onclick="testAuth()">인증 API 테스트</button>
-              <div id="api-result"></div>
-            </div>
-            
-            <div class="info">
-              <p><strong>해결 방법:</strong></p>
-              <ol>
-                <li>Render 대시보드에서 Build Command가 'npm run build'로 설정되어 있는지 확인</li>
-                <li>빌드 로그에서 Next.js 빌드가 성공했는지 확인</li>
-                <li>환경변수 NODE_ENV=production이 설정되어 있는지 확인</li>
-              </ol>
-            </div>
-          </div>
-          
-          <script>
-            async function testAPI() {
-              const result = document.getElementById('api-result');
-              result.innerHTML = '테스트 중...';
-              try {
-                const response = await fetch('/api/odds/MLB');
-                const data = await response.json();
-                result.innerHTML = '<strong>✅ API 정상:</strong> ' + JSON.stringify(data).substring(0, 100) + '...';
-              } catch (error) {
-                result.innerHTML = '<strong>❌ API 오류:</strong> ' + error.message;
-              }
-            }
-            
-            async function testAuth() {
-              const result = document.getElementById('api-result');
-              result.innerHTML = '테스트 중...';
-              try {
-                const response = await fetch('/api/auth/register', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({username: 'test', email: 'test@test.com', password: 'test123'})
-                });
-                const data = await response.json();
-                result.innerHTML = '<strong>✅ 인증 API 정상:</strong> ' + JSON.stringify(data).substring(0, 100) + '...';
-              } catch (error) {
-                result.innerHTML = '<strong>❌ 인증 API 오류:</strong> ' + error.message;
-              }
-            }
-          </script>
-        </body>
-        </html>
-      `);
-    }
+
+  // 서버 시작
+  const PORT = process.env.PORT || 3001;
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
   });
-}
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {
