@@ -8,6 +8,7 @@
     "client": "next dev",
     "build": "next build && echo 'Next.js build completed'",
     "start": "npm run build && cd server && node app.js",
+    "start:server": "cd server && node app.js",
     "migrate": "cd server && node runMigrations.js",
     "lint": "next lint"
   },

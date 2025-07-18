@@ -71,16 +71,23 @@ app.use('/api/exchange', exchangeRoutes);
 app.use('/api', oddsRoutes);
 
 // Next.js SSR 핸들러로 나머지 모든 요청 전달
-nextApp.prepare().then(() => {
-  app.all('*', (req, res) => {
-    return handle(req, res);
-  });
+app.all('*', (req, res) => {
+  return handle(req, res);
+});
 
-  // 서버 시작
-  const PORT = process.env.PORT || 3001;
-  app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+// Render 헬스체크 엔드포인트 (중요)
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    message: 'Server is running',
+    timestamp: new Date().toISOString(),
+    port: process.env.PORT || 3001
   });
+});
+
+// 루트 경로에 대한 간단한 응답 (Render 감지용)
+app.get('/', (req, res) => {
+  res.send("Server is running");
 });
 
 // Error handling middleware
@@ -126,33 +133,53 @@ const PORT = process.env.PORT || 3001;
 // 설정 초기화 후 서버 시작
 async function startServer() {
   try {
+    console.log('🚀 서버 시작 프로세스 시작...');
+    console.log('📋 환경 변수 확인:');
+    console.log('- NODE_ENV:', process.env.NODE_ENV);
+    console.log('- PORT:', process.env.PORT);
+    console.log('- DB_HOST:', process.env.DB_HOST);
+    console.log('- DB_NAME:', process.env.DB_NAME);
+    console.log('- DB_USER:', process.env.DB_USER);
+    console.log('- DB_PASSWORD:', process.env.DB_PASSWORD ? '***' : 'undefined');
+    
     // 중앙화된 설정 초기화
     console.log('[시작] 중앙화된 설정 초기화...');
     await initializeCentralizedConfig();
+    console.log('✅ 중앙화된 설정 초기화 완료');
     
     // 데이터베이스 연결
     console.log('[시작] 데이터베이스 연결 중...');
     await sequelize.authenticate();
-    console.log('Database connection has been established successfully.');
+    console.log('✅ Database connection has been established successfully.');
     
     // 데이터베이스 동기화 및 초기화
     console.log('[시작] 데이터베이스 테이블 동기화...');
     await sequelize.sync({ alter: true });
-    console.log('Database tables synchronized successfully.');
+    console.log('✅ Database tables synchronized successfully.');
     
     // 기본 계정 생성 (Render 환경에서만)
     if (process.env.NODE_ENV === 'production') {
       console.log('[시작] 기본 계정 생성 확인...');
       await createDefaultAccounts();
+      console.log('✅ 기본 계정 생성 완료');
     }
     
-    // 서버 시작
-    const server = app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
+    // Next.js 준비
+    console.log('[시작] Next.js 앱 준비 중...');
+    await nextApp.prepare();
+    console.log('✅ Next.js 앱 준비 완료');
+    
+    // 서버 시작 (Render 포트 바인딩)
+    console.log(`[시작] Express 서버 시작 중... (포트: ${PORT})`);
+    console.log(`🌐 Render 포트 바인딩: ${PORT}`);
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ Server listening on port ${PORT}`);
       console.log('[완료] 서버 초기화 완료');
       
       // Exchange WebSocket 서비스 초기화
+      console.log('[시작] Exchange WebSocket 서비스 초기화...');
       exchangeWebSocketService.initialize(server);
+      console.log('✅ Exchange WebSocket 서비스 초기화 완료');
       
       // Render 환경에서 초기 배당율 수집
       if (process.env.NODE_ENV === 'production') {
@@ -164,8 +191,18 @@ async function startServer() {
       // setupSeasonStatusScheduler();
     });
     
+    // 서버 오류 처리
+    server.on('error', (error) => {
+      console.error('❌ 서버 시작 오류:', error);
+      if (error.code === 'EADDRINUSE') {
+        console.error('포트가 이미 사용 중입니다:', PORT);
+      }
+      process.exit(1);
+    });
+    
   } catch (err) {
-    console.error('서버 시작 실패:', err);
+    console.error('❌ 서버 시작 실패:', err);
+    console.error('스택 트레이스:', err.stack);
     process.exit(1);
   }
 }
