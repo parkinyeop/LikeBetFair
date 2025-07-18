@@ -3,7 +3,7 @@ services:
     name: likebetfair-api
     env: node
     plan: free
-    buildCommand: cd server && npm install
+    buildCommand: npm install && npm run build
     startCommand: cd server && node app.js
     envVars:
       - key: NODE_ENV
