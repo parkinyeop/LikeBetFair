@@ -88,7 +88,12 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
           return a.gameTime.getTime() - b.gameTime.getTime();
         });
         
-        setGames(sortedGames);
+        // odds 필드를 officialOdds로 매핑 (백엔드 호환성 보정)
+        const dataWithOfficialOdds = sortedGames.map((game: any) => ({
+          ...game,
+          officialOdds: game.officialOdds || game.odds || {},
+        }));
+        setGames(dataWithOfficialOdds);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch odds');
