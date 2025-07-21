@@ -20,12 +20,39 @@ const sequelize = new Sequelize({
   logging: false
 });
 
+// SequelizeMeta 테이블에서 실행된 마이그레이션 파일명을 관리
+async function ensureMetaTable() {
+  await sequelize.getQueryInterface().createTable('SequelizeMeta', {
+    name: {
+      type: Sequelize.STRING,
+      allowNull: false,
+      primaryKey: true
+    }
+  }).catch(() => {}); // 이미 있으면 무시
+}
+
+async function getExecutedMigrations() {
+  try {
+    const [results] = await sequelize.query('SELECT name FROM "SequelizeMeta"');
+    return results.map((row) => row.name);
+  } catch {
+    return [];
+  }
+}
+
+async function recordMigration(file) {
+  await sequelize.getQueryInterface().bulkInsert('SequelizeMeta', [{ name: file }], {});
+}
+
 // 마이그레이션 파일들을 실행하는 함수
 async function runMigrations() {
   try {
     console.log('데이터베이스 연결 중...');
     await sequelize.authenticate();
     console.log('데이터베이스 연결 성공!');
+
+    await ensureMetaTable();
+    const executed = await getExecutedMigrations();
 
     // 마이그레이션 디렉토리 경로
     const migrationsDir = join(__dirname, 'migrations');
@@ -42,6 +69,10 @@ async function runMigrations() {
     console.log(`발견된 마이그레이션 파일: ${migrationFiles.length}개`);
 
     for (const file of migrationFiles) {
+      if (executed.includes(file)) {
+        console.log(`⏩ 이미 실행됨: ${file}`);
+        continue;
+      }
       console.log(`실행 중: ${file}`);
       
       try {
@@ -51,6 +82,7 @@ async function runMigrations() {
         
         if (migration.up) {
           await migration.up(sequelize.getQueryInterface(), Sequelize);
+          await recordMigration(file);
           console.log(`✅ ${file} 실행 완료`);
         } else {
           console.log(`⚠️  ${file}에 up 함수가 없음`);
