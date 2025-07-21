@@ -175,7 +175,11 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
           <div
             key={game.id}
             className={`bg-white rounded-lg shadow p-4 ${!isBettable ? 'opacity-60' : ''} cursor-pointer`}
-            onClick={() => router.push(`/odds/${game.sport_key}`)}
+            onClick={() => {
+              if (game.sport_key) {
+                router.push(`/odds/${game.sport_key}`);
+              }
+            }}
           >
             <div className="flex justify-between items-center mb-1">
               <span className="text-lg font-bold">🏟️ {game.home_team} vs {game.away_team}</span>
