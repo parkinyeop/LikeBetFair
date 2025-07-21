@@ -211,9 +211,12 @@ export default function SportsPage() {
                             {isLoading ? (
                               <span className="text-gray-400">로딩중...</span>
                             ) : data?.sampleOdds ? (
-                              <span className="font-medium text-green-600">
+                              <Link 
+                                href={`/odds/${league.key}`}
+                                className="font-medium text-green-600 hover:text-green-800 transition-colors cursor-pointer"
+                              >
                                 배당 {data.sampleOdds.toFixed(2)}
-                              </span>
+                              </Link>
                             ) : (
                               <span className="text-gray-400">배당 없음</span>
                             )}
