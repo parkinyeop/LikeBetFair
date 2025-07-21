@@ -9,7 +9,7 @@
     "build": "NODE_OPTIONS='--max-old-space-size=4096' npm run build:optimized",
     "build:optimized": "next build",
     "build:fast": "./scripts/optimize-build.sh",
-    "start": "cd server && node app.js",
+    "start": "npm run migrate && cd server && node app.js",
     "start:server": "cd server && node app.js",
     "migrate": "cd server && node runMigrations.js",
     "lint": "next lint",
@@ -20,7 +20,9 @@
     "check-env:api": "node scripts/check-environment.js --api",
     "check-env:db": "node scripts/check-environment.js --db",
     "check-env:full": "node scripts/check-environment.js --api --db",
-    "render-postbuild": "npm run migrate"
+    "render-postbuild": "npm run migrate",
+    "postbuild": "npm run migrate",
+    "render-build": "npm run migrate"
   },
   "dependencies": {
     "@types/jsonwebtoken": "^9.0.10",
