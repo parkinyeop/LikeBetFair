@@ -66,12 +66,9 @@ router.get('/test-odds', async (req, res) => {
 // odds 업데이트 엔드포인트
 router.post('/update-odds', async (req, res) => {
   try {
-    const { priority = 'high' } = req.body;
-    console.log(`[API] Odds 업데이트 요청 - priority: ${priority}`);
+    console.log(`[API] Odds 업데이트 요청`);
     
-    // 활성 카테고리 목록 (우선순위에 따라 필터링)
-    const activeCategories = Object.keys(clientSportKeyMap);
-    const result = await oddsApiService.fetchAndCacheOddsForCategories(activeCategories, priority);
+    const result = await oddsApiService.fetchAndCacheOdds();
     
     res.json({
       success: true,
