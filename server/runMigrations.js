@@ -36,6 +36,7 @@ async function runMigrations() {
       .filter(file => !file.includes('recreate-tables-fix')) // 중복 파일 제외
       .filter(file => !file.includes('add-market-to-odds-cache')) // 문제가 있는 마이그레이션 제외
       .filter(file => !file.includes('create-odds-history')) // 문제가 있는 마이그레이션 제외
+      .filter(file => !file.includes('fix-foreign-key-constraints')) // 위험한 마이그레이션 제외
       .sort();
 
     console.log(`발견된 마이그레이션 파일: ${migrationFiles.length}개`);
