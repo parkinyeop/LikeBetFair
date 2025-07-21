@@ -258,7 +258,9 @@ class OddsApiService {
           console.log(`[DEBUG] Found ${oddsResponse.data.length} games with odds for ${clientCategory}`);
 
           // 데이터 검증 및 저장
+          console.log(`[DEBUG] ${clientCategory}: ${oddsResponse.data.length}개 경기 처리 시작`);
           for (const game of oddsResponse.data) {
+            console.log(`[DEBUG] 경기 검증: ${game.home_team} vs ${game.away_team}`);
             if (this.validateOddsData(game)) {
               const mainCategory = this.determineMainCategory(clientCategory);
               const subCategory = this.determineSubCategory(clientCategory);
@@ -269,6 +271,8 @@ class OddsApiService {
                 continue;
               }
               
+              console.log(`[DEBUG] 카테고리 매핑 성공: ${mainCategory}/${subCategory}`);
+              
               const [oddsRecord, created] = await OddsCache.upsert({
                 mainCategory,
                 subCategory,
@@ -278,6 +282,7 @@ class OddsApiService {
                 awayTeam: game.away_team,
                 commenceTime: new Date(game.commence_time),
                 bookmakers: game.bookmakers,
+                market: 'h2h', // 기본값 추가
                 officialOdds: this.calculateAverageOdds(game.bookmakers),
                 lastUpdated: new Date()
               }, {
@@ -286,10 +291,10 @@ class OddsApiService {
 
               if (created) {
                 totalNewCount++;
-                console.log(`[DEBUG] Created new odds: ${game.home_team} vs ${game.away_team}`);
+                console.log(`[DEBUG] ✅ 새 배당률 저장: ${game.home_team} vs ${game.away_team}`);
               } else {
                 totalUpdatedCount++;
-                console.log(`[DEBUG] Updated existing odds: ${game.home_team} vs ${game.away_team}`);
+                console.log(`[DEBUG] 🔄 기존 배당률 업데이트: ${game.home_team} vs ${game.away_team}`);
               }
 
               // 배당률 히스토리 저장
@@ -305,6 +310,7 @@ class OddsApiService {
               }
             } else {
               totalSkippedCount++;
+              console.log(`[DEBUG] ❌ 데이터 검증 실패: ${game.home_team} vs ${game.away_team}`);
             }
           }
         } catch (error) {
