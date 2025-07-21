@@ -2,6 +2,7 @@ import React, { useEffect, useState, memo, useMemo, useCallback } from 'react';
 import { useBetStore } from '../stores/useBetStore';
 import { normalizeTeamName } from '../server/normalizeUtils';
 import { convertUtcToLocal, getBettingStatus } from '../utils/timeUtils';
+import { useRouter } from "next/router";
 
 interface OddsListProps {
   sportKey: string;
@@ -32,6 +33,7 @@ const marketKeyMap = {
 };
 
 const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect }) => {
+  const router = useRouter();
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -170,7 +172,11 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
         const marketOdds = officialOdds[marketKey] || {};
         
         return (
-          <div key={game.id} className={`bg-white rounded-lg shadow p-4 ${!isBettable ? 'opacity-60' : ''}`}>
+          <div
+            key={game.id}
+            className={`bg-white rounded-lg shadow p-4 ${!isBettable ? 'opacity-60' : ''} cursor-pointer`}
+            onClick={() => router.push(`/odds/${game.sport_key}`)}
+          >
             <div className="flex justify-between items-center mb-1">
               <span className="text-lg font-bold">🏟️ {game.home_team} vs {game.away_team}</span>
               <div className="text-right">
