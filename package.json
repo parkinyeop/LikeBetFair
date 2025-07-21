@@ -15,7 +15,12 @@
     "lint": "next lint",
     "postinstall": "cd server && npm install --only=production",
     "clean": "npm cache clean --force && npm prune --production",
-    "optimize": "npm run clean && npm run build:fast"
+    "optimize": "npm run clean && npm run build:fast",
+    "check-env": "node scripts/check-environment.js",
+    "check-env:api": "node scripts/check-environment.js --api",
+    "check-env:db": "node scripts/check-environment.js --db",
+    "check-env:full": "node scripts/check-environment.js --api --db",
+    "render-postbuild": "npm run migrate"
   },
   "dependencies": {
     "@types/jsonwebtoken": "^9.0.10",
