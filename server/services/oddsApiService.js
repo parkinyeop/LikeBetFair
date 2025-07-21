@@ -281,6 +281,7 @@ class OddsApiService {
                 homeTeam: game.home_team,
                 awayTeam: game.away_team,
                 commenceTime: new Date(game.commence_time),
+                odds: game.bookmakers, // odds 필드 추가
                 bookmakers: game.bookmakers,
                 market: 'h2h', // 기본값 추가
                 officialOdds: this.calculateAverageOdds(game.bookmakers),
