@@ -18,15 +18,15 @@ const Bet = sequelize.define('Bet', {
       key: 'id'
     }
   },
-  selection: {
-    type: DataTypes.JSONB,
-    allowNull: false
-  },
   stake: {
     type: DataTypes.INTEGER,
     allowNull: false
   },
-  odds: {
+  selections: {
+    type: DataTypes.JSONB,
+    allowNull: false
+  },
+  totalOdds: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false
   },
