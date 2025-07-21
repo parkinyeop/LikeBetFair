@@ -108,7 +108,7 @@ app.use('/api/bet', betRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/game-results', gameResultRoutes);
 app.use('/api/exchange', exchangeRoutes);
-app.use('/api', oddsRoutes);
+app.use('/api/odds', oddsRoutes);
 
 // API 라우트 디버깅
 app.use('/api/*', (req, res, next) => {
