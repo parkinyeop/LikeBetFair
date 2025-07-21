@@ -40,7 +40,7 @@ router.get('/categories', async (req, res) => {
 });
 
 // 스포츠별 배팅 데이터 가져오기
-router.get('/odds/:sportKey', async (req, res) => {
+router.get('/:sportKey', async (req, res) => {
   try {
     const { sportKey } = req.params;
     const { limit = 100 } = req.query;
