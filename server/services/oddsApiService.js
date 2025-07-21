@@ -34,7 +34,7 @@ const clientSportKeyMap = {
 
 class OddsApiService {
   constructor() {
-    this.apiKey = process.env.ODDS_API_KEY;
+    this.apiKey = process.env.ODDS_API_KEY || process.env.THE_ODDS_API_KEY;
     this.baseUrl = 'https://api.the-odds-api.com/v4/sports';
     
     // API 사용량 추적 (디버깅을 위해 완전히 비활성화)
@@ -214,6 +214,11 @@ class OddsApiService {
   async fetchAndCacheOdds() {
     try {
       console.log('[DEBUG] Starting odds update for all categories...');
+      
+      // API 키 확인
+      if (!this.apiKey) {
+        throw new Error('ODDS_API_KEY 환경변수가 설정되지 않았습니다. Render 대시보드에서 환경변수를 확인해주세요.');
+      }
       
       let totalNewCount = 0;
       let totalUpdatedCount = 0;
