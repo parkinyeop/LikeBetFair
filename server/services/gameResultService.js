@@ -112,8 +112,8 @@ class GameResultService {
     // API 키 정리: 환경 변수에서 불필요한 문자 제거
     let cleanApiKey = rawApiKey.replace(/THESPORTSDB_API_KEY=/g, '').trim();
     // API 키가 너무 길면 잘라내기 (TheSportsDB는 보통 6자리)
-    if (cleanApiKey.length > 10) {
-      cleanApiKey = cleanApiKey.substring(0, 10);
+    if (cleanApiKey.length > 20) {
+      cleanApiKey = cleanApiKey.substring(0, 20);
     }
     // API 키가 숫자가 아니면 기본값 사용
     if (!/^\d+$/.test(cleanApiKey)) {
@@ -127,6 +127,32 @@ class GameResultService {
     this.sportsDbBaseUrl = 'https://www.thesportsdb.com/api/v1/json';
     
     console.log(`[GameResult] TheSportsDB API 키 설정: ${this.sportsDbApiKey} (원본: ${rawApiKey})`);
+    
+    // API 키 유효성 테스트
+    this.testApiKey();
+  }
+
+  /**
+   * API 키 유효성 테스트
+   */
+  async testApiKey() {
+    try {
+      console.log(`[GameResult] API 키 테스트 중...`);
+      const response = await axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/search_all_leagues.php`, {
+        timeout: 10000
+      });
+      
+      if (response.data && response.data.countries) {
+        console.log(`✅ TheSportsDB API 키 유효: ${response.data.countries.length}개 국가/리그 접근 가능`);
+      } else {
+        console.warn(`⚠️ TheSportsDB API 응답 형식 이상:`, response.data);
+      }
+    } catch (error) {
+      console.error(`❌ TheSportsDB API 키 테스트 실패:`, error.message);
+      if (error.response?.status === 404) {
+        console.error(`❌ API 키가 잘못되었거나 만료됨: ${this.sportsDbApiKey}`);
+      }
+    }
   }
 
   /**
