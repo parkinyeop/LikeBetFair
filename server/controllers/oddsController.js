@@ -191,6 +191,32 @@ const oddsController = {
         error: err.message 
       });
     }
+  },
+
+  updateOdds: async (req, res) => {
+    try {
+      console.log('[DEBUG] updateOdds API 호출됨');
+      
+      const startTime = Date.now();
+      const result = await OddsApiService.fetchAndCacheOdds();
+      const processingTime = Date.now() - startTime;
+      
+      console.log(`[DEBUG] updateOdds 완료 - 처리시간: ${processingTime}ms`, result);
+      
+      res.json({
+        success: true,
+        message: 'Odds updated successfully',
+        result,
+        processingTime
+      });
+    } catch (err) {
+      console.error('[DEBUG] Error updating odds:', err);
+      res.status(500).json({ 
+        success: false,
+        message: 'Failed to update odds',
+        error: err.message 
+      });
+    }
   }
 };
 
