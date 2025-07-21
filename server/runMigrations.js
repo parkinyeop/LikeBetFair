@@ -77,6 +77,7 @@ async function runMigrations() {
     console.error('마이그레이션 실행 중 오류:', error);
   } finally {
     await sequelize.close();
+    process.exit(0); // 마이그레이션 종료 후 프로세스 즉시 종료
   }
 }
 
