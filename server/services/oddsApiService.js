@@ -273,7 +273,25 @@ class OddsApiService {
               
               console.log(`[DEBUG] 카테고리 매핑 성공: ${mainCategory}/${subCategory}`);
               
-              const [oddsRecord, created] = await OddsCache.upsert({
+              // 디버깅: upsert 데이터 확인
+              const upsertData = {
+                mainCategory,
+                subCategory,
+                sportKey: sportKey,
+                sportTitle: clientCategory,
+                homeTeam: game.home_team,
+                awayTeam: game.away_team,
+                commenceTime: new Date(game.commence_time),
+                odds: game.bookmakers, // odds 필드 추가
+                bookmakers: game.bookmakers,
+                market: 'h2h', // 기본값 추가
+                officialOdds: this.calculateAverageOdds(game.bookmakers),
+                lastUpdated: new Date()
+              };
+              
+              console.log(`[DEBUG] Upsert 데이터:`, JSON.stringify(upsertData, null, 2));
+              
+              const [oddsRecord, created] = await OddsCache.upsert(upsertData, {
                 mainCategory,
                 subCategory,
                 sportKey: sportKey,
