@@ -715,10 +715,39 @@ export default function Home() {
                         <div className="space-y-2">
                           {(() => {
                             const h2hOdds = game.officialOdds.h2h;
-                            const outcomes = Object.entries(h2hOdds).map(([name, oddsData]: [string, any]) => ({
-                              name,
-                              odds: oddsData
-                            }));
+                            
+                            // 축구 경기인지 확인
+                            const isSoccer = selectedCategory === '축구' || 
+                                           selectedCategory.includes('K리그') || 
+                                           selectedCategory.includes('프리미어리그') || 
+                                           selectedCategory.includes('세리에A') || 
+                                           selectedCategory.includes('분데스리가') || 
+                                           selectedCategory.includes('라리가') || 
+                                           selectedCategory.includes('MLS') || 
+                                           selectedCategory.includes('아르헨티나') || 
+                                           selectedCategory.includes('중국');
+                            
+                            let outcomes;
+                            if (isSoccer) {
+                              // 축구: 팀A, 무, 팀B 순서로 정렬
+                              const homeOdds = h2hOdds[game.home_team];
+                              const awayOdds = h2hOdds[game.away_team];
+                              const drawOdds = Object.entries(h2hOdds).find(([name, _]) => 
+                                name.toLowerCase().includes('draw') || name === 'Draw' || name === 'Tie'
+                              );
+                              
+                              outcomes = [
+                                { name: game.home_team, odds: homeOdds },
+                                { name: 'Draw', odds: drawOdds?.[1] },
+                                { name: game.away_team, odds: awayOdds }
+                              ].filter(outcome => outcome.odds);
+                            } else {
+                              // 다른 스포츠: 기존 순서 유지
+                              outcomes = Object.entries(h2hOdds).map(([name, oddsData]: [string, any]) => ({
+                                name,
+                                odds: oddsData
+                              }));
+                            }
                             
                             return (
                               <div className="flex items-center gap-2">

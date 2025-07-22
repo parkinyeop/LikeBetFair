@@ -211,10 +211,39 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
               <div className="space-y-2">
                 {(() => {
                   const h2hOdds = officialOdds.h2h || {};
-                  const outcomes = Object.entries(h2hOdds).map(([outcomeName, oddsData]: [string, any]) => ({
-                    name: outcomeName,
-                    price: oddsData.averagePrice
-                  }));
+                  
+                  // 축구 경기인지 확인
+                  const isSoccer = sportKey.includes('soccer') || 
+                                 sportKey.includes('korea_kleague') || 
+                                 sportKey.includes('england_premier_league') || 
+                                 sportKey.includes('italy_serie_a') || 
+                                 sportKey.includes('germany_bundesliga') || 
+                                 sportKey.includes('spain_la_liga') || 
+                                 sportKey.includes('usa_mls') || 
+                                 sportKey.includes('argentina_primera') || 
+                                 sportKey.includes('china_super_league');
+                  
+                  let outcomes;
+                  if (isSoccer) {
+                    // 축구: 팀A, 무, 팀B 순서로 정렬
+                    const homeOdds = h2hOdds[game.home_team];
+                    const awayOdds = h2hOdds[game.away_team];
+                    const drawOdds = Object.entries(h2hOdds).find(([name, _]) => 
+                      name.toLowerCase().includes('draw') || name === 'Draw' || name === 'Tie'
+                    );
+                    
+                    outcomes = [
+                      { name: game.home_team, price: (homeOdds as any)?.averagePrice },
+                      { name: 'Draw', price: (drawOdds?.[1] as any)?.averagePrice },
+                      { name: game.away_team, price: (awayOdds as any)?.averagePrice }
+                    ].filter(outcome => outcome.price !== undefined);
+                  } else {
+                    // 다른 스포츠: 기존 순서 유지
+                    outcomes = Object.entries(h2hOdds).map(([outcomeName, oddsData]: [string, any]) => ({
+                      name: outcomeName,
+                      price: oddsData.averagePrice
+                    }));
+                  }
                   
                   if (outcomes.length === 0) {
                     return (
