@@ -75,7 +75,7 @@ const BetSelectionPanel = () => {
     data?: any;
   }>({ isOpen: false });
 
-  const totalOdds = selections.reduce((acc, curr) => acc * curr.odds, 1);
+  ㄷㅅconst totalOdds = selections.reduce((acc, curr) => acc * curr.odds, 1);
   const expectedReturn = stake * totalOdds;
 
   // 베팅 가능 시간 체크 (10분 전 마감)
@@ -117,7 +117,7 @@ const BetSelectionPanel = () => {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
                     (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
                      ? 'http://localhost:5050' 
-                     : 'https://likebetfair-api.onrender.com');
+                     : 'https://likebetfair.onrender.com');
       
       const res = await fetch(`${apiUrl}/api/bet/`, {
         method: 'POST',
@@ -172,7 +172,7 @@ const BetSelectionPanel = () => {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
                     (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
                      ? 'http://localhost:5050' 
-                     : 'https://likebetfair-api.onrender.com');
+                     : 'https://likebetfair.onrender.com');
       
       const res = await fetch(`${apiUrl}/api/bet/`, {
         method: 'POST',

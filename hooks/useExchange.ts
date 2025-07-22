@@ -75,7 +75,7 @@ export const useExchange = () => {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
                     (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
                      ? 'http://localhost:5050' 
-                     : 'https://likebetfair-api.onrender.com');
+                     : 'https://likebetfair.onrender.com');
       
       const response = await fetch(`${apiUrl}/api/exchange/balance`, { headers });
       if (!response.ok) throw new Error('잔고 조회 실패');
@@ -97,7 +97,7 @@ export const useExchange = () => {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
                     (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
                      ? 'http://localhost:5050' 
-                     : 'https://likebetfair-api.onrender.com');
+                     : 'https://likebetfair.onrender.com');
       
       const response = await fetch(`${apiUrl}/api/exchange/orders`, { headers });
       if (!response.ok) throw new Error('주문 내역 조회 실패');
@@ -208,7 +208,7 @@ export const useExchange = () => {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
                     (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
                      ? 'http://localhost:5050' 
-                     : 'https://likebetfair-api.onrender.com');
+                     : 'https://likebetfair.onrender.com');
       
       const response = await fetch(`${apiUrl}/api/exchange/cancel/${orderId}`, {
         method: 'POST',
@@ -292,7 +292,7 @@ export const useExchange = () => {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
                     (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
                      ? 'http://localhost:5050' 
-                     : 'https://likebetfair-api.onrender.com');
+                     : 'https://likebetfair.onrender.com');
       
       const response = await fetch(`${apiUrl}/api/exchange/all-orders`, {
         headers: {

@@ -157,17 +157,33 @@ export async function getBetHistory(req, res) {
       // selections에 gameResult 정보 추가
       const selectionsWithResults = await Promise.all(
         bet.selections.map(async (selection) => {
-          const gameResult = await betResultService.getGameResultByTeams(selection);
-          return {
-            ...selection,
-            gameResult: gameResult ? {
-              status: gameResult.status,
-              result: gameResult.result,
-              score: gameResult.score ? (typeof gameResult.score === 'string' ? JSON.parse(gameResult.score) : gameResult.score) : null,
-              homeTeam: gameResult.homeTeam,
-              awayTeam: gameResult.awayTeam
-            } : null
-          };
+          try {
+            const gameResult = await betResultService.getGameResultByTeams(selection);
+            return {
+              ...selection,
+              gameResult: gameResult ? {
+                status: gameResult.status,
+                result: gameResult.result,
+                score: gameResult.score ? (typeof gameResult.score === 'string' ? 
+                  (() => {
+                    try {
+                      return JSON.parse(gameResult.score);
+                    } catch (parseError) {
+                      console.error('[getBetHistory] Score parse error:', parseError);
+                      return gameResult.score; // 파싱 실패 시 원본 반환
+                    }
+                  })() : gameResult.score) : null,
+                homeTeam: gameResult.homeTeam,
+                awayTeam: gameResult.awayTeam
+              } : null
+            };
+          } catch (selectionError) {
+            console.error('[getBetHistory] Selection processing error:', selectionError);
+            return {
+              ...selection,
+              gameResult: null
+            };
+          }
         })
       );
       return {

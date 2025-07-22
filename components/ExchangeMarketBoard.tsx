@@ -78,10 +78,10 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
       try {
         console.log('📡 스포츠북 배당률 fetch:', currentSportKey);
         // API URL 결정
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
-                      (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                       ? 'http://localhost:5050' 
-                       : 'https://likebetfair-api.onrender.com');
+              const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
+                    (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+                     ? 'http://localhost:5050' 
+                     : 'https://likebetfair.onrender.com');
         
         const response = await fetch(`${apiUrl}/api/odds/${currentSportKey}`);
         if (!response.ok) {

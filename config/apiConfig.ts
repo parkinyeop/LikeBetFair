@@ -1,10 +1,38 @@
 // 프론트엔드용 API 설정 중앙화 파일
 // 백엔드 centralizedConfig.js와 동기화
 
+// ===== 환경별 설정 =====
+const getApiEnvironmentConfig = () => {
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+  
+  return {
+    isDevelopment,
+    isLocalhost,
+    isProduction: process.env.NODE_ENV === 'production',
+    isTest: process.env.NODE_ENV === 'test'
+  };
+};
+
 // ===== API 설정 =====
 export const API_CONFIG = {
-  // 기본 URL 설정
-  BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'https://likebetfair.onrender.com',
+  // 기본 URL 설정 - 환경별로 명확하게 구분
+  get BASE_URL() {
+    const env = getApiEnvironmentConfig();
+    
+    // 1. 환경변수 우선
+    if (process.env.NEXT_PUBLIC_API_URL) {
+      return process.env.NEXT_PUBLIC_API_URL;
+    }
+    
+    // 2. 개발환경에서 localhost 감지
+    if (env.isDevelopment && env.isLocalhost) {
+      return 'http://localhost:5050';
+    }
+    
+    // 3. 기본값 (Render 서버)
+    return 'https://likebetfair.onrender.com';
+  },
   
   // API 엔드포인트
   ENDPOINTS: {

@@ -28,7 +28,7 @@ export default function OrderBook({ gameId, market, line, onOrderClick }: OrderB
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
                     (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
                      ? 'http://localhost:5050' 
-                     : 'https://likebetfair-api.onrender.com');
+                     : 'https://likebetfair.onrender.com');
       
       const response = await fetch(`${apiUrl}/api/odds/${sportKey}`);
       if (!response.ok) return;
