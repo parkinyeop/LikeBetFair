@@ -4,7 +4,6 @@ import { Sequelize } from 'sequelize';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import next from 'next';
 
 dotenv.config();
 
@@ -44,9 +43,7 @@ import betRoutes from './routes/bet.js';
 import adminRoutes from './routes/admin.js';
 import exchangeRoutes from './routes/exchange.js';
 
-const dev = process.env.NODE_ENV !== 'production';
-const nextApp = next({ dev, dir: path.join(__dirname, '..') });
-const handle = nextApp.getRequestHandler();
+
 
 const app = express();
 
@@ -131,9 +128,13 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Next.js SSR 핸들러로 나머지 모든 요청 전달 (마지막에)
+// API가 아닌 모든 요청은 404
 app.all('*', (req, res) => {
-  return handle(req, res);
+  res.status(404).json({ 
+    error: 'Not Found',
+    message: 'API endpoint not found',
+    path: req.path
+  });
 });
 
 // 스케줄러 초기화
