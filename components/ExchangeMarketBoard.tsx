@@ -56,13 +56,20 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
   const currentSportKey = getSportKeyFromCategory(selectedCategory);
   console.log('🎯 현재 스포츠 키:', currentSportKey);
 
-  // 해당 카테고리의 경기만 필터링
-  const filteredGames = exchangeGames.filter(game => {
+  // 해당 카테고리의 경기만 필터링 후 중복 제거
+  const filteredGamesRaw = exchangeGames.filter(game => {
     if (!currentSportKey) return false;
-    const matches = game.sportKey === currentSportKey;
-    console.log('🔍 게임 필터링:', game.sportKey, '===', currentSportKey, '?', matches);
-    return matches;
+    return game.sportKey === currentSportKey;
   });
+  // 중복 제거: homeTeam, awayTeam, commenceTime 조합
+  const uniqueGamesMap = new Map();
+  filteredGamesRaw.forEach((game) => {
+    const key = `${game.homeTeam}|${game.awayTeam}|${game.commenceTime}`;
+    if (!uniqueGamesMap.has(key)) {
+      uniqueGamesMap.set(key, game);
+    }
+  });
+  const filteredGames = Array.from(uniqueGamesMap.values());
 
   console.log('📊 필터링된 게임들:', filteredGames.length, '개');
   console.log('📊 전체 게임들:', exchangeGames.length, '개');

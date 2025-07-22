@@ -95,7 +95,25 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
           ...game,
           officialOdds: game.officialOdds || game.odds || {},
         }));
-        setGames(dataWithOfficialOdds);
+        
+        // 4. 중복 제거: home_team, away_team, commence_time 조합으로 Map 사용
+        const uniqueGamesMap = new Map();
+        dataWithOfficialOdds.forEach((game: any) => {
+          const key = `${game.home_team}|${game.away_team}|${game.commence_time}`;
+          if (!uniqueGamesMap.has(key)) {
+            uniqueGamesMap.set(key, game);
+          } else {
+            // bookmakers가 더 많은 쪽을 우선
+            const prev = uniqueGamesMap.get(key);
+            if (
+              (!prev.bookmakers && game.bookmakers) ||
+              (Array.isArray(game.bookmakers) && Array.isArray(prev.bookmakers) && game.bookmakers.length > prev.bookmakers.length)
+            ) {
+              uniqueGamesMap.set(key, game);
+            }
+          }
+        });
+        setGames(Array.from(uniqueGamesMap.values()));
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch odds');
