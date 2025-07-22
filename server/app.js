@@ -270,11 +270,6 @@ async function startServer() {
       }
     }
     
-    // Next.js 준비
-    console.log('[시작] Next.js 앱 준비 중...');
-    await nextApp.prepare();
-    console.log('✅ Next.js 앱 준비 완료');
-    
     // 서버 시작
     console.log(`[시작] Express 서버 시작 중... (포트: ${PORT})`);
     const server = app.listen(PORT, '0.0.0.0', () => {
