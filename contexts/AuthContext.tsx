@@ -12,6 +12,7 @@ interface AuthContextType {
   logout: () => void;
   setBalance: (balance: number) => void;
   refreshBalance: () => Promise<void>;
+  forceRefreshBalance: () => Promise<void>;
   hasPermission: (permission: string) => boolean;
 }
 
@@ -207,8 +208,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (response.ok) {
         const data = await response.json();
         console.log('[AuthContext] 잔액 새로고침 성공:', data.balance);
-        setBalance(Number(data.balance));
-        sessionStorage.setItem(`balance_${tabId}`, data.balance.toString());
+        const newBalance = Number(data.balance);
+        setBalance(newBalance);
+        sessionStorage.setItem(`balance_${tabId}`, newBalance.toString());
       } else {
         const errorText = await response.text();
         console.error('[AuthContext] 잔액 새로고침 실패:', response.status, errorText);
@@ -220,6 +222,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('[AuthContext] 잔액 새로고침 오류:', error);
       // 오류 시 기존 잔액 유지
       console.log('[AuthContext] 오류로 인해 기존 잔액 유지');
+    }
+  };
+
+  // 강제 잔액 동기화 (캐시 무시)
+  const forceRefreshBalance = async (): Promise<void> => {
+    if (!token || !tabId) {
+      console.log('[AuthContext] 토큰 또는 tabId가 없어서 강제 잔액 새로고침 건너뜀');
+      return;
+    }
+
+    try {
+      console.log('[AuthContext] 강제 잔액 새로고침 시작');
+      
+      // API URL 결정
+      const apiUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+                     ? 'http://localhost:5050' 
+                     : window.location.origin;
+      
+      // 캐시 방지를 위한 타임스탬프 추가
+      const response = await fetch(`${apiUrl}/api/auth/balance?t=${Date.now()}`, {
+        headers: {
+          'x-auth-token': token,
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+
+      console.log('[AuthContext] 강제 잔액 조회 응답 상태:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[AuthContext] 강제 잔액 새로고침 성공:', data.balance);
+        const newBalance = Number(data.balance);
+        setBalance(newBalance);
+        sessionStorage.setItem(`balance_${tabId}`, newBalance.toString());
+      } else {
+        const errorText = await response.text();
+        console.error('[AuthContext] 강제 잔액 새로고침 실패:', response.status, errorText);
+      }
+    } catch (error) {
+      console.error('[AuthContext] 강제 잔액 새로고침 오류:', error);
     }
   };
 
@@ -245,18 +289,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ 
-      isLoggedIn, 
-      username, 
-      balance, 
+        <AuthContext.Provider value={{
+      isLoggedIn,
+      username,
+      balance,
       isAdmin,
       adminLevel,
       token,
       userId,
-      login, 
-      logout, 
+      login,
+      logout,
       setBalance,
       refreshBalance,
+      forceRefreshBalance,
       hasPermission
     }}>
       {children}

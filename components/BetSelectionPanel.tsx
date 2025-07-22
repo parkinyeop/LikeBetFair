@@ -65,7 +65,7 @@ const OddsChangeModal = ({
 
 const BetSelectionPanel = () => {
   const { selections, stake, setStake, removeSelection, clearAll, updateSelection } = useBetStore();
-  const { isLoggedIn, setBalance, token, refreshBalance } = useAuth();
+  const { isLoggedIn, setBalance, token, refreshBalance, forceRefreshBalance } = useAuth();
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   
@@ -141,8 +141,8 @@ const BetSelectionPanel = () => {
           console.log('[BetSelectionPanel] 응답에서 잔액 업데이트:', responseData.balance);
           setBalance(Number(responseData.balance));
         } else {
-          console.log('[BetSelectionPanel] 응답에 잔액 없음, 새로고침 시도');
-          await refreshBalance();
+          console.log('[BetSelectionPanel] 응답에 잔액 없음, 강제 새로고침 시도');
+          await forceRefreshBalance();
         }
         clearAll();
         // 배팅 완료 이벤트 발생
@@ -196,8 +196,8 @@ const BetSelectionPanel = () => {
           console.log('[BetSelectionPanel] 응답에서 잔액 업데이트:', data.balance);
           setBalance(Number(data.balance));
         } else {
-          console.log('[BetSelectionPanel] 응답에 잔액 없음, 새로고침 시도');
-          await refreshBalance();
+          console.log('[BetSelectionPanel] 응답에 잔액 없음, 강제 새로고침 시도');
+          await forceRefreshBalance();
         }
         clearAll();
         // 배팅 완료 이벤트 발생
