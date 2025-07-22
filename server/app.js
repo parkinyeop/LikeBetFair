@@ -4,6 +4,8 @@ import { Sequelize } from 'sequelize';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createServer } from 'http';
+import next from 'next';
 
 dotenv.config();
 
@@ -128,13 +130,14 @@ app.use((err, req, res, next) => {
   });
 });
 
-// API가 아닌 모든 요청은 404
+// Next.js 앱 설정
+const dev = process.env.NODE_ENV !== 'production';
+const nextApp = next({ dev, dir: path.join(__dirname, '..') });
+const handle = nextApp.getRequestHandler();
+
+// API가 아닌 모든 요청은 Next.js로 전달
 app.all('*', (req, res) => {
-  res.status(404).json({ 
-    error: 'Not Found',
-    message: 'API endpoint not found',
-    path: req.path
-  });
+  return handle(req, res);
 });
 
 // 스케줄러 초기화
@@ -269,6 +272,11 @@ async function startServer() {
         console.error('[스키마 수정] 오류:', error.message);
       }
     }
+    
+    // Next.js 준비
+    console.log('[시작] Next.js 앱 준비 중...');
+    await nextApp.prepare();
+    console.log('✅ Next.js 앱 준비 완료');
     
     // 서버 시작
     console.log(`[시작] Express 서버 시작 중... (포트: ${PORT})`);

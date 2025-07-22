@@ -10,7 +10,7 @@
     "build:optimized": "NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS='--max-old-space-size=2048' next build",
     "build:fast": "./scripts/optimize-build.sh",
     "build:production": "NODE_OPTIONS='--max-old-space-size=4096' npm run build:optimized",
-    "start": "cd server && node app.js",
+    "start": "npm run build:fast && cd server && node app.js",
     "start:server": "cd server && node app.js",
     "migrate": "cd server && node runMigrations.js",
     "lint": "next lint",
