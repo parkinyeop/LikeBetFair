@@ -732,7 +732,11 @@ export default function Home() {
                                   else if (outcome.name === game.away_team) label = game.away_team;
                                   
                                   return (
-                                    <div key={idx} className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center">
+                                    <div 
+                                      key={idx} 
+                                      onClick={() => handleGameClick(game, selectedCategory)}
+                                      className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer"
+                                    >
                                       <div className="text-sm text-gray-600 font-medium truncate">{label}</div>
                                       <div className="text-sm font-bold text-blue-600">{outcome.odds.averagePrice.toFixed(2)}</div>
                                     </div>
@@ -775,11 +779,17 @@ export default function Home() {
                                   <div className="w-16 text-base font-bold text-gray-800 text-center">
                                     {point}
                                   </div>
-                                  <div className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center">
+                                  <div 
+                                    onClick={() => handleGameClick(game, selectedCategory)}
+                                    className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer"
+                                  >
                                     <div className="text-sm text-gray-600 font-medium">오버</div>
                                     <div className="text-sm font-bold text-blue-600">{overOdds ? overOdds.toFixed(2) : 'N/A'}</div>
                                   </div>
-                                  <div className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center">
+                                  <div 
+                                    onClick={() => handleGameClick(game, selectedCategory)}
+                                    className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer"
+                                  >
                                     <div className="text-sm text-gray-600 font-medium">언더</div>
                                     <div className="text-sm font-bold text-blue-600">{underOdds ? underOdds.toFixed(2) : 'N/A'}</div>
                                   </div>
@@ -821,11 +831,17 @@ export default function Home() {
                                   <div className="w-16 text-base font-bold text-gray-800 text-center">
                                     {point}
                                   </div>
-                                  <div className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center">
+                                  <div 
+                                    onClick={() => handleGameClick(game, selectedCategory)}
+                                    className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer"
+                                  >
                                     <div className="text-sm text-gray-600 font-medium">홈</div>
                                     <div className="text-sm font-bold text-blue-600">{homeOdds ? homeOdds.toFixed(2) : 'N/A'}</div>
                                   </div>
-                                  <div className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center">
+                                  <div 
+                                    onClick={() => handleGameClick(game, selectedCategory)}
+                                    className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer"
+                                  >
                                     <div className="text-sm text-gray-600 font-medium">원정</div>
                                     <div className="text-sm font-bold text-blue-600">{awayOdds ? awayOdds.toFixed(2) : 'N/A'}</div>
                                   </div>
