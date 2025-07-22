@@ -424,67 +424,175 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                 const bettingStatus = checkBettingCutoff(selectedGame.commenceTime);
                 const isDisabled = !bettingStatus.isAllowed;
                 
-                return (
-                  <>
-                    {/* 홈팀 Back */}
-                    <button
-                      className={`flex-1 p-4 border-2 rounded-lg text-center transition relative ${
-                        isDisabled
-                          ? 'border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed'
-                          : 'border-blue-300 bg-blue-50 hover:bg-blue-100'
-                      }`}
-                      onClick={() => {
-                        const odds = getSportsbookOdds('승패', selectedGame.homeTeam);
-                        if (odds) handleBetClick(selectedGame.homeTeam, odds, 'back');
-                      }}
-                      disabled={isDisabled}
-                    >
-                      <div className={`text-lg font-bold ${isDisabled ? 'text-gray-600' : 'text-blue-800'}`}>
-                        {selectedGame.homeTeam}
-                      </div>
-                      <div className={`text-xl font-extrabold mt-1 ${isDisabled ? 'text-gray-700' : 'text-blue-900'}`}>
-                        {getSportsbookOdds('승패', selectedGame.homeTeam)?.toFixed(2) || 'N/A'}
-                      </div>
-                      <div className={`text-xs mt-1 ${isDisabled ? 'text-gray-500' : 'text-blue-600'}`}>
-                        Back (이길 것)
-                      </div>
-                      {isDisabled && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-gray-500 bg-opacity-20 rounded-lg">
-                          <div className="text-xs font-medium text-gray-600">마감</div>
+                // 축구 경기인지 확인
+                const isSoccer = currentSportKey?.includes('soccer') || 
+                               selectedCategory.includes('축구') || 
+                               selectedCategory.includes('K리그') || 
+                               selectedCategory.includes('J리그') || 
+                               selectedCategory.includes('세리에A') || 
+                               selectedCategory.includes('브라질세리에A') || 
+                               selectedCategory.includes('MLS') || 
+                               selectedCategory.includes('아르헨티나프리메라') || 
+                               selectedCategory.includes('중국슈퍼리그') || 
+                               selectedCategory.includes('라리가') || 
+                               selectedCategory.includes('분데스리가');
+                
+                if (isSoccer) {
+                  // 축구: 홈팀, 무승부, 원정팀 순서
+                  return (
+                    <div className="flex gap-4 max-w-4xl mx-auto">
+                      {/* 홈팀 Back */}
+                      <button
+                        className={`flex-1 p-4 border-2 rounded-lg text-center transition relative ${
+                          isDisabled
+                            ? 'border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed'
+                            : 'border-blue-300 bg-blue-50 hover:bg-blue-100'
+                        }`}
+                        onClick={() => {
+                          const odds = getSportsbookOdds('승패', selectedGame.homeTeam);
+                          if (odds) handleBetClick(selectedGame.homeTeam, odds, 'back');
+                        }}
+                        disabled={isDisabled}
+                      >
+                        <div className={`text-lg font-bold ${isDisabled ? 'text-gray-600' : 'text-blue-800'}`}>
+                          {selectedGame.homeTeam}
                         </div>
-                      )}
-                    </button>
+                        <div className={`text-xl font-extrabold mt-1 ${isDisabled ? 'text-gray-700' : 'text-blue-900'}`}>
+                          {getSportsbookOdds('승패', selectedGame.homeTeam)?.toFixed(2) || 'N/A'}
+                        </div>
+                        <div className={`text-xs mt-1 ${isDisabled ? 'text-gray-500' : 'text-blue-600'}`}>
+                          Back (이길 것)
+                        </div>
+                        {isDisabled && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-gray-500 bg-opacity-20 rounded-lg">
+                            <div className="text-xs font-medium text-gray-600">마감</div>
+                          </div>
+                        )}
+                      </button>
 
-                    {/* 원정팀 Lay */}
-                    <button
-                      className={`flex-1 p-4 border-2 rounded-lg text-center transition relative ${
-                        isDisabled
-                          ? 'border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed'
-                          : 'border-pink-300 bg-pink-50 hover:bg-pink-100'
-                      }`}
-                      onClick={() => {
-                        const odds = getSportsbookOdds('승패', selectedGame.awayTeam);
-                        if (odds) handleBetClick(selectedGame.awayTeam, odds, 'lay');
-                      }}
-                      disabled={isDisabled}
-                    >
-                      <div className={`text-lg font-bold ${isDisabled ? 'text-gray-600' : 'text-pink-800'}`}>
-                        {selectedGame.awayTeam}
-                      </div>
-                      <div className={`text-xl font-extrabold mt-1 ${isDisabled ? 'text-gray-700' : 'text-pink-900'}`}>
-                        {getSportsbookOdds('승패', selectedGame.awayTeam)?.toFixed(2) || 'N/A'}
-                      </div>
-                      <div className={`text-xs mt-1 ${isDisabled ? 'text-gray-500' : 'text-pink-600'}`}>
-                        Lay (질 것)
-                      </div>
-                      {isDisabled && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-gray-500 bg-opacity-20 rounded-lg">
-                          <div className="text-xs font-medium text-gray-600">마감</div>
+                      {/* 무승부 Back */}
+                      <button
+                        className={`flex-1 p-4 border-2 rounded-lg text-center transition relative ${
+                          isDisabled
+                            ? 'border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed'
+                            : 'border-green-300 bg-green-50 hover:bg-green-100'
+                        }`}
+                        onClick={() => {
+                          const odds = getSportsbookOdds('승패', 'Draw');
+                          if (odds) handleBetClick('Draw', odds, 'back');
+                        }}
+                        disabled={isDisabled}
+                      >
+                        <div className={`text-lg font-bold ${isDisabled ? 'text-gray-600' : 'text-green-800'}`}>
+                          무승부
                         </div>
-                      )}
-                    </button>
-                  </>
-                );
+                        <div className={`text-xl font-extrabold mt-1 ${isDisabled ? 'text-gray-700' : 'text-green-900'}`}>
+                          {getSportsbookOdds('승패', 'Draw')?.toFixed(2) || 'N/A'}
+                        </div>
+                        <div className={`text-xs mt-1 ${isDisabled ? 'text-gray-500' : 'text-green-600'}`}>
+                          Back (무승부)
+                        </div>
+                        {isDisabled && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-gray-500 bg-opacity-20 rounded-lg">
+                            <div className="text-xs font-medium text-gray-600">마감</div>
+                          </div>
+                        )}
+                      </button>
+
+                      {/* 원정팀 Back */}
+                      <button
+                        className={`flex-1 p-4 border-2 rounded-lg text-center transition relative ${
+                          isDisabled
+                            ? 'border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed'
+                            : 'border-purple-300 bg-purple-50 hover:bg-purple-100'
+                        }`}
+                        onClick={() => {
+                          const odds = getSportsbookOdds('승패', selectedGame.awayTeam);
+                          if (odds) handleBetClick(selectedGame.awayTeam, odds, 'back');
+                        }}
+                        disabled={isDisabled}
+                      >
+                        <div className={`text-lg font-bold ${isDisabled ? 'text-gray-600' : 'text-purple-800'}`}>
+                          {selectedGame.awayTeam}
+                        </div>
+                        <div className={`text-xl font-extrabold mt-1 ${isDisabled ? 'text-gray-700' : 'text-purple-900'}`}>
+                          {getSportsbookOdds('승패', selectedGame.awayTeam)?.toFixed(2) || 'N/A'}
+                        </div>
+                        <div className={`text-xs mt-1 ${isDisabled ? 'text-gray-500' : 'text-purple-600'}`}>
+                          Back (이길 것)
+                        </div>
+                        {isDisabled && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-gray-500 bg-opacity-20 rounded-lg">
+                            <div className="text-xs font-medium text-gray-600">마감</div>
+                          </div>
+                        )}
+                      </button>
+                    </div>
+                  );
+                } else {
+                  // 다른 스포츠: 기존 방식 (홈팀 Back, 원정팀 Lay)
+                  return (
+                    <>
+                      {/* 홈팀 Back */}
+                      <button
+                        className={`flex-1 p-4 border-2 rounded-lg text-center transition relative ${
+                          isDisabled
+                            ? 'border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed'
+                            : 'border-blue-300 bg-blue-50 hover:bg-blue-100'
+                        }`}
+                        onClick={() => {
+                          const odds = getSportsbookOdds('승패', selectedGame.homeTeam);
+                          if (odds) handleBetClick(selectedGame.homeTeam, odds, 'back');
+                        }}
+                        disabled={isDisabled}
+                      >
+                        <div className={`text-lg font-bold ${isDisabled ? 'text-gray-600' : 'text-blue-800'}`}>
+                          {selectedGame.homeTeam}
+                        </div>
+                        <div className={`text-xl font-extrabold mt-1 ${isDisabled ? 'text-gray-700' : 'text-blue-900'}`}>
+                          {getSportsbookOdds('승패', selectedGame.homeTeam)?.toFixed(2) || 'N/A'}
+                        </div>
+                        <div className={`text-xs mt-1 ${isDisabled ? 'text-gray-500' : 'text-blue-600'}`}>
+                          Back (이길 것)
+                        </div>
+                        {isDisabled && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-gray-500 bg-opacity-20 rounded-lg">
+                            <div className="text-xs font-medium text-gray-600">마감</div>
+                          </div>
+                        )}
+                      </button>
+
+                      {/* 원정팀 Lay */}
+                      <button
+                        className={`flex-1 p-4 border-2 rounded-lg text-center transition relative ${
+                          isDisabled
+                            ? 'border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed'
+                            : 'border-pink-300 bg-pink-50 hover:bg-pink-100'
+                        }`}
+                        onClick={() => {
+                          const odds = getSportsbookOdds('승패', selectedGame.awayTeam);
+                          if (odds) handleBetClick(selectedGame.awayTeam, odds, 'lay');
+                        }}
+                        disabled={isDisabled}
+                      >
+                        <div className={`text-lg font-bold ${isDisabled ? 'text-gray-600' : 'text-pink-800'}`}>
+                          {selectedGame.awayTeam}
+                        </div>
+                        <div className={`text-xl font-extrabold mt-1 ${isDisabled ? 'text-gray-700' : 'text-pink-900'}`}>
+                          {getSportsbookOdds('승패', selectedGame.awayTeam)?.toFixed(2) || 'N/A'}
+                        </div>
+                        <div className={`text-xs mt-1 ${isDisabled ? 'text-gray-500' : 'text-pink-600'}`}>
+                          Lay (질 것)
+                        </div>
+                        {isDisabled && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-gray-500 bg-opacity-20 rounded-lg">
+                            <div className="text-xs font-medium text-gray-600">마감</div>
+                          </div>
+                        )}
+                      </button>
+                    </>
+                  );
+                }
               })()}
 
               {selectedMarket === '총점' && (() => {
