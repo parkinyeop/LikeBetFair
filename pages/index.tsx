@@ -56,14 +56,13 @@ export default function Home() {
               const data = await response.json();
               
               const now = new Date();
-              const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
               const maxDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7일 후
               const bettingDeadlineMinutes = 10; // 경기 시작 10분 전까지 베팅 가능
               
-              // 1. 기본 필터링: 오늘부터 7일 후까지의 경기
+              // 1. 기본 필터링: 현재 시간부터 7일 후까지의 경기 (과거 경기 제외)
               const filteredGames = data.filter((game: any) => {
                 const gameTime = new Date(game.commence_time);
-                return gameTime >= startOfToday && gameTime <= maxDate;
+                return gameTime >= now && gameTime <= maxDate;
               });
               
               // 2. 베팅 가능 여부 분류 및 정렬
@@ -80,13 +79,13 @@ export default function Home() {
                 };
               });
               
-              // 3. 정렬: 베팅 가능한 경기 우선, 그 다음 시간순
+              // 3. 정렬: 베팅 가능한 경기 우선, 그 다음 시간순(가장 가까운 순)
               const sortedGames = categorizedGames.sort((a, b) => {
                 // 베팅 가능한 경기가 우선
                 if (a.isBettable && !b.isBettable) return -1;
                 if (!a.isBettable && b.isBettable) return 1;
                 
-                // 둘 다 베팅 가능하거나 둘 다 불가능한 경우, 시간순 정렬
+                // 둘 다 베팅 가능하거나 둘 다 불가능한 경우, 시간순 정렬(가장 가까운 순)
                 return a.gameTime.getTime() - b.gameTime.getTime();
               });
               
@@ -134,14 +133,13 @@ export default function Home() {
         const data = await response.json();
         
         const now = new Date();
-        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
         const maxDate = new Date(now.getTime() + TIME_CONFIG.BETTING_WINDOW_DAYS * 24 * 60 * 60 * 1000);
         const bettingDeadlineMinutes = 10; // 경기 시작 10분 전까지 베팅 가능
         
-        // 1. 기본 필터링: 오늘부터 7일 후까지의 경기
+        // 1. 기본 필터링: 현재 시간부터 7일 후까지의 경기 (과거 경기 제외)
         const filteredGames = data.filter((game: any) => {
           const gameTime = new Date(game.commence_time);
-          return gameTime >= startOfToday && gameTime <= maxDate;
+          return gameTime >= now && gameTime <= maxDate;
         });
         
         // 2. 중복 제거
