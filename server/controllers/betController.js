@@ -152,51 +152,67 @@ export async function getBetHistory(req, res) {
     console.log(`[getBetHistory] Found ${bets.length} bets for user ${userId}`);
 
     // selection별 result와 전체 status 동기화 + gameResult(score 등) 포함
-    const updatedBets = await Promise.all(bets.map(async (bet) => {
-      await betResultService.processBetResult(bet);
-      // selections에 gameResult 정보 추가
-      const selectionsWithResults = await Promise.all(
-        bet.selections.map(async (selection) => {
-          try {
-            const gameResult = await betResultService.getGameResultByTeams(selection);
-            return {
-              ...selection,
-              gameResult: gameResult ? {
-                status: gameResult.status,
-                result: gameResult.result,
-                score: gameResult.score ? (typeof gameResult.score === 'string' ? 
-                  (() => {
-                    try {
-                      return JSON.parse(gameResult.score);
-                    } catch (parseError) {
-                      console.error('[getBetHistory] Score parse error:', parseError);
-                      return gameResult.score; // 파싱 실패 시 원본 반환
-                    }
-                  })() : gameResult.score) : null,
-                homeTeam: gameResult.homeTeam,
-                awayTeam: gameResult.awayTeam
-              } : null
-            };
-          } catch (selectionError) {
-            console.error('[getBetHistory] Selection processing error:', selectionError);
-            return {
-              ...selection,
-              gameResult: null
-            };
-          }
-        })
-      );
-      return {
-        ...bet.toJSON(),
-        selections: selectionsWithResults
-      };
+    const updatedBets = await Promise.all(bets.map(async (bet, betIndex) => {
+      try {
+        console.log(`[getBetHistory] Processing bet ${betIndex + 1}/${bets.length}: ${bet.id}`);
+        await betResultService.processBetResult(bet);
+        
+        // selections에 gameResult 정보 추가
+        const selectionsWithResults = await Promise.all(
+          bet.selections.map(async (selection, selectionIndex) => {
+            try {
+              console.log(`[getBetHistory] Processing selection ${selectionIndex + 1}/${bet.selections.length}: ${selection.desc}`);
+              const gameResult = await betResultService.getGameResultByTeams(selection);
+              return {
+                ...selection,
+                gameResult: gameResult ? {
+                  status: gameResult.status,
+                  result: gameResult.result,
+                  score: gameResult.score ? (typeof gameResult.score === 'string' ? 
+                    (() => {
+                      try {
+                        return JSON.parse(gameResult.score);
+                      } catch (parseError) {
+                        console.error('[getBetHistory] Score parse error:', parseError);
+                        return gameResult.score; // 파싱 실패 시 원본 반환
+                      }
+                    })() : gameResult.score) : null,
+                  homeTeam: gameResult.homeTeam,
+                  awayTeam: gameResult.awayTeam
+                } : null
+              };
+            } catch (selectionError) {
+              console.error(`[getBetHistory] Selection ${selectionIndex + 1} processing error:`, selectionError);
+              console.error(`[getBetHistory] Selection data:`, JSON.stringify(selection, null, 2));
+              return {
+                ...selection,
+                gameResult: null
+              };
+            }
+          })
+        );
+        return {
+          ...bet.toJSON(),
+          selections: selectionsWithResults
+        };
+      } catch (betError) {
+        console.error(`[getBetHistory] Bet ${betIndex + 1} processing error:`, betError);
+        console.error(`[getBetHistory] Bet data:`, JSON.stringify(bet.toJSON(), null, 2));
+        // 개별 베팅 처리 실패 시에도 전체 요청을 중단하지 않고 기본 데이터 반환
+        return {
+          ...bet.toJSON(),
+          selections: bet.selections,
+          processingError: betError.message
+        };
+      }
     }));
 
     console.log(`[getBetHistory] Returning ${updatedBets.length} updated bets (with gameResult)`);
     res.json(updatedBets);
   } catch (err) {
     console.error('[getBetHistory] Error:', err);
-    res.status(500).json({ message: 'Server error' });
+    console.error('[getBetHistory] Error stack:', err.stack);
+    res.status(500).json({ message: 'Server error', details: err.message });
   }
 }
 
