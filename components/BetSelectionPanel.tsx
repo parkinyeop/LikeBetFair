@@ -119,6 +119,12 @@ const BetSelectionPanel = () => {
                      ? 'http://localhost:5050' 
                      : 'https://likebetfair.onrender.com');
       
+      console.log('[BetSelectionPanel] (배당변경) 베팅 요청 body:', {
+        selections: updatedSelections,
+        stake,
+        totalOdds: newTotalOdds
+      });
+
       const res = await fetch(`${apiUrl}/api/bet/`, {
         method: 'POST',
         headers: {
@@ -174,6 +180,12 @@ const BetSelectionPanel = () => {
                      ? 'http://localhost:5050' 
                      : 'https://likebetfair.onrender.com');
       
+      console.log('[BetSelectionPanel] 베팅 요청 body:', {
+        selections,
+        stake,
+        totalOdds: selections.reduce((acc, curr) => acc * curr.odds, 1)
+      });
+
       const res = await fetch(`${apiUrl}/api/bet/`, {
         method: 'POST',
         headers: {
