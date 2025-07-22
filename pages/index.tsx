@@ -424,7 +424,7 @@ export default function Home() {
                                 }
                               }}
                               className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                                selections.some(sel => sel.team === outcome.name && sel.market === selectedMarket && sel.gameId === game.id)
+                                (selections || []).some(sel => sel.team === outcome.name && sel.market === selectedMarket && sel.gameId === game.id)
                                   ? 'bg-yellow-500 hover:bg-yellow-600'
                                   : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                               } text-white`}
@@ -485,7 +485,7 @@ export default function Home() {
                               }
                             }}
                             className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                              selections.some(sel => sel.team === `Over ${point}` && sel.market === selectedMarket && sel.gameId === game.id)
+                              (selections || []).some(sel => sel.team === `Over ${point}` && sel.market === selectedMarket && sel.gameId === game.id)
                                 ? 'bg-yellow-500 hover:bg-yellow-600'
                                 : isBettable ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-300 cursor-not-allowed'
                             } text-white`}
@@ -510,7 +510,7 @@ export default function Home() {
                               }
                             }}
                             className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                              selections.some(sel => sel.team === `Under ${point}` && sel.market === selectedMarket && sel.gameId === game.id)
+                              (selections || []).some(sel => sel.team === `Under ${point}` && sel.market === selectedMarket && sel.gameId === game.id)
                                 ? 'bg-yellow-500 hover:bg-yellow-600'
                                 : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                             } text-white`}
@@ -569,7 +569,7 @@ export default function Home() {
                               }
                             }}
                             className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                              selections.some(sel => sel.team === `${game.home_team} -${point}` && sel.market === selectedMarket && sel.gameId === game.id)
+                              (selections || []).some(sel => sel.team === `${game.home_team} -${point}` && sel.market === selectedMarket && sel.gameId === game.id)
                                 ? 'bg-yellow-500 hover:bg-yellow-600'
                                 : isBettable ? 'bg-purple-500 hover:bg-purple-600' : 'bg-gray-300 cursor-not-allowed'
                             } text-white`}
@@ -594,7 +594,7 @@ export default function Home() {
                               }
                             }}
                             className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                              selections.some(sel => sel.team === `${game.away_team} +${point}` && sel.market === selectedMarket && sel.gameId === game.id)
+                              (selections || []).some(sel => sel.team === `${game.away_team} +${point}` && sel.market === selectedMarket && sel.gameId === game.id)
                                 ? 'bg-yellow-500 hover:bg-yellow-600'
                                 : isBettable ? 'bg-pink-500 hover:bg-pink-600' : 'bg-gray-300 cursor-not-allowed'
                             } text-white`}

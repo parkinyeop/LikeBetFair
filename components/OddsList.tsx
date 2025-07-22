@@ -139,7 +139,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
   }, [sportKey]);
 
   const isTeamSelected = (team: string, market: string, gameId: string, point?: number) => {
-    return selections.some(selection =>
+    return (selections || []).some(selection =>
       selection.team === team &&
       selection.market === market &&
       selection.gameId === gameId &&
