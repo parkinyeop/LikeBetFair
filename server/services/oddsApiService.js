@@ -436,6 +436,134 @@ class OddsApiService {
       throw error;
     }
   }
+
+  // 활성 카테고리만 업데이트 (스케줄러용)
+  async fetchAndCacheOddsForCategories(activeCategories, priorityLevel = 'medium') {
+    let totalUpdatedCount = 0;
+    let totalNewCount = 0;
+    let totalSkippedCount = 0;
+    let totalApiCalls = 0;
+    
+    try {
+      console.log(`[DEBUG] Starting odds update for categories: ${activeCategories.join(', ')}`);
+      
+      // 활성 카테고리만 필터링
+      const categoriesToUpdate = activeCategories.filter(category => 
+        clientSportKeyMap.hasOwnProperty(category)
+      );
+      
+      console.log(`[DEBUG] Filtered categories: ${categoriesToUpdate.join(', ')}`);
+      
+      for (const clientCategory of categoriesToUpdate) {
+        try {
+          const sportKey = clientSportKeyMap[clientCategory];
+          console.log(`[DEBUG] Processing category: ${clientCategory} (${sportKey})`);
+          
+          // API 호출 가능 여부 확인
+          if (!this.canMakeApiCall()) {
+            console.warn(`[DEBUG] API 호출 제한으로 ${clientCategory} 건너뜀`);
+            continue;
+          }
+
+          // API 호출 추적
+          this.trackApiCall();
+          totalApiCalls++;
+
+          // 최근 7일간의 경기 배당률 데이터 가져오기
+          const oddsResponse = await axios.get(`${this.baseUrl}/${sportKey}/odds`, {
+            params: {
+              apiKey: this.apiKey,
+              regions: 'us',
+              markets: 'h2h,spreads,totals',
+              oddsFormat: 'decimal',
+              dateFormat: 'iso'
+            },
+            timeout: 30000,
+            headers: {
+              'User-Agent': 'LikeBetFair/1.0'
+            }
+          });
+
+          console.log(`[DEBUG] Found ${oddsResponse.data.length} games for ${clientCategory}`);
+
+          // 데이터 검증 및 저장
+          for (const game of oddsResponse.data) {
+            if (this.validateOddsData(game)) {
+              const mainCategory = this.determineMainCategory(clientCategory);
+              const subCategory = this.determineSubCategory(clientCategory);
+              
+              if (!mainCategory || !subCategory) {
+                console.error(`[DEBUG] mainCategory/subCategory 누락: ${mainCategory}/${subCategory}`);
+                totalSkippedCount++;
+                continue;
+              }
+              
+              const upsertData = {
+                mainCategory,
+                subCategory,
+                sportKey: sportKey,
+                sportTitle: clientCategory,
+                homeTeam: game.home_team,
+                awayTeam: game.away_team,
+                commenceTime: new Date(game.commence_time),
+                odds: game.bookmakers,
+                bookmakers: game.bookmakers,
+                market: 'h2h',
+                officialOdds: this.calculateAverageOdds(game.bookmakers),
+                lastUpdated: new Date()
+              };
+              
+              const [oddsRecord, created] = await OddsCache.upsert(upsertData, {
+                returning: true
+              });
+
+              if (created) {
+                totalNewCount++;
+              } else {
+                totalUpdatedCount++;
+              }
+            } else {
+              totalSkippedCount++;
+            }
+          }
+          
+        } catch (error) {
+          console.error(`[DEBUG] Error processing ${clientCategory}:`, error.message);
+          totalSkippedCount++;
+        }
+      }
+      
+      console.log(`[DEBUG] Odds update completed. Total: ${totalUpdatedCount + totalNewCount} updated, ${totalNewCount} new, ${totalSkippedCount} skipped, ${totalApiCalls} API calls`);
+      
+      return {
+        updatedCount: totalUpdatedCount + totalNewCount,
+        newCount: totalNewCount,
+        updatedExistingCount: totalUpdatedCount,
+        skippedCount: totalSkippedCount,
+        apiCalls: totalApiCalls,
+        categories: categoriesToUpdate
+      };
+      
+    } catch (error) {
+      console.error('[DEBUG] Error in fetchAndCacheOddsForCategories:', error);
+      throw error;
+    }
+  }
+
+  // 동적 우선순위 레벨 확인 (스케줄러용)
+  getDynamicPriorityLevel() {
+    // API 사용량에 따른 동적 우선순위 결정
+    const dailyUsage = this.apiCallTracker.dailyCalls;
+    const monthlyUsage = this.apiCallTracker.monthlyCalls;
+    
+    if (dailyUsage > 800 || monthlyUsage > 20000) {
+      return 'high';
+    } else if (dailyUsage > 400 || monthlyUsage > 10000) {
+      return 'medium';
+    } else {
+      return 'low';
+    }
+  }
 }
 
 const oddsApiService = new OddsApiService();
