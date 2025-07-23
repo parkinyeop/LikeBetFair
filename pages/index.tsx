@@ -114,9 +114,15 @@ export default function Home() {
     if (viewMode !== 'today') return;
     // todayGames를 평탄화(flatten)하여 전체 경기 리스트로 변환
     const allGames: any[] = Object.values(todayGames).flat();
+    
+    // 중복 제거: game.id를 기준으로 중복 경기 제거
+    const uniqueGames = allGames.filter((game, index, self) => 
+      index === self.findIndex(g => g.id === game.id)
+    );
+    
     // 경기 시작 시간순 정렬
-    allGames.sort((a, b) => new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime());
-    setTodayFlatGames(allGames);
+    uniqueGames.sort((a, b) => new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime());
+    setTodayFlatGames(uniqueGames);
   }, [todayGames, viewMode]);
 
   useEffect(() => {
@@ -327,8 +333,34 @@ export default function Home() {
         </div>
       );
     }
+    // 배팅 가능한 경기 수 계산
+    const bettableGames = todayFlatGames.filter(game => game.isBettable);
+    const totalGames = todayFlatGames.length;
+    
     return (
       <div className="space-y-4">
+        {/* 배팅 가능한 경기 수 표시 */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">{bettableGames.length}</div>
+                <div className="text-sm text-blue-700">배팅 가능</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-gray-600">{totalGames}</div>
+                <div className="text-sm text-gray-700">전체 경기</div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-sm text-gray-600">
+                📅 {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}
+              </div>
+              <div className="text-xs text-gray-500">업데이트: {new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>
+            </div>
+          </div>
+        </div>
+        
         {todayFlatGames.map((game: any) => {
           const gameTime = new Date(game.commence_time);
           const isBettable = game.isBettable !== undefined ? game.isBettable : true;
@@ -402,40 +434,51 @@ export default function Home() {
                     return (
                       <div className="flex items-center gap-2">
                         <div className="w-16 text-base font-bold text-gray-800 text-center">승/패</div>
-                        {outcomes.map((outcome) => {
-                          let label = outcome.name;
-                          if (outcome.name.toLowerCase() === 'draw') label = '무';
-                          else if (outcome.name === game.home_team) label = game.home_team;
-                          else if (outcome.name === game.away_team) label = game.away_team;
-                          return (
-                            <button
-                              key={outcome.name}
-                              onClick={() => {
-                                if (isBettable && outcome.price) {
-                                  toggleSelection({
-                                    team: outcome.name,
-                                    odds: outcome.price,
-                                    desc: `${game.home_team} vs ${game.away_team}`,
-                                    commence_time: game.commence_time,
-                                    market: selectedMarket,
-                                    gameId: game.id,
-                                    sport_key: game.sport_key
-                                  });
-                                }
-                              }}
-                              className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                                (selections || []).some(sel => sel.team === outcome.name && sel.market === selectedMarket && sel.gameId === game.id)
-                                  ? 'bg-yellow-500 hover:bg-yellow-600'
-                                  : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
-                              } text-white`}
-                              disabled={!isBettable || !outcome.price}
-                            >
-                              <div className="font-bold">{label}</div>
-                              <div className="text-sm">{outcome.price ? outcome.price.toFixed(2) : 'N/A'}</div>
-                              {!isBettable && <div className="text-xs text-red-500 mt-1">베팅 마감</div>}
-                            </button>
-                          );
-                        })}
+                        {(() => {
+                          // 홈팀, 무승부, 어웨이팀 순서로 정렬
+                          const sortedOutcomes = outcomes.sort((a, b) => {
+                            if (a.name === game.home_team) return -1;
+                            if (b.name === game.home_team) return 1;
+                            if (a.name.toLowerCase() === 'draw') return -1;
+                            if (b.name.toLowerCase() === 'draw') return 1;
+                            return 0;
+                          });
+                          
+                          return sortedOutcomes.map((outcome) => {
+                            let label = outcome.name;
+                            if (outcome.name.toLowerCase() === 'draw') label = '무승부';
+                            else if (outcome.name === game.home_team) label = game.home_team;
+                            else if (outcome.name === game.away_team) label = game.away_team;
+                            return (
+                              <button
+                                key={outcome.name}
+                                onClick={() => {
+                                  if (isBettable && outcome.price) {
+                                    toggleSelection({
+                                      team: outcome.name,
+                                      odds: outcome.price,
+                                      desc: `${game.home_team} vs ${game.away_team}`,
+                                      commence_time: game.commence_time,
+                                      market: selectedMarket,
+                                      gameId: game.id,
+                                      sport_key: game.sport_key
+                                    });
+                                  }
+                                }}
+                                className={`flex-1 p-3 rounded-lg text-center transition-colors ${
+                                  (selections || []).some(sel => sel.team === outcome.name && sel.market === selectedMarket && sel.gameId === game.id)
+                                    ? 'bg-yellow-500 hover:bg-yellow-600'
+                                    : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                } text-white`}
+                                disabled={!isBettable || !outcome.price}
+                              >
+                                <div className="font-bold">{label}</div>
+                                <div className="text-sm">{outcome.price ? outcome.price.toFixed(2) : 'N/A'}</div>
+                                {!isBettable && <div className="text-xs text-red-500 mt-1">베팅 마감</div>}
+                              </button>
+                            );
+                          });
+                        })()}
                       </div>
                     );
                   })()}
@@ -486,7 +529,7 @@ export default function Home() {
                             className={`flex-1 p-3 rounded-lg text-center transition-colors ${
                               (selections || []).some(sel => sel.team === `Over ${point}` && sel.market === selectedMarket && sel.gameId === game.id)
                                 ? 'bg-yellow-500 hover:bg-yellow-600'
-                                : isBettable ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-300 cursor-not-allowed'
+                                : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                             } text-white`}
                             disabled={!isBettable || !overOdds}
                           >
@@ -570,7 +613,7 @@ export default function Home() {
                             className={`flex-1 p-3 rounded-lg text-center transition-colors ${
                               (selections || []).some(sel => sel.team === `${game.home_team} -${point}` && sel.market === selectedMarket && sel.gameId === game.id)
                                 ? 'bg-yellow-500 hover:bg-yellow-600'
-                                : isBettable ? 'bg-purple-500 hover:bg-purple-600' : 'bg-gray-300 cursor-not-allowed'
+                                : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                             } text-white`}
                             disabled={!isBettable || !homeOdds}
                           >
@@ -596,7 +639,7 @@ export default function Home() {
                             className={`flex-1 p-3 rounded-lg text-center transition-colors ${
                               (selections || []).some(sel => sel.team === `${game.away_team} +${point}` && sel.market === selectedMarket && sel.gameId === game.id)
                                 ? 'bg-yellow-500 hover:bg-yellow-600'
-                                : isBettable ? 'bg-pink-500 hover:bg-pink-600' : 'bg-gray-300 cursor-not-allowed'
+                                : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                             } text-white`}
                             disabled={!isBettable || !awayOdds}
                           >
@@ -805,9 +848,35 @@ export default function Home() {
                 ) : null;
               })()}
             </div>
-            <p className="text-sm text-gray-500">
-              총 {games.length}개의 경기가 있습니다.
-            </p>
+            
+            {/* 경기 수 정보 표시 */}
+            {(() => {
+              const bettableGames = games.filter(game => game.isBettable);
+              const totalGames = games.length;
+              
+              return (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-2">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center space-x-4">
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-blue-600">{bettableGames.length}</div>
+                        <div className="text-sm text-blue-700">배팅 가능</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-gray-600">{totalGames}</div>
+                        <div className="text-sm text-gray-700">전체 경기</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm text-gray-600">
+                        📅 {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}
+                      </div>
+                      <div className="text-xs text-gray-500">업데이트: {new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           <div className="grid grid-cols-1 gap-4">
@@ -870,23 +939,48 @@ export default function Home() {
                                 <div className="w-16 text-base font-bold text-gray-800 text-center">
                                   승/패
                                 </div>
-                                {outcomes.map((outcome: any, idx: number) => {
-                                  let label = outcome.name;
-                                  if (outcome.name.toLowerCase() === 'draw') label = '무승부';
-                                  else if (outcome.name === game.home_team) label = game.home_team;
-                                  else if (outcome.name === game.away_team) label = game.away_team;
+                                {(() => {
+                                  // 홈팀, 무승부, 어웨이팀 순서로 정렬
+                                  const sortedOutcomes = outcomes.sort((a: any, b: any) => {
+                                    if (a.name === game.home_team) return -1;
+                                    if (b.name === game.home_team) return 1;
+                                    if (a.name.toLowerCase() === 'draw') return -1;
+                                    if (b.name.toLowerCase() === 'draw') return 1;
+                                    return 0;
+                                  });
                                   
-                                  return (
-                                    <div 
-                                      key={idx} 
-                                      onClick={() => handleGameClick(game, selectedCategory)}
-                                      className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer"
-                                    >
-                                      <div className="text-sm text-gray-600 font-medium truncate">{label}</div>
-                                      <div className="text-sm font-bold text-blue-600">{outcome.odds.averagePrice.toFixed(2)}</div>
-                                    </div>
-                                  );
-                                })}
+                                  return sortedOutcomes.map((outcome: any, idx: number) => {
+                                    let label = outcome.name;
+                                    if (outcome.name.toLowerCase() === 'draw') label = '무승부';
+                                    else if (outcome.name === game.home_team) label = game.home_team;
+                                    else if (outcome.name === game.away_team) label = game.away_team;
+                                    
+                                    return (
+                                      <button
+                                        key={idx}
+                                        onClick={() => {
+                                          toggleSelection({
+                                            team: outcome.name,
+                                            odds: outcome.odds.averagePrice,
+                                            desc: `${game.home_team} vs ${game.away_team}`,
+                                            commence_time: game.commence_time,
+                                            market: '승/패',
+                                            gameId: game.id,
+                                            sport_key: game.sport_key
+                                          });
+                                        }}
+                                        className={`flex-1 p-3 rounded-lg text-center transition-colors ${
+                                          (selections || []).some(sel => sel.team === outcome.name && sel.market === '승/패' && sel.gameId === game.id)
+                                            ? 'bg-yellow-500 hover:bg-yellow-600'
+                                            : 'bg-blue-500 hover:bg-blue-600'
+                                        } text-white`}
+                                      >
+                                        <div className="font-bold">{label}</div>
+                                        <div className="text-sm">{outcome.odds.averagePrice.toFixed(2)}</div>
+                                      </button>
+                                    );
+                                  });
+                                })()}
                               </div>
                             );
                           })()}
@@ -921,23 +1015,53 @@ export default function Home() {
                               
                               return (
                                 <div key={idx} className="flex items-center gap-2">
-                                  <div 
-                                    onClick={() => handleGameClick(game, selectedCategory)}
-                                    className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer"
+                                  <button
+                                    onClick={() => {
+                                      toggleSelection({
+                                        team: `Over ${point}`,
+                                        odds: overOdds,
+                                        desc: `${game.home_team} vs ${game.away_team}`,
+                                        commence_time: game.commence_time,
+                                        market: '언더/오버',
+                                        gameId: game.id,
+                                        sport_key: game.sport_key,
+                                        point: parseFloat(point)
+                                      });
+                                    }}
+                                    className={`flex-1 p-3 rounded-lg text-center transition-colors ${
+                                      (selections || []).some(sel => sel.team === `Over ${point}` && sel.market === '언더/오버' && sel.gameId === game.id)
+                                        ? 'bg-yellow-500 hover:bg-yellow-600'
+                                        : 'bg-blue-500 hover:bg-blue-600'
+                                    } text-white`}
                                   >
-                                    <div className="text-sm text-gray-600 font-medium">오버</div>
-                                    <div className="text-sm font-bold text-blue-600">{overOdds ? overOdds.toFixed(2) : 'N/A'}</div>
-                                  </div>
+                                    <div className="font-bold">오버</div>
+                                    <div className="text-sm">{overOdds ? overOdds.toFixed(2) : 'N/A'}</div>
+                                  </button>
                                   <div className="w-16 text-base font-bold text-gray-800 text-center">
                                     {point}
                                   </div>
-                                  <div 
-                                    onClick={() => handleGameClick(game, selectedCategory)}
-                                    className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer"
+                                  <button
+                                    onClick={() => {
+                                      toggleSelection({
+                                        team: `Under ${point}`,
+                                        odds: underOdds,
+                                        desc: `${game.home_team} vs ${game.away_team}`,
+                                        commence_time: game.commence_time,
+                                        market: '언더/오버',
+                                        gameId: game.id,
+                                        sport_key: game.sport_key,
+                                        point: parseFloat(point)
+                                      });
+                                    }}
+                                    className={`flex-1 p-3 rounded-lg text-center transition-colors ${
+                                      (selections || []).some(sel => sel.team === `Under ${point}` && sel.market === '언더/오버' && sel.gameId === game.id)
+                                        ? 'bg-yellow-500 hover:bg-yellow-600'
+                                        : 'bg-blue-500 hover:bg-blue-600'
+                                    } text-white`}
                                   >
-                                    <div className="text-sm text-gray-600 font-medium">언더</div>
-                                    <div className="text-sm font-bold text-blue-600">{underOdds ? underOdds.toFixed(2) : 'N/A'}</div>
-                                  </div>
+                                    <div className="font-bold">언더</div>
+                                    <div className="text-sm">{underOdds ? underOdds.toFixed(2) : 'N/A'}</div>
+                                  </button>
                                 </div>
                               );
                             });
@@ -973,23 +1097,53 @@ export default function Home() {
                               
                               return (
                                 <div key={idx} className="flex items-center gap-2">
-                                  <div 
-                                    onClick={() => handleGameClick(game, selectedCategory)}
-                                    className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer"
+                                  <button
+                                    onClick={() => {
+                                      toggleSelection({
+                                        team: `${game.home_team} -${point}`,
+                                        odds: homeOdds,
+                                        desc: `${game.home_team} vs ${game.away_team}`,
+                                        commence_time: game.commence_time,
+                                        market: '핸디캡',
+                                        gameId: game.id,
+                                        sport_key: game.sport_key,
+                                        point: parseFloat(point)
+                                      });
+                                    }}
+                                    className={`flex-1 p-3 rounded-lg text-center transition-colors ${
+                                      (selections || []).some(sel => sel.team === `${game.home_team} -${point}` && sel.market === '핸디캡' && sel.gameId === game.id)
+                                        ? 'bg-yellow-500 hover:bg-yellow-600'
+                                        : 'bg-blue-500 hover:bg-blue-600'
+                                    } text-white`}
                                   >
-                                    <div className="text-sm text-gray-600 font-medium">홈</div>
-                                    <div className="text-sm font-bold text-blue-600">{homeOdds ? homeOdds.toFixed(2) : 'N/A'}</div>
-                                  </div>
+                                    <div className="font-bold">홈</div>
+                                    <div className="text-sm">{homeOdds ? homeOdds.toFixed(2) : 'N/A'}</div>
+                                  </button>
                                   <div className="w-16 text-base font-bold text-gray-800 text-center">
                                     {point}
                                   </div>
-                                  <div 
-                                    onClick={() => handleGameClick(game, selectedCategory)}
-                                    className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer"
+                                  <button
+                                    onClick={() => {
+                                      toggleSelection({
+                                        team: `${game.away_team} +${point}`,
+                                        odds: awayOdds,
+                                        desc: `${game.home_team} vs ${game.away_team}`,
+                                        commence_time: game.commence_time,
+                                        market: '핸디캡',
+                                        gameId: game.id,
+                                        sport_key: game.sport_key,
+                                        point: parseFloat(point)
+                                      });
+                                    }}
+                                    className={`flex-1 p-3 rounded-lg text-center transition-colors ${
+                                      (selections || []).some(sel => sel.team === `${game.away_team} +${point}` && sel.market === '핸디캡' && sel.gameId === game.id)
+                                        ? 'bg-yellow-500 hover:bg-yellow-600'
+                                        : 'bg-blue-500 hover:bg-blue-600'
+                                    } text-white`}
                                   >
-                                    <div className="text-sm text-gray-600 font-medium">원정</div>
-                                    <div className="text-sm font-bold text-blue-600">{awayOdds ? awayOdds.toFixed(2) : 'N/A'}</div>
-                                  </div>
+                                    <div className="font-bold">원정</div>
+                                    <div className="text-sm">{awayOdds ? awayOdds.toFixed(2) : 'N/A'}</div>
+                                  </button>
                                 </div>
                               );
                             });
