@@ -185,6 +185,13 @@ const BetSelectionPanel = () => {
         stake,
         totalOdds: selections.reduce((acc, curr) => acc * curr.odds, 1)
       });
+      
+      // 더 자세한 로깅 추가
+      console.log('[BetSelectionPanel] 상세 데이터 분석:');
+      console.log('- selections 개수:', selections.length);
+      console.log('- selections 내용:', JSON.stringify(selections, null, 2));
+      console.log('- stake 값:', stake);
+      console.log('- totalOdds 계산:', selections.reduce((acc, curr) => acc * curr.odds, 1));
 
       const res = await fetch(`${apiUrl}/api/bet/`, {
         method: 'POST',

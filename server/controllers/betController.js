@@ -15,6 +15,16 @@ export async function placeBet(req, res) {
         'x-auth-token': req.headers['x-auth-token']?.substring(0, 20) + '...'
       }
     });
+    
+    // 더 자세한 로깅 추가
+    console.log('🔍 [PlaceBet] 상세 데이터 분석:');
+    console.log('- selections 타입:', typeof req.body.selections);
+    console.log('- selections 길이:', req.body.selections?.length);
+    console.log('- selections 내용:', JSON.stringify(req.body.selections, null, 2));
+    console.log('- stake 타입:', typeof req.body.stake);
+    console.log('- stake 값:', req.body.stake);
+    console.log('- totalOdds 타입:', typeof req.body.totalOdds);
+    console.log('- totalOdds 값:', req.body.totalOdds);
 
     const { selections, stake, totalOdds } = req.body;
     const userId = req.user.userId;
