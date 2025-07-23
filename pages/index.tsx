@@ -409,9 +409,26 @@ export default function Home() {
           return (
             <div key={game.id} className={`bg-white rounded-lg shadow p-4 ${!isBettable ? 'opacity-60' : ''}`}>
               <div className="flex justify-between items-center mb-1">
-                <span className="text-lg font-bold">🏟️ {game.home_team} vs {game.away_team}</span>
+                <div className="flex-1">
+                  <span className="text-lg font-bold">🏟️ {game.home_team} vs {game.away_team}</span>
+                  <div className="text-sm text-gray-600 mt-1">
+                    {(() => {
+                      // sport_key를 사용해서 리그명 표시
+                      const leagueName = getDisplayNameFromSportKey(game.sport_key) || game.sport_title || 'Unknown League';
+                      
+                      // 스포츠별 아이콘 결정
+                      let sportIcon = '🏆';
+                      if (game.sport_key?.includes('soccer')) sportIcon = '⚽';
+                      else if (game.sport_key?.includes('basketball')) sportIcon = '🏀';
+                      else if (game.sport_key?.includes('baseball')) sportIcon = '⚾';
+                      else if (game.sport_key?.includes('americanfootball')) sportIcon = '🏈';
+                      
+                      return `${sportIcon} ${leagueName}`;
+                    })()}
+                  </div>
+                </div>
                 <div className="text-right">
-                  <span className="text-sm">📅 {gameTime.toLocaleDateString()} {gameTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} [{game.sport_title}]</span>
+                  <span className="text-sm">📅 {gameTime.toLocaleDateString()} {gameTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   {!isBettable && (
                     <div className="text-xs text-red-500 mt-1">
                       ⏰ 베팅 마감 (경기 시작 10분 전)
