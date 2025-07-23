@@ -75,7 +75,6 @@ class BetCancellationService {
         userId: bet.userId,
         betId: betId,
         amount: refundAmount,
-        balanceAfter: newBalance,
         memo: `베팅 취소 환불 - ${reason}`,
         paidAt: new Date(),
         metadata: {

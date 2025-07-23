@@ -75,8 +75,8 @@ const BetSelectionPanel = () => {
     data?: any;
   }>({ isOpen: false });
 
-  const totalOdds = selections.reduce((acc, curr) => acc * curr.odds, 1);
-  const expectedReturn = stake * totalOdds;
+  const totalOdds = Math.round(selections.reduce((acc, curr) => acc * curr.odds, 1) * 1000) / 1000; // 소수점 3자리로 반올림
+  const expectedReturn = Math.round(stake * totalOdds * 100) / 100; // 소수점 2자리로 반올림
 
   // 베팅 가능 시간 체크 (10분 전 마감)
   const now = new Date();

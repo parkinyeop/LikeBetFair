@@ -303,7 +303,6 @@ class BetResultService {
         userId: user.id,
         betId: bet.id,
         amount: adjustedWinnings,
-        balanceAfter: user.balance,
         memo: hasCancelledSelections ? '베팅 적중 지급 (일부 경기 취소 반영)' : '베팅 적중 지급',
         paidAt: new Date()
       }, { transaction });
@@ -329,7 +328,6 @@ class BetResultService {
         userId: user.id,
         betId: bet.id,
         amount: bet.stake,
-        balanceAfter: user.balance,
         memo: memo,
         paidAt: new Date()
       }, { transaction });

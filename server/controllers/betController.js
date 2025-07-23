@@ -148,13 +148,15 @@ export async function placeBet(req, res) {
       return res.status(400).json({ message: 'Insufficient balance' });
     }
 
-    // Create bet
+    // Create bet with precise decimal calculation
+    const potentialWinnings = Math.round(stake * totalOdds * 100) / 100; // 소수점 2자리로 반올림
+    
     const bet = await Bet.create({
       userId,
       selections,
       stake,
       totalOdds,
-      potentialWinnings: stake * totalOdds,
+      potentialWinnings,
       status: 'pending'
     });
 
@@ -327,7 +329,6 @@ export async function cancelBet(req, res) {
       userId: user.id,
       betId: bet.id,
       amount: bet.stake,
-      balanceAfter: user.balance,
       memo: '베팅 취소 환불',
       paidAt: new Date()
     }, { transaction: t });

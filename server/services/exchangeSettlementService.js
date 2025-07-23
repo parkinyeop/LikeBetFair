@@ -307,7 +307,6 @@ class ExchangeSettlementService {
       userId,
       betId: orderId,
       amount,
-      balanceAfter: newBalance,
       memo: amount > 0 ? 'Exchange 베팅 승리 수익' : 'Exchange 베팅 손실',
       paidAt: new Date()
     }, { transaction });
