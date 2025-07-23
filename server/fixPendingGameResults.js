@@ -89,3 +89,5 @@ fixPendingGameResults()
     console.error('💥 치명적 오류:', error);
     process.exit(1);
   }); 
+
+export default fixPendingGameResults; 
