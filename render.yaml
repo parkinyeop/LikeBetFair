@@ -4,6 +4,7 @@ services:
     env: node
     plan: free
     rootDir: .
+    # 빌드 명령어 최적화 - production 의존성만 설치 후 빌드
     buildCommand: npm ci --only=production && npm run build
     startCommand: npm start
     envVars:
@@ -11,13 +12,42 @@ services:
         value: production
       - key: NODE_OPTIONS
         value: --max-old-space-size=4096
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      # 빌드 타임아웃 관련 환경변수 추가
+      - key: NPM_CONFIG_PROGRESS
+        value: "false"
+      - key: CI
+        value: "true"
     healthCheckPath: /
+    # 빌드 필터 개선 - 더 구체적으로 필요한 파일들만 포함
     buildFilter:
       paths:
         - server/**
+        - pages/**
+        - components/**
+        - lib/**
+        - styles/**
+        - public/**
         - package.json
         - package-lock.json
         - next.config.cjs
         - tailwind.config.cjs
         - postcss.config.cjs
-    autoDeploy: true 
+        - tsconfig.json
+      # 불필요한 파일들 제외
+      ignoredPaths:
+        - "**/*.md"
+        - "**/*.log"
+        - node_modules/**
+        - .git/**
+        - .next/**
+        - "**/__tests__/**"
+        - "**/*.test.*"
+        - "**/*.spec.*"
+    autoDeploy: true
+    # 추가 설정들
+    disk:
+      name: data
+      mountPath: /opt/render/project/data
+      sizeGB: 1 
