@@ -5,6 +5,7 @@ import ReferralCode from '../models/referralCodeModel.js';
 import AdminCommission from '../models/adminCommissionModel.js';
 import Bet from '../models/betModel.js';
 import bcrypt from 'bcryptjs';
+import fixPendingGameResults from '../fixPendingGameResults.js';
 
 const router = express.Router();
 
@@ -433,6 +434,16 @@ router.patch('/referral-codes/:id/status', verifyToken, requireAdmin(3), async (
   } catch (error) {
     console.error('Referral code status update error:', error);
     res.status(500).json({ message: '추천코드 상태 변경 중 오류가 발생했습니다.' });
+  }
+});
+
+// [임시] 인증 없이 누구나 실행 가능한 정산 트리거
+router.post('/admin/fix-pending-game-results', async (req, res) => {
+  try {
+    await fixPendingGameResults();
+    res.send('정산 완료!');
+  } catch (err) {
+    res.status(500).send('실행 중 오류 발생: ' + err.message);
   }
 });
 
