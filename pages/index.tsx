@@ -5,6 +5,7 @@ import GameCard from "../components/GameCard";
 import { SPORTS_TREE, getSportKey, getSeasonInfo, getSeasonStatusBadge, getSeasonStatusStyle, SPORT_CATEGORIES, getDisplayNameFromSportKey } from "../config/sportsMapping";
 import { API_CONFIG, TIME_CONFIG, buildApiUrl, isBettingAllowed } from "../config/apiConfig";
 import GameTimeDisplay from "../components/GameTimeDisplay";
+import { useBetStore } from '../stores/useBetStore';
 
 const initialGameData: Record<string, { teams: string; time: string }[]> = {
   "EPL": [
@@ -313,7 +314,7 @@ export default function Home() {
     }
   };
 
-  const { selections, toggleSelection } = require('../stores/useBetStore');
+  const { selections, toggleSelection } = useBetStore();
   const [selectedMarkets, setSelectedMarkets] = useState<{ [gameId: string]: '승/패' | '언더/오버' | '핸디캡' }>({});
 
   const TodayBettingView = () => {
@@ -459,14 +460,14 @@ export default function Home() {
                                       odds: outcome.price,
                                       desc: `${game.home_team} vs ${game.away_team}`,
                                       commence_time: game.commence_time,
-                                      market: selectedMarket,
+                                      market: '승/패',
                                       gameId: game.id,
                                       sport_key: game.sport_key
                                     });
                                   }
                                 }}
                                 className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                                  (selections || []).some(sel => sel.team === outcome.name && sel.market === selectedMarket && sel.gameId === game.id)
+                                  (selections || []).some(sel => sel.team === outcome.name && sel.market === '승/패' && sel.gameId === game.id)
                                     ? 'bg-yellow-500 hover:bg-yellow-600'
                                     : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                 } text-white`}
@@ -519,18 +520,18 @@ export default function Home() {
                                   odds: overOdds,
                                   desc: `${game.home_team} vs ${game.away_team}`,
                                   commence_time: game.commence_time,
-                                  market: selectedMarket,
+                                  market: '언더/오버',
                                   gameId: game.id,
                                   sport_key: game.sport_key,
                                   point: parseFloat(point)
                                 });
                               }
                             }}
-                            className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                              (selections || []).some(sel => sel.team === `Over ${point}` && sel.market === selectedMarket && sel.gameId === game.id)
-                                ? 'bg-yellow-500 hover:bg-yellow-600'
-                                : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
-                            } text-white`}
+                                                            className={`flex-1 p-3 rounded-lg text-center transition-colors ${
+                                  (selections || []).some(sel => sel.team === `Over ${point}` && sel.market === '언더/오버' && sel.gameId === game.id)
+                                    ? 'bg-yellow-500 hover:bg-yellow-600'
+                                    : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                } text-white`}
                             disabled={!isBettable || !overOdds}
                           >
                             <div className="font-bold">오버</div>
@@ -545,7 +546,7 @@ export default function Home() {
                                   odds: underOdds,
                                   desc: `${game.home_team} vs ${game.away_team}`,
                                   commence_time: game.commence_time,
-                                  market: selectedMarket,
+                                  market: '언더/오버',
                                   gameId: game.id,
                                   sport_key: game.sport_key,
                                   point: parseFloat(point)
@@ -553,7 +554,7 @@ export default function Home() {
                               }
                             }}
                             className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                              (selections || []).some(sel => sel.team === `Under ${point}` && sel.market === selectedMarket && sel.gameId === game.id)
+                              (selections || []).some(sel => sel.team === `Under ${point}` && sel.market === '언더/오버' && sel.gameId === game.id)
                                 ? 'bg-yellow-500 hover:bg-yellow-600'
                                 : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                             } text-white`}
@@ -603,7 +604,7 @@ export default function Home() {
                                   odds: homeOdds,
                                   desc: `${game.home_team} vs ${game.away_team}`,
                                   commence_time: game.commence_time,
-                                  market: selectedMarket,
+                                  market: '핸디캡',
                                   gameId: game.id,
                                   sport_key: game.sport_key,
                                   point: parseFloat(point)
@@ -611,7 +612,7 @@ export default function Home() {
                               }
                             }}
                             className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                              (selections || []).some(sel => sel.team === `${game.home_team} -${point}` && sel.market === selectedMarket && sel.gameId === game.id)
+                              (selections || []).some(sel => sel.team === `${game.home_team} -${point}` && sel.market === '핸디캡' && sel.gameId === game.id)
                                 ? 'bg-yellow-500 hover:bg-yellow-600'
                                 : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                             } text-white`}
@@ -629,7 +630,7 @@ export default function Home() {
                                   odds: awayOdds,
                                   desc: `${game.home_team} vs ${game.away_team}`,
                                   commence_time: game.commence_time,
-                                  market: selectedMarket,
+                                  market: '핸디캡',
                                   gameId: game.id,
                                   sport_key: game.sport_key,
                                   point: parseFloat(point)
@@ -637,7 +638,7 @@ export default function Home() {
                               }
                             }}
                             className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                              (selections || []).some(sel => sel.team === `${game.away_team} +${point}` && sel.market === selectedMarket && sel.gameId === game.id)
+                              (selections || []).some(sel => sel.team === `${game.away_team} +${point}` && sel.market === '핸디캡' && sel.gameId === game.id)
                                 ? 'bg-yellow-500 hover:bg-yellow-600'
                                 : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                             } text-white`}
