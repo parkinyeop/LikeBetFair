@@ -93,6 +93,9 @@ export default function Home() {
                 
                 return {
                   ...game,
+                  sport_key: config.sportKey, // sport_key 추가
+                  sportTitle: displayName, // DB와 일치하는 sportTitle 추가
+                  sport_title: displayName, // 기존 호환성을 위한 sport_title 추가
                   isBettable,
                   gameTime,
                   bettingDeadline
@@ -413,8 +416,8 @@ export default function Home() {
                   <span className="text-lg font-bold">🏟️ {game.home_team} vs {game.away_team}</span>
                   <div className="text-sm text-gray-600 mt-1">
                     {(() => {
-                      // sport_key를 사용해서 리그명 표시
-                      const leagueName = getDisplayNameFromSportKey(game.sport_key) || game.sport_title || 'Unknown League';
+                      // sport_key를 사용해서 리그명 표시 (DB의 sportTitle 우선 사용)
+                      const leagueName = getDisplayNameFromSportKey(game.sport_key) || game.sportTitle || game.sport_title || 'Unknown League';
                       
                       // 스포츠별 아이콘 결정
                       let sportIcon = '🏆';
