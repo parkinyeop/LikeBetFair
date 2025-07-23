@@ -425,6 +425,18 @@ export default function Home() {
                       else if (game.sport_key?.includes('basketball')) sportIcon = '🏀';
                       else if (game.sport_key?.includes('baseball')) sportIcon = '⚾';
                       else if (game.sport_key?.includes('americanfootball')) sportIcon = '🏈';
+                      else if (game.sport_key?.includes('football')) sportIcon = '🏈';
+                      
+                      // 디버깅용 로그 (개발 환경에서만)
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log(`[League Display] ${game.home_team} vs ${game.away_team}:`, {
+                          sport_key: game.sport_key,
+                          sportTitle: game.sportTitle,
+                          sport_title: game.sport_title,
+                          leagueName,
+                          sportIcon
+                        });
+                      }
                       
                       return `${sportIcon} ${leagueName}`;
                     })()}
