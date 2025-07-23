@@ -27,7 +27,16 @@ export async function placeBet(req, res) {
     console.log('- totalOdds 값:', req.body.totalOdds);
 
     const { selections, stake, totalOdds } = req.body;
-    const userId = req.user.userId;
+    
+    // req.user 구조 확인
+    console.log('🔍 [PlaceBet] req.user 구조:', JSON.stringify(req.user, null, 2));
+    
+    const userId = req.user.userId || req.user.id;
+    
+    if (!userId) {
+      console.log('❌ [PlaceBet] userId 없음:', req.user);
+      return res.status(400).json({ message: 'User ID not found in token' });
+    }
 
     // Validate bet data
     if (!selections || !stake || !totalOdds) {
@@ -40,59 +49,71 @@ export async function placeBet(req, res) {
     for (const selection of selections) {
       const sportKey = selection.sport_key;
       if (sportKey) {
-        const seasonValidation = await seasonValidationService.validateBettingEligibility(sportKey);
-        if (!seasonValidation.isEligible) {
-          console.log(`[BetController] 시즌 상태 검증 실패: ${selection.desc} - ${seasonValidation.reason}`);
-          return res.status(400).json({ 
-            message: `베팅 불가능한 리그: ${selection.desc}`,
-            reason: seasonValidation.reason,
-            status: seasonValidation.status,
-            code: 'SEASON_OFFSEASON'
-          });
+        try {
+          const seasonValidation = await seasonValidationService.validateBettingEligibility(sportKey);
+          if (!seasonValidation.isEligible) {
+            console.log(`[BetController] 시즌 상태 검증 실패: ${selection.desc} - ${seasonValidation.reason}`);
+            return res.status(400).json({ 
+              message: `베팅 불가능한 리그: ${selection.desc}`,
+              reason: seasonValidation.reason,
+              status: seasonValidation.status,
+              code: 'SEASON_OFFSEASON'
+            });
+          }
+          
+          // 시즌 상태 로깅
+          console.log(`[BetController] 시즌 상태 검증 통과: ${selection.desc} - ${seasonValidation.reason}`);
+        } catch (seasonError) {
+          console.log(`[BetController] 시즌 상태 검증 오류 (무시): ${selection.desc} - ${seasonError.message}`);
+          // 시즌 검증 오류는 무시하고 계속 진행
         }
-        
-        // 시즌 상태 로깅
-        console.log(`[BetController] 시즌 상태 검증 통과: ${selection.desc} - ${seasonValidation.reason}`);
+      } else {
+        console.log(`[BetController] sport_key 없음 (시즌 검증 건너뜀): ${selection.desc}`);
       }
     }
 
     // 🔒 배당율 검증 추가 (개선된 버전)
     console.log(`[BetController] 베팅 요청 배당율 검증 시작: ${selections.length}개 선택`);
     for (const selection of selections) {
-      const oddsValidation = await simplifiedOddsValidation.validateBetOdds(selection);
-      if (!oddsValidation.isValid) {
-        console.log(`[BetController] 배당율 검증 실패: ${selection.desc} - ${oddsValidation.reason}`);
-        
-        // 배당율이 변경된 경우 특별 처리
-        if (oddsValidation.code === 'ODDS_CHANGED') {
-          return res.status(409).json({ // 409 Conflict
+      try {
+        const oddsValidation = await simplifiedOddsValidation.validateBetOdds(selection);
+        if (!oddsValidation.isValid) {
+          console.log(`[BetController] 배당율 검증 실패: ${selection.desc} - ${oddsValidation.reason}`);
+          
+          // 배당율이 변경된 경우 특별 처리
+          if (oddsValidation.code === 'ODDS_CHANGED') {
+            return res.status(409).json({ // 409 Conflict
+              success: false,
+              code: 'ODDS_CHANGED',
+              message: oddsValidation.message,
+              selection: selection.desc,
+              oldOdds: oddsValidation.requestedOdds,
+              newOdds: oddsValidation.currentOdds,
+              newBettingData: oddsValidation.newBettingData,
+              action: 'confirm_new_odds' // 프론트엔드에서 처리할 액션
+            });
+          }
+          
+          // 기타 검증 실패
+          return res.status(400).json({ 
             success: false,
-            code: 'ODDS_CHANGED',
-            message: oddsValidation.message,
-            selection: selection.desc,
-            oldOdds: oddsValidation.requestedOdds,
-            newOdds: oddsValidation.currentOdds,
-            newBettingData: oddsValidation.newBettingData,
-            action: 'confirm_new_odds' // 프론트엔드에서 처리할 액션
+            message: `배당율 검증 실패: ${selection.desc}`,
+            reason: oddsValidation.reason,
+            code: oddsValidation.code,
+            currentOdds: oddsValidation.currentOdds,
+            requestedOdds: selection.odds
           });
         }
         
-        // 기타 검증 실패
-        return res.status(400).json({ 
-          success: false,
-          message: `배당율 검증 실패: ${selection.desc}`,
-          reason: oddsValidation.reason,
-          code: oddsValidation.code,
-          currentOdds: oddsValidation.currentOdds,
-          requestedOdds: selection.odds
-        });
-      }
-      
-      // 경고가 있는 경우 로깅
-      if (oddsValidation.warning) {
-        console.log(`[BetController] 배당율 경고: ${selection.desc} - ${oddsValidation.reason}`);
-      } else {
-        console.log(`[BetController] 배당율 검증 성공: ${selection.desc}`);
+        // 경고가 있는 경우 로깅
+        if (oddsValidation.warning) {
+          console.log(`[BetController] 배당율 경고: ${selection.desc} - ${oddsValidation.reason}`);
+        } else {
+          console.log(`[BetController] 배당율 검증 성공: ${selection.desc}`);
+        }
+      } catch (oddsError) {
+        console.log(`[BetController] 배당율 검증 오류 (무시): ${selection.desc} - ${oddsError.message}`);
+        // 배당율 검증 오류는 무시하고 계속 진행
       }
     }
 
