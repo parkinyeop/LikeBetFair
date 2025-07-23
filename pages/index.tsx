@@ -468,7 +468,6 @@ export default function Home() {
                       const underOdds = oddsPair.under?.averagePrice;
                       return (
                         <div key={point} className="flex items-center gap-2">
-                          <div className="w-16 text-base font-bold text-gray-800 text-center">{point}</div>
                           <button
                             onClick={() => {
                               if (isBettable && overOdds) {
@@ -494,6 +493,7 @@ export default function Home() {
                             <div className="font-bold">오버</div>
                             <div className="text-sm">{overOdds ? overOdds.toFixed(2) : 'N/A'}</div>
                           </button>
+                          <div className="w-16 text-base font-bold text-gray-800 text-center">{point}</div>
                           <button
                             onClick={() => {
                               if (isBettable && underOdds) {
@@ -552,7 +552,6 @@ export default function Home() {
                       const awayOdds = oddsPair.away?.averagePrice;
                       return (
                         <div key={point} className="flex items-center gap-2">
-                          <div className="w-16 text-base font-bold text-gray-800 text-center">{point}</div>
                           <button
                             onClick={() => {
                               if (isBettable && homeOdds) {
@@ -578,6 +577,7 @@ export default function Home() {
                             <div className="font-bold">홈</div>
                             <div className="text-sm">{homeOdds ? homeOdds.toFixed(2) : 'N/A'}</div>
                           </button>
+                          <div className="w-16 text-base font-bold text-gray-800 text-center">{point}</div>
                           <button
                             onClick={() => {
                               if (isBettable && awayOdds) {
@@ -921,15 +921,15 @@ export default function Home() {
                               
                               return (
                                 <div key={idx} className="flex items-center gap-2">
-                                  <div className="w-16 text-base font-bold text-gray-800 text-center">
-                                    {point}
-                                  </div>
                                   <div 
                                     onClick={() => handleGameClick(game, selectedCategory)}
                                     className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer"
                                   >
                                     <div className="text-sm text-gray-600 font-medium">오버</div>
                                     <div className="text-sm font-bold text-blue-600">{overOdds ? overOdds.toFixed(2) : 'N/A'}</div>
+                                  </div>
+                                  <div className="w-16 text-base font-bold text-gray-800 text-center">
+                                    {point}
                                   </div>
                                   <div 
                                     onClick={() => handleGameClick(game, selectedCategory)}
@@ -973,15 +973,15 @@ export default function Home() {
                               
                               return (
                                 <div key={idx} className="flex items-center gap-2">
-                                  <div className="w-16 text-base font-bold text-gray-800 text-center">
-                                    {point}
-                                  </div>
                                   <div 
                                     onClick={() => handleGameClick(game, selectedCategory)}
                                     className="flex-1 bg-white border-2 border-blue-200 rounded-lg p-3 text-center hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer"
                                   >
                                     <div className="text-sm text-gray-600 font-medium">홈</div>
                                     <div className="text-sm font-bold text-blue-600">{homeOdds ? homeOdds.toFixed(2) : 'N/A'}</div>
+                                  </div>
+                                  <div className="w-16 text-base font-bold text-gray-800 text-center">
+                                    {point}
                                   </div>
                                   <div 
                                     onClick={() => handleGameClick(game, selectedCategory)}

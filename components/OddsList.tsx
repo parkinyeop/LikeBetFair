@@ -353,9 +353,6 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                     
                     return (
                       <div key={point} className="flex items-center gap-2">
-                        <div className="w-16 text-base font-bold text-gray-800 text-center">
-                          {point}
-                        </div>
                         <button
                           onClick={() => {
                             if (isBettable && overOdds) {
@@ -382,6 +379,9 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                           <div className="font-bold">오버</div>
                           <div className="text-sm">{overOdds ? overOdds.toFixed(2) : 'N/A'}</div>
                         </button>
+                        <div className="w-16 text-base font-bold text-gray-800 text-center">
+                          {point}
+                        </div>
                         <button
                           onClick={() => {
                             if (isBettable && underOdds) {
@@ -450,9 +450,6 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                     
                     return (
                       <div key={point} className="flex items-center gap-2">
-                        <div className="w-16 text-base font-bold text-gray-800 text-center">
-                          {point}
-                        </div>
                         <button
                           onClick={() => {
                             if (isBettable && homeOdds) {
@@ -479,6 +476,9 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                           <div className="font-bold">홈</div>
                           <div className="text-sm">{homeOdds ? homeOdds.toFixed(2) : 'N/A'}</div>
                         </button>
+                        <div className="w-16 text-base font-bold text-gray-800 text-center">
+                          {point}
+                        </div>
                         <button
                           onClick={() => {
                             if (isBettable && awayOdds) {
