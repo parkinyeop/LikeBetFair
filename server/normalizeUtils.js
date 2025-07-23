@@ -90,6 +90,7 @@ const globalTeamMapping = {
   'newyorkmets': 'newyorkmets',
   'newyorkyankees': 'newyorkyankees',
   'oaklandathletics': 'oaklandathletics',
+  'athletics': 'oaklandathletics', // 추가: Athletics → Oakland Athletics
   'philadelphiaphillies': 'philadelphiaphillies',
   'pittsburghpirates': 'pittsburghpirates',
   'sandiegopadres': 'sandiegopadres',

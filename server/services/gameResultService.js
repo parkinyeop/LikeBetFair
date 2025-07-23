@@ -985,8 +985,14 @@ class GameResultService {
       return 'pending';
     }
     
-    // 경기가 완료된 경우 결과 계산
-    if (game.completed === true) {
+    // 스코어가 있고 경기 시간이 지났으면 결과 계산 (completed 필드 무시)
+    const gameTime = new Date(game.commence_time);
+    const now = new Date();
+    const timeDiff = now - gameTime;
+    const hoursDiff = timeDiff / (1000 * 60 * 60);
+    
+    // 경기 시작 후 3시간이 지났고 스코어가 있으면 완료된 것으로 간주
+    if (hoursDiff > 3) {
       const homeScoreData = game.scores.find(score => score.name === game.home_team);
       const awayScoreData = game.scores.find(score => score.name === game.away_team);
       
