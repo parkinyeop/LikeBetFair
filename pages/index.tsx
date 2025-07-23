@@ -67,8 +67,26 @@ export default function Home() {
                 return gameTime >= now && gameTime <= maxDate;
               });
               
-              // 2. 베팅 가능 여부 분류 및 정렬
-              const categorizedGames = filteredGames.map((game: any) => {
+              // 2. 중복 제거: 같은 경기 중복 제거
+              const uniqueGamesMap = new Map();
+              filteredGames.forEach((game: any) => {
+                const key = `${game.home_team}|${game.away_team}|${game.commence_time}`;
+                if (!uniqueGamesMap.has(key)) {
+                  uniqueGamesMap.set(key, game);
+                } else {
+                  const prev = uniqueGamesMap.get(key);
+                  if (
+                    (!prev.bookmakers && game.bookmakers) ||
+                    (Array.isArray(game.bookmakers) && Array.isArray(prev.bookmakers) && game.bookmakers.length > prev.bookmakers.length)
+                  ) {
+                    uniqueGamesMap.set(key, game);
+                  }
+                }
+              });
+              const uniqueGames = Array.from(uniqueGamesMap.values());
+              
+              // 3. 베팅 가능 여부 분류 및 정렬
+              const categorizedGames = uniqueGames.map((game: any) => {
                 const gameTime = new Date(game.commence_time);
                 const bettingDeadline = new Date(gameTime.getTime() - bettingDeadlineMinutes * 60 * 1000);
                 const isBettable = now < bettingDeadline;
@@ -81,7 +99,7 @@ export default function Home() {
                 };
               });
               
-              // 3. 정렬: 베팅 가능한 경기 우선, 그 다음 시간순(가장 가까운 순)
+              // 4. 정렬: 베팅 가능한 경기 우선, 그 다음 시간순(가장 가까운 순)
               const sortedGames = categorizedGames.sort((a, b) => {
                 // 베팅 가능한 경기가 우선
                 if (a.isBettable && !b.isBettable) return -1;
@@ -115,11 +133,28 @@ export default function Home() {
     if (viewMode !== 'today') return;
     // todayGames를 평탄화(flatten)하여 전체 경기 리스트로 변환
     const allGames: any[] = Object.values(todayGames).flat();
+    console.log('Today Betting - Total games before deduplication:', allGames.length);
     
-    // 중복 제거: game.id를 기준으로 중복 경기 제거
-    const uniqueGames = allGames.filter((game, index, self) => 
-      index === self.findIndex(g => g.id === game.id)
-    );
+    // 중복 제거: game.id와 경기 정보를 기준으로 중복 경기 제거
+    const uniqueGamesMap = new Map();
+    allGames.forEach((game) => {
+      // game.id가 있으면 id를 키로 사용, 없으면 경기 정보를 키로 사용
+      const key = game.id || `${game.home_team}|${game.away_team}|${game.commence_time}`;
+      if (!uniqueGamesMap.has(key)) {
+        uniqueGamesMap.set(key, game);
+      } else {
+        // 이미 존재하는 경우, 더 많은 bookmakers 정보를 가진 것을 선택
+        const prev = uniqueGamesMap.get(key);
+        if (
+          (!prev.bookmakers && game.bookmakers) ||
+          (Array.isArray(game.bookmakers) && Array.isArray(prev.bookmakers) && game.bookmakers.length > prev.bookmakers.length)
+        ) {
+          uniqueGamesMap.set(key, game);
+        }
+      }
+    });
+    const uniqueGames = Array.from(uniqueGamesMap.values());
+    console.log('Today Betting - Total games after deduplication:', uniqueGames.length);
     
     // 경기 시작 시간순 정렬
     uniqueGames.sort((a, b) => new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime());
