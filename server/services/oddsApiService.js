@@ -257,9 +257,18 @@ class OddsApiService {
 
           console.log(`[DEBUG] Found ${oddsResponse.data.length} games with odds for ${clientCategory}`);
 
+          // === 추가: UTC 기준 7일 이내 경기만 저장 ===
+          const now = new Date();
+          const weekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+          const filteredGames = oddsResponse.data.filter(game => {
+            const commence = new Date(game.commence_time);
+            return commence >= now && commence < weekLater;
+          });
+          console.log(`[DEBUG] ${clientCategory}: ${filteredGames.length}개 경기(7일 이내) 처리 시작`);
+          // === 끝 ===
+
           // 데이터 검증 및 저장
-          console.log(`[DEBUG] ${clientCategory}: ${oddsResponse.data.length}개 경기 처리 시작`);
-          for (const game of oddsResponse.data) {
+          for (const game of filteredGames) {
             console.log(`[DEBUG] 경기 검증: ${game.home_team} vs ${game.away_team}`);
             if (this.validateOddsData(game)) {
               const mainCategory = this.determineMainCategory(clientCategory);
@@ -486,8 +495,17 @@ class OddsApiService {
 
           console.log(`[DEBUG] Found ${oddsResponse.data.length} games for ${clientCategory}`);
 
+          // === 추가: UTC 기준 7일 이내 경기만 저장 ===
+          const now = new Date();
+          const weekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+          const filteredGames = oddsResponse.data.filter(game => {
+            const commence = new Date(game.commence_time);
+            return commence >= now && commence < weekLater;
+          });
+          // === 끝 ===
+
           // 데이터 검증 및 저장
-          for (const game of oddsResponse.data) {
+          for (const game of filteredGames) {
             if (this.validateOddsData(game)) {
               const mainCategory = this.determineMainCategory(clientCategory);
               const subCategory = this.determineSubCategory(clientCategory);
