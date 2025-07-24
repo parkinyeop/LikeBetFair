@@ -238,7 +238,7 @@ class GameResultService {
           home_team: event.strHomeTeam,
           away_team: event.strAwayTeam,
           commence_time: commenceTime,
-          completed: event.strStatus === 'Match Finished',
+          completed: ['FT', 'Match Finished', 'AET', 'PEN', 'HT'].includes(event.strStatus),
           scores: event.intHomeScore !== null && event.intAwayScore !== null ? [
             { name: event.strHomeTeam, score: event.intHomeScore?.toString() || '0' },
             { name: event.strAwayTeam, score: event.intAwayScore?.toString() || '0' }
@@ -356,7 +356,7 @@ class GameResultService {
           home_team: event.strHomeTeam,
           away_team: event.strAwayTeam,
           commence_time: commenceTime,
-          completed: event.strStatus === 'Match Finished',
+          completed: ['FT', 'Match Finished', 'AET', 'PEN', 'HT'].includes(event.strStatus),
           scores: event.intHomeScore !== null && event.intAwayScore !== null ? [
             { name: event.strHomeTeam, score: event.intHomeScore?.toString() || '0' },
             { name: event.strAwayTeam, score: event.intAwayScore?.toString() || '0' }
