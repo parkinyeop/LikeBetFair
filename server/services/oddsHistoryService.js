@@ -26,12 +26,6 @@ class OddsHistoryService {
         return 0;
       }
 
-      // UUID 타입 오류 방지를 위해 히스토리 저장을 임시로 건너뜀
-      console.log('[OddsHistory] UUID 타입 오류 방지를 위해 히스토리 저장 건너뜀');
-      return 0;
-
-      // 아래 코드는 UUID 타입 문제가 해결된 후 활성화
-      /*
       let savedCount = 0;
       const snapshotTime = new Date();
 
@@ -73,7 +67,18 @@ class OddsHistoryService {
               });
               savedCount++;
             } catch (createError) {
-              console.error('[OddsHistory] 개별 히스토리 저장 오류:', createError.message);
+              console.error('[OddsHistory] 개별 히스토리 저장 오류:', createError.message, {
+                oddsCacheId: oddsData.id,
+                homeTeam: oddsData.homeTeam,
+                awayTeam: oddsData.awayTeam,
+                commenceTime: oddsData.commenceTime,
+                marketType: market.key,
+                outcomeName: outcome.name,
+                outcomePoint: outcome.point || null,
+                oddsValue: outcome.price,
+                bookmakerName: bookmaker.title,
+                snapshotTime: snapshotTime
+              });
               // 개별 오류가 전체를 중단시키지 않도록 계속 진행
               continue;
             }
@@ -81,9 +86,10 @@ class OddsHistoryService {
         }
       }
 
+      if (savedCount > 0) {
+        console.log(`[OddsHistory] ${savedCount}개 히스토리 저장 완료 (oddsCacheId: ${oddsData.id})`);
+      }
       return savedCount;
-      */
-
     } catch (error) {
       console.error('[OddsHistory] 히스토리 저장 중 오류:', error);
       return 0;
