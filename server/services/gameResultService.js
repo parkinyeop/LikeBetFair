@@ -23,16 +23,15 @@ const clientSportKeyMap = {
   '중국 슈퍼리그': 'soccer_china_superleague',
   '라리가': 'soccer_spain_la_liga',
   '분데스리가': 'soccer_germany_bundesliga',
-  '프리미어리그': 'soccer_epl',
+  '프리미어리그': 'soccer_england_premier_league',
   'NBA': 'basketball_nba',
   'MLB': 'baseball_mlb',
   'KBO': 'baseball_kbo',
   'NFL': 'americanfootball_nfl'
 };
 
-// TheSportsDB 리그ID 매핑 (배당율을 제공하는 실제 스포츠 카테고리)
+// TheSportsDB 리그ID 매핑 (sportKey 기준, 반드시 clientSportKeyMap 값과 일치)
 const sportsDbLeagueMap = {
-  // 축구 (Football)
   'soccer_korea_kleague1': '4689',      // K리그
   'soccer_japan_j_league': '4340',      // J리그
   'soccer_italy_serie_a': '4332',       // 세리에 A
@@ -40,16 +39,16 @@ const sportsDbLeagueMap = {
   'soccer_usa_mls': '4346',             // MLS
   'soccer_argentina_primera_division': '4406', // 아르헨티나 프리메라
   'soccer_china_superleague': '4359',   // 중국 슈퍼리그
-  'soccer_spain_primera_division': '4335', // 라리가
+  'soccer_spain_la_liga': '4335',       // 라리가
   'soccer_germany_bundesliga': '4331',  // 분데스리가
   'soccer_england_premier_league': '4328', // 프리미어리그
-  // 농구 (Basketball)
-  'basketball_nba': '4387',             // NBA - 수정 필요
+  // 농구
+  'basketball_nba': '4387',             // NBA
   'basketball_kbl': '5124',             // KBL
-  // 야구 (Baseball)
+  // 야구
   'baseball_mlb': '4424',               // MLB
   'baseball_kbo': '4830',               // KBO
-  // 미식축구 (American Football)
+  // 미식축구
   'americanfootball_nfl': '4391'        // NFL
 };
 
@@ -660,13 +659,13 @@ class GameResultService {
     return map[category] || null;
   }
 
-  // clientCategory(한글) → sportKey(영문) 매핑 함수 추가
+  // clientCategory(한글) → sportKey(영문) 매핑 함수 보완
   getSportKeyFromClientCategory(clientCategory) {
-    // clientSportKeyMap이 이미 선언되어 있다고 가정
     if (clientSportKeyMap[clientCategory]) return clientSportKeyMap[clientCategory];
     // 이미 영문 코드면 그대로 반환
-    if (typeof clientCategory === 'string' && clientCategory.startsWith('soccer_')) return clientCategory;
-    return null;
+    if (typeof clientCategory === 'string' && sportsDbLeagueMap[clientCategory]) return clientCategory;
+    console.error(`[getSportKeyFromClientCategory] Unknown or unmapped clientCategory: ${clientCategory}`);
+    return undefined;
   }
 
   // 활성 카테고리만 업데이트 (비용 절약용)
