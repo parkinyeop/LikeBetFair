@@ -314,8 +314,16 @@ class OddsApiService {
 
               // 배당률 히스토리 저장
               if (oddsRecord) {
+                console.log('[DEBUG] saveOddsSnapshot 호출 직전:', {
+                  id: oddsRecord.id,
+                  homeTeam: oddsRecord.homeTeam,
+                  awayTeam: oddsRecord.awayTeam,
+                  commenceTime: oddsRecord.commenceTime,
+                  bookmakersType: typeof oddsRecord.bookmakers
+                });
                 try {
                   const historyCount = await oddsHistoryService.saveOddsSnapshot(oddsRecord);
+                  console.log('[DEBUG] saveOddsSnapshot 반환값:', historyCount);
                   if (historyCount > 0) {
                     console.log(`[DEBUG] ${clientCategory} 히스토리 ${historyCount}개 저장됨`);
                   }

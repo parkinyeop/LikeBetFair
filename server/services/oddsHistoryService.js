@@ -14,9 +14,16 @@ class OddsHistoryService {
    * @returns {Promise<number>} - 저장된 히스토리 개수
    */
   async saveOddsSnapshot(oddsData) {
+    console.log('[DEBUG] saveOddsSnapshot 진입:', {
+      id: oddsData?.id,
+      homeTeam: oddsData?.homeTeam,
+      awayTeam: oddsData?.awayTeam,
+      commenceTime: oddsData?.commenceTime,
+      bookmakersType: typeof oddsData?.bookmakers
+    });
     try {
       if (!oddsData || !oddsData.bookmakers) {
-        console.log('[OddsHistory] oddsData 또는 bookmakers가 없음');
+        console.log('[OddsHistory] oddsData 또는 bookmakers가 없음', oddsData);
         return 0;
       }
 
@@ -35,13 +42,13 @@ class OddsHistoryService {
         try {
           bookmakers = JSON.parse(bookmakers);
         } catch (e) {
-          console.error('[OddsHistory] bookmakers JSON 파싱 오류:', e);
+          console.error('[OddsHistory] bookmakers JSON 파싱 오류:', e, bookmakers);
           return 0;
         }
       }
 
       if (!Array.isArray(bookmakers)) {
-        console.error('[OddsHistory] bookmakers가 배열이 아님:', typeof bookmakers);
+        console.error('[OddsHistory] bookmakers가 배열이 아님:', typeof bookmakers, bookmakers);
         return 0;
       }
 
@@ -88,10 +95,12 @@ class OddsHistoryService {
 
       if (savedCount > 0) {
         console.log(`[OddsHistory] ${savedCount}개 히스토리 저장 완료 (oddsCacheId: ${oddsData.id})`);
+      } else {
+        console.log('[OddsHistory] 저장된 히스토리 없음:', oddsData.id);
       }
       return savedCount;
     } catch (error) {
-      console.error('[OddsHistory] 히스토리 저장 중 오류:', error);
+      console.error('[OddsHistory] 히스토리 저장 중 오류:', error, oddsData);
       return 0;
     }
   }
