@@ -473,8 +473,7 @@ class GameResultService {
     }
     let savedCount = 0;
     for (const league of Object.keys(leagueMap)) {
-      // 모든 리그를 TheSportsDB API로 fetch (The Odds API 사용 금지)
-      const sportKey = this.getSportKeyForCategory(league);
+      const sportKey = this.getSportKeyFromClientCategory(league);
       if (!sportKey) continue;
       
       try {
@@ -661,6 +660,15 @@ class GameResultService {
     return map[category] || null;
   }
 
+  // clientCategory(한글) → sportKey(영문) 매핑 함수 추가
+  getSportKeyFromClientCategory(clientCategory) {
+    // clientSportKeyMap이 이미 선언되어 있다고 가정
+    if (clientSportKeyMap[clientCategory]) return clientSportKeyMap[clientCategory];
+    // 이미 영문 코드면 그대로 반환
+    if (typeof clientCategory === 'string' && clientCategory.startsWith('soccer_')) return clientCategory;
+    return null;
+  }
+
   // 활성 카테고리만 업데이트 (비용 절약용)
   async fetchAndUpdateResultsForCategories(activeCategories) {
     try {
@@ -672,7 +680,7 @@ class GameResultService {
       const processedCategories = [];
 
       for (const clientCategory of activeCategories) {
-        const sportKey = this.getSportKeyForCategory(clientCategory);
+        const sportKey = this.getSportKeyFromClientCategory(clientCategory);
         if (!sportKey) {
           console.log(`No sport key found for ${clientCategory}`);
           continue;
@@ -854,7 +862,12 @@ class GameResultService {
       console.log('Starting game results update for all categories...');
       
       // 클라이언트에서 사용하는 모든 카테고리에 대해 개별적으로 API 호출
-      for (const [clientCategory, sportKey] of Object.entries(clientSportKeyMap)) {
+      for (const [clientCategory, _] of Object.entries(clientSportKeyMap)) {
+        const sportKey = this.getSportKeyFromClientCategory(clientCategory);
+        if (!sportKey) {
+          console.error(`[fetchAndUpdateResults] Unknown sportKey for clientCategory: ${clientCategory}`);
+          continue;
+        }
         console.log(`Fetching results for ${clientCategory} (${sportKey})...`);
         
         try {
