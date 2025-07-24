@@ -83,6 +83,7 @@ async function collectBrasileirao() {
         const [gameResult, created] = await GameResult.upsert({
           mainCategory: MAIN_CATEGORY,
           subCategory: SUB_CATEGORY,
+          sportKey: 'soccer_brazil_campeonato', // 필수 필드 추가
           homeTeam,
           awayTeam,
           commenceTime,
