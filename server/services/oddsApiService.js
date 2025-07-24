@@ -548,6 +548,20 @@ class OddsApiService {
               } else {
                 totalUpdatedCount++;
               }
+
+              // OddsHistory 저장 추가
+              if (oddsRecord) {
+                try {
+                  const historyCount = await oddsHistoryService.saveOddsSnapshot(oddsRecord);
+                  if (historyCount > 0) {
+                    console.log(`[OddsHistory] ${clientCategory} 히스토리 ${historyCount}개 저장됨`);
+                  } else {
+                    console.log(`[OddsHistory] ${clientCategory} 히스토리 저장 없음`);
+                  }
+                } catch (historyError) {
+                  console.error(`[OddsHistory] 히스토리 저장 실패 (${clientCategory}):`, historyError.message);
+                }
+              }
             } else {
               totalSkippedCount++;
             }
