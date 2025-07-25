@@ -27,6 +27,26 @@ class SeasonValidationService {
       // 향후 3일간 예정 경기 확인  
       const upcomingGames = await this.getUpcomingGames(sportKey, 3);
       
+      // 디버그 로그 추가
+      console.log(`🔍 [SeasonValidation] ${sportKey} 시즌 상태 체크:`, {
+        configuredStatus: seasonInfo.status,
+        recentResultsCount: recentResults.length,
+        upcomingGamesCount: upcomingGames.length,
+        recentResults: recentResults.map(r => ({
+          homeTeam: r.homeTeam,
+          awayTeam: r.awayTeam,
+          commenceTime: r.commenceTime,
+          status: r.status,
+          result: r.result
+        })),
+        upcomingGames: upcomingGames.map(g => ({
+          homeTeam: g.homeTeam,
+          awayTeam: g.awayTeam,
+          commenceTime: g.commenceTime,
+          status: g.status
+        }))
+      });
+      
       // 실제 데이터 기반 시즌 상태 판단
       const realStatus = this.determineRealSeasonStatus(seasonInfo, recentResults, upcomingGames);
       
@@ -88,6 +108,9 @@ class SeasonValidationService {
         },
         status: {
           [Op.in]: ['finished']
+        },
+        result: {
+          [Op.notIn]: ['pending']
         }
       },
       order: [['commenceTime', 'DESC']],
@@ -173,6 +196,14 @@ class SeasonValidationService {
       };
     }
     
+    // 최근 경기도 없고 예정 경기도 없는 경우, 설정된 시즌 상태를 우선 사용
+    if (seasonInfo.status === 'active') {
+      return {
+        status: 'active',
+        reason: `설정된 시즌 상태가 active이므로 베팅 허용 (실제 데이터 부족)`
+      };
+    }
+    
     // 최근 경기도 없고 예정 경기도 없음
     return {
       status: 'offseason',
@@ -205,6 +236,15 @@ class SeasonValidationService {
     }
     
     const isEligible = allowedStatuses.includes(seasonStatus.status);
+    
+    // 디버그 로그 추가
+    console.log(`🔍 [SeasonValidation] ${sportKey} 베팅 가능 여부:`, {
+      status: seasonStatus.status,
+      isEligible,
+      reason: seasonStatus.reason,
+      recentGamesCount: seasonStatus.recentGamesCount,
+      upcomingGamesCount: seasonStatus.upcomingGamesCount
+    });
     
     return {
       isEligible: isEligible,
