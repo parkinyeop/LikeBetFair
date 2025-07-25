@@ -304,7 +304,8 @@ class BetResultService {
         betId: bet.id,
         amount: adjustedWinnings,
         memo: hasCancelledSelections ? '베팅 적중 지급 (일부 경기 취소 반영)' : '베팅 적중 지급',
-        paidAt: new Date()
+        paidAt: new Date(),
+        balanceAfter: user.balance
       }, { transaction });
       
       console.log(`[적중 지급] 베팅 ${bet.id}: ${adjustedWinnings}원 지급`);
@@ -329,7 +330,8 @@ class BetResultService {
         betId: bet.id,
         amount: bet.stake,
         memo: memo,
-        paidAt: new Date()
+        paidAt: new Date(),
+        balanceAfter: user.balance
       }, { transaction });
       
       console.log(`[환불 처리] 베팅 ${bet.id}: ${bet.stake}원 환불`);

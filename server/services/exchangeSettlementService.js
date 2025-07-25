@@ -308,7 +308,8 @@ class ExchangeSettlementService {
       betId: orderId,
       amount,
       memo: amount > 0 ? 'Exchange 베팅 승리 수익' : 'Exchange 베팅 손실',
-      paidAt: new Date()
+      paidAt: new Date(),
+      balanceAfter: newBalance
     }, { transaction });
     
     console.log(`      💳 ${userId}: ${previousBalance} → ${newBalance} (${amount > 0 ? '+' : ''}${amount})`);
