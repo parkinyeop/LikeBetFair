@@ -1,11 +1,151 @@
 import { SEASON_SCHEDULES } from '../config/sportsMapping.js';
 import GameResult from '../models/gameResultModel.js';
 import { Op } from 'sequelize';
+import axios from 'axios';
 
 class SeasonValidationService {
   
+  constructor() {
+    this.theSportsDbApiKey = '3'; // TheSportsDB 무료 API 키 사용
+    this.sportsDbBaseUrl = 'https://www.thesportsdb.com/api/v1/json';
+  }
+
   /**
-   * 특정 스포츠의 시즌 상태를 체크
+   * sportKey를 TheSportsDB 리그 ID로 변환
+   */
+  getTheSportsDbId(sportKey) {
+    const mapping = {
+      'soccer_korea_kleague1': '4689',
+      'soccer_japan_j_league': '4414', 
+      'soccer_italy_serie_a': '4332',
+      'soccer_brazil_campeonato': '4351',
+      'soccer_usa_mls': '4346',
+      'soccer_argentina_primera_division': '4406',
+      'soccer_china_superleague': '4359',
+      'soccer_spain_primera_division': '4335',
+      'soccer_germany_bundesliga': '4331',
+      'soccer_england_premier_league': '4328',
+      'basketball_nba': '4387',
+      'basketball_kbl': '5124',
+      'baseball_mlb': '4424',
+      'baseball_kbo': '4578',
+      'americanfootball_nfl': '4391'
+    };
+    
+    return mapping[sportKey];
+  }
+
+  /**
+   * TheSportsDB API를 통한 시즌 상태 확인
+   * @param {string} sportKey - 스포츠 키
+   * @returns {Object} TheSportsDB 기반 시즌 상태
+   */
+  async checkSeasonStatusWithSportsDB(sportKey) {
+    try {
+      const leagueId = this.getTheSportsDbId(sportKey);
+      if (!leagueId) {
+        console.log(`⚠️ [SportsDB] ${sportKey}에 대한 TheSportsDB ID를 찾을 수 없습니다`);
+        return { status: 'unknown', reason: 'TheSportsDB ID 없음' };
+      }
+
+      const currentYear = new Date().getFullYear();
+      console.log(`🔍 [SportsDB] ${sportKey} 시즌 데이터 조회 중... (리그 ID: ${leagueId}, 시즌: ${currentYear})`);
+      
+      const response = await axios.get(
+        `${this.sportsDbBaseUrl}/${this.theSportsDbApiKey}/eventsseason.php`,
+        {
+          params: {
+            id: leagueId,
+            s: currentYear
+          },
+          timeout: 10000
+        }
+      );
+
+      if (!response.data?.events) {
+        console.log(`⚠️ [SportsDB] ${sportKey} 시즌 데이터가 없습니다`);
+        return { status: 'unknown', reason: 'TheSportsDB 시즌 데이터 없음' };
+      }
+
+      const events = response.data.events;
+      console.log(`✅ [SportsDB] ${sportKey}: ${events.length}개 경기 데이터 수신`);
+
+      // 최근 30일 완료된 경기
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const recentFinished = events.filter(event => {
+        const gameDate = new Date(event.dateEvent);
+        return gameDate >= thirtyDaysAgo && 
+               (event.strStatus === 'FT' || event.strStatus === 'Match Finished' || event.intHomeScore !== null);
+      });
+
+      // 향후 30일 예정된 경기
+      const now = new Date();
+      const thirtyDaysLater = new Date();
+      thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
+      
+      const upcomingScheduled = events.filter(event => {
+        const gameDate = new Date(event.dateEvent);
+        return gameDate >= now && 
+               gameDate <= thirtyDaysLater &&
+               event.strStatus !== 'FT' && 
+               event.strStatus !== 'Match Finished';
+      });
+
+      console.log(`📊 [SportsDB] ${sportKey} 분석 결과:`, {
+        totalGames: events.length,
+        recentFinished: recentFinished.length,
+        upcomingScheduled: upcomingScheduled.length
+      });
+
+      // 시즌 상태 판단
+      if (recentFinished.length > 0 && upcomingScheduled.length > 0) {
+        return {
+          status: 'active',
+          reason: `TheSportsDB: 정상 시즌 진행 중 (최근 ${recentFinished.length}경기 완료, ${upcomingScheduled.length}경기 예정)`,
+          recentGamesCount: recentFinished.length,
+          upcomingGamesCount: upcomingScheduled.length,
+          dataSource: 'TheSportsDB'
+        };
+      } else if (recentFinished.length > 0 && upcomingScheduled.length === 0) {
+        return {
+          status: 'break',
+          reason: `TheSportsDB: 시즌 중 휴식기 (최근 ${recentFinished.length}경기 완료, 예정 경기 없음)`,
+          recentGamesCount: recentFinished.length,
+          upcomingGamesCount: 0,
+          dataSource: 'TheSportsDB'
+        };
+      } else if (recentFinished.length === 0 && upcomingScheduled.length > 0) {
+        return {
+          status: 'preseason',
+          reason: `TheSportsDB: 시즌 시작 전 (${upcomingScheduled.length}경기 예정)`,
+          recentGamesCount: 0,
+          upcomingGamesCount: upcomingScheduled.length,
+          dataSource: 'TheSportsDB'
+        };
+      } else {
+        return {
+          status: 'offseason',
+          reason: 'TheSportsDB: 시즌오프 (최근 경기 없음, 예정 경기 없음)',
+          recentGamesCount: 0,
+          upcomingGamesCount: 0,
+          dataSource: 'TheSportsDB'
+        };
+      }
+
+    } catch (error) {
+      console.error(`❌ [SportsDB] ${sportKey} API 호출 실패:`, error.message);
+      return { 
+        status: 'error', 
+        reason: `TheSportsDB API 오류: ${error.message}`,
+        dataSource: 'TheSportsDB'
+      };
+    }
+  }
+  
+  /**
+   * 특정 스포츠의 시즌 상태를 체크 (하이브리드 접근법)
    * @param {string} sportKey - 스포츠 키 (예: soccer_japan_j_league)
    * @returns {Object} 시즌 상태 정보
    */
@@ -20,15 +160,34 @@ class SeasonValidationService {
           reason: '지원하지 않는 리그입니다'
         };
       }
+
+      console.log(`🔍 [SeasonValidation] ${sportKey} 시즌 상태 체크 시작...`);
       
-      // 최근 7일간 경기 결과 확인
+      // 1단계: TheSportsDB API 시도
+      const sportsDbStatus = await this.checkSeasonStatusWithSportsDB(sportKey);
+      
+      if (sportsDbStatus.status !== 'unknown' && sportsDbStatus.status !== 'error') {
+        console.log(`✅ [SeasonValidation] ${sportKey} TheSportsDB API 성공:`, sportsDbStatus);
+        
+        return {
+          isActive: sportsDbStatus.status === 'active',
+          status: sportsDbStatus.status,
+          reason: sportsDbStatus.reason,
+          recentGamesCount: sportsDbStatus.recentGamesCount || 0,
+          upcomingGamesCount: sportsDbStatus.upcomingGamesCount || 0,
+          seasonInfo: seasonInfo,
+          dataSource: 'TheSportsDB'
+        };
+      }
+
+      // 2단계: 로컬 GameResult 데이터로 폴백
+      console.log(`🔄 [SeasonValidation] ${sportKey} TheSportsDB 실패, 로컬 데이터로 폴백...`);
+      
       const recentResults = await this.getRecentGameResults(sportKey, 7);
-      
-      // 향후 3일간 예정 경기 확인  
       const upcomingGames = await this.getUpcomingGames(sportKey, 3);
       
       // 디버그 로그 추가
-      console.log(`🔍 [SeasonValidation] ${sportKey} 시즌 상태 체크:`, {
+      console.log(`🔍 [SeasonValidation] ${sportKey} 로컬 데이터 체크:`, {
         configuredStatus: seasonInfo.status,
         recentResultsCount: recentResults.length,
         upcomingGamesCount: upcomingGames.length,
@@ -56,7 +215,8 @@ class SeasonValidationService {
         reason: realStatus.reason,
         recentGamesCount: recentResults.length,
         upcomingGamesCount: upcomingGames.length,
-        seasonInfo: seasonInfo
+        seasonInfo: seasonInfo,
+        dataSource: 'Local'
       };
       
     } catch (error) {

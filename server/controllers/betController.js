@@ -44,7 +44,7 @@ export async function placeBet(req, res) {
       return res.status(400).json({ message: 'Missing required bet information' });
     }
 
-    // 🆕 시즌 상태 검증 추가 (임시 완화)
+    // 🆕 시즌 상태 검증 추가 (개선된 TheSportsDB 기반)
     console.log(`[BetController] 시즌 상태 검증 시작: ${selections.length}개 선택`);
     for (const selection of selections) {
       const sportKey = selection.sport_key;
@@ -54,21 +54,24 @@ export async function placeBet(req, res) {
           if (!seasonValidation.isEligible) {
             console.log(`[BetController] 시즌 상태 검증 실패: ${selection.desc} - ${seasonValidation.reason}`);
             
-            // 임시로 시즌 검증 실패를 경고로 처리하고 계속 진행
-            console.log(`[BetController] ⚠️ 시즌 검증 실패했지만 임시로 베팅 허용: ${selection.desc}`);
-            // return res.status(400).json({ 
-            //   message: `베팅 불가능한 리그: ${selection.desc}`,
-            //   reason: seasonValidation.reason,
-            //   status: seasonValidation.status,
-            //   code: 'SEASON_OFFSEASON'
-            // });
+            // 시즌 검증 실패 시 베팅 거부
+            return res.status(400).json({ 
+              message: `베팅 불가능한 리그: ${selection.desc}`,
+              reason: seasonValidation.reason,
+              status: seasonValidation.status,
+              dataSource: seasonValidation.seasonStatus?.dataSource || 'Unknown',
+              code: 'SEASON_OFFSEASON'
+            });
           } else {
             // 시즌 상태 로깅
-            console.log(`[BetController] 시즌 상태 검증 통과: ${selection.desc} - ${seasonValidation.reason}`);
+            console.log(`[BetController] 시즌 상태 검증 통과: ${selection.desc} - ${seasonValidation.reason} (${seasonValidation.seasonStatus?.dataSource || 'Unknown'})`);
           }
         } catch (seasonError) {
-          console.log(`[BetController] 시즌 상태 검증 오류 (무시): ${selection.desc} - ${seasonError.message}`);
-          // 시즌 검증 오류는 무시하고 계속 진행
+          console.log(`[BetController] 시즌 상태 검증 오류: ${selection.desc} - ${seasonError.message}`);
+          return res.status(500).json({ 
+            message: `시즌 상태 확인 중 오류 발생: ${selection.desc}`,
+            error: seasonError.message
+          });
         }
       } else {
         console.log(`[BetController] sport_key 없음 (시즌 검증 건너뜀): ${selection.desc}`);
