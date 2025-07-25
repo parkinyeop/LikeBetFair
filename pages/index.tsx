@@ -227,74 +227,8 @@ export default function Home() {
     const allGames: any[] = Object.values(todayGames).flat();
     console.log('Today Betting - Total games before deduplication:', allGames.length);
     
-    // 중복 제거: game.id와 경기 정보를 기준으로 중복 경기 제거 (더 관대한 기준)
-    const uniqueGamesMap = new Map();
-    allGames.forEach((game) => {
-      const key = `${game.sport_key || game.sportTitle || 'Unknown'}|${game.home_team}|${game.away_team}|${game.commence_time}`;
-      if (!uniqueGamesMap.has(key)) {
-        uniqueGamesMap.set(key, game);
-      } else {
-        const prev = uniqueGamesMap.get(key);
-        // 1. 공식 배당이 있으면 우선
-        if (!prev.officialOdds && game.officialOdds) {
-          uniqueGamesMap.set(key, game);
-          return;
-        }
-        if (prev.officialOdds && !game.officialOdds) {
-          return;
-        }
-        // 2. bookmakers 개수 비교
-        const prevBookmakers = Array.isArray(prev.bookmakers) ? prev.bookmakers.length : 0;
-        const gameBookmakers = Array.isArray(game.bookmakers) ? game.bookmakers.length : 0;
-        if (gameBookmakers > prevBookmakers) {
-          uniqueGamesMap.set(key, game);
-          return;
-        }
-        if (gameBookmakers < prevBookmakers) {
-          return;
-        }
-        // 3. 업데이트 시간 비교
-        const prevUpdate = new Date(prev.lastUpdated || prev.commence_time);
-        const gameUpdate = new Date(game.lastUpdated || game.commence_time);
-        if (gameUpdate > prevUpdate) {
-          uniqueGamesMap.set(key, game);
-          return;
-        }
-        // 4. 동점이면 기존 데이터 유지
-      }
-    });
-    const uniqueGames = Array.from(uniqueGamesMap.values());
-    console.log('Today Betting - Total games after deduplication:', uniqueGames.length);
-    
-    // 모든 리그별 경기 수 확인
-    const leagueCounts: Record<string, number> = {};
-    uniqueGames.forEach(game => {
-      const leagueKey = game.sport_key || game.sportTitle || 'Unknown';
-      leagueCounts[leagueKey] = (leagueCounts[leagueKey] || 0) + 1;
-    });
-    
-    console.log('Today Betting - 리그별 경기 수:', leagueCounts);
-    
-    // 각 리그의 첫 번째 경기 정보 확인
-    Object.keys(leagueCounts).forEach(leagueKey => {
-      const leagueGames = uniqueGames.filter(game => 
-        (game.sport_key || game.sportTitle) === leagueKey
-      );
-      if (leagueGames.length > 0) {
-        console.log(`Today Betting - ${leagueKey} 첫 번째 경기:`, {
-          home_team: leagueGames[0].home_team,
-          away_team: leagueGames[0].away_team,
-          sport_key: leagueGames[0].sport_key,
-          sportTitle: leagueGames[0].sportTitle,
-          hasOfficialOdds: !!leagueGames[0].officialOdds,
-          hasBookmakers: !!leagueGames[0].bookmakers
-        });
-      }
-    });
-    
-    // 경기 시작 시간순 정렬
-    uniqueGames.sort((a, b) => new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime());
-    setTodayFlatGames(uniqueGames);
+    // 전체 deduplication(중복 제거) 제거: allGames를 그대로 todayFlatGames로 사용
+    setTodayFlatGames(allGames);
   }, [todayGames, viewMode]);
 
   useEffect(() => {
