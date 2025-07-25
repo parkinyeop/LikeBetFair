@@ -112,7 +112,7 @@ export default function Home() {
               // 2. 중복 제거: 같은 경기 중복 제거 (더 관대한 기준)
               const uniqueGamesMap = new Map();
               filteredGames.forEach((game: any) => {
-                const key = `${game.home_team}|${game.away_team}|${game.commence_time}`;
+                const key = `${game.sport_key || game.sportTitle || 'Unknown'}|${game.home_team}|${game.away_team}|${game.commence_time}`;
                 if (!uniqueGamesMap.has(key)) {
                   uniqueGamesMap.set(key, game);
                 } else {
@@ -120,7 +120,6 @@ export default function Home() {
                   // 더 나은 데이터를 가진 것을 선택하되, 기준을 완화
                   const prevScore = (prev.bookmakers ? 1 : 0) + (prev.officialOdds ? 1 : 0);
                   const gameScore = (game.bookmakers ? 1 : 0) + (game.officialOdds ? 1 : 0);
-                  
                   // 점수가 더 높은 것을 선택하되, 차이가 2점 이상일 때만 교체
                   if (gameScore > prevScore + 1) {
                     uniqueGamesMap.set(key, game);
@@ -231,7 +230,7 @@ export default function Home() {
     // 중복 제거: game.id와 경기 정보를 기준으로 중복 경기 제거 (더 관대한 기준)
     const uniqueGamesMap = new Map();
     allGames.forEach((game) => {
-      const key = game.id || `${game.home_team}|${game.away_team}|${game.commence_time}`;
+      const key = `${game.sport_key || game.sportTitle || 'Unknown'}|${game.home_team}|${game.away_team}|${game.commence_time}`;
       if (!uniqueGamesMap.has(key)) {
         uniqueGamesMap.set(key, game);
       } else {
