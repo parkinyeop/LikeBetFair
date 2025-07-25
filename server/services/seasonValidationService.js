@@ -79,15 +79,21 @@ class SeasonValidationService {
         return { status: 'unknown', reason: 'TheSportsDB ID 없음' };
       }
 
-      const currentYear = new Date().getFullYear();
-      console.log(`🔍 [SportsDB] ${sportKey} 시즌 데이터 조회 중... (리그 ID: ${leagueId}, 시즌: ${currentYear})`);
+      // 개선: 리그별 시즌 문자열(currentSeason) 사용
+      const seasonInfo = SEASON_SCHEDULES[sportKey];
+      const seasonParam = (seasonInfo && seasonInfo.currentSeason) ? seasonInfo.currentSeason : new Date().getFullYear();
+
+      // 실제 호출 URL 로그로 남김
+      const apiUrl = `${this.sportsDbBaseUrl}/${this.theSportsDbApiKey}/eventsseason.php`;
+      console.log(`🔍 [SportsDB] ${sportKey} 시즌 데이터 조회 중... (리그 ID: ${leagueId}, 시즌: ${seasonParam})`);
+      console.log(`[SportsDB] API 호출 URL: ${apiUrl}?id=${leagueId}&s=${seasonParam}`);
       
       const response = await axios.get(
-        `${this.sportsDbBaseUrl}/${this.theSportsDbApiKey}/eventsseason.php`,
+        apiUrl,
         {
           params: {
             id: leagueId,
-            s: currentYear
+            s: seasonParam
           },
           timeout: 10000
         }
