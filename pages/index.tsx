@@ -110,12 +110,32 @@ export default function Home() {
                 filteredOut: data.length - filteredGames.length
               });
               
-              // [중복 제거 완전 비활성화] filteredGames를 그대로 사용
-              const uniqueGames = filteredGames;
-              console.log(`🔍 ${displayName} 중복 제거 결과: (중복 제거 비활성화)`, {
+              // [중복 제거 활성화] 리그별로 동일 경기(홈/어웨이/시간/리그) 1개만 남김
+              const uniqueGamesMap = new Map();
+              filteredGames.forEach((game: any) => {
+                // sport_key|home_team|away_team|commence_time 조합으로 유니크 처리
+                const key = `${game.sport_key || game.sportTitle || 'Unknown'}|${game.home_team}|${game.away_team}|${game.commence_time}`;
+                if (!uniqueGamesMap.has(key)) {
+                  uniqueGamesMap.set(key, game);
+                } else {
+                  // officialOdds 우선, 그다음 bookmakers 개수, 마지막으로 lastUpdated
+                  const prev = uniqueGamesMap.get(key);
+                  const prevHasOfficial = !!(prev.officialOdds && prev.officialOdds.h2h);
+                  const currHasOfficial = !!(game.officialOdds && game.officialOdds.h2h);
+                  if (
+                    (!prevHasOfficial && currHasOfficial) ||
+                    (currHasOfficial === prevHasOfficial && Array.isArray(game.bookmakers) && Array.isArray(prev.bookmakers) && game.bookmakers.length > prev.bookmakers.length) ||
+                    (currHasOfficial === prevHasOfficial && game.bookmakers?.length === prev.bookmakers?.length && new Date(game.lastUpdated || 0) > new Date(prev.lastUpdated || 0))
+                  ) {
+                    uniqueGamesMap.set(key, game);
+                  }
+                }
+              });
+              const uniqueGames = Array.from(uniqueGamesMap.values());
+              console.log(`[${displayName}로그] 중복 제거 결과:`, {
                 beforeDedup: filteredGames.length,
                 afterDedup: uniqueGames.length,
-                duplicatesRemoved: 0
+                duplicatesRemoved: filteredGames.length - uniqueGames.length
               });
               
               // 3. 베팅 가능 여부 분류 및 정렬
@@ -214,11 +234,11 @@ export default function Home() {
                       { name: game.home_team, price: (homeOdds as any)?.averagePrice },
                       { name: game.away_team, price: (awayOdds as any)?.averagePrice }
                     ].filter(outcome => outcome.price !== undefined);
-                    // 상세 로그
-                    if (!homeOdds) console.log(`[야구][${displayName}] home_team 키 미존재(정규화):`, game.home_team, '| h2h keys:', h2hKeys);
-                    if (!awayOdds) console.log(`[야구][${displayName}] away_team 키 미존재(정규화):`, game.away_team, '| h2h keys:', h2hKeys);
+                    // 상세 로그 (유니크 말머리 적용)
+                    if (!homeOdds) console.log(`[KBO로그][${displayName}] home_team 키 미존재(정규화):`, game.home_team, '| h2h keys:', h2hKeys);
+                    if (!awayOdds) console.log(`[KBO로그][${displayName}] away_team 키 미존재(정규화):`, game.away_team, '| h2h keys:', h2hKeys);
                     if ((homeOdds && (homeOdds as any).averagePrice === undefined) || (awayOdds && (awayOdds as any).averagePrice === undefined)) {
-                      console.log(`[야구][${displayName}] averagePrice undefined:`, {
+                      console.log(`[KBO로그][${displayName}] averagePrice undefined:`, {
                         home_team: game.home_team,
                         homeOdds,
                         away_team: game.away_team,
@@ -232,11 +252,11 @@ export default function Home() {
                     }));
                   }
                   if (outcomes.length === 0) {
-                    console.log(`[배당 없음][${displayName}] ${game.home_team} vs ${game.away_team} | ${game.commence_time}`);
+                    console.log(`[${displayName}로그][배당 없음] ${game.home_team} vs ${game.away_team} | ${game.commence_time}`);
                     if (game.officialOdds && game.officialOdds.h2h) {
-                      console.log('  h2h keys:', Object.keys(game.officialOdds.h2h));
+                      console.log(`[${displayName}로그] h2h keys:`, Object.keys(game.officialOdds.h2h));
                     } else {
-                      console.log('  [officialOdds.h2h 없음]');
+                      console.log(`[${displayName}로그] [officialOdds.h2h 없음]`);
                     }
                   }
                 });
