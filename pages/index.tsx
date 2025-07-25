@@ -220,6 +220,25 @@ export default function Home() {
                       { name: 'Draw', price: (drawOdds?.[1] as any)?.averagePrice },
                       { name: game.away_team, price: (awayOdds as any)?.averagePrice }
                     ].filter(outcome => outcome.price !== undefined);
+                  } else if (game.sport_key?.includes('baseball')) {
+                    // 야구 리그: Draw 없이 home/away만 outcomes에 포함
+                    const homeOdds = (h2hOdds as any)[game.home_team];
+                    const awayOdds = (h2hOdds as any)[game.away_team];
+                    outcomes = [
+                      { name: game.home_team, price: (homeOdds as any)?.averagePrice },
+                      { name: game.away_team, price: (awayOdds as any)?.averagePrice }
+                    ].filter(outcome => outcome.price !== undefined);
+                    // 상세 로그
+                    if (!homeOdds) console.log(`[야구][${displayName}] home_team 키 미존재:`, game.home_team, '| h2h keys:', Object.keys(h2hOdds));
+                    if (!awayOdds) console.log(`[야구][${displayName}] away_team 키 미존재:`, game.away_team, '| h2h keys:', Object.keys(h2hOdds));
+                    if ((homeOdds && (homeOdds as any).averagePrice === undefined) || (awayOdds && (awayOdds as any).averagePrice === undefined)) {
+                      console.log(`[야구][${displayName}] averagePrice undefined:`, {
+                        home_team: game.home_team,
+                        homeOdds,
+                        away_team: game.away_team,
+                        awayOdds
+                      });
+                    }
                   } else {
                     outcomes = Object.entries(h2hOdds).map(([outcomeName, oddsData]) => ({
                       name: outcomeName,
@@ -235,7 +254,19 @@ export default function Home() {
                     }
                   }
                 });
-                console.log(`==== [${displayName}] 점검 끝 ====`);
+                // 야구 리그도 첫 번째 경기 officialOdds.h2h 구조 반드시 출력
+                if (sortedGames.length > 0) {
+                  const firstGame = sortedGames[0];
+                  console.log(`==== [${displayName}] 첫 번째 경기 officialOdds.h2h 구조 ====`);
+                  if (firstGame.officialOdds && firstGame.officialOdds.h2h) {
+                    Object.entries(firstGame.officialOdds.h2h).forEach(([name, odds]) => {
+                      console.log(`  h2h: ${name} =`, odds);
+                    });
+                  } else {
+                    console.log('  [배당 없음] officialOdds.h2h가 없음');
+                  }
+                  console.log(`==== [${displayName}] 점검 끝 ====`);
+                }
                 console.log(`✅ ${displayName} Today Betting 데이터:`, sortedGames.length, '개 경기');
                 console.log(`✅ ${displayName} 첫 번째 경기 bookmakers:`, sortedGames[0].bookmakers ? '있음' : '없음');
                 console.log(`✅ ${displayName} 첫 번째 경기 officialOdds:`, sortedGames[0].officialOdds ? '있음' : '없음');
