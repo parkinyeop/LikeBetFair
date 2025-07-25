@@ -166,7 +166,10 @@ import { setupSeasonStatusScheduler } from './services/seasonStatusUpdater.js';
 import exchangeWebSocketService from './services/exchangeWebSocketService.js';
 
 // 데이터베이스 연결 및 서버 시작
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || (() => {
+  console.warn('⚠️ PORT 환경변수가 없어서 3000 포트를 사용합니다.');
+  return 3000;
+})();
 if (!PORT) {
   throw new Error('PORT 환경변수가 설정되어 있지 않습니다!');
 }

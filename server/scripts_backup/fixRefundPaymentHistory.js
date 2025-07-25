@@ -38,6 +38,7 @@ async function fixRefundPaymentHistory() {
     }
     
     // PaymentHistory 기록 추가
+    const user = await User.findByPk(userId);
     const paymentHistory = await PaymentHistory.create({
       userId: userId,
       type: 'refund', 
@@ -45,6 +46,7 @@ async function fixRefundPaymentHistory() {
       status: 'completed',
       method: 'system_refund',
       description: `베팅 취소 환불 (ID: ${betId}) - J리그 시즌오프 기간 잘못 허용된 베팅`,
+      balanceAfter: user.balance,
       metadata: {
         betId: betId,
         refundReason: 'season_offseason',

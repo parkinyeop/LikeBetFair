@@ -336,7 +336,8 @@ export async function cancelBet(req, res) {
       betId: bet.id,
       amount: bet.stake,
       memo: '베팅 취소 환불',
-      paidAt: new Date()
+      paidAt: new Date(),
+      balanceAfter: user.balance
     }, { transaction: t });
     await t.commit();
     res.json({ message: '베팅이 취소되었습니다.', balance: user.balance });

@@ -218,7 +218,8 @@ router.post('/settle', verifyToken, async (req, res) => {
       betId: '00000000-0000-0000-0000-000000000000', // Exchange 거래용 더미 ID
       amount: payout,
       memo: `Exchange 정산 수익`,
-      paidAt: new Date()
+      paidAt: new Date(),
+      balanceAfter: winnerUser.balance
     });
     
     // 거래 내역 업데이트
@@ -265,7 +266,8 @@ router.post('/cancel/:orderId', verifyToken, async (req, res) => {
       betId: '00000000-0000-0000-0000-000000000000', // Exchange 거래용 더미 ID
       amount: refundAmount,
       memo: `Exchange 주문 취소 환불`,
-      paidAt: new Date()
+      paidAt: new Date(),
+      balanceAfter: user.balance
     });
     
     // 주문 상태 변경
