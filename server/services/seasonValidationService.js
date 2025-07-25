@@ -1,5 +1,6 @@
 import { SEASON_SCHEDULES } from '../config/sportsMapping.js';
 import GameResult from '../models/gameResultModel.js';
+import OddsCache from '../models/oddsCacheModel.js';
 import { Op } from 'sequelize';
 import axios from 'axios';
 
@@ -33,6 +34,36 @@ class SeasonValidationService {
     };
     
     return mapping[sportKey];
+  }
+
+  /**
+   * 특정 스포츠의 최근 odds 데이터 존재 여부 확인
+   * @param {string} sportKey - 스포츠 키
+   * @returns {Object} odds 데이터 존재 여부와 개수
+   */
+  async checkRecentOddsData(sportKey) {
+    try {
+      // 30일 전부터 조회 (더 넓은 범위)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const oddsCount = await OddsCache.count({
+        where: {
+          sportKey: sportKey,
+          commenceTime: {
+            [Op.gte]: thirtyDaysAgo
+          }
+        }
+      });
+      
+      return {
+        hasOdds: oddsCount > 0,
+        oddsCount: oddsCount
+      };
+    } catch (error) {
+      console.error(`[SeasonValidation] ${sportKey} odds 데이터 확인 오류:`, error);
+      return { hasOdds: false, oddsCount: 0 };
+    }
   }
 
   /**
@@ -99,7 +130,11 @@ class SeasonValidationService {
         upcomingScheduled: upcomingScheduled.length
       });
 
-      // 시즌 상태 판단
+      // odds 데이터 존재 여부 확인
+      const oddsData = await this.checkRecentOddsData(sportKey);
+      console.log(`📊 [SportsDB] ${sportKey} odds 데이터 확인:`, oddsData);
+
+      // 시즌 상태 판단 (odds 데이터 고려)
       if (recentFinished.length > 0 && upcomingScheduled.length > 0) {
         return {
           status: 'active',
@@ -125,13 +160,25 @@ class SeasonValidationService {
           dataSource: 'TheSportsDB'
         };
       } else {
-        return {
-          status: 'offseason',
-          reason: 'TheSportsDB: 시즌오프 (최근 경기 없음, 예정 경기 없음)',
-          recentGamesCount: 0,
-          upcomingGamesCount: 0,
-          dataSource: 'TheSportsDB'
-        };
+        // 최근/예정 경기가 없지만 odds 데이터가 있는 경우 active로 간주
+        if (oddsData.hasOdds) {
+          return {
+            status: 'active',
+            reason: `TheSportsDB: 경기 일정은 없지만 최근 ${oddsData.oddsCount}개 odds 데이터가 있어 active로 간주`,
+            recentGamesCount: 0,
+            upcomingGamesCount: 0,
+            oddsCount: oddsData.oddsCount,
+            dataSource: 'TheSportsDB + Odds'
+          };
+        } else {
+          return {
+            status: 'offseason',
+            reason: 'TheSportsDB: 시즌오프 (최근 경기 없음, 예정 경기 없음, odds 데이터도 없음)',
+            recentGamesCount: 0,
+            upcomingGamesCount: 0,
+            dataSource: 'TheSportsDB'
+          };
+        }
       }
 
     } catch (error) {
@@ -175,6 +222,7 @@ class SeasonValidationService {
           reason: sportsDbStatus.reason,
           recentGamesCount: sportsDbStatus.recentGamesCount || 0,
           upcomingGamesCount: sportsDbStatus.upcomingGamesCount || 0,
+          oddsCount: sportsDbStatus.oddsCount || 0,
           seasonInfo: seasonInfo,
           dataSource: 'TheSportsDB'
         };
@@ -209,12 +257,16 @@ class SeasonValidationService {
       // 실제 데이터 기반 시즌 상태 판단
       const realStatus = this.determineRealSeasonStatus(seasonInfo, recentResults, upcomingGames);
       
+      // odds 데이터 확인
+      const oddsData = await this.checkRecentOddsData(sportKey);
+      
       return {
         isActive: realStatus.status === 'active',
         status: realStatus.status,
         reason: realStatus.reason,
         recentGamesCount: recentResults.length,
         upcomingGamesCount: upcomingGames.length,
+        oddsCount: oddsData.oddsCount || 0,
         seasonInfo: seasonInfo,
         dataSource: 'Local'
       };
@@ -379,7 +431,7 @@ class SeasonValidationService {
   async validateBettingEligibility(sportKey) {
     const seasonStatus = await this.checkSeasonStatus(sportKey);
     
-    // 베팅 허용 상태: active, break(일부), preseason(일부)
+    // 베팅 허용 상태: active, break(예정 경기 있으면), preseason(예정 경기 있으면)
     const allowedStatuses = ['active'];
     
     // break나 preseason의 경우 예정 경기가 있어야 베팅 허용
@@ -395,7 +447,9 @@ class SeasonValidationService {
       };
     }
     
-    const isEligible = allowedStatuses.includes(seasonStatus.status);
+    // active 상태이거나 odds 데이터가 있는 경우 베팅 허용
+    const isEligible = allowedStatuses.includes(seasonStatus.status) || 
+                      (seasonStatus.oddsCount && seasonStatus.oddsCount > 0);
     
     // 디버그 로그 추가
     console.log(`🔍 [SeasonValidation] ${sportKey} 베팅 가능 여부:`, {
@@ -403,14 +457,18 @@ class SeasonValidationService {
       isEligible,
       reason: seasonStatus.reason,
       recentGamesCount: seasonStatus.recentGamesCount,
-      upcomingGamesCount: seasonStatus.upcomingGamesCount
+      upcomingGamesCount: seasonStatus.upcomingGamesCount,
+      oddsCount: seasonStatus.oddsCount,
+      dataSource: seasonStatus.dataSource
     });
     
     return {
       isEligible: isEligible,
       status: seasonStatus.status,
       reason: isEligible 
-        ? '정상 시즌 진행 중으로 베팅 가능' 
+        ? (allowedStatuses.includes(seasonStatus.status) 
+           ? '정상 시즌 진행 중으로 베팅 가능' 
+           : 'odds 데이터가 있어 베팅 가능')
         : `${seasonStatus.reason}으로 베팅 불가`,
       seasonStatus: seasonStatus
     };
