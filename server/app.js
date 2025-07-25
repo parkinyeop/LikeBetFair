@@ -390,6 +390,4 @@ async function collectInitialOdds() {
   } catch (error) {
     console.error('[배당율] 초기 데이터 수집 실패:', error.message);
   }
-}
-
-startServer(); 
+} 
