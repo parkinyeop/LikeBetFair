@@ -6,6 +6,7 @@ import { SPORTS_TREE, getSportKey, getSeasonInfo, getSeasonStatusBadge, getSeaso
 import { API_CONFIG, TIME_CONFIG, buildApiUrl, isBettingAllowed } from "../config/apiConfig";
 import GameTimeDisplay from "../components/GameTimeDisplay";
 import { useBetStore } from '../stores/useBetStore';
+import { normalizeTeamNameForComparison } from '../utils/matchSportsbookGame';
 
 const initialGameData: Record<string, { teams: string; time: string }[]> = {
   "EPL": [
@@ -221,16 +222,19 @@ export default function Home() {
                       { name: game.away_team, price: (awayOdds as any)?.averagePrice }
                     ].filter(outcome => outcome.price !== undefined);
                   } else if (game.sport_key?.includes('baseball')) {
-                    // 야구 리그: Draw 없이 home/away만 outcomes에 포함
-                    const homeOdds = (h2hOdds as any)[game.home_team];
-                    const awayOdds = (h2hOdds as any)[game.away_team];
+                    // 야구 리그: Draw 없이 home/away만 outcomes에 포함 (정규화 매칭 적용)
+                    const h2hKeys = Object.keys(h2hOdds);
+                    const homeKey = h2hKeys.find(key => normalizeTeamNameForComparison(key) === normalizeTeamNameForComparison(game.home_team));
+                    const awayKey = h2hKeys.find(key => normalizeTeamNameForComparison(key) === normalizeTeamNameForComparison(game.away_team));
+                    const homeOdds = homeKey ? (h2hOdds as any)[homeKey] : undefined;
+                    const awayOdds = awayKey ? (h2hOdds as any)[awayKey] : undefined;
                     outcomes = [
                       { name: game.home_team, price: (homeOdds as any)?.averagePrice },
                       { name: game.away_team, price: (awayOdds as any)?.averagePrice }
                     ].filter(outcome => outcome.price !== undefined);
                     // 상세 로그
-                    if (!homeOdds) console.log(`[야구][${displayName}] home_team 키 미존재:`, game.home_team, '| h2h keys:', Object.keys(h2hOdds));
-                    if (!awayOdds) console.log(`[야구][${displayName}] away_team 키 미존재:`, game.away_team, '| h2h keys:', Object.keys(h2hOdds));
+                    if (!homeOdds) console.log(`[야구][${displayName}] home_team 키 미존재(정규화):`, game.home_team, '| h2h keys:', h2hKeys);
+                    if (!awayOdds) console.log(`[야구][${displayName}] away_team 키 미존재(정규화):`, game.away_team, '| h2h keys:', h2hKeys);
                     if ((homeOdds && (homeOdds as any).averagePrice === undefined) || (awayOdds && (awayOdds as any).averagePrice === undefined)) {
                       console.log(`[야구][${displayName}] averagePrice undefined:`, {
                         home_team: game.home_team,

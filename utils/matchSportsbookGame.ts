@@ -16,4 +16,14 @@ export function isSameGame(exchangeGame: any, sportsbookGame: any, minuteToleran
   }
 
   return homeMatch && awayMatch && timeDiff <= minuteTolerance && leagueMatch;
+}
+
+// 팀명 정규화: 영문/숫자/한글만 남기고, 공백 및 특수문자 제거, 소문자 변환
+export function normalizeTeamNameForComparison(team: string): string {
+  if (!team) return '';
+  return team
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9가-힣]/g, '')
+    .replace(/\s+/g, '');
 } 
