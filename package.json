@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "build": "npm run build:fast",
     "build:fast": "NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS='--max-old-space-size=4096' next build --no-lint",
     "start": "npm run build:fast && cd server && node app.js",
     "start:server": "cd server && node app.js",
