@@ -135,28 +135,81 @@ const dev = process.env.NODE_ENV !== 'production';
 const nextApp = next({ dev, dir: path.join(__dirname, '..') });
 const handle = nextApp.getRequestHandler();
 
-// 백그라운드에서 초기화 작업 수행
-(async () => {
+// API가 아닌 모든 요청은 Next.js로 전달
+app.all('*', (req, res) => {
+  return handle(req, res);
+});
+
+// 스케줄러 초기화
+import './jobs/oddsUpdateJob.js';
+
+// 배팅 결과 업데이트 스케줄러 추가
+import betResultService from './services/betResultService.js';
+
+// 5분마다 배팅 결과 업데이트
+setInterval(async () => {
   try {
+    console.log('[Scheduler] Updating bet results...');
+    const result = await betResultService.updateBetResults();
+    if (result.updatedCount > 0) {
+      console.log(`[Scheduler] Updated ${result.updatedCount} bet results`);
+    }
+  } catch (error) {
+    console.error('[Scheduler] Error updating bet results:', error);
+  }
+}, 5 * 60 * 1000); // 5분
+
+// 스케줄러 관련 import 및 설정
+import { setupSeasonStatusScheduler } from './services/seasonStatusUpdater.js';
+
+// Exchange WebSocket 서비스 import
+import exchangeWebSocketService from './services/exchangeWebSocketService.js';
+
+// 데이터베이스 연결 및 서버 시작
+const PORT = process.env.PORT;
+if (!PORT) {
+  throw new Error('PORT 환경변수가 설정되어 있지 않습니다!');
+}
+
+// 설정 초기화 후 서버 시작
+async function startServer() {
+  try {
+    console.log('🚀 서버 시작 프로세스 시작...');
+    
+    // 환경 변수 확인 (상세)
+    console.log('📋 환경 변수 확인:');
+    console.log('- NODE_ENV:', process.env.NODE_ENV);
+    console.log('- PORT:', process.env.PORT);
+    console.log('- DB_HOST:', process.env.DB_HOST ? '***' : 'undefined');
+    console.log('- DB_PORT:', process.env.DB_PORT);
+    console.log('- DB_NAME:', process.env.DB_NAME);
+    console.log('- DB_USER:', process.env.DB_USER ? '***' : 'undefined');
+    console.log('- DB_PASSWORD:', process.env.DB_PASSWORD ? '***' : 'undefined');
+    console.log('- DB_CONNECTION_STRING:', process.env.DB_CONNECTION_STRING ? '설정됨' : '미설정');
+    console.log('- JWT_SECRET:', process.env.JWT_SECRET ? '***' : 'undefined');
+    console.log('- JWT_EXPIRES_IN:', process.env.JWT_EXPIRES_IN);
+    
     // 데이터베이스 연결
-    console.log('[초기화] 데이터베이스 연결 중...');
+    console.log('[시작] 데이터베이스 연결 중...');
     await sequelize.authenticate();
     console.log('✅ Database connection has been established successfully.');
+    
+    // 글로벌 DB 연결 상태 업데이트
     global.dbConnected = true;
-
+    
     // 중앙화된 설정 초기화
-    console.log('[초기화] 중앙화된 설정 초기화...');
+    console.log('[시작] 중앙화된 설정 초기화...');
     await initializeCentralizedConfig();
     console.log('✅ 중앙화된 설정 초기화 완료');
-
+    
     // 데이터베이스 동기화 및 초기화
-    console.log('[초기화] 데이터베이스 테이블 동기화...');
+    console.log('[시작] 데이터베이스 테이블 동기화...');
     await sequelize.sync({ alter: true });
     console.log('✅ Database tables synchronized successfully.');
-
+    
     // 데이터베이스 스키마 자동 수정 (Render 환경에서만)
     if (process.env.NODE_ENV === 'production') {
-      console.log('[초기화] 데이터베이스 스키마 자동 수정...');
+      console.log('[시작] 데이터베이스 스키마 자동 수정...');
       try {
         // balance 컬럼을 INTEGER에서 DECIMAL(10,2)로 변경
         await sequelize.query(`
@@ -222,57 +275,66 @@ const handle = nextApp.getRequestHandler();
         console.error('[스키마 수정] 오류:', error.message);
       }
     }
-
-    // Next.js 준비 (가장 시간이 오래 걸리는 작업)
-    console.log('[초기화] Next.js 앱 준비 중...');
+    
+    // Next.js 준비
+    console.log('[시작] Next.js 앱 준비 중...');
     await nextApp.prepare();
     console.log('✅ Next.js 앱 준비 완료');
-
-    // 반드시 prepare() 이후에 등록!
-    app.all('*', (req, res) => {
-      return handle(req, res);
+    
+    // 서버 시작
+    console.log(`[시작] Express 서버 시작 중... (포트: ${PORT})`);
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ Server listening on port ${PORT}`);
+      console.log('[완료] 서버 초기화 완료');
+      
+      // Exchange WebSocket 서비스 초기화
+      console.log('[시작] Exchange WebSocket 서비스 초기화...');
+      exchangeWebSocketService.initialize(server);
+      console.log('✅ Exchange WebSocket 서비스 초기화 완료');
+      
+      // 기본 계정 생성 (비동기로 처리)
+      if (process.env.NODE_ENV === 'production') {
+        console.log('[시작] 기본 계정 생성 확인...');
+        createDefaultAccounts().catch(error => {
+          console.error('[계정] 기본 계정 생성 실패:', error.message);
+        });
+      }
+      
+      // Render 환경에서 초기 배당율 수집 (비동기로 처리)
+      if (process.env.NODE_ENV === 'production') {
+        console.log('[시작] 초기 배당율 수집 시작...');
+        collectInitialOdds().catch(error => {
+          console.error('[배당율] 초기 데이터 수집 실패:', error.message);
+        });
+      }
     });
-
-    // Exchange WebSocket 서비스 초기화
-    console.log('[초기화] Exchange WebSocket 서비스 초기화...');
-    exchangeWebSocketService.initialize(server);
-    console.log('✅ Exchange WebSocket 서비스 초기화 완료');
-
-    // 기본 계정 생성 (비동기로 처리)
-    if (process.env.NODE_ENV === 'production') {
-      console.log('[초기화] 기본 계정 생성 확인...');
-      createDefaultAccounts().catch(error => {
-        console.error('[계정] 기본 계정 생성 실패:', error.message);
+    
+    // 서버 오류 처리
+    server.on('error', (error) => {
+      console.error('❌ 서버 시작 오류:', error);
+      if (error.code === 'EADDRINUSE') {
+        console.error('포트가 이미 사용 중입니다:', PORT);
+      }
+      process.exit(1);
+    });
+    
+    // 프로세스 종료 처리
+    process.on('SIGTERM', () => {
+      console.log('[종료] SIGTERM 신호 수신');
+      global.dbConnected = false;
+      server.close(() => {
+        console.log('[종료] 서버 종료 완료');
+        process.exit(0);
       });
-    }
-
-    // Render 환경에서 초기 배당율 수집 (비동기로 처리)
-    if (process.env.NODE_ENV === 'production') {
-      console.log('[초기화] 초기 배당율 수집 시작...');
-      collectInitialOdds().catch(error => {
-        console.error('[배당율] 초기 데이터 수집 실패:', error.message);
-      });
-    }
-
-    console.log('[완료] 모든 초기화 작업 완료!');
-
-  } catch (error) {
-    console.error('❌ 백그라운드 초기화 실패:', error);
-    console.error('스택 트레이스:', error.stack);
-    // DB 연결 실패 시에도 서버는 계속 실행 (헬스체크 응답 가능)
+    });
+    
+  } catch (err) {
+    console.error('❌ 서버 시작 실패:', err);
+    console.error('스택 트레이스:', err.stack);
     global.dbConnected = false;
+    process.exit(1);
   }
-})();
-
-// 프로세스 종료 처리
-process.on('SIGTERM', () => {
-  console.log('[종료] SIGTERM 신호 수신');
-  global.dbConnected = false;
-  server.close(() => {
-    console.log('[종료] 서버 종료 완료');
-    process.exit(0);
-  });
-});
+}
 
 // 기본 계정 생성 함수
 async function createDefaultAccounts() {
@@ -344,4 +406,6 @@ async function collectInitialOdds() {
   } catch (error) {
     console.error('[배당율] 초기 데이터 수집 실패:', error.message);
   }
-} 
+}
+
+startServer(); 
