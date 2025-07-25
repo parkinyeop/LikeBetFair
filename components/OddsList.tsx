@@ -288,7 +288,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                             onClick={() => {
                               if (isBettable && outcome.price) {
                                 toggleSelection({
-                                  team: normalizeTeamName(outcome.name),
+                                  team: outcome.name, // normalizeTeamName 제거, outcome.name 그대로 사용
                                   odds: outcome.price,
                                   desc: `${game.home_team} vs ${game.away_team}`,
                                   commence_time: game.commence_time,
@@ -300,7 +300,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                               }
                             }}
                             className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                              isTeamSelected(normalizeTeamName(outcome.name), selectedMarket, game.id)
+                              isTeamSelected(outcome.name, selectedMarket, game.id)
                                 ? 'bg-yellow-500 hover:bg-yellow-600'
                                 : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                             } text-white`}
