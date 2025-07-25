@@ -13,7 +13,7 @@ const oddsController = {
         'baseball_mlb': ['baseball_mlb', 'MLB'],
         'MLB': ['MLB', 'baseball_mlb'],
         'baseball_kbo': ['baseball_kbo', 'KBO'],
-        'KBO': ['KBO', 'baseball_kbo'],
+        'KBO': ['baseball_kbo'], // KBO로 요청이 오면 baseball_kbo 데이터만 반환
         'baseball': ['baseball_mlb', 'MLB', 'baseball_kbo', 'KBO'],
         // 미식축구
         'americanfootball_nfl': ['americanfootball_nfl', 'NFL'],
@@ -70,6 +70,11 @@ const oddsController = {
       const weekLater = new Date(today);
       weekLater.setUTCDate(today.getUTCDate() + 7);
 
+      // 디버깅을 위해 현재 시간과 필터링 범위 출력
+      console.log(`[oddsController] 현재 시간 (UTC): ${now.toISOString()}`);
+      console.log(`[oddsController] 오늘 시작 (UTC): ${today.toISOString()}`);
+      console.log(`[oddsController] 필터링 범위: ${weekAgo.toISOString()} ~ ${weekLater.toISOString()}`);
+
       console.log(`[oddsController] 필터링 조건:`, {
         sport,
         possibleKeys,
@@ -88,16 +93,64 @@ const oddsController = {
       });
 
       console.log(`[oddsController] 필터링 전 전체 데이터 수:`, allData.length);
+      console.log(`[oddsController] 검색한 키:`, possibleKeys);
+      
+      // 디버깅을 위해 모든 데이터 출력
+      if (allData.length > 0) {
+        console.log(`[oddsController] 첫 번째 데이터:`, {
+          id: allData[0].id,
+          sportKey: allData[0].sportKey,
+          homeTeam: allData[0].homeTeam,
+          awayTeam: allData[0].awayTeam,
+          commenceTime: allData[0].commenceTime,
+          hasOfficialOdds: !!allData[0].officialOdds,
+          hasBookmakers: !!allData[0].bookmakers
+        });
+      } else {
+        console.log(`[oddsController] ⚠️ 데이터베이스에서 ${sport} 관련 데이터를 찾을 수 없습니다.`);
+        console.log(`[oddsController] 검색한 키:`, possibleKeys);
+        
+        // 전체 데이터베이스에서 sportKey 확인
+        const allSportKeys = await OddsCache.findAll({
+          attributes: ['sportKey'],
+          group: ['sportKey']
+        });
+        console.log(`[oddsController] 데이터베이스에 있는 모든 sportKey:`, allSportKeys.map(item => item.sportKey));
+      }
+      
+      // 디버깅을 위해 모든 데이터 출력
+      if (allData.length > 0) {
+        console.log(`[oddsController] 첫 번째 데이터:`, {
+          id: allData[0].id,
+          sportKey: allData[0].sportKey,
+          homeTeam: allData[0].homeTeam,
+          awayTeam: allData[0].awayTeam,
+          commenceTime: allData[0].commenceTime,
+          hasOfficialOdds: !!allData[0].officialOdds,
+          hasBookmakers: !!allData[0].bookmakers
+        });
+      } else {
+        console.log(`[oddsController] ⚠️ 데이터베이스에서 ${sport} 관련 데이터를 찾을 수 없습니다.`);
+        console.log(`[oddsController] 검색한 키:`, possibleKeys);
+      }
 
-      // 필터링 적용
+      // 필터링 적용 (임시로 비활성화)
+      const cachedData = allData; // 모든 데이터 사용
+      
+      console.log(`[oddsController] 필터링 비활성화 - 모든 데이터 사용:`, cachedData.length);
+      
+      // 원래 필터링 로직 (주석 처리)
+      /*
       const cachedData = allData.filter(game => {
         const gameTime = new Date(game.commenceTime);
         const isValid = gameTime >= weekAgo && gameTime < weekLater;
+        
         if (!isValid) {
           console.log(`[oddsController] 필터링 제외: ${game.homeTeam} vs ${game.awayTeam} - ${game.commenceTime} (${gameTime.toISOString()})`);
         }
         return isValid;
       });
+      */
 
       console.log(`[oddsController] 필터링 후 데이터 수:`, cachedData.length);
 
@@ -179,7 +232,9 @@ const oddsController = {
           home_team: game.homeTeam,
           away_team: game.awayTeam,
           commence_time: game.commenceTime,
-          odds: game.officialOdds
+          odds: game.officialOdds || null,
+          bookmakers: game.bookmakers || null,
+          officialOdds: game.officialOdds || null
         };
       });
 
