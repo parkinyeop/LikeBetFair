@@ -135,57 +135,6 @@ const dev = process.env.NODE_ENV !== 'production';
 const nextApp = next({ dev, dir: path.join(__dirname, '..') });
 const handle = nextApp.getRequestHandler();
 
-// API가 아닌 모든 요청은 Next.js로 전달
-app.all('*', (req, res) => {
-  return handle(req, res);
-});
-
-// 스케줄러 초기화
-import './jobs/oddsUpdateJob.js';
-
-// 배팅 결과 업데이트 스케줄러 추가
-import betResultService from './services/betResultService.js';
-
-// 5분마다 배팅 결과 업데이트
-setInterval(async () => {
-  try {
-    console.log('[Scheduler] Updating bet results...');
-    const result = await betResultService.updateBetResults();
-    if (result.updatedCount > 0) {
-      console.log(`[Scheduler] Updated ${result.updatedCount} bet results`);
-    }
-  } catch (error) {
-    console.error('[Scheduler] Error updating bet results:', error);
-  }
-}, 5 * 60 * 1000); // 5분
-
-// 스케줄러 관련 import 및 설정
-import { setupSeasonStatusScheduler } from './services/seasonStatusUpdater.js';
-
-// Exchange WebSocket 서비스 import
-import exchangeWebSocketService from './services/exchangeWebSocketService.js';
-
-// 데이터베이스 연결 및 서버 시작
-const PORT = process.env.PORT;
-if (!PORT) {
-  throw new Error('PORT 환경변수가 설정되어 있지 않습니다!');
-}
-
-// 서버를 먼저 listen해서 포트를 즉시 오픈
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Server listening on port ${PORT}`);
-  console.log('✅ 포트 바인딩 완료 - Render 헬스체크 통과 가능');
-});
-
-// 서버 오류 처리
-server.on('error', (error) => {
-  console.error('❌ 서버 시작 오류:', error);
-  if (error.code === 'EADDRINUSE') {
-    console.error('포트가 이미 사용 중입니다:', PORT);
-  }
-  process.exit(1);
-});
-
 // 백그라운드에서 초기화 작업 수행
 (async () => {
   try {
@@ -278,6 +227,11 @@ server.on('error', (error) => {
     console.log('[초기화] Next.js 앱 준비 중...');
     await nextApp.prepare();
     console.log('✅ Next.js 앱 준비 완료');
+
+    // 반드시 prepare() 이후에 등록!
+    app.all('*', (req, res) => {
+      return handle(req, res);
+    });
 
     // Exchange WebSocket 서비스 초기화
     console.log('[초기화] Exchange WebSocket 서비스 초기화...');
