@@ -7,6 +7,7 @@ import { API_CONFIG, TIME_CONFIG, buildApiUrl, isBettingAllowed } from "../confi
 import GameTimeDisplay from "../components/GameTimeDisplay";
 import { useBetStore } from '../stores/useBetStore';
 import { normalizeTeamNameForComparison } from '../utils/matchSportsbookGame';
+import { convertUtcToLocal, getCurrentLocalTime } from '../utils/timeUtils';
 
 const initialGameData: Record<string, { teams: string; time: string }[]> = {
   "EPL": [
@@ -82,16 +83,15 @@ export default function Home() {
                 } : 'No games'
               });
               
-              const now = new Date();
-              const today = new Date();
-              today.setHours(0, 0, 0, 0); // 오늘 자정
+              const now = getCurrentLocalTime(); // 클라이언트 로컬 시간 사용
+              const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0); // 오늘 자정 (로컬)
               const maxDate = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000); // 7일 후
               const bettingDeadlineMinutes = 10; // 경기 시작 10분 전까지 베팅 가능
               
-              // 1. 기본 필터링: 오늘 자정부터 7일 후까지의 경기 (오늘 경기 포함)
+              // 1. 기본 필터링: 오늘 자정부터 7일 후까지의 경기 (UTC를 로컬로 변환하여 비교)
               const filteredGames = data.filter((game: any) => {
-                const gameTime = new Date(game.commence_time);
-                const isValid = gameTime >= today && gameTime <= maxDate;
+                const localGameTime = convertUtcToLocal(game.commence_time); // UTC를 로컬로 변환
+                const isValid = localGameTime >= today && localGameTime <= maxDate;
                 
                 // 모든 활성 리그에 대해 필터링 로그 (첫 번째 경기만)
                 if (data.indexOf(game) === 0) {
@@ -99,7 +99,7 @@ export default function Home() {
                     home_team: game.home_team,
                     away_team: game.away_team,
                     commence_time: game.commence_time,
-                    gameTime: gameTime.toISOString(),
+                    gameTime: localGameTime.toISOString(),
                     now: now.toISOString(),
                     maxDate: maxDate.toISOString(),
                     isValid
@@ -145,8 +145,8 @@ export default function Home() {
               
               // 3. 베팅 가능 여부 분류 및 정렬
               const categorizedGames = uniqueGames.map((game: any) => {
-                const gameTime = new Date(game.commence_time);
-                const bettingDeadline = new Date(gameTime.getTime() - bettingDeadlineMinutes * 60 * 1000);
+                const localGameTime = convertUtcToLocal(game.commence_time); // UTC를 로컬로 변환
+                const bettingDeadline = new Date(localGameTime.getTime() - bettingDeadlineMinutes * 60 * 1000);
                 const isBettable = now < bettingDeadline;
                 
                 // bookmakers 데이터를 officialOdds로 변환
@@ -188,7 +188,7 @@ export default function Home() {
                   sport_title: displayName, // 기존 호환성을 위한 sport_title 추가
                   officialOdds: officialOdds || game.officialOdds, // 변환된 officialOdds 사용
                   isBettable,
-                  gameTime,
+                  gameTime: localGameTime,
                   bettingDeadline
                 };
               });
@@ -342,15 +342,14 @@ export default function Home() {
         
         const data = await response.json();
         
-        const now = new Date();
-        const today = new Date();
-        today.setHours(0, 0, 0, 0); // 오늘 자정
+        const now = getCurrentLocalTime(); // 클라이언트 로컬 시간 사용
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0); // 오늘 자정 (로컬)
         const maxDate = new Date(today.getTime() + TIME_CONFIG.BETTING_WINDOW_DAYS * 24 * 60 * 60 * 1000);
         const bettingDeadlineMinutes = 10; // 경기 시작 10분 전까지 베팅 가능
         
         const filteredGames = data.filter((game: any) => {
-          const gameTime = new Date(game.commence_time);
-          return gameTime >= today && gameTime <= maxDate;
+          const localGameTime = convertUtcToLocal(game.commence_time); // UTC를 로컬로 변환
+          return localGameTime >= today && localGameTime <= maxDate;
         });
         
         // 2. 중복 제거
@@ -373,14 +372,14 @@ export default function Home() {
         
         // 3. 베팅 가능 여부 분류 및 정렬
         const categorizedGames = uniqueGames.map((game: any) => {
-          const gameTime = new Date(game.commence_time);
-          const bettingDeadline = new Date(gameTime.getTime() - bettingDeadlineMinutes * 60 * 1000);
+          const localGameTime = convertUtcToLocal(game.commence_time); // UTC를 로컬로 변환
+          const bettingDeadline = new Date(localGameTime.getTime() - bettingDeadlineMinutes * 60 * 1000);
           const isBettable = now < bettingDeadline;
           
           return {
             ...game,
             isBettable,
-            gameTime,
+            gameTime: localGameTime,
             bettingDeadline
           };
         });
