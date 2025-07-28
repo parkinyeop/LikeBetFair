@@ -858,13 +858,17 @@ export default function Home() {
                     // 핸디캡 쌍으로 그룹화
                     const groupedSpreads: { [point: string]: { home?: any, away?: any } } = {};
                     spreadEntries.forEach(([outcomeName, oddsData]) => {
-                      if (outcomeName.includes(' -')) {
-                        const point = outcomeName.split(' -')[1];
-                        if (!groupedSpreads[point]) groupedSpreads[point] = {};
+                      // "Team Point" 형식에서 팀명과 핸디캡 분리
+                      const parts = outcomeName.split(' ');
+                      const point = parts[parts.length - 1]; // 마지막 부분이 핸디캡
+                      const teamName = parts.slice(0, -1).join(' '); // 나머지가 팀명
+                      
+                      if (!groupedSpreads[point]) groupedSpreads[point] = {};
+                      
+                      // 홈팀인지 원정팀인지 판단
+                      if (teamName === game.home_team) {
                         groupedSpreads[point].home = oddsData;
-                      } else if (outcomeName.includes(' +')) {
-                        const point = outcomeName.split(' +')[1];
-                        if (!groupedSpreads[point]) groupedSpreads[point] = {};
+                      } else if (teamName === game.away_team) {
                         groupedSpreads[point].away = oddsData;
                       }
                     });
@@ -1358,13 +1362,17 @@ export default function Home() {
                             const groupedSpreads: { [point: string]: { home?: any, away?: any } } = {};
                             
                             Object.entries(spreadsOdds).forEach(([outcomeName, oddsData]) => {
-                              if (outcomeName.includes(' -')) {
-                                const point = outcomeName.split(' -')[1];
-                                if (!groupedSpreads[point]) groupedSpreads[point] = {};
+                              // "Team Point" 형식에서 팀명과 핸디캡 분리
+                              const parts = outcomeName.split(' ');
+                              const point = parts[parts.length - 1]; // 마지막 부분이 핸디캡
+                              const teamName = parts.slice(0, -1).join(' '); // 나머지가 팀명
+                              
+                              if (!groupedSpreads[point]) groupedSpreads[point] = {};
+                              
+                              // 홈팀인지 원정팀인지 판단
+                              if (teamName === game.home_team) {
                                 groupedSpreads[point].home = oddsData;
-                              } else if (outcomeName.includes(' +')) {
-                                const point = outcomeName.split(' +')[1];
-                                if (!groupedSpreads[point]) groupedSpreads[point] = {};
+                              } else if (teamName === game.away_team) {
                                 groupedSpreads[point].away = oddsData;
                               }
                             });
