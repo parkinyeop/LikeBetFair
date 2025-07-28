@@ -88,11 +88,10 @@ export default function Home() {
               const maxDate = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000); // 7일 후
               const bettingDeadlineMinutes = 10; // 경기 시작 10분 전까지 베팅 가능
               
-              // 1. 기본 필터링: 과거 7일부터 미래 7일까지의 경기 (UTC를 로컬로 변환하여 비교)
+              // 1. 기본 필터링: 오늘 자정부터 7일 후까지의 경기 (UTC를 로컬로 변환하여 비교)
               const filteredGames = data.filter((game: any) => {
                 const localGameTime = convertUtcToLocal(game.commence_time); // UTC를 로컬로 변환
-                const pastDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000); // 7일 전
-                const isValid = localGameTime >= pastDate && localGameTime <= maxDate;
+                const isValid = localGameTime >= today && localGameTime <= maxDate;
                 
                 // 모든 활성 리그에 대해 필터링 로그 (첫 번째 경기만)
                 if (data.indexOf(game) === 0) {
@@ -353,8 +352,7 @@ export default function Home() {
         
         const filteredGames = data.filter((game: any) => {
           const localGameTime = convertUtcToLocal(game.commence_time); // UTC를 로컬로 변환
-          const pastDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000); // 7일 전
-          return localGameTime >= pastDate && localGameTime <= maxDate;
+          return localGameTime >= today && localGameTime <= maxDate;
         });
         
         // 2. 중복 제거
@@ -379,7 +377,7 @@ export default function Home() {
         const categorizedGames = uniqueGames.map((game: any) => {
           const localGameTime = convertUtcToLocal(game.commence_time); // UTC를 로컬로 변환
           const bettingDeadline = new Date(localGameTime.getTime() - bettingDeadlineMinutes * 60 * 1000);
-          const isBettable = now < bettingDeadline;
+                      const isBettable = now < bettingDeadline;
           
           return {
             ...game,
