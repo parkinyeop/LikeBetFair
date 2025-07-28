@@ -56,10 +56,13 @@ export default function Home() {
         const gamesData: Record<string, any[]> = {};
         
         for (const [displayName, config] of activeLeagues) {
+          let apiUrl = '';
           try {
             console.log(`🔍 Today Betting - ${displayName} API 호출:`, config.sportKey);
-            const apiUrl = buildApiUrl(`${API_CONFIG.ENDPOINTS.ODDS}/${config.sportKey}`);
+            apiUrl = buildApiUrl(`${API_CONFIG.ENDPOINTS.ODDS}/${config.sportKey}`);
+            console.log(`🔍 API URL:`, apiUrl);
             const response = await fetch(apiUrl);
+            console.log(`🔍 ${displayName} API 응답 상태:`, response.status, response.statusText);
             
             if (response.ok) {
               const data = await response.json();
@@ -280,6 +283,7 @@ export default function Home() {
             }
           } catch (err) {
             console.error(`Error fetching ${displayName}:`, err);
+            console.error(`🔍 ${displayName} API URL:`, apiUrl);
           }
         }
         
