@@ -257,14 +257,14 @@ class OddsApiService {
 
           console.log(`[DEBUG] Found ${oddsResponse.data.length} games with odds for ${clientCategory}`);
 
-          // === 수정: UTC 기준 30일 이내 경기 저장 (미래 경기 포함) ===
+          // === 추가: UTC 기준 7일 이내 경기만 저장 ===
           const now = new Date();
-          const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+          const weekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
           const filteredGames = oddsResponse.data.filter(game => {
             const commence = new Date(game.commence_time);
-            return commence >= now && commence < thirtyDaysLater;
+            return commence >= now && commence < weekLater;
           });
-          console.log(`[DEBUG] ${clientCategory}: ${filteredGames.length}개 경기(30일 이내) 처리 시작`);
+          console.log(`[DEBUG] ${clientCategory}: ${filteredGames.length}개 경기(7일 이내) 처리 시작`);
           // === 끝 ===
 
           // 데이터 검증 및 저장
@@ -503,12 +503,12 @@ class OddsApiService {
 
           console.log(`[DEBUG] Found ${oddsResponse.data.length} games for ${clientCategory}`);
 
-          // === 수정: UTC 기준 30일 이내 경기 저장 (미래 경기 포함) ===
+          // === 추가: UTC 기준 7일 이내 경기만 저장 ===
           const now = new Date();
-          const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+          const weekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
           const filteredGames = oddsResponse.data.filter(game => {
             const commence = new Date(game.commence_time);
-            return commence >= now && commence < thirtyDaysLater;
+            return commence >= now && commence < weekLater;
           });
           // === 끝 ===
 
@@ -540,6 +540,13 @@ class OddsApiService {
               };
               
               const [oddsRecord, created] = await OddsCache.upsert(upsertData, {
+                where: {
+                  mainCategory,
+                  subCategory,
+                  homeTeam: game.home_team,
+                  awayTeam: game.away_team,
+                  commenceTime: new Date(game.commence_time)
+                },
                 returning: true
               });
 

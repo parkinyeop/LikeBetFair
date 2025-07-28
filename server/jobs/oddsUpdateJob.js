@@ -146,10 +146,10 @@ cron.schedule('*/10 * * * *', async () => {
   }
 });
 
-// 고우선순위 리그 - 10분마다 업데이트
-cron.schedule('*/10 * * * *', async () => {
+// 고우선순위 리그 - 30분마다 업데이트 (10분에서 변경)
+cron.schedule('*/30 * * * *', async () => {
   saveUpdateLog('odds', 'start', { 
-    message: 'Starting high-priority leagues odds update (10min interval)',
+    message: 'Starting high-priority leagues odds update (30min interval)',
     priority: 'high',
     leagues: Array.from(highPriorityCategories)
   });
@@ -179,7 +179,7 @@ cron.schedule('*/10 * * * *', async () => {
     };
     
     saveUpdateLog('odds', 'success', { 
-      message: 'High-priority odds update completed (10min interval)',
+      message: 'High-priority odds update completed (30min interval)',
       priority: actualPriority,
       leagues: Array.from(highPriorityCategories),
       dynamicPriority: dynamicPriority,
@@ -197,10 +197,10 @@ cron.schedule('*/10 * * * *', async () => {
   }
 });
 
-// 중우선순위 리그 - 1시간마다 업데이트  
-cron.schedule('0 * * * *', async () => {
+// 중우선순위 리그 - 2시간마다 업데이트 (1시간에서 변경)
+cron.schedule('0 */2 * * *', async () => {
   saveUpdateLog('odds', 'start', { 
-    message: 'Starting medium-priority leagues odds update (1hour interval)',
+    message: 'Starting medium-priority leagues odds update (2hour interval)',
     priority: 'medium',
     leagues: Array.from(mediumPriorityCategories)
   });
@@ -222,7 +222,7 @@ cron.schedule('0 * * * *', async () => {
       };
       
       saveUpdateLog('odds', 'success', { 
-        message: 'Medium-priority odds update completed (1hour interval)',
+        message: 'Medium-priority odds update completed (2hour interval)',
         priority: 'medium',
         leagues: Array.from(mediumPriorityCategories),
         dynamicPriority: dynamicPriority,
@@ -390,14 +390,14 @@ const initializeData = async () => {
 // 서버 시작시 초기화 실행
 initializeData();
 
-// 스케줄러 상태 모니터링 - 15분마다 (비용 절약을 위해 간격 증가)
+// 스케줄러 상태 모니터링 - 30분마다 (15분에서 변경)
 setInterval(() => {
   const status = {
     isUpdating,
     lastUpdateTime: lastUpdateTime ? lastUpdateTime.toISOString() : null,
     activeCategories: Array.from(activeCategories),
     uptime: process.uptime(),
-    apiCallEstimate: `~${activeCategories.size * 2} calls per hour`, // 시간당 예상 API 호출 수
+    apiCallEstimate: `~${activeCategories.size * 2} calls per hour`,
     memory: {
       used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
       total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB'
@@ -408,7 +408,7 @@ setInterval(() => {
     message: 'Scheduler status check',
     ...status
   });
-}, 15 * 60 * 1000); // 15분
+}, 30 * 60 * 1000); // 30분
 
 // 헬스체크 엔드포인트용 함수
 const getHealthStatus = () => {
@@ -550,6 +550,44 @@ cron.schedule('*/10 * * * *', async () => {
     saveUpdateLog('epl', 'success', { message: 'EPL 프리미어리그 데이터 업데이트 완료' });
   } catch (error) {
     saveUpdateLog('epl', 'error', { message: 'EPL 프리미어리그 데이터 업데이트 실패', error: error.message });
+  }
+});
+
+// OddsHistory 정리 스케줄러 - 매일 새벽 4시에 실행
+cron.schedule('0 4 * * *', async () => {
+  saveUpdateLog('cleanup', 'start', { 
+    message: 'Starting OddsHistory cleanup (7+ days old data)'
+  });
+  
+  try {
+    const { default: OddsHistory } = await import('../models/oddsHistoryModel.js');
+    const { Op } = await import('sequelize');
+    
+    // 7일 이상 된 데이터 삭제
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const deletedCount = await OddsHistory.destroy({
+      where: {
+        snapshotTime: {
+          [Op.lt]: sevenDaysAgo
+        }
+      }
+    });
+    
+    saveUpdateLog('cleanup', 'success', { 
+      message: 'OddsHistory cleanup completed',
+      deletedCount: deletedCount,
+      cutoffDate: sevenDaysAgo.toISOString()
+    });
+    
+    console.log(`🧹 [Cleanup] OddsHistory에서 ${deletedCount}개 레코드 삭제 완료 (7일 이상)`);
+    
+  } catch (error) {
+    saveUpdateLog('cleanup', 'error', { 
+      message: 'OddsHistory cleanup failed',
+      error: error.message
+    });
+    
+    console.error('❌ [Cleanup] OddsHistory 정리 실패:', error.message);
   }
 });
 
