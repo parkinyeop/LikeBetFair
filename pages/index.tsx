@@ -99,9 +99,12 @@ export default function Home() {
                     home_team: game.home_team,
                     away_team: game.away_team,
                     commence_time: game.commence_time,
-                    gameTime: localGameTime.toISOString(),
-                    now: now.toISOString(),
-                    maxDate: maxDate.toISOString(),
+                    gameTimeUTC: localGameTime.toISOString(),
+                    gameTimeLocal: localGameTime.toLocaleString('ko-KR'),
+                    nowUTC: now.toISOString(),
+                    nowLocal: now.toLocaleString('ko-KR'),
+                    todayLocal: today.toLocaleString('ko-KR'),
+                    maxDateLocal: maxDate.toLocaleString('ko-KR'),
                     isValid
                   });
                 }
