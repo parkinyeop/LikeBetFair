@@ -220,15 +220,15 @@ const oddsController = {
       // 데이터 포맷 변환
       const formattedData = uniqueGames.map(game => {
         const standardSportKey = sport;
-        // DB의 sportTitle을 그대로 사용 (이미 영어로 통일됨)
-        const sportTitle = game.sportTitle || game.subCategory || sport;
+        // 스포츠 제목 매핑에서 가져오기
+        const sportTitle = sportTitleMapping[sport] || sport;
         
         console.log(`[oddsController] sport: ${sport}, sportTitle: ${sportTitle}, game.subCategory: ${game.subCategory}`);
         
         return {
           id: game.id,
-          sport_key: standardSportKey,
-          sport_title: sportTitle,
+          sportKey: game.sportKey,
+          sportTitle: game.sportTitle,
           home_team: game.homeTeam,
           away_team: game.awayTeam,
           commence_time: game.commenceTime,

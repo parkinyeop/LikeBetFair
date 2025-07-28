@@ -113,8 +113,8 @@ export default function Home() {
               // [중복 제거 활성화] 리그별로 동일 경기(홈/어웨이/시간/리그) 1개만 남김
               const uniqueGamesMap = new Map();
               filteredGames.forEach((game: any) => {
-                // sport_key|home_team|away_team|commence_time 조합으로 유니크 처리
-                const key = `${game.sport_key || game.sportTitle || 'Unknown'}|${game.home_team}|${game.away_team}|${game.commence_time}`;
+                // sport|home_team|away_team|commence_time 조합으로 유니크 처리
+                const key = `${game.sport || game.sportKey || game.sportTitle || 'Unknown'}|${game.home_team}|${game.away_team}|${game.commence_time}`;
                 if (!uniqueGamesMap.has(key)) {
                   uniqueGamesMap.set(key, game);
                 } else {
@@ -178,7 +178,7 @@ export default function Home() {
                 
                 return {
                   ...game,
-                  sport_key: config.sportKey, // sport_key 추가
+                  sport_key: game.sport || config.sportKey, // sport 필드 우선 사용
                   sportTitle: displayName, // DB와 일치하는 sportTitle 추가
                   sport_title: displayName, // 기존 호환성을 위한 sport_title 추가
                   officialOdds: officialOdds || game.officialOdds, // 변환된 officialOdds 사용
