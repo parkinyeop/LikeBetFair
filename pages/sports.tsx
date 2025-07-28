@@ -15,16 +15,16 @@ const sportCategories: SportCategory[] = [
   {
     name: "축구",
     leagues: [
-      { name: "K리그", key: "soccer_korea_kleague1" },
-      { name: "J리그", key: "soccer_japan_j_league" },
-      { name: "세리에 A", key: "soccer_italy_serie_a" },
-      { name: "브라질 세리에 A", key: "soccer_brazil_campeonato" },
+      { name: "K League 1", key: "soccer_korea_kleague1" },
+      { name: "J League", key: "soccer_japan_j_league" },
+      { name: "Serie A", key: "soccer_italy_serie_a" },
+      { name: "Brasileirao", key: "soccer_brazil_campeonato" },
       { name: "MLS", key: "soccer_usa_mls" },
-      { name: "아르헨티나 프리메라", key: "soccer_argentina_primera_division" },
-      { name: "중국 슈퍼리그", key: "soccer_china_superleague" },
-      { name: "라리가", key: "soccer_spain_primera_division" },
-      { name: "분데스리가", key: "soccer_germany_bundesliga" },
-      { name: "프리미어리그", key: "soccer_england_premier_league" },
+      { name: "Primera Division", key: "soccer_argentina_primera_division" },
+      { name: "Chinese Super League", key: "soccer_china_superleague" },
+      { name: "La Liga", key: "soccer_spain_primera_division" },
+      { name: "Bundesliga", key: "soccer_germany_bundesliga" },
+      { name: "Premier League", key: "soccer_england_premier_league" },
     ]
   },
   {

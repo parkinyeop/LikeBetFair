@@ -1171,14 +1171,14 @@ export default function Home() {
                             
                             // 축구 경기인지 확인
                             const isSoccer = selectedCategory === '축구' || 
-                                           selectedCategory.includes('K리그') || 
-                                           selectedCategory.includes('프리미어리그') || 
-                                           selectedCategory.includes('세리에A') || 
-                                           selectedCategory.includes('분데스리가') || 
-                                           selectedCategory.includes('라리가') || 
+                                           selectedCategory.includes('K League 1') || 
+                                           selectedCategory.includes('Premier League') || 
+                                           selectedCategory.includes('Serie A') || 
+                                           selectedCategory.includes('Bundesliga') || 
+                                           selectedCategory.includes('La Liga') || 
                                            selectedCategory.includes('MLS') || 
-                                           selectedCategory.includes('아르헨티나') || 
-                                           selectedCategory.includes('중국');
+                                           selectedCategory.includes('Primera Division') || 
+                                           selectedCategory.includes('Chinese Super League');
                             
                             let outcomes;
                             if (isSoccer) {

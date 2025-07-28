@@ -14,7 +14,7 @@ export default function ExchangeSportPage() {
       if (displayName) {
         // 해당 스포츠가 속한 메인 카테고리를 찾아서 트리 형태로 선택 (스포츠북의 전체 리그)
         const parentCategory = Object.entries({
-          "축구": ["K리그", "J리그", "세리에A", "브라질세리에A", "MLS", "아르헨티나프리메라", "중국슈퍼리그", "라리가", "분데스리가"],
+          "축구": ["K League 1", "J League", "Serie A", "Brasileirao", "MLS", "Primera Division", "Chinese Super League", "La Liga", "Bundesliga"],
           "야구": ["MLB", "KBO"],
           "농구": ["NBA", "KBL"],
           "미식축구": ["NFL"]

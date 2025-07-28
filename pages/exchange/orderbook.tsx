@@ -68,14 +68,14 @@ const OrderbookPage: React.FC = () => {
       'baseball_kbo': 'KBO',
       'americanfootball_nfl': 'NFL',
       'soccer_usa_mls': 'MLS',
-      'soccer_korea_kleague1': 'K리그',
-      'soccer_japan_j_league': 'J리그',
-      'soccer_italy_serie_a': '세리에 A',
-      'soccer_brazil_campeonato': '브라질 세리에 A',
-      'soccer_argentina_primera_division': '아르헨티나 프리메라',
-      'soccer_china_superleague': '중국 슈퍼리그',
-      'soccer_spain_primera_division': '라리가',
-      'soccer_germany_bundesliga': '분데스리가'
+      'soccer_korea_kleague1': 'K League 1',
+      'soccer_japan_j_league': 'J League',
+      'soccer_italy_serie_a': 'Serie A',
+      'soccer_brazil_campeonato': 'Brasileirao',
+      'soccer_argentina_primera_division': 'Primera Division',
+      'soccer_china_superleague': 'Chinese Super League',
+      'soccer_spain_primera_division': 'La Liga',
+      'soccer_germany_bundesliga': 'Bundesliga'
     };
     return sportMap[sportKey] || sportKey;
   };

@@ -452,15 +452,15 @@ export default function ExchangePage() {
           {/* 카테고리별로 그룹핑해서 표시 */}
           {Object.entries({
             '축구': [
-              { id: 'kleague', name: 'K리그', sport: 'soccer_korea_kleague1', emoji: '⚽' },
-              { id: 'jleague', name: 'J리그', sport: 'soccer_japan_j_league', emoji: '⚽' },
-              { id: 'seriea', name: '세리에 A', sport: 'soccer_italy_serie_a', emoji: '⚽' },
-              { id: 'brasileirao', name: '브라질 세리에 A', sport: 'soccer_brazil_campeonato', emoji: '⚽' },
+              { id: 'kleague', name: 'K League 1', sport: 'soccer_korea_kleague1', emoji: '⚽' },
+              { id: 'jleague', name: 'J League', sport: 'soccer_japan_j_league', emoji: '⚽' },
+              { id: 'seriea', name: 'Serie A', sport: 'soccer_italy_serie_a', emoji: '⚽' },
+              { id: 'brasileirao', name: 'Brasileirao', sport: 'soccer_brazil_campeonato', emoji: '⚽' },
               { id: 'mls', name: 'MLS', sport: 'soccer_usa_mls', emoji: '⚽' },
-              { id: 'argentina', name: '아르헨티나 프리메라', sport: 'soccer_argentina_primera_division', emoji: '⚽' },
-              { id: 'csl', name: '중국 슈퍼리그', sport: 'soccer_china_superleague', emoji: '⚽' },
-              { id: 'laliga', name: '라리가', sport: 'soccer_spain_primera_division', emoji: '⚽' },
-              { id: 'bundesliga', name: '분데스리가', sport: 'soccer_germany_bundesliga', emoji: '⚽' }
+              { id: 'argentina', name: 'Primera Division', sport: 'soccer_argentina_primera_division', emoji: '⚽' },
+              { id: 'csl', name: 'Chinese Super League', sport: 'soccer_china_superleague', emoji: '⚽' },
+              { id: 'laliga', name: 'La Liga', sport: 'soccer_spain_primera_division', emoji: '⚽' },
+              { id: 'bundesliga', name: 'Bundesliga', sport: 'soccer_germany_bundesliga', emoji: '⚽' }
             ],
             '농구': [
               { id: 'nba', name: 'NBA', sport: 'basketball_nba', emoji: '🏀' },
