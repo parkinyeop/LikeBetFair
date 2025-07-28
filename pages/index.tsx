@@ -872,7 +872,17 @@ export default function Home() {
                         groupedSpreads[point].away = oddsData;
                       }
                     });
-                    return Object.entries(groupedSpreads).map(([point, oddsPair], idx: number) => {
+                    // 0.5 이상의 핸디캡만 필터링
+                    const filteredSpreads = Object.entries(groupedSpreads).filter(([point, oddsPair]) => {
+                      const pointValue = Math.abs(parseFloat(point));
+                      return pointValue >= 0.5;
+                    });
+                    
+                    if (filteredSpreads.length === 0) {
+                      return <div className="text-center text-gray-500 py-6">핸디캡 배당 정보 없음</div>;
+                    }
+                    
+                    return filteredSpreads.map(([point, oddsPair], idx: number) => {
                       const homeOdds = oddsPair.home?.averagePrice;
                       const awayOdds = oddsPair.away?.averagePrice;
                       return (
@@ -1377,7 +1387,17 @@ export default function Home() {
                               }
                             });
                             
-                            return Object.entries(groupedSpreads).map(([point, oddsPair], idx: number) => {
+                            // 0.5 이상의 핸디캡만 필터링
+                            const filteredSpreads = Object.entries(groupedSpreads).filter(([point, oddsPair]) => {
+                              const pointValue = Math.abs(parseFloat(point));
+                              return pointValue >= 0.5;
+                            });
+                            
+                            if (filteredSpreads.length === 0) {
+                              return <div className="text-center text-gray-500 py-6">핸디캡 배당 정보 없음</div>;
+                            }
+                            
+                            return filteredSpreads.map(([point, oddsPair], idx: number) => {
                               const homeOdds = oddsPair.home?.averagePrice;
                               const awayOdds = oddsPair.away?.averagePrice;
                               
