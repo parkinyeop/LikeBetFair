@@ -107,6 +107,8 @@ async function collectKLeagueData() {
         const gameResult = await GameResult.create({
           mainCategory: 'soccer',
           subCategory: 'KLEAGUE1',
+          sportKey: 'soccer_kleague1',
+          sportTitle: 'K리그 1',
           homeTeam,
           awayTeam,
           commenceTime,

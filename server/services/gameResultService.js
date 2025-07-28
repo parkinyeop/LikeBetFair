@@ -14,6 +14,7 @@ dotenv.config();
 
 // 클라이언트에서 사용하는 sport key 매핑
 const clientSportKeyMap = {
+  // 올바른 카테고리명
   'K리그': 'soccer_korea_kleague1',
   'J리그': 'soccer_japan_j_league',
   '세리에 A': 'soccer_italy_serie_a',
@@ -27,7 +28,18 @@ const clientSportKeyMap = {
   'NBA': 'basketball_nba',
   'MLB': 'baseball_mlb',
   'KBO': 'baseball_kbo',
-  'NFL': 'americanfootball_nfl'
+  'NFL': 'americanfootball_nfl',
+  
+  // 잘못된 카테고리명 (서버 로그에서 사용되는 것들)
+  'CSL': 'soccer_china_superleague',
+  'EPL': 'soccer_england_premier_league',
+  'LaLiga': 'soccer_spain_la_liga',
+  'Bundesliga': 'soccer_germany_bundesliga',
+  'SerieA': 'soccer_italy_serie_a',
+  'Ligue1': 'soccer_france_ligue_1',
+  'JLeague': 'soccer_japan_j_league',
+  'ArgentinaPrimera': 'soccer_argentina_primera_division',
+  'Brasileirao': 'soccer_brazil_campeonato'
 };
 
 // TheSportsDB 리그ID 매핑 (sportKey 기준, 반드시 clientSportKeyMap 값과 일치)
