@@ -30,17 +30,6 @@ const clientSportKeyMap = {
   'KBO': 'baseball_kbo',
   'NFL': 'americanfootball_nfl',
   
-  // 기존 한글 카테고리명 (하위 호환성)
-  'K리그': 'soccer_korea_kleague1',
-  'J리그': 'soccer_japan_j_league',
-  '세리에 A': 'soccer_italy_serie_a',
-  '브라질 세리에 A': 'soccer_brazil_campeonato',
-  '아르헨티나 프리메라': 'soccer_argentina_primera_division',
-  '중국 슈퍼리그': 'soccer_china_superleague',
-  '라리가': 'soccer_spain_la_liga',
-  '분데스리가': 'soccer_germany_bundesliga',
-  '프리미어리그': 'soccer_england_premier_league',
-  
   // 기타 영문 변형
   'LaLiga': 'soccer_spain_la_liga',
   'SerieA': 'soccer_italy_serie_a',
