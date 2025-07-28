@@ -579,7 +579,9 @@ export default function Home() {
               sportTitle: game.sportTitle,
               officialOdds: game.officialOdds ? '있음' : '없음',
               bookmakers: game.bookmakers ? '있음' : '없음',
-              h2hOdds: officialOdds.h2h ? '있음' : '없음'
+              h2hOdds: officialOdds.h2h ? '있음' : '없음',
+              officialOddsKeys: game.officialOdds ? Object.keys(game.officialOdds) : [],
+              h2hOddsKeys: officialOdds.h2h ? Object.keys(officialOdds.h2h) : []
             });
           }
 
