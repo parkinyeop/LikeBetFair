@@ -83,13 +83,15 @@ export default function Home() {
               });
               
               const now = new Date();
-              const maxDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7일 후
+              const today = new Date();
+              today.setHours(0, 0, 0, 0); // 오늘 자정
+              const maxDate = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000); // 7일 후
               const bettingDeadlineMinutes = 10; // 경기 시작 10분 전까지 베팅 가능
               
-              // 1. 기본 필터링: 현재 시간부터 7일 후까지의 경기 (과거 경기 제외)
+              // 1. 기본 필터링: 오늘 자정부터 7일 후까지의 경기 (오늘 경기 포함)
               const filteredGames = data.filter((game: any) => {
                 const gameTime = new Date(game.commence_time);
-                const isValid = gameTime >= now && gameTime <= maxDate;
+                const isValid = gameTime >= today && gameTime <= maxDate;
                 
                 // 모든 활성 리그에 대해 필터링 로그 (첫 번째 경기만)
                 if (data.indexOf(game) === 0) {
@@ -341,13 +343,14 @@ export default function Home() {
         const data = await response.json();
         
         const now = new Date();
-        const maxDate = new Date(now.getTime() + TIME_CONFIG.BETTING_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // 오늘 자정
+        const maxDate = new Date(today.getTime() + TIME_CONFIG.BETTING_WINDOW_DAYS * 24 * 60 * 60 * 1000);
         const bettingDeadlineMinutes = 10; // 경기 시작 10분 전까지 베팅 가능
         
-        // 1. 기본 필터링: 현재 시간부터 7일 후까지의 경기 (과거 경기 제외)
         const filteredGames = data.filter((game: any) => {
           const gameTime = new Date(game.commence_time);
-          return gameTime >= now && gameTime <= maxDate;
+          return gameTime >= today && gameTime <= maxDate;
         });
         
         // 2. 중복 제거
