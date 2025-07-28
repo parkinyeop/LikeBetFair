@@ -312,8 +312,18 @@ export default function Home() {
     const allGames: any[] = Object.values(todayGames).flat();
     console.log('Today Betting - Total games before deduplication:', allGames.length);
     
-    // 전체 deduplication(중복 제거) 제거: allGames를 그대로 todayFlatGames로 사용
-    setTodayFlatGames(allGames);
+    // 전체 시간순 정렬: 베팅 가능한 경기 우선, 그 다음 시간순(가장 가까운 순)
+    const sortedAllGames = allGames.sort((a, b) => {
+      // 베팅 가능한 경기가 우선
+      if (a.isBettable && !b.isBettable) return -1;
+      if (!a.isBettable && b.isBettable) return 1;
+      
+      // 둘 다 베팅 가능하거나 둘 다 불가능한 경우, 시간순 정렬(가장 가까운 순)
+      return a.gameTime.getTime() - b.gameTime.getTime();
+    });
+    
+    console.log('Today Betting - Total games after sorting:', sortedAllGames.length);
+    setTodayFlatGames(sortedAllGames);
   }, [todayGames, viewMode]);
 
   useEffect(() => {
