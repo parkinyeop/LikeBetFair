@@ -605,8 +605,18 @@ class BetResultService {
       return 'pending';
     }
 
-    const selectedTeam = normalizeTeamNameForComparison(selection.team);
-    const handicap = selection.handicap || 0;
+    // 핸디캡 베팅에서 팀명과 핸디캡 분리
+    let selectedTeam, handicap;
+    if (selection.team && selection.team.includes(' -')) {
+      // "Doosan Bears -1" 형식에서 팀명과 핸디캡 분리
+      const parts = selection.team.split(' -');
+      selectedTeam = normalizeTeamNameForComparison(parts[0]);
+      handicap = parseInt(parts[1]) || 0;
+    } else {
+      // 기존 방식 (selection.team이 팀명만 있는 경우)
+      selectedTeam = normalizeTeamNameForComparison(selection.team);
+      handicap = selection.handicap || 0;
+    }
     
     // 스코어 계산 (방어 코드 사용)
     const { homeScore, awayScore } = this.extractHomeAwayScores(gameResult.score, gameResult.homeTeam, gameResult.awayTeam);
