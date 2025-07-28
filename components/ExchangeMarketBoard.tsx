@@ -669,11 +669,130 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                 );
               })()}
 
-              {selectedMarket === '핸디캡' && (
-                <div className="text-center text-gray-500 py-8">
-                  <p>핸디캡 마켓은 준비 중입니다.</p>
-                </div>
-              )}
+              {selectedMarket === '핸디캡' && (() => {
+                const bettingStatus = checkBettingCutoff(selectedGame.commenceTime);
+                const isDisabled = !bettingStatus.isAllowed;
+                
+                // 스포츠북에서 핸디캡 배당 가져오기
+                const sbGame = sportsbookOdds.find((g: any) => isSameGame(selectedGame, g));
+                if (!sbGame || !sbGame.officialOdds?.spreads) {
+                  return (
+                    <div className="text-center text-gray-500 py-8">
+                      <p>핸디캡 배당 정보 없음</p>
+                    </div>
+                  );
+                }
+                
+                const spreadsOdds = sbGame.officialOdds.spreads;
+                const spreadEntries = Object.entries(spreadsOdds);
+                
+                if (spreadEntries.length === 0) {
+                  return (
+                    <div className="text-center text-gray-500 py-8">
+                      <p>핸디캡 배당 정보 없음</p>
+                    </div>
+                  );
+                }
+                
+                // Home/Away 쌍으로 그룹화 (팀명 기반 매칭)
+                const groupedSpreads: { [point: string]: { home?: any, away?: any } } = {};
+                
+                spreadEntries.forEach(([outcomeName, oddsData]) => {
+                  // "Team Point" 형식에서 팀명과 핸디캡 분리
+                  const parts = outcomeName.split(' ');
+                  const point = parts[parts.length - 1]; // 마지막 부분이 핸디캡
+                  const teamName = parts.slice(0, -1).join(' '); // 나머지가 팀명
+                  
+                  if (!groupedSpreads[point]) groupedSpreads[point] = {};
+                  
+                  // 홈팀인지 원정팀인지 판단
+                  if (teamName === selectedGame.homeTeam) {
+                    groupedSpreads[point].home = oddsData;
+                  } else if (teamName === selectedGame.awayTeam) {
+                    groupedSpreads[point].away = oddsData;
+                  }
+                });
+                
+                // 0.5 이상의 핸디캡만 필터링
+                const filteredSpreads = Object.entries(groupedSpreads).filter(([point, oddsPair]) => {
+                  const pointValue = Math.abs(parseFloat(point));
+                  return pointValue >= 0.5;
+                });
+                
+                if (filteredSpreads.length === 0) {
+                  return (
+                    <div className="text-center text-gray-500 py-8">
+                      <p>핸디캡 배당 정보 없음 (0.5 이상)</p>
+                    </div>
+                  );
+                }
+                
+                return (
+                  <div className="space-y-4 max-w-4xl mx-auto">
+                    {filteredSpreads.map(([point, oddsPair]) => {
+                      const homeOdds = oddsPair.home?.averagePrice;
+                      const awayOdds = oddsPair.away?.averagePrice;
+                      
+                      return (
+                        <div key={point} className="flex gap-4">
+                          {/* 홈팀 Back */}
+                          <button
+                            className={`flex-1 p-4 border-2 rounded-lg text-center transition relative ${
+                              isDisabled || !homeOdds
+                                ? 'border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed'
+                                : 'border-blue-300 bg-blue-50 hover:bg-blue-100'
+                            }`}
+                            onClick={() => {
+                              if (homeOdds) handleBetClick(`${selectedGame.homeTeam} -${point}`, homeOdds, 'back');
+                            }}
+                            disabled={isDisabled || !homeOdds}
+                          >
+                            <div className={`text-lg font-bold ${isDisabled || !homeOdds ? 'text-gray-600' : 'text-blue-800'}`}>
+                              {selectedGame.homeTeam} -{point}
+                            </div>
+                            <div className={`text-xl font-extrabold mt-1 ${isDisabled || !homeOdds ? 'text-gray-700' : 'text-blue-900'}`}>
+                              {homeOdds ? homeOdds.toFixed(2) : 'N/A'}
+                            </div>
+                            <div className={`text-xs mt-1 ${isDisabled || !homeOdds ? 'text-gray-500' : 'text-blue-600'}`}>
+                              Back
+                            </div>
+                          </button>
+
+                          {/* 핸디캡 표시 */}
+                          <div className="w-20 flex items-center justify-center">
+                            <div className="text-lg font-bold text-gray-800">
+                              {point}
+                            </div>
+                          </div>
+
+                          {/* 원정팀 Back */}
+                          <button
+                            className={`flex-1 p-4 border-2 rounded-lg text-center transition relative ${
+                              isDisabled || !awayOdds
+                                ? 'border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed'
+                                : 'border-purple-300 bg-purple-50 hover:bg-purple-100'
+                            }`}
+                            onClick={() => {
+                              if (awayOdds) handleBetClick(`${selectedGame.awayTeam} +${point}`, awayOdds, 'back');
+                            }}
+                            disabled={isDisabled || !awayOdds}
+                          >
+                            <div className={`text-lg font-bold ${isDisabled || !awayOdds ? 'text-gray-600' : 'text-purple-800'}`}>
+                              {selectedGame.awayTeam} +{point}
+                            </div>
+                            <div className={`text-xl font-extrabold mt-1 ${isDisabled || !awayOdds ? 'text-gray-700' : 'text-purple-900'}`}>
+                              {awayOdds ? awayOdds.toFixed(2) : 'N/A'}
+                            </div>
+                            <div className={`text-xs mt-1 ${isDisabled || !awayOdds ? 'text-gray-500' : 'text-purple-600'}`}>
+                              Back
+                            </div>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* 안내 메시지 - 컴팩트 */}

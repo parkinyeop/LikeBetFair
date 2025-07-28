@@ -429,22 +429,40 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                     );
                   }
                   
-                  // Home/Away 쌍으로 그룹화
+                  // Home/Away 쌍으로 그룹화 (팀명 기반 매칭)
                   const groupedSpreads: { [point: string]: { home?: any, away?: any } } = {};
                   
                   spreadEntries.forEach(([outcomeName, oddsData]) => {
-                    if (outcomeName.includes(' -')) {
-                      const point = outcomeName.split(' -')[1];
-                      if (!groupedSpreads[point]) groupedSpreads[point] = {};
+                    // "Team Point" 형식에서 팀명과 핸디캡 분리
+                    const parts = outcomeName.split(' ');
+                    const point = parts[parts.length - 1]; // 마지막 부분이 핸디캡
+                    const teamName = parts.slice(0, -1).join(' '); // 나머지가 팀명
+                    
+                    if (!groupedSpreads[point]) groupedSpreads[point] = {};
+                    
+                    // 홈팀인지 원정팀인지 판단
+                    if (teamName === game.home_team) {
                       groupedSpreads[point].home = oddsData;
-                    } else if (outcomeName.includes(' +')) {
-                      const point = outcomeName.split(' +')[1];
-                      if (!groupedSpreads[point]) groupedSpreads[point] = {};
+                    } else if (teamName === game.away_team) {
                       groupedSpreads[point].away = oddsData;
                     }
                   });
                   
-                  return Object.entries(groupedSpreads).map(([point, oddsPair]) => {
+                  // 0.5 이상의 핸디캡만 필터링
+                  const filteredSpreads = Object.entries(groupedSpreads).filter(([point, oddsPair]) => {
+                    const pointValue = Math.abs(parseFloat(point));
+                    return pointValue >= 0.5;
+                  });
+                  
+                  if (filteredSpreads.length === 0) {
+                    return (
+                      <div className="text-center text-gray-500 py-6">
+                        핸디캡 배당 정보 없음
+                      </div>
+                    );
+                  }
+                  
+                  return filteredSpreads.map(([point, oddsPair]) => {
                     const homeOdds = oddsPair.home?.averagePrice;
                     const awayOdds = oddsPair.away?.averagePrice;
                     
