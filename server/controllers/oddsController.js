@@ -182,13 +182,13 @@ const oddsController = {
         });
       }
 
-      // 동일 경기 중복 제거 (최신 odds만)
+      // 동일 경기 중복 제거 (최신 odds만) - 개선된 로직
       const uniqueGames = [];
       const seen = new Set();
       for (const game of cachedData) {
-        // commenceTime을 분 단위까지만 비교
+        // commenceTime을 분 단위까지만 비교 (sportKey 제외)
         const date = new Date(game.commenceTime);
-        const key = `${game.sportKey}_${game.homeTeam}_${game.awayTeam}_${date.getUTCFullYear()}-${String(date.getUTCMonth()+1).padStart(2,'0')}-${String(date.getUTCDate()).padStart(2,'0')}T${String(date.getUTCHours()).padStart(2,'0')}:${String(date.getUTCMinutes()).padStart(2,'0')}`;
+        const key = `${game.homeTeam}_${game.awayTeam}_${date.getUTCFullYear()}-${String(date.getUTCMonth()+1).padStart(2,'0')}-${String(date.getUTCDate()).padStart(2,'0')}T${String(date.getUTCHours()).padStart(2,'0')}:${String(date.getUTCMinutes()).padStart(2,'0')}`;
         if (!seen.has(key)) {
           uniqueGames.push(game);
           seen.add(key);
