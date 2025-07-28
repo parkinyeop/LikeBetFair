@@ -66,19 +66,19 @@ const sportsDbLeagueMap = {
 
 const API_KEY = process.env.THESPORTSDB_API_KEY || '123';
 
-// 표준화된 카테고리 매핑
+// 표준화된 카테고리 매핑 (영문으로 통일)
 const standardizedCategoryMap = {
   // 축구
-  'soccer_korea_kleague1': { main: 'soccer', sub: 'K리그' },
-  'soccer_japan_j_league': { main: 'soccer', sub: 'J리그' },
-  'soccer_italy_serie_a': { main: 'soccer', sub: '세리에A' },
-  'soccer_brazil_campeonato': { main: 'soccer', sub: '브라질리라오' },
+  'soccer_korea_kleague1': { main: 'soccer', sub: 'KLEAGUE' },
+  'soccer_japan_j_league': { main: 'soccer', sub: 'JLEAGUE' },
+  'soccer_italy_serie_a': { main: 'soccer', sub: 'SERIEA' },
+  'soccer_brazil_campeonato': { main: 'soccer', sub: 'BRASILEIRAO' },
   'soccer_usa_mls': { main: 'soccer', sub: 'MLS' },
-  'soccer_argentina_primera_division': { main: 'soccer', sub: '아르헨티나프리메라' },
+  'soccer_argentina_primera_division': { main: 'soccer', sub: 'ARGENTINA_PRIMERA' },
   'soccer_china_superleague': { main: 'soccer', sub: 'CSL' },
-  'soccer_spain_primera_division': { main: 'soccer', sub: '라리가' },
-  'soccer_germany_bundesliga': { main: 'soccer', sub: '분데스리가' },
-  'soccer_england_premier_league': { main: 'soccer', sub: '프리미어리그' },
+  'soccer_spain_primera_division': { main: 'soccer', sub: 'LALIGA' },
+  'soccer_germany_bundesliga': { main: 'soccer', sub: 'BUNDESLIGA' },
+  'soccer_england_premier_league': { main: 'soccer', sub: 'EPL' },
   
   // 농구
   'basketball_nba': { main: 'basketball', sub: 'NBA' },
