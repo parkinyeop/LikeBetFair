@@ -7,29 +7,34 @@ import oddsHistoryService from './oddsHistoryService.js';
 import { BETTING_CONFIG } from '../config/centralizedConfig.js';
 import { ODDS_API_CONFIG, LOG_LEVELS } from '../config/oddsApiConfig.js';
 
-// 클라이언트에서 사용하는 sport key 매핑
+// 클라이언트에서 사용하는 sport key 매핑 (영문으로 통일)
 const clientSportKeyMap = {
-  // 축구 (Soccer)
+  // 영문 카테고리명
+  'KLEAGUE': 'soccer_korea_kleague1',
+  'JLEAGUE': 'soccer_japan_j_league',
+  'SERIEA': 'soccer_italy_serie_a',
+  'BRASILEIRAO': 'soccer_brazil_campeonato',
+  'MLS': 'soccer_usa_mls',
+  'ARGENTINA_PRIMERA': 'soccer_argentina_primera_division',
+  'CSL': 'soccer_china_superleague',
+  'LALIGA': 'soccer_spain_la_liga',
+  'BUNDESLIGA': 'soccer_germany_bundesliga',
+  'EPL': 'soccer_england_premier_league',
+  'NBA': 'basketball_nba',
+  'MLB': 'baseball_mlb',
+  'KBO': 'baseball_kbo',
+  'NFL': 'americanfootball_nfl',
+  
+  // 기존 한글 카테고리명 (하위 호환성)
   'K리그': 'soccer_korea_kleague1',
   'J리그': 'soccer_japan_j_league',
   '세리에 A': 'soccer_italy_serie_a',
   '브라질 세리에 A': 'soccer_brazil_campeonato',
-  'MLS': 'soccer_usa_mls',
   '아르헨티나 프리메라': 'soccer_argentina_primera_division',
   '중국 슈퍼리그': 'soccer_china_superleague',
   '라리가': 'soccer_spain_la_liga',
   '분데스리가': 'soccer_germany_bundesliga',
-  '프리미어리그': 'soccer_epl',
-  
-  // 농구 (Basketball)
-  'NBA': 'basketball_nba',
-  
-  // 야구 (Baseball)
-  'MLB': 'baseball_mlb',
-  'KBO': 'baseball_kbo',
-  
-  // 미식축구 (American Football)
-  'NFL': 'americanfootball_nfl'
+  '프리미어리그': 'soccer_england_premier_league'
 };
 
 class OddsApiService {

@@ -12,34 +12,41 @@ import dotenv from 'dotenv';
 // 환경변수 로드
 dotenv.config();
 
-// 클라이언트에서 사용하는 sport key 매핑
+// 클라이언트에서 사용하는 sport key 매핑 (영문으로 통일)
 const clientSportKeyMap = {
-  // 올바른 카테고리명
-  'K리그': 'soccer_korea_kleague1',
-  'J리그': 'soccer_japan_j_league',
-  '세리에 A': 'soccer_italy_serie_a',
-  '브라질 세리에 A': 'soccer_brazil_campeonato',
+  // 영문 카테고리명
+  'KLEAGUE': 'soccer_korea_kleague1',
+  'JLEAGUE': 'soccer_japan_j_league',
+  'SERIEA': 'soccer_italy_serie_a',
+  'BRASILEIRAO': 'soccer_brazil_campeonato',
   'MLS': 'soccer_usa_mls',
-  '아르헨티나 프리메라': 'soccer_argentina_primera_division',
-  '중국 슈퍼리그': 'soccer_china_superleague',
-  '라리가': 'soccer_spain_la_liga',
-  '분데스리가': 'soccer_germany_bundesliga',
-  '프리미어리그': 'soccer_england_premier_league',
+  'ARGENTINA_PRIMERA': 'soccer_argentina_primera_division',
+  'CSL': 'soccer_china_superleague',
+  'LALIGA': 'soccer_spain_la_liga',
+  'BUNDESLIGA': 'soccer_germany_bundesliga',
+  'EPL': 'soccer_england_premier_league',
   'NBA': 'basketball_nba',
   'MLB': 'baseball_mlb',
   'KBO': 'baseball_kbo',
   'NFL': 'americanfootball_nfl',
   
-  // 잘못된 카테고리명 (서버 로그에서 사용되는 것들)
-  'CSL': 'soccer_china_superleague',
-  'EPL': 'soccer_england_premier_league',
+  // 기존 한글 카테고리명 (하위 호환성)
+  'K리그': 'soccer_korea_kleague1',
+  'J리그': 'soccer_japan_j_league',
+  '세리에 A': 'soccer_italy_serie_a',
+  '브라질 세리에 A': 'soccer_brazil_campeonato',
+  '아르헨티나 프리메라': 'soccer_argentina_primera_division',
+  '중국 슈퍼리그': 'soccer_china_superleague',
+  '라리가': 'soccer_spain_la_liga',
+  '분데스리가': 'soccer_germany_bundesliga',
+  '프리미어리그': 'soccer_england_premier_league',
+  
+  // 기타 영문 변형
   'LaLiga': 'soccer_spain_la_liga',
-  'Bundesliga': 'soccer_germany_bundesliga',
   'SerieA': 'soccer_italy_serie_a',
   'Ligue1': 'soccer_france_ligue_1',
   'JLeague': 'soccer_japan_j_league',
-  'ArgentinaPrimera': 'soccer_argentina_primera_division',
-  'Brasileirao': 'soccer_brazil_campeonato'
+  'ArgentinaPrimera': 'soccer_argentina_primera_division'
 };
 
 // TheSportsDB 리그ID 매핑 (sportKey 기준, 반드시 clientSportKeyMap 값과 일치)

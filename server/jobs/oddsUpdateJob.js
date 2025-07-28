@@ -19,11 +19,11 @@ const highPriorityCategories = new Set([
 ]);
 
 const mediumPriorityCategories = new Set([
-  'MLS', 'K리그', 'J리그', '세리에 A'
+  'MLS', 'KLEAGUE', 'JLEAGUE', 'SERIEA'
 ]);
 
 const lowPriorityCategories = new Set([
-  '브라질 세리에 A', '아르헨티나 프리메라', '중국 슈퍼리그', '라리가', '분데스리가'
+  'BRASILEIRAO', 'ARGENTINA_PRIMERA', 'CSL', 'LALIGA', 'BUNDESLIGA'
 ]);
 
 let activeCategories = new Set([
