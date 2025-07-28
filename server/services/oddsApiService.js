@@ -292,7 +292,7 @@ class OddsApiService {
                 mainCategory,
                 subCategory,
                 sportKey: sportKey,
-                sportTitle: clientCategory,
+                sportTitle: this.getSportTitleFromSportKey(sportKey),
                 homeTeam: game.home_team,
                 awayTeam: game.away_team,
                 commenceTime: new Date(game.commence_time),
@@ -533,7 +533,7 @@ class OddsApiService {
                 mainCategory,
                 subCategory,
                 sportKey: sportKey,
-                sportTitle: clientCategory,
+                sportTitle: this.getSportTitleFromSportKey(sportKey),
                 homeTeam: game.home_team,
                 awayTeam: game.away_team,
                 commenceTime: new Date(game.commence_time),
@@ -600,6 +600,28 @@ class OddsApiService {
       console.error('[DEBUG] Error in fetchAndCacheOddsForCategories:', error);
       throw error;
     }
+  }
+
+  // sportKey에서 sportTitle 가져오기 (영문)
+  getSportTitleFromSportKey(sportKey) {
+    const sportTitleMap = {
+      'soccer_korea_kleague1': 'K League 1',
+      'soccer_japan_j_league': 'J League',
+      'soccer_italy_serie_a': 'Serie A',
+      'soccer_brazil_campeonato': 'Brasileirao',
+      'soccer_usa_mls': 'MLS',
+      'soccer_argentina_primera_division': 'Primera Division',
+      'soccer_china_superleague': 'Chinese Super League',
+      'soccer_spain_la_liga': 'La Liga',
+      'soccer_germany_bundesliga': 'Bundesliga',
+      'soccer_england_premier_league': 'Premier League',
+      'basketball_nba': 'NBA',
+      'basketball_kbl': 'KBL',
+      'baseball_mlb': 'MLB',
+      'baseball_kbo': 'KBO',
+      'americanfootball_nfl': 'NFL'
+    };
+    return sportTitleMap[sportKey] || sportKey;
   }
 
   // 동적 우선순위 레벨 확인 (스케줄러용)
