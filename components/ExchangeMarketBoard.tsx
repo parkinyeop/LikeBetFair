@@ -736,59 +736,63 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       return (
                         <div key={point} className="flex gap-4">
                           {/* 홈팀 Back */}
-                          <button
-                            className={`flex-1 p-4 border-2 rounded-lg text-center transition relative ${
-                              isDisabled || !homeOdds
-                                ? 'border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed'
-                                : 'border-blue-300 bg-blue-50 hover:bg-blue-100'
-                            }`}
-                            onClick={() => {
-                              if (homeOdds) handleBetClick(`${selectedGame.homeTeam} -${point}`, homeOdds, 'back');
-                            }}
-                            disabled={isDisabled || !homeOdds}
-                          >
-                            <div className={`text-lg font-bold ${isDisabled || !homeOdds ? 'text-gray-600' : 'text-blue-800'}`}>
-                              {selectedGame.homeTeam}
-                            </div>
-                            <div className={`text-xl font-extrabold mt-1 ${isDisabled || !homeOdds ? 'text-gray-700' : 'text-blue-900'}`}>
-                              {homeOdds ? homeOdds.toFixed(2) : 'N/A'} 
-                              <span className="ml-1 text-xs">+{point}</span>
-                            </div>
-                            <div className={`text-xs mt-1 ${isDisabled || !homeOdds ? 'text-gray-500' : 'text-blue-600'}`}>
-                              Back
-                            </div>
-                          </button>
+                          {homeOdds && (
+                            <button
+                              className={`flex-1 p-4 border-2 rounded-lg text-center transition relative ${
+                                isDisabled || !homeOdds
+                                  ? 'border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed'
+                                  : 'border-blue-300 bg-blue-50 hover:bg-blue-100'
+                              }`}
+                              onClick={() => {
+                                if (homeOdds) handleBetClick(`${selectedGame.homeTeam} -${point}`, homeOdds, 'back');
+                              }}
+                              disabled={isDisabled || !homeOdds}
+                            >
+                              <div className={`text-lg font-bold ${isDisabled || !homeOdds ? 'text-gray-600' : 'text-blue-800'}`}>
+                                {selectedGame.homeTeam}
+                              </div>
+                              <div className={`text-xl font-extrabold mt-1 ${isDisabled || !homeOdds ? 'text-gray-700' : 'text-blue-900'}`}>
+                                {homeOdds.toFixed(2)} 
+                                <span className="ml-1 text-xs">+{Math.abs(parseFloat(point))}</span>
+                              </div>
+                              <div className={`text-xs mt-1 ${isDisabled || !homeOdds ? 'text-gray-500' : 'text-blue-600'}`}>
+                                Back
+                              </div>
+                            </button>
+                          )}
 
                           {/* 핸디캡 표시 */}
                           <div className="w-20 flex items-center justify-center">
                             <div className="text-lg font-bold text-gray-800">
-                              {point}
+                              {Math.abs(parseFloat(point))}
                             </div>
                           </div>
 
                           {/* 원정팀 Back */}
-                          <button
-                            className={`flex-1 p-4 border-2 rounded-lg text-center transition relative ${
-                              isDisabled || !awayOdds
-                                ? 'border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed'
-                                : 'border-purple-300 bg-purple-50 hover:bg-purple-100'
-                            }`}
-                            onClick={() => {
-                              if (awayOdds) handleBetClick(`${selectedGame.awayTeam} +${point}`, awayOdds, 'back');
-                            }}
-                            disabled={isDisabled || !awayOdds}
-                          >
-                            <div className={`text-lg font-bold ${isDisabled || !awayOdds ? 'text-gray-600' : 'text-purple-800'}`}>
-                              {selectedGame.awayTeam}
-                            </div>
-                            <div className={`text-xl font-extrabold mt-1 ${isDisabled || !awayOdds ? 'text-gray-700' : 'text-purple-900'}`}>
-                              {awayOdds ? awayOdds.toFixed(2) : 'N/A'} 
-                              <span className="ml-1 text-xs">-{point}</span>
-                            </div>
-                            <div className={`text-xs mt-1 ${isDisabled || !awayOdds ? 'text-gray-500' : 'text-purple-600'}`}>
-                              Back
-                            </div>
-                          </button>
+                                                    {awayOdds && (
+                            <button
+                              className={`flex-1 p-4 border-2 rounded-lg text-center transition relative ${
+                                isDisabled || !awayOdds
+                                  ? 'border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed'
+                                  : 'border-purple-300 bg-purple-50 hover:bg-purple-100'
+                              }`}
+                              onClick={() => {
+                                if (awayOdds) handleBetClick(`${selectedGame.awayTeam} +${point}`, awayOdds, 'back');
+                              }}
+                              disabled={isDisabled || !awayOdds}
+                            >
+                              <div className={`text-lg font-bold ${isDisabled || !awayOdds ? 'text-gray-600' : 'text-purple-800'}`}>
+                                {selectedGame.awayTeam}
+                              </div>
+                              <div className={`text-xl font-extrabold mt-1 ${isDisabled || !awayOdds ? 'text-gray-700' : 'text-purple-900'}`}>
+                                {awayOdds.toFixed(2)} 
+                                <span className="ml-1 text-xs">-{Math.abs(parseFloat(point))}</span>
+                              </div>
+                              <div className={`text-xs mt-1 ${isDisabled || !awayOdds ? 'text-gray-500' : 'text-purple-600'}`}>
+                                Back
+                              </div>
+                            </button>
+                          )}
                         </div>
                       );
                     })}
