@@ -736,7 +736,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       return (
                         <div key={point} className="flex gap-4">
                           {/* 홈팀 Back */}
-                          {homeOdds && (
+                          {homeOdds != null && (
                             <button
                               className={`flex-1 p-4 border-2 rounded-lg text-center transition relative ${
                                 isDisabled || !homeOdds
@@ -769,7 +769,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                           </div>
 
                           {/* 원정팀 Back */}
-                                                    {awayOdds && (
+                                                    {awayOdds != null && (
                             <button
                               className={`flex-1 p-4 border-2 rounded-lg text-center transition relative ${
                                 isDisabled || !awayOdds

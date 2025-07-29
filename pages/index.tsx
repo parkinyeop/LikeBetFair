@@ -891,7 +891,7 @@ export default function Home() {
                           
                           return (
                             <div key={point} className="flex items-center gap-2">
-                              {homeOdds && (
+                              {homeOdds != null && (
                                 <button
                                   onClick={() => {
                                     if (isBettable && homeOdds) {
@@ -917,12 +917,12 @@ export default function Home() {
                                   <div className="font-bold">{game.home_team}</div>
                                   <div className="text-sm">
                                     {homeOdds.toFixed(2)} 
-                                    <span className="ml-1 text-xs">+{Math.abs(pointValue)}</span>
+                                    <span className="ml-1 text-xs">{point}</span>
                                   </div>
                                 </button>
                               )}
                               <div className="w-16 text-base font-bold text-gray-800 text-center">{Math.abs(pointValue)}</div>
-                                                            {awayOdds && (
+                              {awayOdds != null && (
                                 <button
                                   onClick={() => {
                                     if (isBettable && awayOdds) {
@@ -948,7 +948,7 @@ export default function Home() {
                                   <div className="font-bold">{game.away_team}</div>
                                   <div className="text-sm">
                                     {awayOdds.toFixed(2)} 
-                                    <span className="ml-1 text-xs">-{Math.abs(pointValue)}</span>
+                                    <span className="ml-1 text-xs">{point}</span>
                                   </div>
                                 </button>
                               )}
@@ -1422,7 +1422,7 @@ export default function Home() {
                                   
                                   return (
                                     <div key={idx} className="flex items-center gap-2">
-                                      {homeOdds && (
+                                      {homeOdds != null && (
                                         <button
                                           onClick={() => {
                                             toggleSelection({
@@ -1450,7 +1450,7 @@ export default function Home() {
                                         </button>
                                       )}
                                       <div className="w-16 text-base font-bold text-gray-800 text-center">{Math.abs(pointValue)}</div>
-                                      {awayOdds && (
+                                      {awayOdds != null && (
                                         <button
                                           onClick={() => {
                                             toggleSelection({

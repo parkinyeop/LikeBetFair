@@ -471,7 +471,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                         
                         return (
                           <div key={point} className="flex items-center gap-2">
-                            {homeOdds && (
+                            {homeOdds != null && (
                               <button
                                 onClick={() => {
                                   if (isBettable && homeOdds) {
@@ -503,7 +503,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                               </button>
                             )}
                             <div className="w-16 text-base font-bold text-gray-800 text-center">{Math.abs(pointValue)}</div>
-                                                        {awayOdds && (
+                                                        {awayOdds != null && (
                               <button
                                 onClick={() => {
                                   if (isBettable && awayOdds) {
