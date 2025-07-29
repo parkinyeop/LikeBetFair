@@ -897,7 +897,7 @@ export default function Home() {
                           const pointValue = parseFloat(absPoint);
                           
                           return (
-                            <div key={point} className="flex items-center gap-2">
+                            <div key={absPoint} className="flex items-center gap-2">
                               {homeOdds != null && (
                                 <button
                                   onClick={() => {
@@ -1399,14 +1399,16 @@ export default function Home() {
                               const parts = outcomeName.split(' ');
                               const point = parts[parts.length - 1]; // 마지막 부분이 핸디캡
                               const teamName = parts.slice(0, -1).join(' '); // 나머지가 팀명
+                              const handicapValue = parseFloat(point); // -1.5 또는 +1.5
+                              const absPoint = Math.abs(handicapValue).toString(); // "1.5"로 통일
                               
-                              if (!groupedSpreads[point]) groupedSpreads[point] = {};
+                              if (!groupedSpreads[absPoint]) groupedSpreads[absPoint] = {};
                               
                               // 홈팀인지 원정팀인지 판단
                               if (teamName === game.home_team) {
-                                groupedSpreads[point].home = oddsData;
+                                groupedSpreads[absPoint].home = { oddsData, handicap: handicapValue };
                               } else if (teamName === game.away_team) {
-                                groupedSpreads[point].away = oddsData;
+                                groupedSpreads[absPoint].away = { oddsData, handicap: handicapValue };
                               }
                             });
                             
@@ -1422,10 +1424,15 @@ export default function Home() {
                             
                             return (
                               <div className="space-y-2">
-                                {filteredSpreads.map(([point, oddsPair], idx: number) => {
-                                  const homeOdds = oddsPair.home?.averagePrice;
-                                  const awayOdds = oddsPair.away?.averagePrice;
-                                  const pointValue = parseFloat(point);
+                                {filteredSpreads.map(([absPoint, oddsPair], idx: number) => {
+                                  const homeData = oddsPair.home;
+                                  const awayData = oddsPair.away;
+                                  
+                                  const homeOdds = homeData?.oddsData?.averagePrice;
+                                  const awayOdds = awayData?.oddsData?.averagePrice;
+                                  const homeHandicap = homeData?.handicap || 0;
+                                  const awayHandicap = awayData?.handicap || 0;
+                                  const pointValue = parseFloat(absPoint);
                                   
                                   return (
                                     <div key={idx} className="flex items-center gap-2">
@@ -1433,7 +1440,7 @@ export default function Home() {
                                         <button
                                           onClick={() => {
                                             toggleSelection({
-                                              team: `${game.home_team} -${point}`,
+                                              team: `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`,
                                               odds: homeOdds,
                                               desc: `${game.home_team} vs ${game.away_team}`,
                                               commence_time: game.commence_time,
@@ -1444,7 +1451,7 @@ export default function Home() {
                                             });
                                           }}
                                           className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                                            (selections || []).some(sel => sel.team === `${game.home_team} -${point}` && sel.market === '핸디캡' && sel.gameId === game.id)
+                                                                                          (selections || []).some(sel => sel.team === `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}` && sel.market === '핸디캡' && sel.gameId === game.id)
                                               ? 'bg-yellow-500 hover:bg-yellow-600'
                                               : 'bg-blue-500 hover:bg-blue-600'
                                           } text-white`}
@@ -1452,16 +1459,16 @@ export default function Home() {
                                           <div className="font-bold">{game.home_team}</div>
                                           <div className="text-sm">
                                             {homeOdds.toFixed(2)} 
-                                            <span className="ml-1 text-xs">+{Math.abs(pointValue)}</span>
+                                            <span className="ml-1 text-xs">{homeHandicap > 0 ? '+' : ''}{homeHandicap}</span>
                                           </div>
                                         </button>
                                       )}
-                                      <div className="w-16 text-base font-bold text-gray-800 text-center">{Math.abs(pointValue)}</div>
+                                      <div className="w-16 text-base font-bold text-gray-800 text-center">{absPoint}</div>
                                       {awayOdds != null && (
                                         <button
                                           onClick={() => {
                                             toggleSelection({
-                                              team: `${game.away_team} +${point}`,
+                                              team: `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`,
                                               odds: awayOdds,
                                               desc: `${game.home_team} vs ${game.away_team}`,
                                               commence_time: game.commence_time,
@@ -1472,7 +1479,7 @@ export default function Home() {
                                             });
                                           }}
                                           className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                                            (selections || []).some(sel => sel.team === `${game.away_team} +${point}` && sel.market === '핸디캡' && sel.gameId === game.id)
+                                                                                          (selections || []).some(sel => sel.team === `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}` && sel.market === '핸디캡' && sel.gameId === game.id)
                                               ? 'bg-yellow-500 hover:bg-yellow-600'
                                               : 'bg-blue-500 hover:bg-blue-600'
                                           } text-white`}
@@ -1480,7 +1487,7 @@ export default function Home() {
                                           <div className="font-bold">{game.away_team}</div>
                                           <div className="text-sm">
                                             {awayOdds.toFixed(2)} 
-                                            <span className="ml-1 text-xs">-{Math.abs(pointValue)}</span>
+                                            <span className="ml-1 text-xs">{awayHandicap > 0 ? '+' : ''}{awayHandicap}</span>
                                           </div>
                                         </button>
                                       )}
