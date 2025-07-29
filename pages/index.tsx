@@ -914,7 +914,10 @@ export default function Home() {
                                 disabled={!isBettable || !homeOdds}
                               >
                                 <div className="font-bold">{game.home_team}</div>
-                                <div className="text-sm">{homeOdds ? homeOdds.toFixed(2) : 'N/A'}</div>
+                                <div className="text-sm">
+                                  {homeOdds ? homeOdds.toFixed(2) : 'N/A'} 
+                                  <span className="ml-1 text-xs">+{point}</span>
+                                </div>
                               </button>
                               <div className="w-16 text-base font-bold text-gray-800 text-center">{point}</div>
                               <button
@@ -940,7 +943,10 @@ export default function Home() {
                                 disabled={!isBettable || !awayOdds}
                               >
                                 <div className="font-bold">{game.away_team}</div>
-                                <div className="text-sm">{awayOdds ? awayOdds.toFixed(2) : 'N/A'}</div>
+                                <div className="text-sm">
+                                  {awayOdds ? awayOdds.toFixed(2) : 'N/A'} 
+                                  <span className="ml-1 text-xs">-{point}</span>
+                                </div>
                               </button>
                             </div>
                           );
@@ -1432,7 +1438,10 @@ export default function Home() {
                                         } text-white`}
                                       >
                                         <div className="font-bold">{game.home_team}</div>
-                                        <div className="text-sm">{homeOdds ? homeOdds.toFixed(2) : 'N/A'}</div>
+                                        <div className="text-sm">
+                                          {homeOdds ? homeOdds.toFixed(2) : 'N/A'} 
+                                          <span className="ml-1 text-xs">+{point}</span>
+                                        </div>
                                       </button>
                                       <div className="w-16 text-base font-bold text-gray-800 text-center">{point}</div>
                                       <button
@@ -1455,7 +1464,10 @@ export default function Home() {
                                         } text-white`}
                                       >
                                         <div className="font-bold">{game.away_team}</div>
-                                        <div className="text-sm">{awayOdds ? awayOdds.toFixed(2) : 'N/A'}</div>
+                                        <div className="text-sm">
+                                          {awayOdds ? awayOdds.toFixed(2) : 'N/A'} 
+                                          <span className="ml-1 text-xs">-{point}</span>
+                                        </div>
                                       </button>
                                     </div>
                                   );
