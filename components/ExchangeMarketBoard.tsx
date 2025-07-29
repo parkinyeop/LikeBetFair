@@ -713,10 +713,10 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                   }
                 });
                 
-                // 0.5 이상의 핸디캡만 필터링
+                // 0.5 단위 핸디캡만 필터링 (0.5, 1.0, 1.5, 2.0 등)
                 const filteredSpreads = Object.entries(groupedSpreads).filter(([point, oddsPair]) => {
                   const pointValue = Math.abs(parseFloat(point));
-                  return pointValue >= 0.5;
+                  return pointValue >= 0.5 && pointValue % 0.5 === 0;
                 });
                 
                 if (filteredSpreads.length === 0) {
@@ -748,10 +748,11 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                             disabled={isDisabled || !homeOdds}
                           >
                             <div className={`text-lg font-bold ${isDisabled || !homeOdds ? 'text-gray-600' : 'text-blue-800'}`}>
-                              {selectedGame.homeTeam} -{point}
+                              {selectedGame.homeTeam}
                             </div>
                             <div className={`text-xl font-extrabold mt-1 ${isDisabled || !homeOdds ? 'text-gray-700' : 'text-blue-900'}`}>
-                              {homeOdds ? homeOdds.toFixed(2) : 'N/A'}
+                              {homeOdds ? homeOdds.toFixed(2) : 'N/A'} 
+                              <span className="ml-1 text-xs">+{point}</span>
                             </div>
                             <div className={`text-xs mt-1 ${isDisabled || !homeOdds ? 'text-gray-500' : 'text-blue-600'}`}>
                               Back
@@ -778,10 +779,11 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                             disabled={isDisabled || !awayOdds}
                           >
                             <div className={`text-lg font-bold ${isDisabled || !awayOdds ? 'text-gray-600' : 'text-purple-800'}`}>
-                              {selectedGame.awayTeam} +{point}
+                              {selectedGame.awayTeam}
                             </div>
                             <div className={`text-xl font-extrabold mt-1 ${isDisabled || !awayOdds ? 'text-gray-700' : 'text-purple-900'}`}>
-                              {awayOdds ? awayOdds.toFixed(2) : 'N/A'}
+                              {awayOdds ? awayOdds.toFixed(2) : 'N/A'} 
+                              <span className="ml-1 text-xs">-{point}</span>
                             </div>
                             <div className={`text-xs mt-1 ${isDisabled || !awayOdds ? 'text-gray-500' : 'text-purple-600'}`}>
                               Back
