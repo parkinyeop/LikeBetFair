@@ -883,7 +883,7 @@ export default function Home() {
                     }
                     
                     return (
-                      <div className="flex items-center gap-2">
+                      <div className="space-y-2">
                         {filteredSpreads.map(([point, oddsPair], idx: number) => {
                           const homeOdds = oddsPair.home?.averagePrice;
                           const awayOdds = oddsPair.away?.averagePrice;
@@ -914,11 +914,9 @@ export default function Home() {
                                 disabled={!isBettable || !homeOdds}
                               >
                                 <div className="font-bold">{game.home_team}</div>
-                                <div className="text-sm">
-                                  {homeOdds ? homeOdds.toFixed(2) : 'N/A'} 
-                                  <span className="ml-1 text-xs">-{point}</span>
-                                </div>
+                                <div className="text-sm">{homeOdds ? homeOdds.toFixed(2) : 'N/A'}</div>
                               </button>
+                              <div className="w-16 text-base font-bold text-gray-800 text-center">{point}</div>
                               <button
                                 onClick={() => {
                                   if (isBettable && awayOdds) {
@@ -942,10 +940,7 @@ export default function Home() {
                                 disabled={!isBettable || !awayOdds}
                               >
                                 <div className="font-bold">{game.away_team}</div>
-                                <div className="text-sm">
-                                  {awayOdds ? awayOdds.toFixed(2) : 'N/A'} 
-                                  <span className="ml-1 text-xs">+{point}</span>
-                                </div>
+                                <div className="text-sm">{awayOdds ? awayOdds.toFixed(2) : 'N/A'}</div>
                               </button>
                             </div>
                           );
@@ -1409,7 +1404,7 @@ export default function Home() {
                             }
                             
                             return (
-                              <div className="flex items-center gap-2">
+                              <div className="space-y-2">
                                 {filteredSpreads.map(([point, oddsPair], idx: number) => {
                                   const homeOdds = oddsPair.home?.averagePrice;
                                   const awayOdds = oddsPair.away?.averagePrice;
@@ -1437,11 +1432,9 @@ export default function Home() {
                                         } text-white`}
                                       >
                                         <div className="font-bold">{game.home_team}</div>
-                                        <div className="text-sm">
-                                          {homeOdds ? homeOdds.toFixed(2) : 'N/A'} 
-                                          <span className="ml-1 text-xs">-{point}</span>
-                                        </div>
+                                        <div className="text-sm">{homeOdds ? homeOdds.toFixed(2) : 'N/A'}</div>
                                       </button>
+                                      <div className="w-16 text-base font-bold text-gray-800 text-center">{point}</div>
                                       <button
                                         onClick={() => {
                                           toggleSelection({
@@ -1462,10 +1455,7 @@ export default function Home() {
                                         } text-white`}
                                       >
                                         <div className="font-bold">{game.away_team}</div>
-                                        <div className="text-sm">
-                                          {awayOdds ? awayOdds.toFixed(2) : 'N/A'} 
-                                          <span className="ml-1 text-xs">+{point}</span>
-                                        </div>
+                                        <div className="text-sm">{awayOdds ? awayOdds.toFixed(2) : 'N/A'}</div>
                                       </button>
                                     </div>
                                   );
