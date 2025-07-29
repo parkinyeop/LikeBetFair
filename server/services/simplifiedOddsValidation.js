@@ -7,7 +7,7 @@ import oddsHistoryService from './oddsHistoryService.js';
 
 class SimplifiedOddsValidation {
   constructor() {
-    this.ODDS_TOLERANCE = 0.001; // 0.1% 허용 오차로 원래대로 복원
+    this.ODDS_TOLERANCE = 0.01; // 1% 허용 오차로 조정 (더 관대하게)
   }
 
   /**
@@ -45,7 +45,10 @@ class SimplifiedOddsValidation {
       // 3. 배당율 일치 검증 (최소한의 오차 허용)
       const deviation = Math.abs(selection.odds - currentOdds.odds) / currentOdds.odds;
       
+      console.log(`[SimplifiedValidation] 배당율 비교: 요청=${selection.odds}, 현재=${currentOdds.odds}, 오차=${(deviation * 100).toFixed(2)}%, 허용=${(this.ODDS_TOLERANCE * 100).toFixed(2)}%`);
+      
       if (deviation > this.ODDS_TOLERANCE) {
+        console.log(`[SimplifiedValidation] 배당율 변경 감지: ${selection.desc} - ${selection.odds} → ${currentOdds.odds}`);
         return {
           isValid: false,
           reason: '배당율이 변경되었습니다',

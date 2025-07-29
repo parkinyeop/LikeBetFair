@@ -89,7 +89,7 @@ class BetResultService {
     }
   }
 
-  // 개별 배팅 결과 처리 (경기별 결과 Map 활용)
+  // 개별 배팅 결과 처리 (스코어 유무 기반)
   async processBetResult(bet) {
     // ✅ 환불 기록이 있으면 무조건 cancelled로 고정
     const whereCond = {
@@ -118,44 +118,7 @@ class BetResultService {
     const prevSelections = JSON.stringify(bet.selections);
     const prevStatus = bet.status;
 
-    // 1. 날짜별 GameResult 한 번만 조회해서 Map 생성
-    const dateSet = new Set();
-    for (const selection of selections) {
-      if (selection.commence_time) {
-        const d = new Date(selection.commence_time);
-        d.setUTCHours(0,0,0,0);
-        dateSet.add(d.toISOString());
-      }
-    }
-    const allGameResults = [];
-    for (const dateStr of dateSet) {
-      const dayStart = new Date(dateStr);
-      const dayEnd = new Date(dateStr);
-      dayEnd.setUTCHours(23,59,59,999);
-      const results = await GameResult.findAll({
-        where: {
-          commenceTime: { [Op.between]: [dayStart, dayEnd] },
-          status: 'finished'
-        }
-      });
-      allGameResults.push(...results);
-    }
-    // Map: key = commence_time|homeTeam|awayTeam (확정 결과 우선)
-    const resultMap = new Map();
-    for (const gr of allGameResults) {
-      const key = `${gr.commenceTime.toISOString()}|${normalizeTeamNameForComparison(gr.homeTeam)}|${normalizeTeamNameForComparison(gr.awayTeam)}`;
-      // 이미 확정 결과가 있으면 덮어쓰지 않음, 없으면 저장
-      if (!resultMap.has(key)) {
-        resultMap.set(key, gr);
-      } else {
-        const existing = resultMap.get(key);
-        // 기존 값이 pending이고, 새 값이 확정 결과면 교체
-        if ((existing.result === 'pending' || !existing.result) && gr.result && gr.result !== 'pending') {
-          resultMap.set(key, gr);
-        }
-      }
-    }
-
+    // 각 선택에 대해 스코어 유무로 결과 처리
     for (const selection of selections) {
       const desc = selection.desc;
       const teams = desc ? desc.split(' vs ') : [];
@@ -164,8 +127,9 @@ class BetResultService {
         hasPending = true;
         continue;
       }
-      const homeTeamNorm = normalizeTeamNameForComparison(teams[0].trim());
-      const awayTeamNorm = normalizeTeamNameForComparison(teams[1].trim());
+      
+      const homeTeam = teams[0].trim();
+      const awayTeam = teams[1].trim();
       let commenceTime;
       try {
         commenceTime = new Date(selection.commence_time);
@@ -179,32 +143,29 @@ class BetResultService {
         hasPending = true;
         continue;
       }
-      // 시간대 차이 보정: ±9시간 범위로 매칭 시도
-      let gameResult = null;
-      const baseKey = `${homeTeamNorm}|${awayTeamNorm}`;
-      
-      // 정확한 시간 매칭 시도
-      const exactKey = `${commenceTime.toISOString()}|${baseKey}`;
-      gameResult = resultMap.get(exactKey);
-      
-      // 정확한 매칭이 없으면 ±9시간 범위로 시도
-      if (!gameResult) {
-        for (let hourOffset = -9; hourOffset <= 9; hourOffset++) {
-          const adjustedTime = new Date(commenceTime.getTime() + hourOffset * 60 * 60 * 1000);
-          const adjustedKey = `${adjustedTime.toISOString()}|${baseKey}`;
-          gameResult = resultMap.get(adjustedKey);
-          if (gameResult) {
-            console.log(`[시간대 보정] ${selection.desc}: ${hourOffset}시간 조정으로 매칭 성공`);
-            break;
+
+      // 해당 경기의 GameResult 조회 (스코어 유무 확인)
+      const gameResult = await GameResult.findOne({
+        where: {
+          homeTeam: { [Op.iLike]: `%${homeTeam}%` },
+          awayTeam: { [Op.iLike]: `%${awayTeam}%` },
+          commenceTime: {
+            [Op.between]: [
+              new Date(commenceTime.getTime() - 24 * 60 * 60 * 1000), // 24시간 전
+              new Date(commenceTime.getTime() + 24 * 60 * 60 * 1000)  // 24시간 후
+            ]
           }
-        }
-      }
-      
-      if (!gameResult) {
+        },
+        order: [['createdAt', 'DESC']]
+      });
+
+      // 스코어가 없으면 pending 유지
+      if (!gameResult || !gameResult.score || !Array.isArray(gameResult.score) || gameResult.score.length === 0) {
         selection.result = 'pending';
         hasPending = true;
         continue;
       }
+
       // 취소/연기 처리
       if (gameResult.status === 'cancelled' || gameResult.result === 'cancelled' ||
           gameResult.status === 'postponed' || gameResult.result === 'postponed') {
@@ -212,12 +173,11 @@ class BetResultService {
         hasCancelled = true;
         continue;
       }
-      if (gameResult.status === 'finished') {
-        const selectionResult = this.determineSelectionResult(selection, gameResult);
-        selection.result = selectionResult;
-      } else {
-        selection.result = 'pending';
-      }
+
+      // 스코어가 있으면 결과 처리
+      const selectionResult = this.determineSelectionResult(selection, gameResult);
+      selection.result = selectionResult;
+      
       if (selection.result === 'pending') hasPending = true;
       else if (selection.result === 'lost' || selection.result === 'draw') hasLost = true;
       else if (selection.result === 'won') hasWon = true;
@@ -361,138 +321,138 @@ class BetResultService {
     return Math.min(adjustedWinnings, Number(bet.potentialWinnings));
   }
 
-  // 개선: 날짜별 pending GameResult를 한 번만 조회 후 메모리상에서 팀명 매칭
-  async getGameResultByTeams(selection, pendingGameResultsCache = null) {
-    try {
-      const desc = selection.desc;
-      const teams = desc ? desc.split(' vs ') : [];
-      if (teams.length !== 2) {
-        console.log(`[getGameResultByTeams] Invalid game description format: ${desc}`);
-        return null;
-      }
-      // team 정규화 적용 (비교용)
-      const homeTeamNorm = normalizeTeamNameForComparison(teams[0].trim());
-      const awayTeamNorm = normalizeTeamNameForComparison(teams[1].trim());
-      // 날짜 추출 (commence_time)
-      let commenceTime;
-      try {
-        commenceTime = new Date(selection.commence_time);
-        if (isNaN(commenceTime.getTime())) {
-          console.log(`[getGameResultByTeams] Invalid commence_time format: ${selection.commence_time} for game: ${desc}`);
-          return null;
-        }
-      } catch (error) {
-        console.log(`[getGameResultByTeams] Error parsing commence_time: ${selection.commence_time} for game: ${desc}`);
-        return null;
-      }
-      // 날짜 범위 (해당 날짜 00:00~23:59)
-      const dayStart = new Date(commenceTime);
-      dayStart.setUTCHours(0,0,0,0);
-      const dayEnd = new Date(commenceTime);
-      dayEnd.setUTCHours(23,59,59,999);
-      // pendingGameResultsCache가 없으면 한 번만 조회
-      let pendingGameResults = pendingGameResultsCache;
-      if (!pendingGameResults) {
-        pendingGameResults = await GameResult.findAll({
-          where: {
-            commenceTime: { [Op.between]: [dayStart, dayEnd] },
-            status: 'finished'
-          }
-        });
-      }
-      // 메모리상에서 팀명 매칭
-      for (const candidate of pendingGameResults) {
-        const dbHomeNorm = normalizeTeamNameForComparison(candidate.homeTeam);
-        const dbAwayNorm = normalizeTeamNameForComparison(candidate.awayTeam);
-        if (
-          (dbHomeNorm === homeTeamNorm && dbAwayNorm === awayTeamNorm) ||
-          (dbHomeNorm === awayTeamNorm && dbAwayNorm === homeTeamNorm)
-        ) {
-          return candidate;
-        }
-      }
-      // 매칭 실패
-      return null;
-    } catch (error) {
-      console.error('[getGameResultByTeams] Error:', error.stack || error);
-      return null;
-    }
-  }
+  // 🚫 더 이상 사용하지 않는 메서드 (스코어 유무 기반으로 변경됨)
+  // async getGameResultByTeams(selection, pendingGameResultsCache = null) {
+  //   try {
+  //     const desc = selection.desc;
+  //     const teams = desc ? desc.split(' vs ') : [];
+  //     if (teams.length !== 2) {
+  //       console.log(`[getGameResultByTeams] Invalid game description format: ${desc}`);
+  //       return null;
+  //     }
+  //     // team 정규화 적용 (비교용)
+  //     const homeTeamNorm = normalizeTeamNameForComparison(teams[0].trim());
+  //     const awayTeamNorm = normalizeTeamNameForComparison(teams[1].trim());
+  //     // 날짜 추출 (commence_time)
+  //     let commenceTime;
+  //     try {
+  //         commenceTime = new Date(selection.commence_time);
+  //         if (isNaN(commenceTime.getTime())) {
+  //           console.log(`[getGameResultByTeams] Invalid commence_time format: ${selection.commence_time} for game: ${desc}`);
+  //           return null;
+  //         }
+  //     } catch (error) {
+  //       console.log(`[getGameResultByTeams] Error parsing commence_time: ${selection.commence_time} for game: ${desc}`);
+  //       return null;
+  //     }
+  //     // 날짜 범위 (해당 날짜 00:00~23:59)
+  //     const dayStart = new Date(commenceTime);
+  //     dayStart.setUTCHours(0,0,0,0);
+  //     const dayEnd = new Date(commenceTime);
+  //     dayEnd.setUTCHours(23,59,59,999);
+  //     // pendingGameResultsCache가 없으면 한 번만 조회
+  //     let pendingGameResults = pendingGameResultsCache;
+  //     if (!pendingGameResults) {
+  //       pendingGameResults = await GameResult.findAll({
+  //         where: {
+  //           commenceTime: { [Op.between]: [dayStart, dayEnd] },
+  //           status: 'finished'
+  //         }
+  //       });
+  //     }
+  //     // 메모리상에서 팀명 매칭
+  //     for (const candidate of pendingGameResults) {
+  //       const dbHomeNorm = normalizeTeamNameForComparison(candidate.homeTeam);
+  //       const dbAwayNorm = normalizeTeamNameForComparison(candidate.awayTeam);
+  //       if (
+  //         (dbHomeNorm === homeTeamNorm && dbAwayNorm === awayTeamNorm) ||
+  //         (dbHomeNorm === awayTeamNorm && dbAwayNorm === homeTeamNorm)
+  //       ) {
+  //         return candidate;
+  //       }
+  //     }
+  //     // 매칭 실패
+  //     return null;
+  //   } catch (error) {
+  //     console.error('[getGameResultByTeams] Error:', error.stack || error);
+  //     return null;
+  //   }
+  // }
 
-  // 클라이언트에서 배당률을 제공하는 모든 게임 목록 수집
-  async collectAllBettingGames() {
-    try {
-      console.log('Collecting all games that have betting odds...');
-      
-      // 모든 배팅에서 고유한 게임 목록 추출
-      const allBets = await Bet.findAll({
-        attributes: ['selections']
-      });
+  // 🚫 더 이상 사용하지 않는 메서드들 (스코어 유무 기반으로 변경됨)
+  // async collectAllBettingGames() {
+  //   try {
+  //     console.log('Collecting all games that have betting odds...');
+  //     
+  //     // 모든 배팅에서 고유한 게임 목록 추출
+  //     const allBets = await Bet.findAll({
+  //       attributes: ['selections']
+  //     });
 
-      const uniqueGames = new Map();
+  //     const uniqueGames = new Map();
 
-      allBets.forEach(bet => {
-        bet.selections.forEach(selection => {
-          const gameKey = selection.desc;
-          if (gameKey && !uniqueGames.has(gameKey)) {
-            uniqueGames.set(gameKey, {
-              desc: selection.desc,
-              commence_time: selection.commence_time,
-              gameId: selection.gameId,
-              market: selection.market
-            });
-          }
-        });
-      });
+  //     allBets.forEach(bet => {
+  //       bet.selections.forEach(selection => {
+  //         const gameKey = selection.desc;
+  //         if (gameKey && !uniqueGames.has(gameKey)) {
+  //           uniqueGames.set(gameKey, {
+  //             desc: selection.desc,
+  //             commence_time: selection.commence_time,
+  //             gameId: selection.gameId,
+  //             market: selection.market
+  //           });
+  //         }
+  //       });
+  //     });
 
-      const gamesList = Array.from(uniqueGames.values());
-      console.log(`Found ${gamesList.length} unique games with betting odds`);
-      
-      return gamesList;
-    } catch (error) {
-      console.error('Error collecting betting games:', error);
-      throw error;
-    }
-  }
+  //     const gamesList = Array.from(uniqueGames.values());
+  //     console.log(`Found ${gamesList.length} unique games with betting odds`);
+  //     
+  //     return gamesList;
+  //   } catch (error) {
+  //     console.error('Error collecting betting games:', error);
+  //     throw error;
+  //   }
+  // }
 
-  // 누락된 경기 결과 식별
-  async identifyMissingGameResults() {
-    try {
-      console.log('Identifying missing game results...');
-      
-      const bettingGames = await this.collectAllBettingGames();
-      const missingGames = [];
+  // // 누락된 경기 결과 식별
+  // async identifyMissingGameResults() {
+  //   try {
+  //     console.log('Identifying missing game results...');
+  //     
+  //     const bettingGames = await this.collectAllBettingGames();
+  //     const missingGames = [];
 
-      for (const game of bettingGames) {
-        const gameResult = await this.getGameResultByTeams(game);
-        if (!gameResult) {
-          missingGames.push(game);
-        }
-      }
+  //     for (const game of bettingGames) {
+  //         const gameResult = await this.getGameResultByTeams(game);
+  //         if (!gameResult) {
+  //           missingGames.push(game);
+  //         }
+  //       }
 
-      console.log(`Found ${missingGames.length} games missing results out of ${bettingGames.length} total games`);
-      return missingGames;
-    } catch (error) {
-      console.error('Error identifying missing game results:', error);
-      throw error;
-    }
-  }
+  //     console.log(`Found ${missingGames.length} games missing results out of ${bettingGames.length} total games`);
+  //     return missingGames;
+  //   } catch (error) {
+  //     console.error('Error identifying missing game results:', error);
+  //     throw error;
+  //   }
+  // }
 
-  // 기존 gameId로 조회하는 메서드 (하위 호환성)
-  async getGameResult(gameId) {
-    try {
-      const gameResult = await GameResult.findOne({
-        where: {
-          id: gameId
-        }
-      });
+  // // 기존 gameId로 조회하는 메서드 (하위 호환성)
+  // async getGameResult(gameId) {
+  //   try {
+  //     const gameResult = await GameResult.findOne({
+  //       where: {
+  //         id: gameId
+  //       }
+  //     });
 
-      return gameResult;
-    } catch (error) {
-      console.error('Error getting game result:', error);
-      return null;
-    }
-  }
+  //     return gameResult;
+  //   } catch (error) {
+  //     console.error('Error getting game result:', error);
+  //     return null;
+  //   }
+  // }
 
   // 개별 selection 결과 판정
   determineSelectionResult(selection, gameResult) {
