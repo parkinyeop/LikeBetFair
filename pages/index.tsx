@@ -921,11 +921,8 @@ export default function Home() {
                                   } text-white`}
                                   disabled={!isBettable || !homeOdds}
                                 >
-                                  <div className="font-bold">{game.home_team}</div>
-                                  <div className="text-sm">
-                                    {homeOdds.toFixed(2)} 
-                                    <span className="ml-1 text-xs">{homeHandicap > 0 ? '+' : ''}{homeHandicap}</span>
-                                  </div>
+                                  <div className="font-bold">{game.home_team} {homeHandicap > 0 ? '+' : ''}{homeHandicap}</div>
+                                  <div className="text-sm">{homeOdds.toFixed(2)}</div>
                                 </button>
                               )}
                               <div className="w-16 text-base font-bold text-gray-800 text-center">{absPoint}</div>
@@ -952,11 +949,8 @@ export default function Home() {
                                   } text-white`}
                                   disabled={!isBettable || !awayOdds}
                                 >
-                                  <div className="font-bold">{game.away_team}</div>
-                                  <div className="text-sm">
-                                    {awayOdds.toFixed(2)} 
-                                    <span className="ml-1 text-xs">{awayHandicap > 0 ? '+' : ''}{awayHandicap}</span>
-                                  </div>
+                                  <div className="font-bold">{game.away_team} {awayHandicap > 0 ? '+' : ''}{awayHandicap}</div>
+                                  <div className="text-sm">{awayOdds.toFixed(2)}</div>
                                 </button>
                               )}
                             </div>

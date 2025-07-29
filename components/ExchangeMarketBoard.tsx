@@ -695,7 +695,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                 }
                 
                 // Home/Away 쌍으로 그룹화 (팀명 기반 매칭)
-                const groupedSpreads: { [point: string]: { home?: any, away?: any } } = {};
+                const groupedSpreads: { [absPoint: string]: { home?: { oddsData: any, handicap: number }, away?: { oddsData: any, handicap: number } } } = {};
                 
                 spreadEntries.forEach(([outcomeName, oddsData]) => {
                   // "Team Point" 형식에서 팀명과 핸디캡 분리
@@ -703,19 +703,22 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                   const point = parts[parts.length - 1]; // 마지막 부분이 핸디캡
                   const teamName = parts.slice(0, -1).join(' '); // 나머지가 팀명
                   
-                  if (!groupedSpreads[point]) groupedSpreads[point] = {};
+                  const handicapValue = parseFloat(point); // -1.5 또는 +1.5
+                  const absPoint = Math.abs(handicapValue).toString(); // "1.5"로 통일
+                  
+                  if (!groupedSpreads[absPoint]) groupedSpreads[absPoint] = {};
                   
                   // 홈팀인지 원정팀인지 판단
                   if (teamName === selectedGame.homeTeam) {
-                    groupedSpreads[point].home = oddsData;
+                    groupedSpreads[absPoint].home = { oddsData, handicap: handicapValue };
                   } else if (teamName === selectedGame.awayTeam) {
-                    groupedSpreads[point].away = oddsData;
+                    groupedSpreads[absPoint].away = { oddsData, handicap: handicapValue };
                   }
                 });
                 
                 // 0.5 단위 핸디캡만 필터링 (0.5, 1.0, 1.5, 2.0 등)
-                const filteredSpreads = Object.entries(groupedSpreads).filter(([point, oddsPair]) => {
-                  const pointValue = Math.abs(parseFloat(point));
+                const filteredSpreads = Object.entries(groupedSpreads).filter(([absPoint, oddsPair]) => {
+                  const pointValue = Math.abs(parseFloat(absPoint));
                   return pointValue >= 0.5 && pointValue % 0.5 === 0;
                 });
                 
@@ -729,12 +732,17 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                 
                 return (
                   <div className="space-y-4 max-w-4xl mx-auto">
-                    {filteredSpreads.map(([point, oddsPair]) => {
-                      const homeOdds = oddsPair.home?.averagePrice;
-                      const awayOdds = oddsPair.away?.averagePrice;
+                    {filteredSpreads.map(([absPoint, oddsPair]) => {
+                      const homeData = oddsPair.home;
+                      const awayData = oddsPair.away;
+                      
+                      const homeOdds = homeData?.oddsData?.averagePrice;
+                      const awayOdds = awayData?.oddsData?.averagePrice;
+                      const homeHandicap = homeData?.handicap || 0;
+                      const awayHandicap = awayData?.handicap || 0;
                       
                       return (
-                        <div key={point} className="flex gap-4">
+                        <div key={absPoint} className="flex gap-4">
                           {/* 홈팀 Back */}
                           {homeOdds != null && (
                             <button
@@ -744,16 +752,15 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                                   : 'border-blue-300 bg-blue-50 hover:bg-blue-100'
                               }`}
                               onClick={() => {
-                                if (homeOdds) handleBetClick(`${selectedGame.homeTeam} -${point}`, homeOdds, 'back');
+                                if (homeOdds) handleBetClick(`${selectedGame.homeTeam} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`, homeOdds, 'back');
                               }}
                               disabled={isDisabled || !homeOdds}
                             >
                               <div className={`text-lg font-bold ${isDisabled || !homeOdds ? 'text-gray-600' : 'text-blue-800'}`}>
-                                {selectedGame.homeTeam}
+                                {selectedGame.homeTeam} {homeHandicap > 0 ? '+' : ''}{homeHandicap}
                               </div>
                               <div className={`text-xl font-extrabold mt-1 ${isDisabled || !homeOdds ? 'text-gray-700' : 'text-blue-900'}`}>
-                                {homeOdds.toFixed(2)} 
-                                <span className="ml-1 text-xs">+{Math.abs(parseFloat(point))}</span>
+                                {homeOdds.toFixed(2)}
                               </div>
                               <div className={`text-xs mt-1 ${isDisabled || !homeOdds ? 'text-gray-500' : 'text-blue-600'}`}>
                                 Back
@@ -764,12 +771,12 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                           {/* 핸디캡 표시 */}
                           <div className="w-20 flex items-center justify-center">
                             <div className="text-lg font-bold text-gray-800">
-                              {Math.abs(parseFloat(point))}
+                              {absPoint}
                             </div>
                           </div>
 
                           {/* 원정팀 Back */}
-                                                    {awayOdds != null && (
+                          {awayOdds != null && (
                             <button
                               className={`flex-1 p-4 border-2 rounded-lg text-center transition relative ${
                                 isDisabled || !awayOdds
@@ -777,16 +784,15 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                                   : 'border-purple-300 bg-purple-50 hover:bg-purple-100'
                               }`}
                               onClick={() => {
-                                if (awayOdds) handleBetClick(`${selectedGame.awayTeam} +${point}`, awayOdds, 'back');
+                                if (awayOdds) handleBetClick(`${selectedGame.awayTeam} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`, awayOdds, 'back');
                               }}
                               disabled={isDisabled || !awayOdds}
                             >
                               <div className={`text-lg font-bold ${isDisabled || !awayOdds ? 'text-gray-600' : 'text-purple-800'}`}>
-                                {selectedGame.awayTeam}
+                                {selectedGame.awayTeam} {awayHandicap > 0 ? '+' : ''}{awayHandicap}
                               </div>
                               <div className={`text-xl font-extrabold mt-1 ${isDisabled || !awayOdds ? 'text-gray-700' : 'text-purple-900'}`}>
-                                {awayOdds.toFixed(2)} 
-                                <span className="ml-1 text-xs">-{Math.abs(parseFloat(point))}</span>
+                                {awayOdds.toFixed(2)}
                               </div>
                               <div className={`text-xs mt-1 ${isDisabled || !awayOdds ? 'text-gray-500' : 'text-purple-600'}`}>
                                 Back
