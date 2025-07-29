@@ -448,10 +448,10 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                     }
                   });
                   
-                  // 0.5 이상의 핸디캡만 필터링
+                  // 0.5 단위 핸디캡만 필터링 (0.5, 1.0, 1.5, 2.0 등)
                   const filteredSpreads = Object.entries(groupedSpreads).filter(([point, oddsPair]) => {
                     const pointValue = Math.abs(parseFloat(point));
-                    return pointValue >= 0.5;
+                    return pointValue >= 0.5 && pointValue % 0.5 === 0;
                   });
                   
                   if (filteredSpreads.length === 0) {
@@ -462,70 +462,78 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                     );
                   }
                   
-                  return filteredSpreads.map(([point, oddsPair]) => {
-                    const homeOdds = oddsPair.home?.averagePrice;
-                    const awayOdds = oddsPair.away?.averagePrice;
-                    
-                    return (
-                      <div key={point} className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            if (isBettable && homeOdds) {
-                              toggleSelection({
-                                team: `${game.home_team} -${point}`,
-                                odds: homeOdds,
-                                desc: `${game.home_team} vs ${game.away_team}`,
-                                commence_time: game.commence_time,
-                                market: selectedMarket,
-                                gameId: game.id,
-                                sport_key: game.sport_key,
-                                point: parseFloat(point)
-                              });
-                              handleBettingAreaSelect();
-                            }
-                          }}
-                          className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                            isTeamSelected(`${game.home_team} -${point}`, selectedMarket, game.id, parseFloat(point))
-                              ? 'bg-yellow-500 hover:bg-yellow-600'
-                              : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
-                          } text-white`}
-                          disabled={!isBettable || !homeOdds}
-                        >
-                          <div className="font-bold">{game.home_team}</div>
-                          <div className="text-sm">{homeOdds ? homeOdds.toFixed(2) : 'N/A'}</div>
-                        </button>
-                        <div className="w-16 text-base font-bold text-gray-800 text-center">
-                          {point}
-                        </div>
-                        <button
-                          onClick={() => {
-                            if (isBettable && awayOdds) {
-                              toggleSelection({
-                                team: `${game.away_team} +${point}`,
-                                odds: awayOdds,
-                                desc: `${game.home_team} vs ${game.away_team}`,
-                                commence_time: game.commence_time,
-                                market: selectedMarket,
-                                gameId: game.id,
-                                sport_key: game.sport_key,
-                                point: parseFloat(point)
-                              });
-                              handleBettingAreaSelect();
-                            }
-                          }}
-                          className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                            isTeamSelected(`${game.away_team} +${point}`, selectedMarket, game.id, parseFloat(point))
-                              ? 'bg-yellow-500 hover:bg-yellow-600'
-                              : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
-                          } text-white`}
-                          disabled={!isBettable || !awayOdds}
-                        >
-                          <div className="font-bold">{game.away_team}</div>
-                          <div className="text-sm">{awayOdds ? awayOdds.toFixed(2) : 'N/A'}</div>
-                        </button>
-                      </div>
-                    );
-                  });
+                  return (
+                    <div className="flex items-center gap-2">
+                      {filteredSpreads.map(([point, oddsPair]) => {
+                        const homeOdds = oddsPair.home?.averagePrice;
+                        const awayOdds = oddsPair.away?.averagePrice;
+                        const pointValue = parseFloat(point);
+                        
+                        return (
+                          <div key={point} className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                if (isBettable && homeOdds) {
+                                  toggleSelection({
+                                    team: `${game.home_team} -${point}`,
+                                    odds: homeOdds,
+                                    desc: `${game.home_team} vs ${game.away_team}`,
+                                    commence_time: game.commence_time,
+                                    market: selectedMarket,
+                                    gameId: game.id,
+                                    sport_key: game.sport_key,
+                                    point: pointValue
+                                  });
+                                  handleBettingAreaSelect();
+                                }
+                              }}
+                              className={`flex-1 p-3 rounded-lg text-center transition-colors ${
+                                isTeamSelected(`${game.home_team} -${point}`, selectedMarket, game.id, pointValue)
+                                  ? 'bg-yellow-500 hover:bg-yellow-600'
+                                  : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                              } text-white`}
+                              disabled={!isBettable || !homeOdds}
+                            >
+                              <div className="font-bold">{game.home_team}</div>
+                              <div className="text-sm">
+                                {homeOdds ? homeOdds.toFixed(2) : 'N/A'} 
+                                <span className="ml-1 text-xs">-{point}</span>
+                              </div>
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (isBettable && awayOdds) {
+                                  toggleSelection({
+                                    team: `${game.away_team} +${point}`,
+                                    odds: awayOdds,
+                                    desc: `${game.home_team} vs ${game.away_team}`,
+                                    commence_time: game.commence_time,
+                                    market: selectedMarket,
+                                    gameId: game.id,
+                                    sport_key: game.sport_key,
+                                    point: pointValue
+                                  });
+                                  handleBettingAreaSelect();
+                                }
+                              }}
+                              className={`flex-1 p-3 rounded-lg text-center transition-colors ${
+                                isTeamSelected(`${game.away_team} +${point}`, selectedMarket, game.id, pointValue)
+                                  ? 'bg-yellow-500 hover:bg-yellow-600'
+                                  : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                              } text-white`}
+                              disabled={!isBettable || !awayOdds}
+                            >
+                              <div className="font-bold">{game.away_team}</div>
+                              <div className="text-sm">
+                                {awayOdds ? awayOdds.toFixed(2) : 'N/A'} 
+                                <span className="ml-1 text-xs">+{point}</span>
+                              </div>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
                 })()}
               </div>
             )}
