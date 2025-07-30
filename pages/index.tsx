@@ -44,12 +44,9 @@ export default function Home() {
       
       try {
         setTodayLoading(true);
-        const activeLeagues = Object.entries(SPORT_CATEGORIES).filter(([_, config]) => {
-          const seasonInfo = getSeasonInfo(config.sportKey);
-          const isActive = seasonInfo?.status === 'active';
-          console.log(`🔍 Today Betting - ${config.sportKey}: ${seasonInfo?.status} (활성: ${isActive})`);
-          return isActive;
-        });
+        // 시즌 정보 필터링 주석처리 - 모든 리그 포함
+        const activeLeagues = Object.entries(SPORT_CATEGORIES);
+        console.log(`🔍 Today Betting - 모든 리그 포함:`, activeLeagues.map(([name, config]) => `${name}(${config.sportKey})`));
         
         console.log(`🔍 Today Betting - 활성 리그 수:`, activeLeagues.length);
         console.log(`🔍 Today Betting - 활성 리그 목록:`, activeLeagues.map(([name, config]) => `${name}(${config.sportKey})`));

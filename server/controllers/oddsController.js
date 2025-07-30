@@ -134,13 +134,7 @@ const oddsController = {
         console.log(`[oddsController] 검색한 키:`, possibleKeys);
       }
 
-      // 필터링 적용 (임시로 비활성화)
-      const cachedData = allData; // 모든 데이터 사용
-      
-      console.log(`[oddsController] 필터링 비활성화 - 모든 데이터 사용:`, cachedData.length);
-      
-      // 원래 필터링 로직 (주석 처리)
-      /*
+      // 필터링 적용 (다시 활성화)
       const cachedData = allData.filter(game => {
         const gameTime = new Date(game.commenceTime);
         const isValid = gameTime >= weekAgo && gameTime < weekLater;
@@ -150,7 +144,8 @@ const oddsController = {
         }
         return isValid;
       });
-      */
+      
+      console.log(`[oddsController] 필터링 적용 - 유효한 데이터:`, cachedData.length);
 
       console.log(`[oddsController] 필터링 후 데이터 수:`, cachedData.length);
 
