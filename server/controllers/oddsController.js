@@ -81,10 +81,13 @@ const oddsController = {
         now: now.toISOString()
       });
 
-      // 🔧 임시 해결책: 필터링을 비활성화하여 모든 데이터 조회 (과거 경기도 포함)
+      // 현재 시간 이후의 경기만 조회 (미래 경기)
       const cachedData = await OddsCache.findAll({
         where: {
-          sportKey: { [Op.in]: possibleKeys }
+          sportKey: { [Op.in]: possibleKeys },
+          commenceTime: {
+            [Op.gte]: now // 현재 시간 이후의 경기만
+          }
         },
         order: [['commenceTime', 'ASC']]
       });
@@ -121,29 +124,36 @@ const oddsController = {
         });
       }
 
-      // 필터링 조건을 만족하지 않는 데이터가 있는지 확인 (수정된 로직)
-      const invalidData = cachedData.filter(game => {
-        const gameTime = new Date(game.commenceTime);
-        return gameTime < today || gameTime >= thirtyDaysLater;
-      });
-      
-      if (invalidData.length > 0) {
-        console.log(`[oddsController] ⚠️ 필터링 조건을 만족하지 않는 데이터 ${invalidData.length}개 발견:`);
-        invalidData.slice(0, 3).forEach((game, i) => {
-          console.log(`  ${i+1}. ${game.homeTeam} vs ${game.awayTeam} - ${game.commenceTime}`);
-        });
+      // 성공적으로 필터링된 데이터 로그
+      console.log(`[oddsController] ✅ 현재 시간 이후 경기만 필터링됨: ${cachedData.length}개`);
+      if (cachedData.length > 0) {
+        const firstGame = cachedData[0];
+        const lastGame = cachedData[cachedData.length - 1];
+        console.log(`[oddsController] 첫 경기: ${firstGame.homeTeam} vs ${firstGame.awayTeam} - ${firstGame.commenceTime}`);
+        console.log(`[oddsController] 마지막 경기: ${lastGame.homeTeam} vs ${lastGame.awayTeam} - ${lastGame.commenceTime}`);
       }
 
-      // 동일 경기 중복 제거 (최신 odds만) - 개선된 로직
+      // 동일 경기 중복 제거 (덜 제한적인 로직) - 같은 날 같은 팀끼리만 중복으로 처리
       const uniqueGames = [];
       const seen = new Set();
       for (const game of cachedData) {
-        // commenceTime을 분 단위까지만 비교 (sportKey 제외)
+        // 날짜만 비교하여 중복 제거 (시간은 무시)
         const date = new Date(game.commenceTime);
-        const key = `${game.homeTeam}_${game.awayTeam}_${date.getUTCFullYear()}-${String(date.getUTCMonth()+1).padStart(2,'0')}-${String(date.getUTCDate()).padStart(2,'0')}T${String(date.getUTCHours()).padStart(2,'0')}:${String(date.getUTCMinutes()).padStart(2,'0')}`;
+        const dateOnly = `${date.getUTCFullYear()}-${String(date.getUTCMonth()+1).padStart(2,'0')}-${String(date.getUTCDate()).padStart(2,'0')}`;
+        const key = `${game.homeTeam}_${game.awayTeam}_${dateOnly}`;
         if (!seen.has(key)) {
           uniqueGames.push(game);
           seen.add(key);
+        } else {
+          // 같은 키가 있으면 더 최신 데이터를 선택 (updatedAt 기준)
+          const existingIndex = uniqueGames.findIndex(g => {
+            const existingDate = new Date(g.commenceTime);
+            const existingDateOnly = `${existingDate.getUTCFullYear()}-${String(existingDate.getUTCMonth()+1).padStart(2,'0')}-${String(existingDate.getUTCDate()).padStart(2,'0')}`;
+            return `${g.homeTeam}_${g.awayTeam}_${existingDateOnly}` === key;
+          });
+          if (existingIndex !== -1 && new Date(game.updatedAt) > new Date(uniqueGames[existingIndex].updatedAt)) {
+            uniqueGames[existingIndex] = game; // 더 최신 데이터로 교체
+          }
         }
       }
 
@@ -204,6 +214,8 @@ const oddsController = {
         };
       });
 
+      console.log(`[oddsController] 중복 제거 전: ${cachedData.length}개`);
+      console.log(`[oddsController] 중복 제거 후: ${uniqueGames.length}개`);
       console.log(`[oddsController] 최종 반환 데이터 수:`, formattedData.length);
       if (formattedData.length > 0) {
         console.log(`[oddsController] 첫 번째 게임 샘플:`, {
