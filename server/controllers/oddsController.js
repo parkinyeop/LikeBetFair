@@ -81,7 +81,7 @@ const oddsController = {
         now: now.toISOString()
       });
 
-      // DB 레벨에서 필터링 적용 (효율성 개선)
+      // 🔧 수정된 쿼리: 필터링을 DB 레벨에서 수행
       const cachedData = await OddsCache.findAll({
         where: {
           sportKey: { [Op.in]: possibleKeys },
@@ -93,22 +93,11 @@ const oddsController = {
         order: [['commenceTime', 'ASC']]
       });
 
-      console.log(`[oddsController] DB 필터링 후 데이터 수:`, cachedData.length);
+      console.log(`[oddsController] DB에서 조회된 데이터 수:`, cachedData.length);
       console.log(`[oddsController] 검색한 키:`, possibleKeys);
       
-      // 디버깅을 위해 데이터 출력
-      if (cachedData.length > 0) {
-        console.log(`[oddsController] 첫 번째 데이터:`, {
-          id: cachedData[0].id,
-          sportKey: cachedData[0].sportKey,
-          homeTeam: cachedData[0].homeTeam,
-          awayTeam: cachedData[0].awayTeam,
-          commenceTime: cachedData[0].commenceTime,
-          hasOfficialOdds: !!cachedData[0].officialOdds,
-          hasBookmakers: !!cachedData[0].bookmakers
-        });
-      } else {
-        console.log(`[oddsController] ⚠️ 데이터베이스에서 ${sport} 관련 미래 경기 데이터를 찾을 수 없습니다.`);
+      if (cachedData.length === 0) {
+        console.log(`[oddsController] ⚠️ 데이터베이스에서 ${sport} 관련 데이터를 찾을 수 없습니다.`);
         console.log(`[oddsController] 검색한 키:`, possibleKeys);
         
         // 전체 데이터베이스에서 sportKey 확인
@@ -117,6 +106,8 @@ const oddsController = {
           group: ['sportKey']
         });
         console.log(`[oddsController] 데이터베이스에 있는 모든 sportKey:`, allSportKeys.map(item => item.sportKey));
+        
+        return res.status(404).json({ message: 'No odds data found for this sport' });
       }
 
       if (cachedData.length > 0) {
@@ -182,30 +173,20 @@ const oddsController = {
         'americanfootball_nfl': 'NFL'
       };
 
-      // 데이터 포맷 변환 (JSON 파싱 개선)
+      // 🔧 수정된 데이터 포맷 변환
       const formattedData = uniqueGames.map(game => {
-        // 각 게임의 실제 sportKey로 제목 매핑
-        const sportTitle = sportTitleMapping[game.sportKey] || game.sportKey;
+        // 🔧 게임의 실제 sportKey를 사용하여 제목 매핑
+        const actualSportKey = game.sportKey;
+        const sportTitle = sportTitleMapping[actualSportKey] || game.sportTitle || actualSportKey;
         
-        // JSON 파싱 개선: 문자열인 경우에만 파싱
-        let parsedOfficialOdds = null;
-        let parsedBookmakers = null;
-        
-        try {
-          if (typeof game.officialOdds === 'string') {
-            parsedOfficialOdds = JSON.parse(game.officialOdds);
-          } else if (game.officialOdds) {
-            parsedOfficialOdds = game.officialOdds;
-          }
-          
-          if (typeof game.bookmakers === 'string') {
-            parsedBookmakers = JSON.parse(game.bookmakers);
-          } else if (game.bookmakers) {
-            parsedBookmakers = game.bookmakers;
-          }
-        } catch (parseError) {
-          console.log(`[oddsController] JSON 파싱 오류 (${game.homeTeam} vs ${game.awayTeam}):`, parseError.message);
-        }
+        console.log(`[oddsController] 게임 포맷팅:`, {
+          actualSportKey,
+          sportTitle,
+          homeTeam: game.homeTeam,
+          awayTeam: game.awayTeam,
+          hasOfficialOdds: !!game.officialOdds,
+          hasBookmakers: !!game.bookmakers
+        });
         
         return {
           id: game.id,
@@ -214,11 +195,30 @@ const oddsController = {
           home_team: game.homeTeam,
           away_team: game.awayTeam,
           commence_time: game.commenceTime,
-          odds: parsedOfficialOdds,
-          bookmakers: parsedBookmakers,
-          officialOdds: parsedOfficialOdds
+          // 🔧 배당률 데이터 처리 개선
+          odds: game.officialOdds ? 
+            (typeof game.officialOdds === 'string' ? JSON.parse(game.officialOdds) : game.officialOdds) : 
+            null,
+          bookmakers: game.bookmakers ? 
+            (typeof game.bookmakers === 'string' ? JSON.parse(game.bookmakers) : game.bookmakers) : 
+            null,
+          officialOdds: game.officialOdds ? 
+            (typeof game.officialOdds === 'string' ? JSON.parse(game.officialOdds) : game.officialOdds) : 
+            null
         };
       });
+
+      console.log(`[oddsController] 최종 반환 데이터 수:`, formattedData.length);
+      if (formattedData.length > 0) {
+        console.log(`[oddsController] 첫 번째 게임 샘플:`, {
+          id: formattedData[0].id,
+          sportTitle: formattedData[0].sportTitle,
+          home_team: formattedData[0].home_team,
+          away_team: formattedData[0].away_team,
+          hasOdds: !!formattedData[0].odds,
+          hasBookmakers: !!formattedData[0].bookmakers
+        });
+      }
 
       res.json(formattedData);
     } catch (err) {
