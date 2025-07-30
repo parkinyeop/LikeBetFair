@@ -994,19 +994,13 @@ class GameResultService {
   }
 
   determineGameResult(game) {
-    // 스코어가 없는 경우
-    if (!game.scores || !Array.isArray(game.scores) || game.scores.length !== 2) {
-      // 경기 시간이 지났지만 스코어가 없으면 pending
-      const gameTime = new Date(game.commence_time);
-      const now = new Date();
-      if (gameTime < now) {
-        return 'pending';
-      }
-      return 'pending';
+    // 1. 연기/취소 상태 우선 확인
+    if (game.status === 'postponed' || game.status === 'cancelled') {
+      return game.status;
     }
     
-    // status가 'finished'이고 스코어가 있으면 즉시 결과 계산
-    if (game.status === 'finished' && game.scores && game.scores.length === 2) {
+    // 2. API에서 명시적으로 finished 상태이고 스코어가 있는 경우
+    if (game.status === 'finished' && game.scores && Array.isArray(game.scores) && game.scores.length === 2) {
       const homeScoreData = game.scores.find(score => score.name === game.home_team);
       const awayScoreData = game.scores.find(score => score.name === game.away_team);
       
@@ -1030,6 +1024,50 @@ class GameResultService {
       }
     }
     
+    // 3. 스코어가 있지만 status가 finished가 아닌 경우 - 보수적 시간 기반 처리
+    if (game.scores && Array.isArray(game.scores) && game.scores.length === 2) {
+      const gameTime = new Date(game.commence_time);
+      const now = new Date();
+      const hoursSinceGame = (now - gameTime) / (1000 * 60 * 60);
+      
+      // 48시간 이상 지났고 스코어가 있으면 완료로 처리 (보수적 접근)
+      if (hoursSinceGame > 48) {
+        const homeScoreData = game.scores.find(score => score.name === game.home_team);
+        const awayScoreData = game.scores.find(score => score.name === game.away_team);
+        
+        if (homeScoreData && awayScoreData) {
+          const homeScore = parseInt(homeScoreData.score);
+          const awayScore = parseInt(awayScoreData.score);
+          
+          if (!isNaN(homeScore) && !isNaN(awayScore)) {
+            if (homeScore > awayScore) {
+              return 'home_win';
+            } else if (awayScore > homeScore) {
+              return 'away_win';
+            } else {
+              return 'draw';
+            }
+          }
+        }
+      }
+    }
+    
+    // 4. 연기/취소 키워드 감지 (API 응답의 description이나 기타 필드에서)
+    if (game.description || game.strStatus) {
+      const text = (game.description || game.strStatus || '').toLowerCase();
+      const postponedKeywords = ['postponed', 'delayed', 'suspended', '연기', '지연'];
+      const cancelledKeywords = ['cancelled', 'abandoned', '취소', '중단'];
+      
+      if (postponedKeywords.some(keyword => text.includes(keyword))) {
+        return 'postponed';
+      }
+      
+      if (cancelledKeywords.some(keyword => text.includes(keyword))) {
+        return 'cancelled';
+      }
+    }
+    
+    // 5. 기본값: pending
     return 'pending';
   }
 

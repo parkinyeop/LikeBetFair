@@ -233,8 +233,13 @@ async function collectMLBData() {
         let result = 'pending';
         let score = null;
         
-        // TheSportsDB 상태 매핑
-        if (event.strStatus === 'Match Finished' || event.intHomeScore !== null) {
+        // 1. 연기/취소 상태 우선 확인
+        if (event.strStatus === 'Postponed' || event.strStatus === 'Cancelled') {
+          status = event.strStatus.toLowerCase();
+          result = event.strStatus.toLowerCase();
+        }
+        // 2. TheSportsDB 상태 매핑 - 명시적으로 finished인 경우
+        else if (event.strStatus === 'Match Finished' || event.intHomeScore !== null) {
           status = 'finished';
           
           if (event.intHomeScore !== null && event.intAwayScore !== null) {
@@ -254,9 +259,46 @@ async function collectMLBData() {
               result = 'draw'; // 야구에서는 드물지만 가능
             }
           }
-        } else if (event.strStatus === 'Postponed') {
-          status = 'postponed';
-          result = 'postponed';
+        }
+        // 3. 스코어가 있지만 status가 finished가 아닌 경우 - 보수적 시간 기반 처리
+        else if (event.intHomeScore !== null && event.intAwayScore !== null) {
+          const gameTime = new Date(commenceTime);
+          const now = new Date();
+          const hoursSinceGame = (now - gameTime) / (1000 * 60 * 60);
+          
+          // 48시간 이상 지났고 스코어가 있으면 완료로 처리
+          if (hoursSinceGame > 48) {
+            status = 'finished';
+            score = JSON.stringify([
+              { name: event.strHomeTeam, score: event.intHomeScore.toString() },
+              { name: event.strAwayTeam, score: event.intAwayScore.toString() }
+            ]);
+            
+            const homeScore = parseInt(event.intHomeScore);
+            const awayScore = parseInt(event.intAwayScore);
+            
+            if (homeScore > awayScore) {
+              result = 'home_win';
+            } else if (awayScore > homeScore) {
+              result = 'away_win';
+            } else {
+              result = 'draw';
+            }
+          }
+        }
+        // 4. 연기/취소 키워드 감지
+        else if (event.strStatus) {
+          const statusText = event.strStatus.toLowerCase();
+          const postponedKeywords = ['postponed', 'delayed', 'suspended'];
+          const cancelledKeywords = ['cancelled', 'abandoned'];
+          
+          if (postponedKeywords.some(keyword => statusText.includes(keyword))) {
+            status = 'postponed';
+            result = 'postponed';
+          } else if (cancelledKeywords.some(keyword => statusText.includes(keyword))) {
+            status = 'cancelled';
+            result = 'cancelled';
+          }
         }
         
         // 중복 체크 (eventId 또는 팀명+날짜로)
@@ -306,14 +348,6 @@ async function collectMLBData() {
           });
           savedCount++;
           console.log(`✅ 새 경기 저장: ${homeTeam} vs ${awayTeam} (${commenceTime.toISOString().slice(0,10)}) - ${result}`);
-        }
-        
-        if (created) {
-          savedCount++;
-          console.log(`✅ 새 경기 저장: ${homeTeam} vs ${awayTeam} (${commenceTime.toISOString().slice(0,10)}) - ${result}`);
-        } else {
-          updatedCount++;
-          console.log(`🔄 경기 업데이트: ${homeTeam} vs ${awayTeam} (${commenceTime.toISOString().slice(0,10)}) - ${result}`);
         }
         
       } catch (error) {
