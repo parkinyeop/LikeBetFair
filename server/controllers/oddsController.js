@@ -81,14 +81,10 @@ const oddsController = {
         now: now.toISOString()
       });
 
-      // 🔧 수정된 쿼리: 필터링을 DB 레벨에서 수행
+      // 🔧 임시 해결책: 필터링을 비활성화하여 모든 데이터 조회 (과거 경기도 포함)
       const cachedData = await OddsCache.findAll({
         where: {
-          sportKey: { [Op.in]: possibleKeys },
-          commenceTime: {
-            [Op.gte]: today,
-            [Op.lt]: thirtyDaysLater
-          }
+          sportKey: { [Op.in]: possibleKeys }
         },
         order: [['commenceTime', 'ASC']]
       });

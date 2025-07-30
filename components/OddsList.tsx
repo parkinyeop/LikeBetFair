@@ -58,22 +58,20 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
         console.log(`[OddsList] 첫 번째 경기 샘플:`, data[0]);
         
         const now = new Date();
-        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-        const maxDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7일 후
         const bettingDeadlineMinutes = 10; // 경기 시작 10분 전까지 베팅 가능
         
-        // 1. 기본 필터링: 오늘부터 7일 후까지의 경기 (UTC 시간을 로컬 시간으로 변환하여 비교)
+        // 1. 기본 필터링: 현재 시간 이후의 경기만 표시 (과거 경기 제외)
         const filteredGames = data.filter((game: Game) => {
           // timeUtils를 사용하여 UTC 시간을 로컬 시간으로 변환
           const localGameTime = convertUtcToLocal(game.commence_time);
-          return localGameTime >= startOfToday && localGameTime <= maxDate;
+          return localGameTime > now; // 현재 시간 이후 경기만
         });
         
         console.log(`[OddsList] 시간 필터링 후:`, filteredGames.length, '개 경기');
         console.log(`[OddsList] 필터링 기준:`, {
-          startOfToday: startOfToday.toISOString(),
-          maxDate: maxDate.toISOString(),
-          now: now.toISOString()
+          filterType: 'future_games_only',
+          currentTime: now.toISOString(),
+          description: '현재 시간 이후 경기만 표시'
         });
         
         // 2. 베팅 가능 여부 분류 및 정렬
