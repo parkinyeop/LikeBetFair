@@ -116,23 +116,19 @@ export default function Home() {
                 filteredOut: data.length - filteredGames.length
               });
               
-              // [중복 제거 활성화] 리그별로 동일 경기(홈/어웨이/시간/리그) 1개만 남김
+              // [중복 제거 간소화] 리그별로 동일 경기(홈/어웨이/시간) 1개만 남김
               const uniqueGamesMap = new Map();
               filteredGames.forEach((game: any) => {
-                // sport|home_team|away_team|commence_time 조합으로 유니크 처리
-                const key = `${game.sport || game.sportKey || game.sportTitle || 'Unknown'}|${game.home_team}|${game.away_team}|${game.commence_time}`;
+                // home_team|away_team|commence_time 조합으로 유니크 처리 (sport 제외하여 더 관대하게)
+                const key = `${game.home_team}|${game.away_team}|${game.commence_time}`;
                 if (!uniqueGamesMap.has(key)) {
                   uniqueGamesMap.set(key, game);
                 } else {
-                  // officialOdds 우선, 그다음 bookmakers 개수, 마지막으로 lastUpdated
+                  // 더 간단한 우선순위: bookmakers 개수가 많은 것 우선
                   const prev = uniqueGamesMap.get(key);
-                  const prevHasOfficial = !!(prev.officialOdds && prev.officialOdds.h2h);
-                  const currHasOfficial = !!(game.officialOdds && game.officialOdds.h2h);
-                  if (
-                    (!prevHasOfficial && currHasOfficial) ||
-                    (currHasOfficial === prevHasOfficial && Array.isArray(game.bookmakers) && Array.isArray(prev.bookmakers) && game.bookmakers.length > prev.bookmakers.length) ||
-                    (currHasOfficial === prevHasOfficial && game.bookmakers?.length === prev.bookmakers?.length && new Date(game.lastUpdated || 0) > new Date(prev.lastUpdated || 0))
-                  ) {
+                  const prevBookmakersCount = Array.isArray(prev.bookmakers) ? prev.bookmakers.length : 0;
+                  const currBookmakersCount = Array.isArray(game.bookmakers) ? game.bookmakers.length : 0;
+                  if (currBookmakersCount > prevBookmakersCount) {
                     uniqueGamesMap.set(key, game);
                   }
                 }
