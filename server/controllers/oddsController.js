@@ -62,25 +62,25 @@ const oddsController = {
       
       const possibleKeys = sportKeyMapping[sport] || [sport];
       
-      // 7일 전~7일 후까지 범위 계산 (UTC 기준)
+      // 30일 전~30일 후까지 범위 계산 (UTC 기준) - 더 넓은 범위로 조정
       const now = new Date();
       const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-      const weekAgo = new Date(today);
-      weekAgo.setUTCDate(today.getUTCDate() - 7);
-      const weekLater = new Date(today);
-      weekLater.setUTCDate(today.getUTCDate() + 7);
+      const thirtyDaysAgo = new Date(today);
+      thirtyDaysAgo.setUTCDate(today.getUTCDate() - 30);
+      const thirtyDaysLater = new Date(today);
+      thirtyDaysLater.setUTCDate(today.getUTCDate() + 30);
 
       // 디버깅을 위해 현재 시간과 필터링 범위 출력
       console.log(`[oddsController] 현재 시간 (UTC): ${now.toISOString()}`);
       console.log(`[oddsController] 오늘 시작 (UTC): ${today.toISOString()}`);
-      console.log(`[oddsController] 필터링 범위: ${weekAgo.toISOString()} ~ ${weekLater.toISOString()}`);
+      console.log(`[oddsController] 필터링 범위: ${thirtyDaysAgo.toISOString()} ~ ${thirtyDaysLater.toISOString()}`);
 
       console.log(`[oddsController] 필터링 조건:`, {
         sport,
         possibleKeys,
-        weekAgo: weekAgo.toISOString(),
+        thirtyDaysAgo: thirtyDaysAgo.toISOString(),
         today: today.toISOString(),
-        weekLater: weekLater.toISOString(),
+        thirtyDaysLater: thirtyDaysLater.toISOString(),
         now: now.toISOString()
       });
 
@@ -134,10 +134,10 @@ const oddsController = {
         console.log(`[oddsController] 검색한 키:`, possibleKeys);
       }
 
-      // 필터링 적용 (다시 활성화)
+      // 필터링 적용 (30일 전~30일 후 범위)
       const cachedData = allData.filter(game => {
         const gameTime = new Date(game.commenceTime);
-        const isValid = gameTime >= weekAgo && gameTime < weekLater;
+        const isValid = gameTime >= thirtyDaysAgo && gameTime < thirtyDaysLater;
         
         if (!isValid) {
           console.log(`[oddsController] 필터링 제외: ${game.homeTeam} vs ${game.awayTeam} - ${game.commenceTime} (${gameTime.toISOString()})`);
@@ -167,7 +167,7 @@ const oddsController = {
       // 필터링 조건을 만족하지 않는 데이터가 있는지 확인
       const invalidData = cachedData.filter(game => {
         const gameTime = new Date(game.commenceTime);
-        return gameTime < weekAgo || gameTime >= weekLater;
+        return gameTime < thirtyDaysAgo || gameTime >= thirtyDaysLater;
       });
       
       if (invalidData.length > 0) {
