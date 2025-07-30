@@ -81,14 +81,15 @@ export default function Home() {
               });
               
               const now = getCurrentLocalTime(); // 클라이언트 로컬 시간 사용
-              const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0); // 오늘 자정 (로컬)
-              const maxDate = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000); // 7일 후
+              // 시간 필터링 범위를 더 넓게 조정: 3일 전부터 30일 후까지
+              const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000); // 3일 전
+              const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30일 후
               const bettingDeadlineMinutes = 10; // 경기 시작 10분 전까지 베팅 가능
               
-              // 1. 기본 필터링: 오늘 자정부터 7일 후까지의 경기 (UTC를 로컬로 변환하여 비교)
+              // 1. 기본 필터링: 3일 전부터 30일 후까지의 경기 (UTC를 로컬로 변환하여 비교)
               const filteredGames = data.filter((game: any) => {
                 const localGameTime = convertUtcToLocal(game.commence_time); // UTC를 로컬로 변환
-                const isValid = localGameTime >= today && localGameTime <= maxDate;
+                const isValid = localGameTime >= threeDaysAgo && localGameTime <= thirtyDaysLater;
                 
                 // 모든 활성 리그에 대해 필터링 로그 (첫 번째 경기만)
                 if (data.indexOf(game) === 0) {
@@ -100,8 +101,8 @@ export default function Home() {
                     gameTimeLocal: localGameTime.toLocaleString('ko-KR'),
                     nowUTC: now.toISOString(),
                     nowLocal: now.toLocaleString('ko-KR'),
-                    todayLocal: today.toLocaleString('ko-KR'),
-                    maxDateLocal: maxDate.toLocaleString('ko-KR'),
+                    threeDaysAgoLocal: threeDaysAgo.toLocaleString('ko-KR'),
+                    thirtyDaysLaterLocal: thirtyDaysLater.toLocaleString('ko-KR'),
                     isValid
                   });
                 }
