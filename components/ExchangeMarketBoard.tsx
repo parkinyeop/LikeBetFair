@@ -771,7 +771,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                           {/* 핸디캡 표시 */}
                           <div className="w-20 flex items-center justify-center">
                             <div className="text-lg font-bold text-gray-800">
-                              {absPoint}
+                              {homeHandicap > 0 ? '+' : ''}{homeHandicap}
                             </div>
                           </div>
 

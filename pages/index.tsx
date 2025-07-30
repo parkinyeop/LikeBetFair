@@ -925,7 +925,7 @@ export default function Home() {
                                   <div className="text-sm">{homeOdds.toFixed(2)}</div>
                                 </button>
                               )}
-                              <div className="w-16 text-base font-bold text-gray-800 text-center">{absPoint}</div>
+                              <div className="w-16 text-base font-bold text-gray-800 text-center">{homeHandicap > 0 ? '+' : ''}{homeHandicap}</div>
                               {awayOdds != null && (
                                 <button
                                   onClick={() => {
@@ -1457,7 +1457,7 @@ export default function Home() {
                                           </div>
                                         </button>
                                       )}
-                                      <div className="w-16 text-base font-bold text-gray-800 text-center">{absPoint}</div>
+                                      <div className="w-16 text-base font-bold text-gray-800 text-center">{homeHandicap > 0 ? '+' : ''}{homeHandicap}</div>
                                       {awayOdds != null && (
                                         <button
                                           onClick={() => {
