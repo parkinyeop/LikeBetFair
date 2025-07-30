@@ -54,6 +54,9 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
           throw new Error('Failed to fetch odds');
         }
         const data = await response.json();
+        console.log(`[OddsList] ${sportKey} API 응답:`, data.length, '개 경기');
+        console.log(`[OddsList] 첫 번째 경기 샘플:`, data[0]);
+        
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
         const maxDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7일 후
@@ -64,6 +67,13 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
           // timeUtils를 사용하여 UTC 시간을 로컬 시간으로 변환
           const localGameTime = convertUtcToLocal(game.commence_time);
           return localGameTime >= startOfToday && localGameTime <= maxDate;
+        });
+        
+        console.log(`[OddsList] 시간 필터링 후:`, filteredGames.length, '개 경기');
+        console.log(`[OddsList] 필터링 기준:`, {
+          startOfToday: startOfToday.toISOString(),
+          maxDate: maxDate.toISOString(),
+          now: now.toISOString()
         });
         
         // 2. 베팅 가능 여부 분류 및 정렬
@@ -113,7 +123,12 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
             }
           }
         });
-        setGames(Array.from(uniqueGamesMap.values()));
+        
+        const finalGames = Array.from(uniqueGamesMap.values());
+        console.log(`[OddsList] 중복 제거 후:`, finalGames.length, '개 경기');
+        console.log(`[OddsList] 최종 경기 목록:`, finalGames.map(g => `${g.home_team} vs ${g.away_team} (${g.commence_time})`));
+        
+        setGames(finalGames);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch odds');
@@ -473,9 +488,10 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                         
                         const homeOdds = homeData?.oddsData?.averagePrice;
                         const awayOdds = awayData?.oddsData?.averagePrice;
-                        const homeHandicap = homeData?.handicap || 0;
-                        const awayHandicap = awayData?.handicap || 0;
                         const pointValue = parseFloat(absPoint);
+                        // 스프레드 베팅에서는 하나의 핸디캡 값으로 양팀이 반대 방향을 가짐
+                        const homeHandicap = pointValue;
+                        const awayHandicap = -pointValue;
                         
                         return (
                           <div key={absPoint} className="flex items-center gap-2">
@@ -507,7 +523,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                                 <div className="text-sm">{homeOdds.toFixed(2)}</div>
                               </button>
                             )}
-                            <div className="w-16 text-base font-bold text-gray-800 text-center">{homeHandicap > 0 ? '+' : ''}{homeHandicap}</div>
+                            <div className="w-16 text-base font-bold text-gray-800 text-center">{pointValue}</div>
                             {awayOdds != null && (
                               <button
                                 onClick={() => {

@@ -420,6 +420,18 @@ class OddsApiService {
         lastUpdated: oddsRecord.lastUpdated
       }));
       
+      console.log(`[DEBUG] Formatted odds for ${sportKey}:`, formattedOdds.length, '개');
+      if (formattedOdds.length > 0) {
+        console.log(`[DEBUG] 첫 번째 경기 샘플:`, {
+          id: formattedOdds[0].id,
+          home_team: formattedOdds[0].home_team,
+          away_team: formattedOdds[0].away_team,
+          commence_time: formattedOdds[0].commence_time,
+          hasBookmakers: !!formattedOdds[0].bookmakers,
+          hasOfficialOdds: !!formattedOdds[0].officialOdds
+        });
+      }
+      
       return formattedOdds;
     } catch (error) {
       console.error('[DEBUG] Error fetching cached odds:', error);
