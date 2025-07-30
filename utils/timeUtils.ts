@@ -50,10 +50,23 @@ export function convertUtcToLocal(utcTime: string | Date): Date {
   let utcDate: Date;
   if (typeof utcTime === 'string') {
     // UTC 문자열을 명시적으로 UTC로 파싱
-    utcDate = utcTime.endsWith('Z') ? new Date(utcTime) : new Date(utcTime + 'Z');
+    if (utcTime.endsWith('Z')) {
+      utcDate = new Date(utcTime);
+    } else {
+      // Z가 없으면 UTC로 간주하고 추가
+      utcDate = new Date(utcTime + 'Z');
+    }
   } else {
     utcDate = new Date(utcTime.getTime());
   }
+  
+  // 디버깅을 위한 로그 추가
+  console.log(`[TimeUtils] UTC 변환:`, {
+    input: utcTime,
+    utcDate: utcDate.toISOString(),
+    localDate: utcDate.toLocaleString('ko-KR'),
+    timezone: getClientTimezone()
+  });
   
   // JavaScript Date는 자동으로 클라이언트 시간대로 표시됨
   return utcDate;
