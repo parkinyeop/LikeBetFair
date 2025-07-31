@@ -256,20 +256,13 @@ export default function Home() {
     console.log("베팅 가능한 경기 개수:", bettableGames.length);
     console.log("베팅 불가능한 경기 개수:", nonBettableGames.length);
     
-    // 리그별 베팅 가능한 경기 개수
-    const leagueStats = {};
-    sortedAllGames.forEach(game => {
-      const league = game.sportTitle || game.sport_title;
-      if (!leagueStats[league]) {
-        leagueStats[league] = { total: 0, bettable: 0 };
-      }
-      leagueStats[league].total++;
-      if (game.isBettable) {
-        leagueStats[league].bettable++;
-      }
+    // 리그별 배당율 데이터 개수
+    const leagueDataCount = {};
+    Object.entries(todayGames).forEach(([league, games]) => {
+      leagueDataCount[league] = games.length;
     });
     
-    console.log("리그별 통계:", leagueStats);
+    console.log("리그별 배당율 데이터 개수:", leagueDataCount);
     
     if (bettableGames.length > 0) {
       console.log("베팅 가능한 첫 번째 경기:", {

@@ -63,33 +63,26 @@ const oddsController = {
       
       const possibleKeys = sportKeyMapping[sport] || [sport];
       
-      // 오늘부터 30일 후까지 범위 계산 (UTC 기준) - 미래 경기만 포함
+      // 현재 시간부터 30일 후까지 범위 계산 (미래 경기 중심)
       const now = new Date();
-      const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-      const thirtyDaysLater = new Date(today);
-      thirtyDaysLater.setUTCDate(today.getUTCDate() + 30);
+      const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
       // 디버깅을 위해 현재 시간과 필터링 범위 출력
       console.log(`[oddsController] 현재 시간 (UTC): ${now.toISOString()}`);
-      console.log(`[oddsController] 오늘 시작 (UTC): ${today.toISOString()}`);
-      console.log(`[oddsController] 필터링 범위: ${today.toISOString()} ~ ${thirtyDaysLater.toISOString()}`);
+      console.log(`[oddsController] 필터링 범위: ${now.toISOString()} ~ ${thirtyDaysLater.toISOString()}`);
 
       console.log(`[oddsController] 필터링 조건:`, {
         sport,
         possibleKeys,
-        today: today.toISOString(),
-        thirtyDaysLater: thirtyDaysLater.toISOString(),
-        now: now.toISOString()
+        now: now.toISOString(),
+        thirtyDaysLater: thirtyDaysLater.toISOString()
       });
-
-      // 최근 7일 + 향후 30일 경기 조회 (과거 경기도 포함)
-      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       
       const koreaTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-      console.log(`[oddsController] 최근 7일 + 향후 30일 필터링:`, {
+      console.log(`[oddsController] 현재부터 30일 후 필터링:`, {
           currentTimeUTC: now.toISOString(),
           currentTimeKorea: koreaTime.toISOString().replace('Z', ' KST'),
-          sevenDaysAgo: sevenDaysAgo.toISOString(),
+          now: now.toISOString(),
           thirtyDaysLater: thirtyDaysLater.toISOString(),
           sport: sport
         });
@@ -101,8 +94,8 @@ const oddsController = {
         where: {
           sportKey: { [Op.in]: possibleKeys },
           commenceTime: {
-            [Op.gte]: sevenDaysAgo,    // 최근 7일
-            [Op.lt]: thirtyDaysLater   // 향후 30일
+            [Op.gte]: now,              // 현재 시간부터
+            [Op.lt]: thirtyDaysLater    // 30일 후까지
           }
         },
         order: [['commenceTime', 'ASC']],
@@ -144,7 +137,7 @@ const oddsController = {
       // 필터링 조건을 만족하지 않는 데이터가 있는지 확인 (수정된 로직)
       const invalidData = cachedData.filter(game => {
         const gameTime = new Date(game.commenceTime);
-        return gameTime < today || gameTime >= thirtyDaysLater;
+        return gameTime < now || gameTime >= thirtyDaysLater;
       });
       
       if (invalidData.length > 0) {

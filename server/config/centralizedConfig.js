@@ -248,6 +248,13 @@ export const LOG_CONFIG = {
   // 로그 보존 기간
   RETENTION_DAYS: 30,
   
+  // 과도한 로그 방지 설정
+  ANTI_SPAM: {
+    INIT_LOG_INTERVAL: 5 * 60 * 1000, // 5분 (init 로그 중복 방지)
+    MAX_LOGS_PER_MINUTE: 10, // 분당 최대 로그 수
+    SKIP_DUPLICATE_MESSAGES: true, // 중복 메시지 생략
+  },
+  
   // 로그 카테고리
   CATEGORIES: {
     API: 'api',

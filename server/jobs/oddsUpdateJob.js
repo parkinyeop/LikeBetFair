@@ -12,6 +12,8 @@ const execAsync = promisify(exec);
 
 let isUpdating = false;
 let lastUpdateTime = null;
+let isInitializing = false; // 초기화 중복 실행 방지
+let lastInitTime = null; // 마지막 초기화 시간
 
 // 리그별 우선순위 설정 (API 사용량 최적화)
 const highPriorityCategories = new Set([
@@ -44,25 +46,44 @@ if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
-// 로그 저장 함수
+// 로그 저장 함수 (최적화됨)
 function saveUpdateLog(type, status, data = {}) {
   const now = new Date();
   const dateStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
   const logFile = path.join(logsDir, `scheduler_${dateStr}.log`);
   
+  // init 타입 로그 최적화 - 중복 방지
+  if (type === 'init' && status === 'start') {
+    // 마지막 초기화로부터 5분 이내면 로그 생략
+    if (lastInitTime && (now - lastInitTime) < 5 * 60 * 1000) {
+      console.log(`⏭️ Skipping init log (last init: ${Math.round((now - lastInitTime) / 1000)}s ago)`);
+      return;
+    }
+    lastInitTime = now;
+  }
+  
+  // 불필요한 데이터 제거
+  const cleanData = { ...data };
+  if (cleanData.categories && Array.isArray(cleanData.categories)) {
+    cleanData.categoryCount = cleanData.categories.length;
+    delete cleanData.categories; // 카테고리 배열 제거로 로그 크기 감소
+  }
+  
   const logEntry = {
     timestamp: now.toISOString(),
-    type: type, // 'odds', 'results', 'bets', 'full'
-    status: status, // 'start', 'success', 'error'
-    ...data
+    type: type,
+    status: status,
+    ...cleanData
   };
   
   const logLine = JSON.stringify(logEntry) + '\n';
   fs.appendFileSync(logFile, logLine);
   
-  // 콘솔에도 출력
+  // 콘솔 출력 최적화 - 스케줄러 검색 키워드 추가
   const emoji = status === 'success' ? '✅' : status === 'error' ? '❌' : '🚀';
-  console.log(`${emoji} [${now.toISOString()}] ${type.toUpperCase()} ${status.toUpperCase()}:`, data.message || '');
+  const message = cleanData.message || '';
+  const searchKeyword = `[SCHEDULER_${type.toUpperCase()}]`; // 검색용 키워드
+  console.log(`${searchKeyword} ${emoji} [${now.toISOString()}] ${type.toUpperCase()} ${status.toUpperCase()}: ${message}`);
 }
 
 // 경기 결과 업데이트 - 10분마다 실행
@@ -149,11 +170,13 @@ cron.schedule('*/10 * * * *', async () => {
 // 고우선순위 리그 - 30분마다 업데이트 (10분에서 변경)
 cron.schedule('*/30 * * * *', async () => {
   if (isUpdating) {
-    console.log('Previous odds update is still running, skipping this update');
+    console.log('[SCHEDULER_ODDS] ⏭️ Previous odds update is still running, skipping this update');
     return;
   }
   
   isUpdating = true;
+  console.log('[SCHEDULER_ODDS] 🚀 Starting high-priority leagues odds update (30min interval)');
+  console.log('[SCHEDULER_ODDS] 📋 Target leagues:', Array.from(highPriorityCategories));
   saveUpdateLog('odds', 'start', { 
     message: 'Starting high-priority leagues odds update (30min interval)',
     priority: 'high',
@@ -165,12 +188,17 @@ cron.schedule('*/30 * * * *', async () => {
     const dynamicPriority = oddsApiService.getDynamicPriorityLevel();
     const actualPriority = dynamicPriority === 'high' ? 'high' : 'medium';
     
+    console.log('[SCHEDULER_ODDS] 🔍 Dynamic priority level:', dynamicPriority);
+    console.log('[SCHEDULER_ODDS] 🎯 Actual priority level:', actualPriority);
+    
     let oddsUpdateResult;
     if (dynamicPriority === 'high') {
       // API 사용량이 높을 때는 고우선순위만
+      console.log('[SCHEDULER_ODDS] ⚠️ High API usage detected, processing high-priority leagues only');
       oddsUpdateResult = await oddsApiService.fetchAndCacheOddsForCategories(Array.from(highPriorityCategories), 'high');
     } else {
       // 정상적일 때는 기존대로
+      console.log('[SCHEDULER_ODDS] ✅ Normal API usage, processing all high-priority leagues');
       oddsUpdateResult = await oddsApiService.fetchAndCacheOddsForCategories(Array.from(highPriorityCategories), 'medium');
     }
     
@@ -184,6 +212,14 @@ cron.schedule('*/30 * * * *', async () => {
       categoriesProcessed: oddsUpdateResult?.categories?.length || 0
     };
     
+    console.log('[SCHEDULER_ODDS] 📊 Update Summary:');
+    console.log('[SCHEDULER_ODDS]   - Total Updated:', oddsSummary.totalUpdated);
+    console.log('[SCHEDULER_ODDS]   - New Odds:', oddsSummary.newOdds);
+    console.log('[SCHEDULER_ODDS]   - Existing Updated:', oddsSummary.existingOddsUpdated);
+    console.log('[SCHEDULER_ODDS]   - Skipped:', oddsSummary.skippedOdds);
+    console.log('[SCHEDULER_ODDS]   - API Calls:', oddsSummary.apiCalls);
+    console.log('[SCHEDULER_ODDS]   - Categories Processed:', oddsSummary.categoriesProcessed);
+    
     saveUpdateLog('odds', 'success', { 
       message: 'High-priority odds update completed (30min interval)',
       priority: actualPriority,
@@ -194,6 +230,7 @@ cron.schedule('*/30 * * * *', async () => {
     });
     
   } catch (error) {
+    console.log('[SCHEDULER_ODDS] ❌ High-priority odds update failed:', error.message);
     saveUpdateLog('odds', 'error', { 
       message: 'High-priority odds update failed',
       priority: 'high',
@@ -202,6 +239,7 @@ cron.schedule('*/30 * * * *', async () => {
     });
   } finally {
     isUpdating = false;
+    console.log('[SCHEDULER_ODDS] ✅ High-priority odds update process completed');
   }
 });
 
@@ -347,6 +385,11 @@ cron.schedule('0 0 * * *', async () => {
 
 // 서버 시작시 즉시 한 번 실행 (활성 카테고리만)
 const initializeData = async () => {
+  if (isInitializing) {
+    console.log('Initialization already in progress, skipping...');
+    return;
+  }
+  isInitializing = true;
   saveUpdateLog('init', 'start', { 
     message: 'Starting initial data caching for active categories',
     categories: Array.from(activeCategories)
@@ -377,8 +420,12 @@ const initializeData = async () => {
       categories: Array.from(activeCategories)
     });
     
-    // 초기 데이터 로드 실패 시 2분 후 재시도
+    // 초기 데이터 로드 실패 시 2분 후 재시도 (중복 방지)
     setTimeout(async () => {
+      if (isInitializing) {
+        console.log('Retry skipped - initialization already in progress');
+        return;
+      }
       try {
         saveUpdateLog('init', 'start', { message: 'Retrying initial data caching', isRetry: true });
         await Promise.all([
@@ -390,13 +437,17 @@ const initializeData = async () => {
         saveUpdateLog('init', 'success', { message: 'Initial retry successful', isRetry: true });
       } catch (retryError) {
         saveUpdateLog('init', 'error', { message: 'Initial retry failed', error: retryError.message, isRetry: true });
+      } finally {
+        isInitializing = false;
       }
     }, 2 * 60 * 1000); // 2분
   }
 };
 
-// 서버 시작시 초기화 실행
-initializeData();
+// 서버 시작시 초기화 실행 (중복 방지)
+if (!isInitializing) {
+  initializeData();
+}
 
 // 스케줄러 상태 모니터링 - 30분마다 (15분에서 변경)
 setInterval(() => {
