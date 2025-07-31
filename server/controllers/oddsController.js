@@ -6,47 +6,48 @@ const oddsController = {
   getOdds: async (req, res) => {
     try {
       const { sport } = req.params;
+      const { limit } = req.query; // limit 파라미터 추가
       
       // sportKey 매핑 (여러 형태의 키를 처리)
       const sportKeyMapping = {
         // 야구
         'baseball_mlb': ['baseball_mlb', 'MLB'],
-        'MLB': ['MLB', 'baseball_mlb'],
+        'MLB': ['baseball_mlb'], // MLB로 요청이 오면 baseball_mlb 데이터만 반환
         'baseball_kbo': ['baseball_kbo', 'KBO'],
         'KBO': ['baseball_kbo'], // KBO로 요청이 오면 baseball_kbo 데이터만 반환
         'baseball': ['baseball_mlb', 'MLB', 'baseball_kbo', 'KBO'],
         // 미식축구
         'americanfootball_nfl': ['americanfootball_nfl', 'NFL'],
-        'NFL': ['NFL', 'americanfootball_nfl'],
+        'NFL': ['americanfootball_nfl'], // NFL로 요청이 오면 americanfootball_nfl 데이터만 반환
         'americanfootball': ['americanfootball_nfl', 'NFL'],
         // 농구
         'basketball_nba': ['basketball_nba', 'NBA'],
-        'NBA': ['NBA', 'basketball_nba'],
+        'NBA': ['basketball_nba'], // NBA로 요청이 오면 basketball_nba 데이터만 반환
         'basketball_kbl': ['basketball_kbl', 'KBL'],
-        'KBL': ['KBL', 'basketball_kbl'],
+        'KBL': ['basketball_kbl'], // KBL로 요청이 오면 basketball_kbl 데이터만 반환
         'basketball': ['basketball_nba', 'NBA', 'basketball_kbl', 'KBL'],
         // 축구 (영문/한글/코드 모두 포함)
         'soccer_usa_mls': ['soccer_usa_mls', 'MLS'],
-        'MLS': ['MLS', 'soccer_usa_mls'],
+        'MLS': ['soccer_usa_mls'], // MLS로 요청이 오면 soccer_usa_mls 데이터만 반환
         'soccer_korea_kleague1': ['soccer_korea_kleague1', 'K리그'],
-        'K리그': ['K리그', 'soccer_korea_kleague1'],
+        'K리그': ['soccer_korea_kleague1'], // K리그로 요청이 오면 soccer_korea_kleague1 데이터만 반환
         'soccer_japan_j_league': ['soccer_japan_j_league', 'J리그'],
-        'J리그': ['J리그', 'soccer_japan_j_league'],
+        'J리그': ['soccer_japan_j_league'], // J리그로 요청이 오면 soccer_japan_j_league 데이터만 반환
         'soccer_italy_serie_a': ['soccer_italy_serie_a', '세리에 A', 'SERIE_A'],
-        '세리에A': ['세리에 A', 'SERIE_A', 'soccer_italy_serie_a'],
-        'SERIE_A': ['SERIE_A', '세리에 A', 'soccer_italy_serie_a'],
+        '세리에A': ['soccer_italy_serie_a'], // 세리에A로 요청이 오면 soccer_italy_serie_a 데이터만 반환
+        'SERIE_A': ['soccer_italy_serie_a'], // SERIE_A로 요청이 오면 soccer_italy_serie_a 데이터만 반환
         'soccer_brazil_campeonato': ['soccer_brazil_campeonato', '브라질 세리에 A', 'BRASILEIRAO'],
-        '브라질 세리에 A': ['브라질 세리에 A', 'BRASILEIRAO', 'soccer_brazil_campeonato'],
-        'BRASILEIRAO': ['BRASILEIRAO', '브라질 세리에 A', 'soccer_brazil_campeonato'],
+        '브라질 세리에 A': ['soccer_brazil_campeonato'], // 브라질 세리에 A로 요청이 오면 soccer_brazil_campeonato 데이터만 반환
+        'BRASILEIRAO': ['soccer_brazil_campeonato'], // BRASILEIRAO로 요청이 오면 soccer_brazil_campeonato 데이터만 반환
         'soccer_argentina_primera_division': ['soccer_argentina_primera_division', '아르헨티나 프리메라', 'ARGENTINA_PRIMERA'],
-        '아르헨티나 프리메라': ['아르헨티나 프리메라', 'ARGENTINA_PRIMERA', 'soccer_argentina_primera_division'],
-        'ARGENTINA_PRIMERA': ['ARGENTINA_PRIMERA', '아르헨티나 프리메라', 'soccer_argentina_primera_division'],
+        '아르헨티나 프리메라': ['soccer_argentina_primera_division'], // 아르헨티나 프리메라로 요청이 오면 soccer_argentina_primera_division 데이터만 반환
+        'ARGENTINA_PRIMERA': ['soccer_argentina_primera_division'], // ARGENTINA_PRIMERA로 요청이 오면 soccer_argentina_primera_division 데이터만 반환
         'soccer_china_superleague': ['soccer_china_superleague', '중국 슈퍼리그'],
-        '중국 슈퍼리그': ['중국 슈퍼리그', 'soccer_china_superleague'],
+        '중국 슈퍼리그': ['soccer_china_superleague'], // 중국 슈퍼리그로 요청이 오면 soccer_china_superleague 데이터만 반환
         'soccer_spain_primera_division': ['soccer_spain_primera_division', '라리가'],
-        '라리가': ['라리가', 'soccer_spain_primera_division'],
+        '라리가': ['soccer_spain_primera_division'], // 라리가로 요청이 오면 soccer_spain_primera_division 데이터만 반환
         'soccer_germany_bundesliga': ['soccer_germany_bundesliga', '분데스리가'],
-        '분데스리가': ['분데스리가', 'soccer_germany_bundesliga'],
+        '분데스리가': ['soccer_germany_bundesliga'], // 분데스리가로 요청이 오면 soccer_germany_bundesliga 데이터만 반환
         'soccer': [
           'soccer_usa_mls', 'MLS',
           'soccer_korea_kleague1', 'K리그',
@@ -93,6 +94,9 @@ const oddsController = {
           sport: sport
         });
       
+      // limit 설정 (기본값: 제한없음, limit 파라미터가 있으면 해당 값 사용)
+      const limitValue = limit ? parseInt(limit) : null;
+      
       const cachedData = await OddsCache.findAll({
         where: {
           sportKey: { [Op.in]: possibleKeys },
@@ -101,7 +105,8 @@ const oddsController = {
             [Op.lt]: thirtyDaysLater   // 향후 30일
           }
         },
-        order: [['commenceTime', 'ASC']]
+        order: [['commenceTime', 'ASC']],
+        ...(limitValue && { limit: limitValue })
       });
 
       console.log(`[oddsController] DB에서 조회된 데이터 수:`, cachedData.length);
