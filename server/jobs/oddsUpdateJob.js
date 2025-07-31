@@ -10,7 +10,8 @@ import { collectPremierLeagueData } from '../scripts/collectPremierLeagueData.js
 
 const execAsync = promisify(exec);
 
-let isUpdating = false;
+let isUpdatingResults = false; // 경기 결과 업데이트 플래그
+let isUpdatingOdds = false; // 배당률 업데이트 플래그
 let lastUpdateTime = null;
 let isInitializing = false; // 초기화 중복 실행 방지
 let lastInitTime = null; // 마지막 초기화 시간
@@ -88,13 +89,13 @@ function saveUpdateLog(type, status, data = {}) {
 
 // 경기 결과 업데이트 - 10분마다 실행
 cron.schedule('*/10 * * * *', async () => {
-  if (isUpdating) {
+  if (isUpdatingResults) {
     console.log('Previous game results update is still running, skipping this update');
     return;
   }
 
   saveUpdateLog('results', 'start', { message: 'Starting cost-efficient game results update', categories: Array.from(activeCategories) });
-  isUpdating = true;
+  isUpdatingResults = true;
 
   try {
     // 활성 카테고리만 업데이트
@@ -159,17 +160,17 @@ cron.schedule('*/10 * * * *', async () => {
           isRetry: true 
         });
       } finally {
-        isUpdating = false;
+        isUpdatingResults = false;
       }
     }, 10 * 60 * 1000); // 10분
   } finally {
-    isUpdating = false;
+    isUpdatingResults = false;
   }
 });
 
 // 고우선순위 리그 - 15분마다 업데이트 (더 빠른 업데이트)
 cron.schedule('*/15 * * * *', async () => {
-  if (isUpdating) {
+  if (isUpdatingOdds) {
     console.log('[SCHEDULER_ODDS] ⏭️ Previous odds update is still running, skipping this update');
     return;
   }
@@ -178,13 +179,13 @@ cron.schedule('*/15 * * * *', async () => {
   const updateStartTime = Date.now();
   const maxUpdateTime = 15 * 60 * 1000; // 15분
   
-  // 타임아웃 설정
+  // 타입아웃 설정
   const timeoutId = setTimeout(() => {
     console.log('[SCHEDULER_ODDS] ⚠️ Odds update timeout detected, forcing reset');
-    isUpdating = false;
+    isUpdatingOdds = false;
   }, maxUpdateTime);
   
-  isUpdating = true;
+  isUpdatingOdds = true;
   console.log('[SCHEDULER_ODDS] 🚀 Starting high-priority leagues odds update (30min interval)');
   console.log('[SCHEDULER_ODDS] 📋 Target leagues:', Array.from(highPriorityCategories));
   saveUpdateLog('odds', 'start', { 
@@ -249,7 +250,7 @@ cron.schedule('*/15 * * * *', async () => {
     });
   } finally {
     clearTimeout(timeoutId); // 타임아웃 클리어
-    isUpdating = false;
+    isUpdatingOdds = false;
     console.log('[SCHEDULER_ODDS] ✅ High-priority odds update process completed');
   }
 });
@@ -463,7 +464,8 @@ if (!isInitializing) {
 // 스케줄러 상태 모니터링 - 30분마다 (15분에서 변경)
 setInterval(() => {
   const status = {
-    isUpdating,
+    isUpdatingResults,
+    isUpdatingOdds,
     lastUpdateTime: lastUpdateTime ? lastUpdateTime.toISOString() : null,
     activeCategories: Array.from(activeCategories),
     uptime: process.uptime(),
@@ -483,7 +485,8 @@ setInterval(() => {
 // 헬스체크 엔드포인트용 함수
 const getHealthStatus = () => {
   return {
-    isUpdating,
+    isUpdatingResults,
+    isUpdatingOdds,
     lastUpdateTime: lastUpdateTime ? lastUpdateTime.toISOString() : null,
     activeCategories: Array.from(activeCategories),
     uptime: process.uptime(),

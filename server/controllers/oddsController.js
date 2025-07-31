@@ -79,14 +79,14 @@ const oddsController = {
       });
       
       const koreaTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-      // 최근 3일 + 향후 7일 필터링 (실용적인 범위로 축소)
-      const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+      // 최근 7일 + 향후 7일 필터링 (과거 경기도 포함)
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
       
-      console.log(`[oddsController] 최근 3일 + 향후 7일 필터링:`, {
+      console.log(`[oddsController] 최근 7일 + 향후 7일 필터링:`, {
           currentTimeUTC: now.toISOString(),
           currentTimeKorea: koreaTime.toISOString().replace('Z', ' KST'),
-          threeDaysAgo: threeDaysAgo.toISOString(),
+          sevenDaysAgo: sevenDaysAgo.toISOString(),
           sevenDaysLater: sevenDaysLater.toISOString(),
           sport: sport
         });
@@ -98,7 +98,7 @@ const oddsController = {
         where: {
           sportKey: { [Op.in]: possibleKeys },
           commenceTime: {
-            [Op.gte]: threeDaysAgo,     // 최근 3일
+            [Op.gte]: sevenDaysAgo,     // 최근 7일
             [Op.lt]: sevenDaysLater     // 향후 7일
           }
         },
@@ -141,7 +141,7 @@ const oddsController = {
       // 필터링 조건을 만족하지 않는 데이터가 있는지 확인 (수정된 로직)
       const invalidData = cachedData.filter(game => {
         const gameTime = new Date(game.commenceTime);
-        return gameTime < threeDaysAgo || gameTime >= sevenDaysLater;
+        return gameTime < sevenDaysAgo || gameTime >= sevenDaysLater;
       });
       
       if (invalidData.length > 0) {
