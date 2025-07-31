@@ -46,39 +46,17 @@ export default function Home() {
         setTodayLoading(true);
         // 시즌 정보 필터링 주석처리 - 모든 리그 포함
         const activeLeagues = Object.entries(SPORT_CATEGORIES);
-        console.log(`🔍 Today Betting - 모든 리그 포함:`, activeLeagues.map(([name, config]) => `${name}(${config.sportKey})`));
-        
-        console.log(`🔍 Today Betting - 활성 리그 수:`, activeLeagues.length);
-        console.log(`🔍 Today Betting - 활성 리그 목록:`, activeLeagues.map(([name, config]) => `${name}(${config.sportKey})`));
 
         const gamesData: Record<string, any[]> = {};
         
         for (const [displayName, config] of activeLeagues) {
           let apiUrl = '';
           try {
-            console.log(`🔍 Today Betting - ${displayName} API 호출:`, config.sportKey);
             apiUrl = buildApiUrl(`${API_CONFIG.ENDPOINTS.ODDS}/${config.sportKey}`);
-            console.log(`🔍 API URL:`, apiUrl);
             const response = await fetch(apiUrl);
-            console.log(`🔍 ${displayName} API 응답 상태:`, response.status, response.statusText);
             
             if (response.ok) {
               const data = await response.json();
-              console.log(`🔍 Today Betting - ${displayName} API 응답:`, data.length, '개 경기');
-              
-              // 모든 활성 리그에 대해 상세 로그
-              console.log(`🔍 ${displayName} API 응답 상세:`, {
-                totalGames: data.length,
-                firstGame: data[0] ? {
-                  home_team: data[0].home_team,
-                  away_team: data[0].away_team,
-                  commence_time: data[0].commence_time,
-                  hasOfficialOdds: !!data[0].officialOdds,
-                  hasBookmakers: !!data[0].bookmakers,
-                  officialOddsKeys: data[0].officialOdds ? Object.keys(data[0].officialOdds) : [],
-                  bookmakersCount: data[0].bookmakers ? data[0].bookmakers.length : 0
-                } : 'No games'
-              });
               
               const now = getCurrentLocalTime(); // 클라이언트 로컬 시간 사용
               // 시간 필터링 범위를 더 넓게 조정: 3일 전부터 30일 후까지
@@ -91,30 +69,12 @@ export default function Home() {
                 const localGameTime = convertUtcToLocal(game.commence_time); // UTC를 로컬로 변환
                 const isValid = localGameTime >= threeDaysAgo && localGameTime <= thirtyDaysLater;
                 
-                // 모든 활성 리그에 대해 필터링 로그 (첫 번째 경기만)
-                if (data.indexOf(game) === 0) {
-                  console.log(`🔍 ${displayName} 첫 번째 경기 필터링:`, {
-                    home_team: game.home_team,
-                    away_team: game.away_team,
-                    commence_time: game.commence_time,
-                    gameTimeUTC: localGameTime.toISOString(),
-                    gameTimeLocal: localGameTime.toLocaleString('ko-KR'),
-                    nowUTC: now.toISOString(),
-                    nowLocal: now.toLocaleString('ko-KR'),
-                    threeDaysAgoLocal: threeDaysAgo.toLocaleString('ko-KR'),
-                    thirtyDaysLaterLocal: thirtyDaysLater.toLocaleString('ko-KR'),
-                    isValid
-                  });
-                }
+
                 
                 return isValid;
               });
               
-              console.log(`🔍 ${displayName} 시간 필터링 결과:`, {
-                totalData: data.length,
-                filteredGames: filteredGames.length,
-                filteredOut: data.length - filteredGames.length
-              });
+
               
               // [중복 제거 간소화] 리그별로 동일 경기(홈/어웨이/시간) 1개만 남김
               const uniqueGamesMap = new Map();
@@ -134,11 +94,6 @@ export default function Home() {
                 }
               });
               const uniqueGames = Array.from(uniqueGamesMap.values());
-              console.log(`[${displayName}로그] 중복 제거 결과:`, {
-                beforeDedup: filteredGames.length,
-                afterDedup: uniqueGames.length,
-                duplicatesRemoved: filteredGames.length - uniqueGames.length
-              });
               
               // 3. 베팅 가능 여부 분류 및 정렬
               const categorizedGames = uniqueGames.map((game: any) => {
@@ -253,31 +208,9 @@ export default function Home() {
                       price: (oddsData as any).averagePrice
                     }));
                   }
-                  if (outcomes.length === 0) {
-                    console.log(`[${displayName}로그][배당 없음] ${game.home_team} vs ${game.away_team} | ${game.commence_time}`);
-                    if (game.officialOdds && game.officialOdds.h2h) {
-                      console.log(`[${displayName}로그] h2h keys:`, Object.keys(game.officialOdds.h2h));
-                    } else {
-                      console.log(`[${displayName}로그] [officialOdds.h2h 없음]`);
-                    }
-                  }
+
                 });
-                // 야구 리그도 첫 번째 경기 officialOdds.h2h 구조 반드시 출력
-                if (sortedGames.length > 0) {
-                  const firstGame = sortedGames[0];
-                  console.log(`==== [${displayName}] 첫 번째 경기 officialOdds.h2h 구조 ====`);
-                  if (firstGame.officialOdds && firstGame.officialOdds.h2h) {
-                    Object.entries(firstGame.officialOdds.h2h).forEach(([name, odds]) => {
-                      console.log(`  h2h: ${name} =`, odds);
-                    });
-                  } else {
-                    console.log('  [배당 없음] officialOdds.h2h가 없음');
-                  }
-                  console.log(`==== [${displayName}] 점검 끝 ====`);
-                }
-                console.log(`✅ ${displayName} Today Betting 데이터:`, sortedGames.length, '개 경기');
-                console.log(`✅ ${displayName} 첫 번째 경기 bookmakers:`, sortedGames[0].bookmakers ? '있음' : '없음');
-                console.log(`✅ ${displayName} 첫 번째 경기 officialOdds:`, sortedGames[0].officialOdds ? '있음' : '없음');
+
               }
             }
           } catch (err) {
@@ -286,8 +219,7 @@ export default function Home() {
           }
         }
         
-        console.log(`🔍 Today Betting - 최종 gamesData:`, Object.keys(gamesData));
-        console.log(`🔍 Today Betting - KBO 데이터:`, gamesData["KBO"] ? gamesData["KBO"].length : 0, '개 경기');
+
         
         setTodayGames(gamesData);
         setTodayLoading(false);
@@ -304,7 +236,6 @@ export default function Home() {
     if (viewMode !== 'today') return;
     // todayGames를 평탄화(flatten)하여 전체 경기 리스트로 변환
     const allGames: any[] = Object.values(todayGames).flat();
-    console.log('Today Betting - Total games before deduplication:', allGames.length);
     
     // 전체 시간순 정렬: 베팅 가능한 경기 우선, 그 다음 시간순(가장 가까운 순)
     const sortedAllGames = allGames.sort((a, b) => {
@@ -315,8 +246,6 @@ export default function Home() {
       // 둘 다 베팅 가능하거나 둘 다 불가능한 경우, 시간순 정렬(가장 가까운 순)
       return a.gameTime.getTime() - b.gameTime.getTime();
     });
-    
-    console.log('Today Betting - Total games after sorting:', sortedAllGames.length);
     setTodayFlatGames(sortedAllGames);
   }, [todayGames, viewMode]);
 
@@ -339,7 +268,7 @@ export default function Home() {
           return;
         }
 
-        console.log(`Fetching data for ${selectedCategory} with sportKey: ${sportKey}`);
+
         const apiUrl = buildApiUrl(`${API_CONFIG.ENDPOINTS.ODDS}/${sportKey}`);
         const response = await fetch(apiUrl);
         

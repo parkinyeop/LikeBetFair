@@ -54,8 +54,6 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
           throw new Error('Failed to fetch odds');
         }
         const data = await response.json();
-        console.log(`[OddsList] ${sportKey} API 응답:`, data.length, '개 경기');
-        console.log(`[OddsList] 첫 번째 경기 샘플:`, data[0]);
         
         const now = new Date();
         const bettingDeadlineMinutes = 10; // 경기 시작 10분 전까지 베팅 가능
@@ -67,12 +65,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
           return localGameTime > now; // 현재 시간 이후 경기만
         });
         
-        console.log(`[OddsList] 시간 필터링 후:`, filteredGames.length, '개 경기');
-        console.log(`[OddsList] 필터링 기준:`, {
-          filterType: 'future_games_only',
-          currentTime: now.toISOString(),
-          description: '현재 시간 이후 경기만 표시'
-        });
+
         
         // 2. 베팅 가능 여부 분류 및 정렬
         const categorizedGames = filteredGames.map((game: Game) => {

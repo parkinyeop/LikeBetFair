@@ -6,6 +6,7 @@ import AdminCommission from '../models/adminCommissionModel.js';
 import Bet from '../models/betModel.js';
 import bcrypt from 'bcryptjs';
 
+
 const router = express.Router();
 
 // 관리자 권한 확인 미들웨어
@@ -433,6 +434,36 @@ router.patch('/referral-codes/:id/status', verifyToken, requireAdmin(3), async (
   } catch (error) {
     console.error('Referral code status update error:', error);
     res.status(500).json({ message: '추천코드 상태 변경 중 오류가 발생했습니다.' });
+  }
+});
+
+// 수동 배당 데이터 수집 API
+router.post('/manual-odds-update', async (req, res) => {
+  try {
+    console.log('🔧 관리자 요청: 수동 배당 데이터 수집 시작');
+    
+    // 비동기로 실행 (응답을 기다리지 않음)
+    manualOddsUpdate()
+      .then(() => {
+        console.log('✅ 수동 배당 데이터 수집 완료');
+      })
+      .catch((error) => {
+        console.error('❌ 수동 배당 데이터 수집 실패:', error);
+      });
+    
+    res.json({
+      success: true,
+      message: '수동 배당 데이터 수집이 시작되었습니다. 로그를 확인해주세요.',
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ 수동 배당 데이터 수집 API 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '수동 배당 데이터 수집 중 오류가 발생했습니다.',
+      error: error.message
+    });
   }
 });
 
