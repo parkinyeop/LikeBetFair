@@ -19,6 +19,9 @@ services:
         value: "false"
       - key: CI
         value: "true"
+      # 빌드 중 스케줄러 비활성화 (타임아웃 방지)
+      - key: DISABLE_SCHEDULER
+        value: "true"
     healthCheckPath: /
     # 빌드 필터 개선 - 더 구체적으로 필요한 파일들만 포함
     buildFilter:

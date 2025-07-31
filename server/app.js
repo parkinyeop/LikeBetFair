@@ -141,7 +141,14 @@ app.all('*', (req, res) => {
 });
 
 // 스케줄러 초기화
-import './jobs/oddsUpdateJob.js';
+// 빌드 환경에서는 스케줄러 비활성화 (타임아웃 방지)
+if (process.env.NODE_ENV !== 'production' || process.env.DISABLE_SCHEDULER !== 'true') {
+  import('./jobs/oddsUpdateJob.js').catch(err => {
+    console.log('[스케줄러] 빌드 환경에서 스케줄러 로드 실패 (정상):', err.message);
+  });
+} else {
+  console.log('[스케줄러] 빌드 환경에서 스케줄러 비활성화됨');
+}
 
 // 배팅 결과 업데이트 스케줄러 추가
 import betResultService from './services/betResultService.js';
@@ -383,31 +390,52 @@ async function createDefaultAccounts() {
   }
 }
 
-// 초기 배당율 수집 함수
+// 초기 배당율 수집 함수 (빌드 환경에서는 비활성화)
 async function collectInitialOdds() {
   try {
+    // 빌드 환경에서는 초기 데이터 수집 건너뛰기
+    if (process.env.NODE_ENV === 'production' && process.env.DISABLE_SCHEDULER === 'true') {
+      console.log('[배당율] 빌드 환경에서 초기 데이터 수집 건너뛰기');
+      return;
+    }
+    
     const oddsApiService = (await import('./services/oddsApiService.js')).default;
     const gameResultService = (await import('./services/gameResultService.js')).default;
     
-    const activeCategories = [
-      'NBA', 'MLB', 'KBO', 'NFL', 'MLS', 'K리그', 'J리그', 
-      '세리에 A', '브라질 세리에 A', '아르헨티나 프리메라', 
-      '중국 슈퍼리그', '라리가', '분데스리가'
-    ];
+    // 빌드 환경에서는 고우선순위 리그만 수집
+    const categories = process.env.NODE_ENV === 'production' && process.env.DISABLE_SCHEDULER === 'true' 
+      ? ['KBO', 'MLB'] // 빌드 시에는 핵심 리그만
+      : ['NBA', 'MLB', 'KBO', 'NFL', 'MLS', 'K리그', 'J리그', 
+         '세리에 A', '브라질 세리에 A', '아르헨티나 프리메라', 
+         '중국 슈퍼리그', '라리가', '분데스리가'];
     
     console.log('[배당율] 초기 배당율 수집 시작...');
     
-    // 배당율 수집
-    const oddsResult = await oddsApiService.fetchAndCacheOddsForCategories(activeCategories, 'high');
+    // 배당율 수집 (빌드 환경에서는 타임아웃 설정)
+    const timeout = process.env.NODE_ENV === 'production' && process.env.DISABLE_SCHEDULER === 'true' 
+      ? 60000 // 1분 타임아웃
+      : 300000; // 5분 타임아웃
+    
+    const oddsResult = await Promise.race([
+      oddsApiService.fetchAndCacheOddsForCategories(categories, 'high'),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Initial odds collection timeout')), timeout))
+    ]);
+    
     console.log(`[배당율] 배당율 수집 완료: ${oddsResult.updatedCount}개`);
     
-    // 경기 결과 수집
-    const resultsResult = await gameResultService.fetchAndUpdateResultsForCategories(activeCategories);
-    console.log(`[배당율] 경기 결과 수집 완료: ${resultsResult?.updatedCount || 0}개`);
+    // 경기 결과 수집 (빌드 환경에서는 건너뛰기)
+    if (process.env.NODE_ENV !== 'production' || process.env.DISABLE_SCHEDULER !== 'true') {
+      const resultsResult = await gameResultService.fetchAndUpdateResultsForCategories(categories);
+      console.log(`[배당율] 경기 결과 수집 완료: ${resultsResult?.updatedCount || 0}개`);
+    }
     
     console.log('[배당율] 초기 데이터 수집 완료!');
   } catch (error) {
     console.error('[배당율] 초기 데이터 수집 실패:', error.message);
+    // 빌드 환경에서는 오류를 무시하고 계속 진행
+    if (process.env.NODE_ENV === 'production' && process.env.DISABLE_SCHEDULER === 'true') {
+      console.log('[배당율] 빌드 환경에서 오류 무시하고 계속 진행');
+    }
   }
 }
 
