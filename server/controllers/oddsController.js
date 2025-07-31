@@ -200,6 +200,34 @@ const oddsController = {
           hasBookmakers: !!game.bookmakers
         });
         
+        // 🔧 officialOdds 파싱 디버깅
+        let parsedOfficialOdds = null;
+        if (game.officialOdds) {
+          try {
+            parsedOfficialOdds = typeof game.officialOdds === 'string' ? 
+              JSON.parse(game.officialOdds) : game.officialOdds;
+            
+            // KBO 데이터 디버깅
+            if (game.sportKey === 'baseball_kbo') {
+              console.log(`[oddsController] KBO officialOdds 파싱 성공:`, {
+                homeTeam: game.homeTeam,
+                awayTeam: game.awayTeam,
+                hasH2h: !!parsedOfficialOdds.h2h,
+                h2hKeys: parsedOfficialOdds.h2h ? Object.keys(parsedOfficialOdds.h2h) : []
+              });
+            }
+          } catch (parseError) {
+            console.error(`[oddsController] officialOdds 파싱 오류:`, {
+              homeTeam: game.homeTeam,
+              awayTeam: game.awayTeam,
+              error: parseError.message,
+              officialOddsType: typeof game.officialOdds,
+              officialOddsLength: typeof game.officialOdds === 'string' ? game.officialOdds.length : 'N/A'
+            });
+            parsedOfficialOdds = null;
+          }
+        }
+        
         return {
           id: game.id,
           sportKey: game.sportKey,
@@ -208,15 +236,11 @@ const oddsController = {
           away_team: game.awayTeam,
           commence_time: game.commenceTime,
           // 🔧 배당률 데이터 처리 개선
-          odds: game.officialOdds ? 
-            (typeof game.officialOdds === 'string' ? JSON.parse(game.officialOdds) : game.officialOdds) : 
-            null,
+          odds: parsedOfficialOdds,
           bookmakers: game.bookmakers ? 
             (typeof game.bookmakers === 'string' ? JSON.parse(game.bookmakers) : game.bookmakers) : 
             null,
-          officialOdds: game.officialOdds ? 
-            (typeof game.officialOdds === 'string' ? JSON.parse(game.officialOdds) : game.officialOdds) : 
-            null
+          officialOdds: parsedOfficialOdds
         };
       });
 

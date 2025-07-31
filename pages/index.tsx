@@ -329,9 +329,13 @@ export default function Home() {
         const maxDate = new Date(today.getTime() + TIME_CONFIG.BETTING_WINDOW_DAYS * 24 * 60 * 60 * 1000);
         const bettingDeadlineMinutes = 10; // 경기 시작 10분 전까지 베팅 가능
         
+        // 과거 7일부터 미래 7일까지 필터링 (백엔드와 동일하게)
+        const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const sevenDaysLater = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+        
         const filteredGames = data.filter((game: any) => {
           const localGameTime = convertUtcToLocal(game.commence_time); // UTC를 로컬로 변환
-          return localGameTime >= today && localGameTime <= maxDate;
+          return localGameTime >= sevenDaysAgo && localGameTime <= sevenDaysLater;
         });
         
         // KBO 필터링 로그
