@@ -270,6 +270,14 @@ export default function Home() {
 
 
         const apiUrl = buildApiUrl(`${API_CONFIG.ENDPOINTS.ODDS}/${sportKey}`);
+        
+        // KBO 데이터 요청 로그
+        if (selectedCategory === "KBO") {
+          console.log("=== KBO 데이터 요청 시작 ===");
+          console.log("요청 URL:", apiUrl);
+          console.log("요청 시간:", new Date().toLocaleString('ko-KR'));
+        }
+        
         const response = await fetch(apiUrl);
         
         if (!response.ok) {
@@ -277,6 +285,14 @@ export default function Home() {
         }
         
         const data = await response.json();
+        
+        // KBO 데이터 응답 로그
+        if (selectedCategory === "KBO") {
+          console.log("=== KBO 데이터 응답 ===");
+          console.log("응답 상태:", response.status);
+          console.log("총 데이터 개수:", data.length);
+          console.log("첫 번째 데이터 샘플:", data[0]);
+        }
         
         const now = getCurrentLocalTime(); // 클라이언트 로컬 시간 사용
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0); // 오늘 자정 (로컬)
@@ -287,6 +303,18 @@ export default function Home() {
           const localGameTime = convertUtcToLocal(game.commence_time); // UTC를 로컬로 변환
           return localGameTime >= today && localGameTime <= maxDate;
         });
+        
+        // KBO 필터링 로그
+        if (selectedCategory === "KBO") {
+          console.log("=== KBO 데이터 필터링 ===");
+          console.log("필터링 전 데이터 개수:", data.length);
+          console.log("필터링 후 데이터 개수:", filteredGames.length);
+          console.log("필터링 기준:", {
+            today: today.toLocaleString('ko-KR'),
+            maxDate: maxDate.toLocaleString('ko-KR'),
+            bettingWindowDays: TIME_CONFIG.BETTING_WINDOW_DAYS
+          });
+        }
         
         // 2. 중복 제거
         const uniqueGamesMap = new Map();
@@ -305,6 +333,14 @@ export default function Home() {
           }
         });
         const uniqueGames = Array.from(uniqueGamesMap.values());
+        
+        // KBO 중복 제거 로그
+        if (selectedCategory === "KBO") {
+          console.log("=== KBO 중복 제거 ===");
+          console.log("중복 제거 전 데이터 개수:", filteredGames.length);
+          console.log("중복 제거 후 데이터 개수:", uniqueGames.length);
+          console.log("제거된 중복 데이터 개수:", filteredGames.length - uniqueGames.length);
+        }
         
         // 3. 베팅 가능 여부 분류 및 정렬
         const categorizedGames = uniqueGames.map((game: any) => {
@@ -330,15 +366,41 @@ export default function Home() {
           return a.gameTime.getTime() - b.gameTime.getTime();
         });
         
-        if (selectedCategory === "KBO" && filteredGames.length > 0) {
-          console.log("KBO bookmakers 구조 sample:", filteredGames[0].bookmakers);
-          console.log("KBO API 호출 sportKey:", sportKey);
+        // KBO 최종 데이터 로그
+        if (selectedCategory === "KBO") {
+          console.log("=== KBO 최종 데이터 ===");
+          console.log("최종 정렬된 데이터 개수:", sortedGames.length);
+          console.log("베팅 가능한 경기 개수:", sortedGames.filter(game => game.isBettable).length);
+          console.log("베팅 불가능한 경기 개수:", sortedGames.filter(game => !game.isBettable).length);
+          
+          if (sortedGames.length > 0) {
+            console.log("첫 번째 경기:", {
+              homeTeam: sortedGames[0].home_team,
+              awayTeam: sortedGames[0].away_team,
+              commenceTime: sortedGames[0].commence_time,
+              isBettable: sortedGames[0].isBettable,
+              hasBookmakers: !!sortedGames[0].bookmakers,
+              hasOfficialOdds: !!sortedGames[0].officialOdds
+            });
+            
+            if (sortedGames[0].bookmakers) {
+              console.log("첫 번째 경기 북메이커 수:", sortedGames[0].bookmakers.length);
+            }
+          }
+          
+          console.log("=== KBO 데이터 로딩 완료 ===");
         }
         setGames(sortedGames);
         setCurrentSportKey(selectedCategory);
         setLoading(false);
       } catch (err) {
-        console.error('Error fetching games:', err);
+        if (selectedCategory === "KBO") {
+          console.error("=== KBO 데이터 요청 오류 ===");
+          console.error("오류 메시지:", err instanceof Error ? err.message : 'Unknown error');
+          console.error("오류 객체:", err);
+        } else {
+          console.error('Error fetching games:', err);
+        }
         setError(err instanceof Error ? err.message : 'An error occurred');
         setLoading(false);
       }
