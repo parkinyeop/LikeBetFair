@@ -84,8 +84,10 @@ const oddsController = {
       // 현재 시간 이후의 미래 경기만 조회
       const currentDate = new Date();
       
+      const koreaTime = new Date(currentDate.getTime() + 9 * 60 * 60 * 1000);
       console.log(`[oddsController] 미래 경기만 필터링:`, {
-          currentTime: currentDate.toISOString(),
+          currentTimeUTC: currentDate.toISOString(),
+          currentTimeKorea: koreaTime.toISOString().replace('Z', ' KST'),
           sport: sport
         });
       
