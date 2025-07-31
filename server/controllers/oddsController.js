@@ -63,25 +63,24 @@ const oddsController = {
       
       const possibleKeys = sportKeyMapping[sport] || [sport];
       
-      // 현재 시간부터 30일 후까지 범위 계산 (미래 경기 중심)
+      // 현재 시간부터 7일 후까지 범위 계산
       const now = new Date();
-      const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
       // 디버깅을 위해 현재 시간과 필터링 범위 출력
       console.log(`[oddsController] 현재 시간 (UTC): ${now.toISOString()}`);
-      console.log(`[oddsController] 필터링 범위: ${now.toISOString()} ~ ${thirtyDaysLater.toISOString()}`);
+      console.log(`[oddsController] 필터링 범위: ${now.toISOString()} ~ ${sevenDaysLater.toISOString()}`);
 
       console.log(`[oddsController] 필터링 조건:`, {
         sport,
         possibleKeys,
         now: now.toISOString(),
-        thirtyDaysLater: thirtyDaysLater.toISOString()
+        sevenDaysLater: sevenDaysLater.toISOString()
       });
       
       const koreaTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
       // 최근 7일 + 향후 7일 필터링 (과거 경기도 포함)
       const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
       
       console.log(`[oddsController] 최근 7일 + 향후 7일 필터링:`, {
           currentTimeUTC: now.toISOString(),
