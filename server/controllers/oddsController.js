@@ -293,4 +293,4 @@ const oddsController = {
   }
 };
 
-export { oddsController }; 
+export default oddsController; 
