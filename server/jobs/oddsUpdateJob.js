@@ -174,6 +174,16 @@ cron.schedule('*/30 * * * *', async () => {
     return;
   }
   
+  // 안전장치: 15분 이상 실행 중이면 강제 리셋
+  const updateStartTime = Date.now();
+  const maxUpdateTime = 15 * 60 * 1000; // 15분
+  
+  // 타임아웃 설정
+  const timeoutId = setTimeout(() => {
+    console.log('[SCHEDULER_ODDS] ⚠️ Odds update timeout detected, forcing reset');
+    isUpdating = false;
+  }, maxUpdateTime);
+  
   isUpdating = true;
   console.log('[SCHEDULER_ODDS] 🚀 Starting high-priority leagues odds update (30min interval)');
   console.log('[SCHEDULER_ODDS] 📋 Target leagues:', Array.from(highPriorityCategories));
@@ -238,6 +248,7 @@ cron.schedule('*/30 * * * *', async () => {
       error: error.message
     });
   } finally {
+    clearTimeout(timeoutId); // 타임아웃 클리어
     isUpdating = false;
     console.log('[SCHEDULER_ODDS] ✅ High-priority odds update process completed');
   }

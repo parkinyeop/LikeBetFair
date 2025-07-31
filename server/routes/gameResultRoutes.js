@@ -149,6 +149,35 @@ router.get('/odds/cost-estimate', async (req, res) => {
   }
 });
 
+// 스케줄러 강제 리셋 API
+router.post('/scheduler/reset', async (req, res) => {
+  try {
+    console.log('[API] 스케줄러 강제 리셋 요청 받음');
+    
+    // 고우선순위 리그 배당율 업데이트 실행
+    const highPriorityCategories = ['NBA', 'MLB', 'KBO', 'NFL', '프리미어리그'];
+    const highResult = await oddsApiService.fetchAndCacheOddsForCategories(highPriorityCategories, 'high');
+    
+    // 중우선순위 리그 배당율 업데이트 실행
+    const mediumPriorityCategories = ['MLS', 'KLEAGUE', 'JLEAGUE', 'SERIEA'];
+    const mediumResult = await oddsApiService.fetchAndCacheOddsForCategories(mediumPriorityCategories, 'medium');
+    
+    const totalUpdated = (highResult?.updatedCount || 0) + (mediumResult?.updatedCount || 0);
+    
+    console.log('[API] 스케줄러 리셋 완료:', { highResult, mediumResult, totalUpdated });
+    
+    res.json({ 
+      message: 'Scheduler reset completed successfully',
+      highPriorityResult: highResult,
+      mediumPriorityResult: mediumResult,
+      totalUpdated
+    });
+  } catch (error) {
+    console.error('[API] 스케줄러 리셋 실패:', error);
+    res.status(500).json({ error: 'Failed to reset scheduler', details: error.message });
+  }
+});
+
 // 모든 게임 결과 조회
 router.get('/', async (req, res) => {
   try {
