@@ -101,7 +101,7 @@ const oddsController = {
             [Op.lt]: sevenDaysLater     // 향후 7일
           }
         },
-        order: [['commenceTime', 'ASC']],
+        order: [['commenceTime', 'DESC']],
         ...(limitValue && { limit: limitValue })
       });
 
