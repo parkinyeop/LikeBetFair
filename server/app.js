@@ -38,7 +38,7 @@ console.log('[DB 연결] DB_USER:', process.env.DB_USER);
 console.log('[DB 연결] DB_PASSWORD:', process.env.DB_PASSWORD ? '***' : 'undefined');
 
 // 라우트 임포트
-import oddsRoutes from './routes/oddsRoutes.js';
+import oddsRoutes from './routes/odds.js';
 import gameResultRoutes from './routes/gameResultRoutes.js';
 import authRoutes from './routes/auth.js';
 import betRoutes from './routes/bet.js';
