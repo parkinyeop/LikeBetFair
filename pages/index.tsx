@@ -246,6 +246,43 @@ export default function Home() {
       // 둘 다 베팅 가능하거나 둘 다 불가능한 경우, 시간순 정렬(가장 가까운 순)
       return a.gameTime.getTime() - b.gameTime.getTime();
     });
+    
+    // Today Betting 전체 베팅 가능한 경기 개수 로깅
+    const bettableGames = sortedAllGames.filter(game => game.isBettable);
+    const nonBettableGames = sortedAllGames.filter(game => !game.isBettable);
+    
+    console.log("=== Today Betting 전체 통계 ===");
+    console.log("전체 경기 개수:", sortedAllGames.length);
+    console.log("베팅 가능한 경기 개수:", bettableGames.length);
+    console.log("베팅 불가능한 경기 개수:", nonBettableGames.length);
+    
+    // 리그별 베팅 가능한 경기 개수
+    const leagueStats = {};
+    sortedAllGames.forEach(game => {
+      const league = game.sportTitle || game.sport_title;
+      if (!leagueStats[league]) {
+        leagueStats[league] = { total: 0, bettable: 0 };
+      }
+      leagueStats[league].total++;
+      if (game.isBettable) {
+        leagueStats[league].bettable++;
+      }
+    });
+    
+    console.log("리그별 통계:", leagueStats);
+    
+    if (bettableGames.length > 0) {
+      console.log("베팅 가능한 첫 번째 경기:", {
+        homeTeam: bettableGames[0].home_team,
+        awayTeam: bettableGames[0].away_team,
+        sportTitle: bettableGames[0].sportTitle,
+        commenceTime: bettableGames[0].commence_time,
+        gameTime: bettableGames[0].gameTime,
+        bettingDeadline: bettableGames[0].bettingDeadline,
+        isBettable: bettableGames[0].isBettable
+      });
+    }
+    
     setTodayFlatGames(sortedAllGames);
   }, [todayGames, viewMode]);
 
