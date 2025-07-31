@@ -81,13 +81,15 @@ const oddsController = {
         now: now.toISOString()
       });
 
-      // 현재 시간 이후의 미래 경기만 조회
-      const currentDate = new Date();
+      // 최근 7일 + 향후 30일 경기 조회 (과거 경기도 포함)
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       
-      const koreaTime = new Date(currentDate.getTime() + 9 * 60 * 60 * 1000);
-      console.log(`[oddsController] 미래 경기만 필터링:`, {
-          currentTimeUTC: currentDate.toISOString(),
+      const koreaTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+      console.log(`[oddsController] 최근 7일 + 향후 30일 필터링:`, {
+          currentTimeUTC: now.toISOString(),
           currentTimeKorea: koreaTime.toISOString().replace('Z', ' KST'),
+          sevenDaysAgo: sevenDaysAgo.toISOString(),
+          thirtyDaysLater: thirtyDaysLater.toISOString(),
           sport: sport
         });
       
@@ -95,7 +97,8 @@ const oddsController = {
         where: {
           sportKey: { [Op.in]: possibleKeys },
           commenceTime: {
-            [Op.gte]: currentDate // 현재 시간 이후의 경기만
+            [Op.gte]: sevenDaysAgo,    // 최근 7일
+            [Op.lt]: thirtyDaysLater   // 향후 30일
           }
         },
         order: [['commenceTime', 'ASC']]
