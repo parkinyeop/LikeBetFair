@@ -251,11 +251,13 @@ class OddsApiService {
 
           console.log(`[DEBUG] Found ${oddsResponse.data.length} games with odds for ${clientCategory}`);
 
-          // 현재 시간 이후의 모든 미래 경기 저장 (시간 제한 제거)
+          // 과거 7일부터 미래 7일까지의 경기 저장
           const now = new Date();
+          const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
           const filteredGames = oddsResponse.data.filter(game => {
             const commence = new Date(game.commence_time);
-            return commence >= now; // 현재 시간 이후의 모든 경기
+            return commence >= sevenDaysAgo && commence <= sevenDaysLater;
           });
           console.log(`[DEBUG] ${clientCategory}: ${filteredGames.length}개 미래 경기 처리 시작`);
           console.log(`[DEBUG] 원본 데이터: ${oddsResponse.data.length}개, 필터링 후: ${filteredGames.length}개`);
