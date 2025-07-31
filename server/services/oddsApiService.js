@@ -251,15 +251,14 @@ class OddsApiService {
 
           console.log(`[DEBUG] Found ${oddsResponse.data.length} games with odds for ${clientCategory}`);
 
-          // === 추가: UTC 기준 7일 이내 경기만 저장 ===
+          // 현재 시간 이후의 모든 미래 경기 저장 (시간 제한 제거)
           const now = new Date();
-          const weekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
           const filteredGames = oddsResponse.data.filter(game => {
             const commence = new Date(game.commence_time);
-            return commence >= now && commence < weekLater;
+            return commence >= now; // 현재 시간 이후의 모든 경기
           });
-          console.log(`[DEBUG] ${clientCategory}: ${filteredGames.length}개 경기(7일 이내) 처리 시작`);
-          // === 끝 ===
+          console.log(`[DEBUG] ${clientCategory}: ${filteredGames.length}개 미래 경기 처리 시작`);
+          console.log(`[DEBUG] 원본 데이터: ${oddsResponse.data.length}개, 필터링 후: ${filteredGames.length}개`);
 
           // 데이터 검증 및 저장
           for (const game of filteredGames) {
