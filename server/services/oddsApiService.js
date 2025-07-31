@@ -515,12 +515,13 @@ class OddsApiService {
 
           console.log(`[DEBUG] Found ${oddsResponse.data.length} games for ${clientCategory}`);
 
-          // === 추가: UTC 기준 7일 이내 경기만 저장 ===
+          // === 추가: UTC 기준 최근 3일 + 미래 7일 경기만 저장 ===
           const now = new Date();
-          const weekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+          const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+          const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
           const filteredGames = oddsResponse.data.filter(game => {
             const commence = new Date(game.commence_time);
-            return commence >= now && commence < weekLater;
+            return commence >= threeDaysAgo && commence < sevenDaysLater;
           });
           // === 끝 ===
 

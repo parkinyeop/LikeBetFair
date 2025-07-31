@@ -167,8 +167,8 @@ cron.schedule('*/10 * * * *', async () => {
   }
 });
 
-// 고우선순위 리그 - 30분마다 업데이트 (10분에서 변경)
-cron.schedule('*/30 * * * *', async () => {
+// 고우선순위 리그 - 15분마다 업데이트 (더 빠른 업데이트)
+cron.schedule('*/15 * * * *', async () => {
   if (isUpdating) {
     console.log('[SCHEDULER_ODDS] ⏭️ Previous odds update is still running, skipping this update');
     return;
@@ -254,8 +254,8 @@ cron.schedule('*/30 * * * *', async () => {
   }
 });
 
-// 중우선순위 리그 - 2시간마다 업데이트 (1시간에서 변경)
-cron.schedule('0 */2 * * *', async () => {
+// 중우선순위 리그 - 1시간마다 업데이트 (더 빠른 업데이트)
+cron.schedule('0 */1 * * *', async () => {
   saveUpdateLog('odds', 'start', { 
     message: 'Starting medium-priority leagues odds update (2hour interval)',
     priority: 'medium',
@@ -626,19 +626,19 @@ cron.schedule('*/10 * * * *', async () => {
 // OddsHistory 정리 스케줄러 - 매일 새벽 4시에 실행
 cron.schedule('0 4 * * *', async () => {
   saveUpdateLog('cleanup', 'start', { 
-    message: 'Starting OddsHistory cleanup (7+ days old data)'
+    message: 'Starting OddsHistory cleanup (3+ days old data)'
   });
   
   try {
     const { default: OddsHistory } = await import('../models/oddsHistoryModel.js');
     const { Op } = await import('sequelize');
     
-    // 7일 이상 된 데이터 삭제
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    // 3일 이상 된 데이터 삭제
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
     const deletedCount = await OddsHistory.destroy({
       where: {
         snapshotTime: {
-          [Op.lt]: sevenDaysAgo
+          [Op.lt]: threeDaysAgo
         }
       }
     });
@@ -646,10 +646,10 @@ cron.schedule('0 4 * * *', async () => {
     saveUpdateLog('cleanup', 'success', { 
       message: 'OddsHistory cleanup completed',
       deletedCount: deletedCount,
-      cutoffDate: sevenDaysAgo.toISOString()
+      cutoffDate: threeDaysAgo.toISOString()
     });
     
-    console.log(`🧹 [Cleanup] OddsHistory에서 ${deletedCount}개 레코드 삭제 완료 (7일 이상)`);
+    console.log(`🧹 [Cleanup] OddsHistory에서 ${deletedCount}개 레코드 삭제 완료 (3일 이상)`);
     
   } catch (error) {
     saveUpdateLog('cleanup', 'error', { 

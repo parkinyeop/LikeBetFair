@@ -60,6 +60,14 @@ const OddsCache = sequelize.define('OddsCache', {
       unique: true,
       fields: ['sportKey', 'homeTeam', 'awayTeam', 'commenceTime'],
       name: 'unique_game_odds'
+    },
+    {
+      fields: ['sportKey', 'commenceTime'],
+      name: 'idx_sport_commence'
+    },
+    {
+      fields: ['lastUpdated'],
+      name: 'idx_last_updated'
     }
   ]
 });
