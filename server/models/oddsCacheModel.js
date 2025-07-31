@@ -54,7 +54,14 @@ const OddsCache = sequelize.define('OddsCache', {
     defaultValue: 'h2h'
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  indexes: [
+    {
+      unique: true,
+      fields: ['sportKey', 'homeTeam', 'awayTeam', 'commenceTime'],
+      name: 'unique_game_odds'
+    }
+  ]
 });
 
 export default OddsCache; 

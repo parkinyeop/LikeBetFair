@@ -293,7 +293,14 @@ class OddsApiService {
               
               console.log(`[DEBUG] Upsert 데이터:`, JSON.stringify(upsertData, null, 2));
               
+              // 중복 방지를 위한 where 조건 추가
               const [oddsRecord, created] = await OddsCache.upsert(upsertData, {
+                where: {
+                  sportKey: sportKey,
+                  homeTeam: game.home_team,
+                  awayTeam: game.away_team,
+                  commenceTime: new Date(game.commence_time)
+                },
                 returning: true
               });
 

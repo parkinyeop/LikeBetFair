@@ -104,22 +104,46 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
           officialOdds: game.officialOdds || game.odds || {},
         }));
         
-        // 4. 중복 제거: home_team, away_team, commence_time 조합으로 Map 사용
+        // 4. 개선된 중복 제거: 시간 우선 → 팀 조합으로 정확한 중복 판단
         const uniqueGamesMap = new Map();
+        
+        // 시간별로 그룹화
+        const gamesByTime = new Map();
         dataWithOfficialOdds.forEach((game: any) => {
-          const key = `${game.home_team}|${game.away_team}|${game.commence_time}`;
-          if (!uniqueGamesMap.has(key)) {
-            uniqueGamesMap.set(key, game);
-          } else {
-            // bookmakers가 더 많은 쪽을 우선
-            const prev = uniqueGamesMap.get(key);
-            if (
-              (!prev.bookmakers && game.bookmakers) ||
-              (Array.isArray(game.bookmakers) && Array.isArray(prev.bookmakers) && game.bookmakers.length > prev.bookmakers.length)
-            ) {
-              uniqueGamesMap.set(key, game);
-            }
+          const timeKey = game.commence_time; // 정확한 시간 사용
+          if (!gamesByTime.has(timeKey)) {
+            gamesByTime.set(timeKey, []);
           }
+          gamesByTime.get(timeKey).push(game);
+        });
+        
+        // 각 시간대별로 팀 조합 중복 제거
+        gamesByTime.forEach((gamesAtTime, timeKey) => {
+          const teamMap = new Map();
+          
+          gamesAtTime.forEach((game: any) => {
+            const teamKey = `${game.home_team}|${game.away_team}`;
+            
+            if (!teamMap.has(teamKey)) {
+              teamMap.set(teamKey, game); // 첫 번째 경기는 반드시 저장
+            } else {
+              // 중복인 경우 더 나은 데이터로 교체
+              const existing = teamMap.get(teamKey);
+              const currentBookmakers = Array.isArray(game.bookmakers) ? game.bookmakers.length : 0;
+              const existingBookmakers = Array.isArray(existing.bookmakers) ? existing.bookmakers.length : 0;
+              
+              if (currentBookmakers > existingBookmakers || 
+                  (game.officialOdds && !existing.officialOdds)) {
+                teamMap.set(teamKey, game);
+              }
+            }
+          });
+          
+          // 해당 시간대의 유니크한 경기들을 최종 맵에 추가
+          teamMap.forEach((game, teamKey) => {
+            const finalKey = `${timeKey}|${teamKey}`;
+            uniqueGamesMap.set(finalKey, game);
+          });
         });
         
         const finalGames = Array.from(uniqueGamesMap.values());

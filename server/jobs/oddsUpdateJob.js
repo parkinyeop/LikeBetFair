@@ -148,6 +148,12 @@ cron.schedule('*/10 * * * *', async () => {
 
 // 고우선순위 리그 - 30분마다 업데이트 (10분에서 변경)
 cron.schedule('*/30 * * * *', async () => {
+  if (isUpdating) {
+    console.log('Previous odds update is still running, skipping this update');
+    return;
+  }
+  
+  isUpdating = true;
   saveUpdateLog('odds', 'start', { 
     message: 'Starting high-priority leagues odds update (30min interval)',
     priority: 'high',
@@ -194,6 +200,8 @@ cron.schedule('*/30 * * * *', async () => {
       leagues: Array.from(highPriorityCategories),
       error: error.message
     });
+  } finally {
+    isUpdating = false;
   }
 });
 
