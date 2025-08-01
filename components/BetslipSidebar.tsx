@@ -297,30 +297,31 @@ function MyBetsPanel() {
                                   ) : (
                                     <span className={`font-semibold ${color}`}>{sel.desc ? sel.desc.split(' vs ').find(t => t && sel.team && t.replace(/\s/g, '').toLowerCase().includes(sel.team.replace(/\s/g, '').toLowerCase())) || sel.team : sel.team}</span>
                                   )}
-                                <span className="ml-2 text-gray-600">@ {sel.odds}</span>
-                                <span className={`ml-2 text-xs ${color}`}>{label}</span>
-                                {bet.status === 'cancelled' && (
-                                  <span className="ml-2 text-xs text-gray-400 font-semibold">베팅 취소됨</span>
-                                )}
-                                {sel.result === 'cancelled' && bet.status !== 'cancelled' && (
-                                  <span className="ml-2 text-xs text-orange-500 font-semibold">경기 취소 (무효처리)</span>
-                                )}
-                                {['won', 'lost'].includes(sel.result) && sel.gameResult && sel.gameResult.score && Array.isArray(sel.gameResult.score) ? (
-                                  <span className="ml-2 text-xs text-blue-600">
-                                    결과: ({sel.gameResult.homeTeam} {
-                                      // 스코어 형태에 따라 다르게 처리: ['3', '7'] 또는 [{score: '3'}, {score: '7'}]
-                                      typeof sel.gameResult.score[0] === 'string' 
-                                        ? sel.gameResult.score[0] 
-                                        : sel.gameResult.score[0]?.score ?? '-'
-                                    } : {sel.gameResult.awayTeam} {
-                                      typeof sel.gameResult.score[1] === 'string' 
-                                        ? sel.gameResult.score[1] 
-                                        : sel.gameResult.score[1]?.score ?? '-'
-                                    })
-                                  </span>
-                                ) : ['won', 'lost'].includes(sel.result) ? (
-                                  <span className="ml-2 text-xs text-gray-400">결과 대기중</span>
-                                ) : null}
+                                  <span className="ml-2 text-gray-600">@ {sel.odds}</span>
+                                  <span className={`ml-2 text-xs ${color}`}>{label}</span>
+                                  {bet.status === 'cancelled' && (
+                                    <span className="ml-2 text-xs text-gray-400 font-semibold">베팅 취소됨</span>
+                                  )}
+                                  {sel.result === 'cancelled' && bet.status !== 'cancelled' && (
+                                    <span className="ml-2 text-xs text-orange-500 font-semibold">경기 취소 (무효처리)</span>
+                                  )}
+                                  {['won', 'lost'].includes(sel.result) && sel.gameResult && sel.gameResult.score && Array.isArray(sel.gameResult.score) ? (
+                                    <span className="ml-2 text-xs text-blue-600">
+                                      결과: ({sel.gameResult.homeTeam} {
+                                        // 스코어 형태에 따라 다르게 처리: ['3', '7'] 또는 [{score: '3'}, {score: '7'}]
+                                        typeof sel.gameResult.score[0] === 'string' 
+                                          ? sel.gameResult.score[0] 
+                                          : sel.gameResult.score[0]?.score ?? '-'
+                                      } : {sel.gameResult.awayTeam} {
+                                        typeof sel.gameResult.score[1] === 'string' 
+                                          ? sel.gameResult.score[1] 
+                                          : sel.gameResult.score[1]?.score ?? '-'
+                                      })
+                                    </span>
+                                  ) : ['won', 'lost'].includes(sel.result) ? (
+                                    <span className="ml-2 text-xs text-gray-400">결과 대기중</span>
+                                  ) : null}
+                                </div>
                               </div>
                             );
                           })
