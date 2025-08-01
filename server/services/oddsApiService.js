@@ -20,6 +20,7 @@ const clientSportKeyMap = {
   'LALIGA': 'soccer_spain_la_liga',
   'BUNDESLIGA': 'soccer_germany_bundesliga',
   'EPL': 'soccer_england_premier_league',
+  '프리미어리그': 'soccer_england_premier_league', // 한글 매핑 추가
   'NBA': 'basketball_nba',
   'MLB': 'baseball_mlb',
   'KBO': 'baseball_kbo',
