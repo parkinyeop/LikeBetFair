@@ -299,8 +299,14 @@ class OddsApiService {
               
               console.log(`[DEBUG] Upsert 데이터:`, JSON.stringify(upsertData, null, 2));
               
-              // unique constraint를 사용한 upsert (where 조건 제거)
+              // where 조건을 사용한 안전한 upsert (unique constraint 불필요)
               const [oddsRecord, created] = await OddsCache.upsert(upsertData, {
+                where: {
+                  sportKey: sportKey,
+                  homeTeam: game.home_team,  
+                  awayTeam: game.away_team,
+                  commenceTime: new Date(game.commence_time)
+                },
                 returning: true
               });
 
