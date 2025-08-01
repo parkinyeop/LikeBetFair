@@ -59,15 +59,15 @@ export default function Home() {
               const data = await response.json();
               
               const now = getCurrentLocalTime(); // 클라이언트 로컬 시간 사용
-              // 시간 필터링 범위를 더 넓게 조정: 3일 전부터 30일 후까지
-              const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000); // 3일 전
-              const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30일 후
+              // 시간 필터링 범위 조정: 1일 전부터 7일 후까지
+              const oneDayAgo = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000); // 1일 전
+              const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7일 후
               const bettingDeadlineMinutes = 10; // 경기 시작 10분 전까지 베팅 가능
               
-              // 1. 기본 필터링: 3일 전부터 30일 후까지의 경기 (UTC를 로컬로 변환하여 비교)
+              // 1. 기본 필터링: 1일 전부터 7일 후까지의 경기 (UTC를 로컬로 변환하여 비교)
               const filteredGames = data.filter((game: any) => {
                 const localGameTime = convertUtcToLocal(game.commence_time); // UTC를 로컬로 변환
-                const isValid = localGameTime >= threeDaysAgo && localGameTime <= thirtyDaysLater;
+                const isValid = localGameTime >= oneDayAgo && localGameTime <= sevenDaysLater;
                 
 
                 
