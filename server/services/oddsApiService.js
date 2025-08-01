@@ -252,15 +252,15 @@ class OddsApiService {
 
           console.log(`[DEBUG] Found ${oddsResponse.data.length} games with odds for ${clientCategory}`);
 
-          // 과거 1일부터 미래 7일까지의 경기 저장 (필터링 조건 완화)
+          // 과거 3일부터 미래 14일까지의 경기 저장 (필터링 조건 대폭 완화)
           const now = new Date();
-          const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-          const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+          const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+          const fourteenDaysLater = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
           const filteredGames = oddsResponse.data.filter(game => {
             const commence = new Date(game.commence_time);
-            return commence >= oneDayAgo && commence <= sevenDaysLater;
+            return commence >= threeDaysAgo && commence <= fourteenDaysLater;
           });
-          console.log(`[DEBUG] ${clientCategory}: ${filteredGames.length}개 경기 처리 시작 (과거 1일 ~ 미래 7일)`);
+          console.log(`[DEBUG] ${clientCategory}: ${filteredGames.length}개 경기 처리 시작 (과거 3일 ~ 미래 14일)`);
           console.log(`[DEBUG] 원본 데이터: ${oddsResponse.data.length}개, 필터링 후: ${filteredGames.length}개`);
 
           // 데이터 검증 및 저장
@@ -524,13 +524,13 @@ class OddsApiService {
 
           console.log(`[DEBUG] Found ${oddsResponse.data.length} games for ${clientCategory}`);
 
-          // === 추가: UTC 기준 최근 3일 + 미래 7일 경기만 저장 ===
+          // === 추가: UTC 기준 최근 3일 + 미래 14일 경기만 저장 (대폭 완화) ===
           const now = new Date();
           const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-          const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+          const fourteenDaysLater = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
           const filteredGames = oddsResponse.data.filter(game => {
             const commence = new Date(game.commence_time);
-            return commence >= threeDaysAgo && commence < sevenDaysLater;
+            return commence >= threeDaysAgo && commence <= fourteenDaysLater;
           });
           // === 끝 ===
 
