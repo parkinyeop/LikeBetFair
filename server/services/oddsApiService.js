@@ -252,14 +252,15 @@ class OddsApiService {
 
           console.log(`[DEBUG] Found ${oddsResponse.data.length} games with odds for ${clientCategory}`);
 
-          // 미래 7일까지의 경기만 저장 (과거 데이터 제외)
+          // 과거 1일부터 미래 7일까지의 경기 저장 (필터링 조건 완화)
           const now = new Date();
+          const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
           const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
           const filteredGames = oddsResponse.data.filter(game => {
             const commence = new Date(game.commence_time);
-            return commence >= now && commence <= sevenDaysLater;
+            return commence >= oneDayAgo && commence <= sevenDaysLater;
           });
-          console.log(`[DEBUG] ${clientCategory}: ${filteredGames.length}개 미래 경기 처리 시작`);
+          console.log(`[DEBUG] ${clientCategory}: ${filteredGames.length}개 경기 처리 시작 (과거 1일 ~ 미래 7일)`);
           console.log(`[DEBUG] 원본 데이터: ${oddsResponse.data.length}개, 필터링 후: ${filteredGames.length}개`);
 
           // 데이터 검증 및 저장
@@ -278,6 +279,9 @@ class OddsApiService {
               console.log(`[DEBUG] 카테고리 매핑 성공: ${mainCategory}/${subCategory}`);
               
               // 디버깅: upsert 데이터 확인
+              const calculatedOdds = this.calculateAverageOdds(game.bookmakers);
+              console.log(`[DEBUG] calculateAverageOdds 결과:`, JSON.stringify(calculatedOdds, null, 2));
+              
               const upsertData = {
                 mainCategory,
                 subCategory,
@@ -289,7 +293,7 @@ class OddsApiService {
                 odds: game.bookmakers, // odds 필드 추가
                 bookmakers: game.bookmakers,
                 market: 'h2h', // 기본값 추가
-                officialOdds: this.calculateAverageOdds(game.bookmakers),
+                officialOdds: calculatedOdds,
                 lastUpdated: new Date()
               };
               
