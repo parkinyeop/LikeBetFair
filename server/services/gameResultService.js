@@ -758,14 +758,14 @@ class GameResultService {
                   if (updatedCount > 0) {
                     totalUpdated++;
                     updatedExistingCount++;
-                    console.log(`Updated existing game: ${event.strHomeTeam} vs ${event.strAwayTeam}`);
+                    console.log(`Updated existing game: ${event.home_team || event.strHomeTeam} vs ${event.away_team || event.strAwayTeam}`);
                   }
                 } else {
                   // 새 데이터 생성
                   await GameResult.create(gameData);
                   newCount++;
                   totalUpdated++;
-                  console.log(`Created new game: ${event.strHomeTeam} vs ${event.strAwayTeam}`);
+                                      console.log(`Created new game: ${event.home_team || event.strHomeTeam} vs ${event.away_team || event.strAwayTeam}`);
                 }
               } else {
                 skippedCount++;
