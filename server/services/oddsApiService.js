@@ -336,7 +336,16 @@ class OddsApiService {
               }
             } else {
               totalSkippedCount++;
-              console.log(`[DEBUG] ❌ 데이터 검증 실패: ${game.home_team} vs ${game.away_team}`);
+              console.log(`[DEBUG] ${clientCategory} ❌ 데이터 검증 실패: ${game.home_team} vs ${game.away_team}`);
+              console.log(`[DEBUG] ${clientCategory} 검증 실패 상세:`, {
+                has_game: !!game,
+                has_home_team: !!game?.home_team,
+                has_away_team: !!game?.away_team, 
+                has_commence_time: !!game?.commence_time,
+                has_bookmakers: !!game?.bookmakers,
+                bookmakers_is_array: Array.isArray(game?.bookmakers),
+                bookmakers_length: game?.bookmakers?.length || 0
+              });
             }
           }
         } catch (error) {
@@ -529,8 +538,13 @@ class OddsApiService {
           // === 끝 ===
 
           // 데이터 검증 및 저장
+          console.log(`[DEBUG] ${clientCategory} Processing ${filteredGames.length} games for database storage`);
           for (const game of filteredGames) {
-            if (this.validateOddsData(game)) {
+            console.log(`[DEBUG] ${clientCategory} Validating game: ${game.home_team} vs ${game.away_team}`);
+            const isValid = this.validateOddsData(game);
+            console.log(`[DEBUG] ${clientCategory} Validation result: ${isValid} for ${game.home_team} vs ${game.away_team}`);
+            
+            if (isValid) {
               const mainCategory = this.determineMainCategory(clientCategory);
               const subCategory = this.determineSubCategory(clientCategory);
               
