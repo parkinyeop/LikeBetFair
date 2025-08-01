@@ -213,6 +213,10 @@ cron.schedule('*/15 * * * *', async () => {
     console.log('[SCHEDULER_ODDS] 🎯 Actual priority level:', actualPriority);
     
     let oddsUpdateResult;
+    console.log('[SCHEDULER_ODDS] 🔧 About to call fetchAndCacheOddsForCategories with:', Array.from(highPriorityCategories));
+    console.log('[SCHEDULER_ODDS] 🔧 oddsApiService type:', typeof oddsApiService);
+    console.log('[SCHEDULER_ODDS] 🔧 fetchAndCacheOddsForCategories type:', typeof oddsApiService.fetchAndCacheOddsForCategories);
+    
     if (dynamicPriority === 'high') {
       // API 사용량이 높을 때는 고우선순위만
       console.log('[SCHEDULER_ODDS] ⚠️ High API usage detected, processing high-priority leagues only');
@@ -220,7 +224,9 @@ cron.schedule('*/15 * * * *', async () => {
     } else {
       // 정상적일 때는 기존대로
       console.log('[SCHEDULER_ODDS] ✅ Normal API usage, processing all high-priority leagues');
+      console.log('[SCHEDULER_ODDS] 🔧 Calling fetchAndCacheOddsForCategories...');
       oddsUpdateResult = await oddsApiService.fetchAndCacheOddsForCategories(Array.from(highPriorityCategories), 'medium');
+      console.log('[SCHEDULER_ODDS] 🔧 fetchAndCacheOddsForCategories returned:', oddsUpdateResult);
     }
     
     // 실제 업데이트 결과를 상세히 로그에 기록
