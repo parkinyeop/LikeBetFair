@@ -663,6 +663,38 @@ class OddsApiService {
       return 'low';
     }
   }
+
+  // 단일 스포츠의 배당율 가져오기 (외부 스크립트용)
+  async fetchOdds(sportKey, options = {}) {
+    try {
+      if (!this.canMakeApiCall()) {
+        throw new Error('API 호출 한도 초과');
+      }
+
+      this.trackApiCall();
+      
+      const params = new URLSearchParams({
+        apiKey: this.apiKey,
+        ...options
+      });
+
+      const url = `${this.baseUrl}/${sportKey}/odds?${params}`;
+      console.log(`[DEBUG] Fetching odds from: ${url.replace(this.apiKey, '***')}`);
+      
+      const response = await axios.get(url);
+      
+      if (response.status === 200) {
+        console.log(`[DEBUG] Successfully fetched ${response.data.length} odds for ${sportKey}`);
+        return response.data;
+      } else {
+        throw new Error(`API 응답 오류: ${response.status}`);
+      }
+      
+    } catch (error) {
+      console.error(`[DEBUG] Error fetching odds for ${sportKey}:`, error.message);
+      throw error;
+    }
+  }
 }
 
 const oddsApiService = new OddsApiService();

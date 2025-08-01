@@ -588,13 +588,18 @@ class BetResultService {
       return 'pending';
     }
 
-    // 핸디캡 베팅에서 팀명과 핸디캡 분리
+    // 핸디캡 베팅에서 팀명과 핸디캡 분리 (개선된 로직)
     let selectedTeam, handicap;
-    if (selection.team && selection.team.includes(' -')) {
-      // "Doosan Bears -1" 형식에서 팀명과 핸디캡 분리
-      const parts = selection.team.split(' -');
-      selectedTeam = normalizeTeamNameForComparison(parts[0]);
-      handicap = parseInt(parts[1]) || 0;
+    if (selection.team && (selection.team.includes(' -') || selection.team.includes(' +'))) {
+      // "Kia Tigers -1" 또는 "Lotte Giants +1" 형식에서 팀명과 핸디캡 분리
+      const match = selection.team.match(/^(.+?)\s*([+-]\d+)$/);
+      if (match) {
+        selectedTeam = normalizeTeamNameForComparison(match[1].trim());
+        handicap = parseInt(match[2]) || 0;
+      } else {
+        selectedTeam = normalizeTeamNameForComparison(selection.team);
+        handicap = 0;
+      }
     } else {
       // 기존 방식 (selection.team이 팀명만 있는 경우)
       selectedTeam = normalizeTeamNameForComparison(selection.team);
@@ -608,14 +613,24 @@ class BetResultService {
     const homeTeamNorm = normalizeTeamNameForComparison(gameResult.homeTeam);
     const awayTeamNorm = normalizeTeamNameForComparison(gameResult.awayTeam);
     
+    // 디버깅 로그 추가
+    console.log(`[핸디캡 매칭] 베팅 팀: "${selectedTeam}", 핸디캡: ${handicap}`);
+    console.log(`[핸디캡 매칭] 경기 홈팀: "${homeTeamNorm}", 원정팀: "${awayTeamNorm}"`);
+    console.log(`[핸디캡 매칭] 스코어: ${homeScore}-${awayScore}`);
+    
     if (selectedTeam === homeTeamNorm) {
       const adjustedScore = homeScore + handicap;
-      return adjustedScore > awayScore ? 'won' : 'lost';
+      const result = adjustedScore > awayScore ? 'won' : 'lost';
+      console.log(`[핸디캡 매칭] 홈팀 매칭: ${adjustedScore} vs ${awayScore} = ${result}`);
+      return result;
     } else if (selectedTeam === awayTeamNorm) {
       const adjustedScore = awayScore + handicap;
-      return adjustedScore > homeScore ? 'won' : 'lost';
+      const result = adjustedScore > homeScore ? 'won' : 'lost';
+      console.log(`[핸디캡 매칭] 원정팀 매칭: ${adjustedScore} vs ${homeScore} = ${result}`);
+      return result;
     }
 
+    console.log(`[핸디캡 매칭] 팀명 매칭 실패: "${selectedTeam}" not found in ["${homeTeamNorm}", "${awayTeamNorm}"]`);
     return 'pending';
   }
 
