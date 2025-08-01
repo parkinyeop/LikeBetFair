@@ -7,7 +7,7 @@ import path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { collectPremierLeagueData } from '../scripts/collectPremierLeagueData.js';
-import { sequelize } from '../models/sequelize.js';
+import sequelize from '../models/sequelize.js';
 
 const execAsync = promisify(exec);
 

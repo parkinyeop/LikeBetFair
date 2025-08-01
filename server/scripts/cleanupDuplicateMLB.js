@@ -1,4 +1,4 @@
-import { sequelize } from '../models/sequelize.js';
+import sequelize from '../models/sequelize.js';
 import { Op } from 'sequelize';
 
 console.log('🧹 [MLB_CLEANUP] MLB 중복 데이터 정리 시작...');
