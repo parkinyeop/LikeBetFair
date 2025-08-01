@@ -16,6 +16,13 @@ let lastUpdateTime = null;
 let isInitializing = false; // 초기화 중복 실행 방지
 let lastInitTime = null; // 마지막 초기화 시간
 
+// 서버 시작 로그
+console.log('🚀 [SCHEDULER_SYSTEM] Odds Update Scheduler Starting...');
+console.log('🚀 [SCHEDULER_SYSTEM] Process ID:', process.pid);
+console.log('🚀 [SCHEDULER_SYSTEM] Start Time:', new Date().toISOString());
+console.log('🚀 [SCHEDULER_SYSTEM] Node Version:', process.version);
+console.log('🚀 [SCHEDULER_SYSTEM] Environment:', process.env.NODE_ENV || 'development');
+
 // 리그별 우선순위 설정 (API 사용량 최적화)
 const highPriorityCategories = new Set([
   'NBA', 'MLB', 'KBO', 'NFL', '프리미어리그' // 활발한 시즌 또는 높은 베팅 볼륨
@@ -170,8 +177,11 @@ cron.schedule('*/5 * * * *', async () => {
 
 // 고우선순위 리그 - 15분마다 업데이트 (더 빠른 업데이트)
 cron.schedule('*/15 * * * *', async () => {
+  console.log('[SCHEDULER_ODDS] 🔔 Cron job triggered at:', new Date().toISOString());
+  
   if (isUpdatingOdds) {
     console.log('[SCHEDULER_ODDS] ⏭️ Previous odds update is still running, skipping this update');
+    console.log('[SCHEDULER_ODDS] ⏭️ isUpdatingOdds flag is:', isUpdatingOdds);
     return;
   }
   
@@ -242,16 +252,19 @@ cron.schedule('*/15 * * * *', async () => {
     
   } catch (error) {
     console.log('[SCHEDULER_ODDS] ❌ High-priority odds update failed:', error.message);
+    console.log('[SCHEDULER_ODDS] ❌ Error stack:', error.stack);
     saveUpdateLog('odds', 'error', { 
       message: 'High-priority odds update failed',
       priority: 'high',
       leagues: Array.from(highPriorityCategories),
-      error: error.message
+      error: error.message,
+      errorStack: error.stack
     });
   } finally {
     clearTimeout(timeoutId); // 타임아웃 클리어
     isUpdatingOdds = false;
-    console.log('[SCHEDULER_ODDS] ✅ High-priority odds update process completed');
+    console.log('[SCHEDULER_ODDS] ✅ High-priority odds update process completed at:', new Date().toISOString());
+    console.log('[SCHEDULER_ODDS] ✅ isUpdatingOdds flag reset to:', isUpdatingOdds);
   }
 });
 
@@ -693,5 +706,45 @@ cron.schedule('0 4 * * *', async () => {
     console.error('❌ [Cleanup] OddsHistory 정리 실패:', error.message);
   }
 });
+
+// 프로세스 종료 감지
+process.on('SIGTERM', () => {
+  console.log('🛑 [SCHEDULER_SYSTEM] SIGTERM received, shutting down gracefully...');
+  console.log('🛑 [SCHEDULER_SYSTEM] Process ID:', process.pid);
+  console.log('🛑 [SCHEDULER_SYSTEM] Shutdown Time:', new Date().toISOString());
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('🛑 [SCHEDULER_SYSTEM] SIGINT received, shutting down gracefully...');
+  console.log('🛑 [SCHEDULER_SYSTEM] Process ID:', process.pid);
+  console.log('🛑 [SCHEDULER_SYSTEM] Shutdown Time:', new Date().toISOString());
+  process.exit(0);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('💥 [SCHEDULER_SYSTEM] Uncaught Exception:', error.message);
+  console.error('💥 [SCHEDULER_SYSTEM] Error stack:', error.stack);
+  console.error('💥 [SCHEDULER_SYSTEM] Process ID:', process.pid);
+  console.error('💥 [SCHEDULER_SYSTEM] Error Time:', new Date().toISOString());
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('💥 [SCHEDULER_SYSTEM] Unhandled Rejection at:', promise);
+  console.error('💥 [SCHEDULER_SYSTEM] Reason:', reason);
+  console.error('💥 [SCHEDULER_SYSTEM] Process ID:', process.pid);
+  console.error('💥 [SCHEDULER_SYSTEM] Error Time:', new Date().toISOString());
+});
+
+// 정기적인 생존 신호 (5분마다)
+setInterval(() => {
+  console.log('💓 [SCHEDULER_SYSTEM] Heartbeat - Process alive');
+  console.log('💓 [SCHEDULER_SYSTEM] PID:', process.pid);
+  console.log('💓 [SCHEDULER_SYSTEM] Uptime:', Math.round(process.uptime()), 'seconds');
+  console.log('💓 [SCHEDULER_SYSTEM] Memory:', Math.round(process.memoryUsage().heapUsed / 1024 / 1024), 'MB');
+  console.log('💓 [SCHEDULER_SYSTEM] isUpdatingOdds:', isUpdatingOdds);
+  console.log('💓 [SCHEDULER_SYSTEM] Time:', new Date().toISOString());
+}, 5 * 60 * 1000); // 5분마다
 
 export { getHealthStatus, updateActiveCategories, getActiveCategories }; 
