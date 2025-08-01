@@ -186,10 +186,10 @@ cron.schedule('*/15 * * * *', async () => {
   }, maxUpdateTime);
   
   isUpdatingOdds = true;
-  console.log('[SCHEDULER_ODDS] 🚀 Starting high-priority leagues odds update (30min interval)');
+  console.log('[SCHEDULER_ODDS] 🚀 Starting high-priority leagues odds update (15min interval)');
   console.log('[SCHEDULER_ODDS] 📋 Target leagues:', Array.from(highPriorityCategories));
   saveUpdateLog('odds', 'start', { 
-    message: 'Starting high-priority leagues odds update (30min interval)',
+    message: 'Starting high-priority leagues odds update (15min interval)',
     priority: 'high',
     leagues: Array.from(highPriorityCategories)
   });
@@ -232,7 +232,7 @@ cron.schedule('*/15 * * * *', async () => {
     console.log('[SCHEDULER_ODDS]   - Categories Processed:', oddsSummary.categoriesProcessed);
     
     saveUpdateLog('odds', 'success', { 
-      message: 'High-priority odds update completed (30min interval)',
+      message: 'High-priority odds update completed (15min interval)',
       priority: actualPriority,
       leagues: Array.from(highPriorityCategories),
       dynamicPriority: dynamicPriority,
@@ -279,6 +279,14 @@ cron.schedule('0 */1 * * *', async () => {
         categoriesProcessed: oddsUpdateResult?.categories?.length || 0
       };
       
+      console.log('[SCHEDULER_ODDS] 📊 Medium-priority Update Summary:');
+      console.log('[SCHEDULER_ODDS]   - Total Updated:', oddsSummary.totalUpdated);
+      console.log('[SCHEDULER_ODDS]   - New Odds:', oddsSummary.newOdds);
+      console.log('[SCHEDULER_ODDS]   - Existing Updated:', oddsSummary.existingOddsUpdated);
+      console.log('[SCHEDULER_ODDS]   - Skipped:', oddsSummary.skippedOdds);
+      console.log('[SCHEDULER_ODDS]   - API Calls:', oddsSummary.apiCalls);
+      console.log('[SCHEDULER_ODDS]   - Categories Processed:', oddsSummary.categoriesProcessed);
+      
       saveUpdateLog('odds', 'success', { 
         message: 'Medium-priority odds update completed (2hour interval)',
         priority: 'medium',
@@ -288,6 +296,7 @@ cron.schedule('0 */1 * * *', async () => {
         oddsDetail: oddsSummary
       });
     } else {
+      console.log('[SCHEDULER_ODDS] ⚠️ Skipping medium-priority update due to high API usage');
       saveUpdateLog('odds', 'skip', { 
         message: 'Skipping medium-priority update due to high API usage',
         priority: 'medium',
@@ -317,14 +326,35 @@ cron.schedule('0 0 * * *', async () => {
     // API 사용량이 낮을 때만 실행
     const dynamicPriority = oddsApiService.getDynamicPriorityLevel();
     if (dynamicPriority === 'low') {
-      await oddsApiService.fetchAndCacheOddsForCategories(Array.from(lowPriorityCategories), 'low');
+      const oddsUpdateResult = await oddsApiService.fetchAndCacheOddsForCategories(Array.from(lowPriorityCategories), 'low');
+      
+      const oddsSummary = {
+        totalUpdated: oddsUpdateResult?.updatedCount || 0,
+        newOdds: oddsUpdateResult?.newCount || 0,
+        existingOddsUpdated: oddsUpdateResult?.updatedExistingCount || 0,
+        skippedOdds: oddsUpdateResult?.skippedCount || 0,
+        apiCalls: oddsUpdateResult?.apiCalls || 0,
+        categoriesProcessed: oddsUpdateResult?.categories?.length || 0
+      };
+      
+      console.log('[SCHEDULER_ODDS] 📊 Low-priority Update Summary:');
+      console.log('[SCHEDULER_ODDS]   - Total Updated:', oddsSummary.totalUpdated);
+      console.log('[SCHEDULER_ODDS]   - New Odds:', oddsSummary.newOdds);
+      console.log('[SCHEDULER_ODDS]   - Existing Updated:', oddsSummary.existingOddsUpdated);
+      console.log('[SCHEDULER_ODDS]   - Skipped:', oddsSummary.skippedOdds);
+      console.log('[SCHEDULER_ODDS]   - API Calls:', oddsSummary.apiCalls);
+      console.log('[SCHEDULER_ODDS]   - Categories Processed:', oddsSummary.categoriesProcessed);
+      
       saveUpdateLog('odds', 'success', { 
         message: 'Low-priority odds update completed (24hour interval)',
         priority: 'low',
         leagues: Array.from(lowPriorityCategories),
-        dynamicPriority: dynamicPriority
+        dynamicPriority: dynamicPriority,
+        oddsUpdated: oddsSummary.totalUpdated,
+        oddsDetail: oddsSummary
       });
     } else {
+      console.log('[SCHEDULER_ODDS] ⚠️ Skipping low-priority update due to API usage constraints');
       saveUpdateLog('odds', 'skip', { 
         message: 'Skipping low-priority update due to API usage constraints',
         priority: 'low',
@@ -421,7 +451,7 @@ const initializeData = async () => {
     saveUpdateLog('init', 'success', { 
       message: 'Initial data cached successfully for active categories',
       categories: Array.from(activeCategories),
-      oddsUpdated: 'Active categories only',
+      oddsUpdated: oddsResult?.updatedCount || 0,
       resultsUpdated: resultsResult?.updatedCount || 'N/A',
       betsUpdated: betResult?.updatedCount || 0
     });
