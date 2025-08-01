@@ -62,7 +62,14 @@ const GameResult = sequelize.define('GameResult', {
   timestamps: true,
   indexes: [
     {
-      fields: ['eventId']
+      unique: true,
+      fields: ['eventId'],
+      name: 'unique_event_id'
+    },
+    {
+      unique: true,
+      fields: ['homeTeam', 'awayTeam', 'commenceTime'],
+      name: 'unique_game_match'
     },
     {
       fields: ['mainCategory', 'subCategory']

@@ -493,17 +493,23 @@ class GameResultService {
             const mainCategory = this.determineMainCategory(sportKey);
             const subCategory = this.determineSubCategory(sportKey);
             
-            await GameResult.upsert({
-              mainCategory,
-              subCategory,
-              homeTeam: event.home_team,
-              awayTeam: event.away_team,
-              commenceTime: new Date(event.commence_time),
-              status: this.determineGameStatus(event),
-              score: event.scores,
-              result: this.determineGameResult(event),
-              lastUpdated: new Date()
-            });
+                    await GameResult.upsert({
+          mainCategory,
+          subCategory,
+          homeTeam: event.home_team,
+          awayTeam: event.away_team,
+          commenceTime: new Date(event.commence_time),
+          status: this.determineGameStatus(event),
+          score: event.scores,
+          result: this.determineGameResult(event),
+          lastUpdated: new Date()
+        }, {
+          where: {
+            homeTeam: event.home_team,
+            awayTeam: event.away_team,
+            commenceTime: new Date(event.commence_time)
+          }
+        });
             savedCount++;
           }
         }
@@ -579,6 +585,12 @@ class GameResultService {
           score: matchingGame.scores,
           result: this.determineGameResult(matchingGame),
           lastUpdated: new Date()
+        }, {
+          where: {
+            homeTeam: matchingGame.home_team,
+            awayTeam: matchingGame.away_team,
+            commenceTime
+          }
         });
         console.log(`[결과수집] 성공: ${desc} 결과 저장 완료`);
         return true;
@@ -918,6 +930,12 @@ class GameResultService {
                 score: validatedScore,
                 result: this.determineGameResult(game),
                 lastUpdated: new Date()
+              }, {
+                where: {
+                  homeTeam: game.home_team,
+                  awayTeam: game.away_team,
+                  commenceTime: new Date(game.commence_time)
+                }
               });
             }
           }
@@ -1228,7 +1246,13 @@ class GameResultService {
       sportTitle: sportTitle || null
     };
     
-    return GameResult.upsert(saveData);
+    return GameResult.upsert(saveData, {
+      where: {
+        homeTeam: saveData.homeTeam,
+        awayTeam: saveData.awayTeam,
+        commenceTime: saveData.commenceTime
+      }
+    });
   }
 }
 
