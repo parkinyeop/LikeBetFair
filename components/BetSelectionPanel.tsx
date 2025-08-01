@@ -271,6 +271,8 @@ const BetSelectionPanel = () => {
             <div>
               {((sel as any)?.market === '언더/오버' || (sel as any)?.market === 'totals') ? (
                 <p className="text-sm font-medium">{normalizeOption((sel as any)?.option || sel.team)} {(sel as any)?.point !== undefined ? `(${(sel as any).point})` : ''}</p>
+              ) : ((sel as any)?.market === '핸디캡' || (sel as any)?.market === 'spreads') ? (
+                <p className="text-sm font-medium">{sel.team}</p>
               ) : (
                 <p className="text-sm font-medium">{sel.team}</p>
               )}

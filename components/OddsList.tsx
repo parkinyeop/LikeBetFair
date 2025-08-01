@@ -403,7 +403,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                           onClick={() => {
                             if (isBettable && overOdds) {
                               toggleSelection({
-                                team: `Over ${point}`,
+                                team: `Over ${point} (${game.home_team} vs ${game.away_team})`,
                                 odds: overOdds,
                                 desc: `${game.home_team} vs ${game.away_team}`,
                                 commence_time: game.commence_time,
@@ -416,7 +416,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                             }
                           }}
                           className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                            isTeamSelected(`Over ${point}`, selectedMarket, game.id, parseFloat(point))
+                            isTeamSelected(`Over ${point} (${game.home_team} vs ${game.away_team})`, selectedMarket, game.id, parseFloat(point))
                               ? 'bg-yellow-500 hover:bg-yellow-600'
                               : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                           } text-white`}
@@ -432,7 +432,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                           onClick={() => {
                             if (isBettable && underOdds) {
                               toggleSelection({
-                                team: `Under ${point}`,
+                                team: `Under ${point} (${game.home_team} vs ${game.away_team})`,
                                 odds: underOdds,
                                 desc: `${game.home_team} vs ${game.away_team}`,
                                 commence_time: game.commence_time,
@@ -445,7 +445,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                             }
                           }}
                           className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                            isTeamSelected(`Under ${point}`, selectedMarket, game.id, parseFloat(point))
+                            isTeamSelected(`Under ${point} (${game.home_team} vs ${game.away_team})`, selectedMarket, game.id, parseFloat(point))
                               ? 'bg-yellow-500 hover:bg-yellow-600'
                               : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                           } text-white`}
@@ -531,7 +531,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                                 onClick={() => {
                                   if (isBettable && homeOdds) {
                                     toggleSelection({
-                                      team: `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`,
+                                      team: `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap} (vs ${game.away_team})`,
                                       odds: homeOdds,
                                       desc: `${game.home_team} vs ${game.away_team}`,
                                       commence_time: game.commence_time,
@@ -544,7 +544,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                                   }
                                 }}
                                 className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                                  isTeamSelected(`${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`, selectedMarket, game.id, pointValue)
+                                  isTeamSelected(`${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap} (vs ${game.away_team})`, selectedMarket, game.id, pointValue)
                                     ? 'bg-yellow-500 hover:bg-yellow-600'
                                     : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                 } text-white`}
@@ -560,7 +560,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                                 onClick={() => {
                                   if (isBettable && awayOdds) {
                                     toggleSelection({
-                                      team: `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`,
+                                      team: `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap} (vs ${game.home_team})`,
                                       odds: awayOdds,
                                       desc: `${game.home_team} vs ${game.away_team}`,
                                       commence_time: game.commence_time,
@@ -573,7 +573,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                                   }
                                 }}
                                 className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                                  isTeamSelected(`${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`, selectedMarket, game.id, pointValue)
+                                  isTeamSelected(`${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap} (vs ${game.home_team})`, selectedMarket, game.id, pointValue)
                                     ? 'bg-yellow-500 hover:bg-yellow-600'
                                     : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                 } text-white`}

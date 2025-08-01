@@ -276,17 +276,27 @@ function MyBetsPanel() {
                             else if (sel.result === 'lost') { icon = '❌'; color = 'text-red-500'; label = '실패'; }
                             else if (sel.result === 'cancelled') { icon = '🚫'; color = 'text-orange-500'; label = '경기취소'; }
                             else if (sel.result === 'draw') { icon = '⚖️'; color = 'text-blue-500'; label = '무승부'; }
-                            // 언더/오버 마켓이면 라인+옵션만 노출
+                            // 언더/오버 마켓이면 라인+옵션과 경기 정보도 함께 표시
                             const isOverUnder = sel.market === '언더/오버' || sel.market === 'totals';
+                            const isHandicap = sel.market === '핸디캡' || sel.market === 'spreads';
                             const ouType = normalizeOption(sel.option || sel.team);
                             return (
-                              <div key={idx} className="flex items-center text-sm">
-                                <span className={`mr-2 ${color}`}>{icon}</span>
-                                {isOverUnder ? (
-                                  <span className={`font-semibold ${color}`}>{ouType} {sel.point !== undefined ? `(${sel.point})` : ''}</span>
-                                ) : (
-                                  <span className={`font-semibold ${color}`}>{sel.desc ? sel.desc.split(' vs ').find(t => t && sel.team && t.replace(/\s/g, '').toLowerCase().includes(sel.team.replace(/\s/g, '').toLowerCase())) || sel.team : sel.team}</span>
-                                )}
+                              <div key={idx} className="flex flex-col text-sm">
+                                <div className="flex items-center">
+                                  <span className={`mr-2 ${color}`}>{icon}</span>
+                                  {isOverUnder ? (
+                                    <div className="flex flex-col">
+                                      <span className={`font-semibold ${color}`}>{ouType} {sel.point !== undefined ? `(${sel.point})` : ''}</span>
+                                      {sel.desc && <span className="text-xs text-gray-500">{sel.desc}</span>}
+                                    </div>
+                                  ) : isHandicap ? (
+                                    <div className="flex flex-col">
+                                      <span className={`font-semibold ${color}`}>{sel.team}</span>
+                                      {sel.desc && <span className="text-xs text-gray-500">{sel.desc}</span>}
+                                    </div>
+                                  ) : (
+                                    <span className={`font-semibold ${color}`}>{sel.desc ? sel.desc.split(' vs ').find(t => t && sel.team && t.replace(/\s/g, '').toLowerCase().includes(sel.team.replace(/\s/g, '').toLowerCase())) || sel.team : sel.team}</span>
+                                  )}
                                 <span className="ml-2 text-gray-600">@ {sel.odds}</span>
                                 <span className={`ml-2 text-xs ${color}`}>{label}</span>
                                 {bet.status === 'cancelled' && (
