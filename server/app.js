@@ -150,21 +150,7 @@ if (process.env.NODE_ENV !== 'production' || process.env.DISABLE_SCHEDULER !== '
   console.log('[스케줄러] 빌드 환경에서 스케줄러 비활성화됨');
 }
 
-// 배팅 결과 업데이트 스케줄러 추가
-import betResultService from './services/betResultService.js';
-
-// 5분마다 배팅 결과 업데이트
-setInterval(async () => {
-  try {
-    console.log('[Scheduler] Updating bet results...');
-    const result = await betResultService.updateBetResults();
-    if (result.updatedCount > 0) {
-      console.log(`[Scheduler] Updated ${result.updatedCount} bet results`);
-    }
-  } catch (error) {
-    console.error('[Scheduler] Error updating bet results:', error);
-  }
-}, 5 * 60 * 1000); // 5분
+// 배팅 결과 업데이트는 oddsUpdateJob.js에서만 처리 (중복 방지)
 
 // 스케줄러 관련 import 및 설정
 import { setupSeasonStatusScheduler } from './services/seasonStatusUpdater.js';

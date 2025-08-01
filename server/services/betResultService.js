@@ -91,6 +91,12 @@ class BetResultService {
 
   // 개별 배팅 결과 처리 (스코어 유무 기반)
   async processBetResult(bet) {
+    // ✅ 이미 완료된 베팅은 건너뛰기 (중복 처리 방지)
+    if (bet.status === 'won' || bet.status === 'lost' || bet.status === 'cancelled') {
+      console.log(`[베팅 처리] 이미 완료된 베팅 ${bet.id} (${bet.status}) 건너뛰기`);
+      return true;
+    }
+    
     // ✅ 환불 기록이 있으면 무조건 cancelled로 고정
     const whereCond = {
       betId: bet.id,
@@ -267,8 +273,22 @@ class BetResultService {
     return 'pending';
   }
 
-  // 🆕 베팅 적중 시 상금 지급
+  // 🆕 베팅 적중 시 상금 지급 (중복 지급 방지)
   async processBetWinnings(bet, transaction) {
+    // 이미 지급된 베팅인지 확인
+    const existingPayment = await PaymentHistory.findOne({
+      where: {
+        betId: bet.id,
+        memo: { [Op.like]: '%베팅 적중 지급%' }
+      },
+      transaction
+    });
+    
+    if (existingPayment) {
+      console.log(`[적중 지급] 이미 지급된 베팅 ${bet.id} 건너뛰기`);
+      return;
+    }
+    
     const user = await User.findByPk(bet.userId, { 
       transaction, 
       lock: transaction.LOCK.UPDATE 
@@ -297,8 +317,22 @@ class BetResultService {
     }
   }
 
-  // 🆕 베팅 환불 처리
+  // 🆕 베팅 환불 처리 (중복 환불 방지)
   async processBetRefund(bet, transaction, memo = '경기 취소로 인한 환불') {
+    // 이미 환불된 베팅인지 확인
+    const existingRefund = await PaymentHistory.findOne({
+      where: {
+        betId: bet.id,
+        memo: { [Op.like]: '%환불%' }
+      },
+      transaction
+    });
+    
+    if (existingRefund) {
+      console.log(`[환불 처리] 이미 환불된 베팅 ${bet.id} 건너뛰기`);
+      return;
+    }
+    
     const user = await User.findByPk(bet.userId, { 
       transaction, 
       lock: transaction.LOCK.UPDATE 

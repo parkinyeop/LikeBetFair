@@ -8,7 +8,7 @@ const oddsController = {
       const { sport } = req.params;
       const { limit } = req.query; // limit 파라미터 추가
       
-      // sportKey 매핑 (여러 형태의 키를 처리)
+      // sportKey 매핑 (여러 형태의 키를 처리) - 확장된 버전
       const sportKeyMapping = {
         // 야구
         'baseball_mlb': ['baseball_mlb', 'MLB'],
@@ -18,6 +18,7 @@ const oddsController = {
         'baseball': ['baseball_mlb', 'MLB', 'baseball_kbo', 'KBO'],
         // 미식축구
         'americanfootball_nfl': ['americanfootball_nfl', 'NFL'],
+        'american_football_nfl': ['americanfootball_nfl', 'NFL'], // 추가된 별칭
         'NFL': ['americanfootball_nfl'], // NFL로 요청이 오면 americanfootball_nfl 데이터만 반환
         'americanfootball': ['americanfootball_nfl', 'NFL'],
         // 농구
@@ -48,6 +49,9 @@ const oddsController = {
         '라리가': ['soccer_spain_primera_division'], // 라리가로 요청이 오면 soccer_spain_primera_division 데이터만 반환
         'soccer_germany_bundesliga': ['soccer_germany_bundesliga', '분데스리가'],
         '분데스리가': ['soccer_germany_bundesliga'], // 분데스리가로 요청이 오면 soccer_germany_bundesliga 데이터만 반환
+        'soccer_england_premier_league': ['soccer_england_premier_league', '프리미어리그', 'PREMIER_LEAGUE'],
+        '프리미어리그': ['soccer_england_premier_league'], // 프리미어리그로 요청이 오면 soccer_england_premier_league 데이터만 반환
+        'PREMIER_LEAGUE': ['soccer_england_premier_league'], // PREMIER_LEAGUE로 요청이 오면 soccer_england_premier_league 데이터만 반환
         'soccer': [
           'soccer_usa_mls', 'MLS',
           'soccer_korea_kleague1', 'K리그',
@@ -57,7 +61,8 @@ const oddsController = {
           'soccer_argentina_primera_division', '아르헨티나 프리메라', 'ARGENTINA_PRIMERA',
           'soccer_china_superleague', '중국 슈퍼리그',
           'soccer_spain_primera_division', '라리가',
-          'soccer_germany_bundesliga', '분데스리가'
+          'soccer_germany_bundesliga', '분데스리가',
+          'soccer_england_premier_league', '프리미어리그', 'PREMIER_LEAGUE'
         ]
       };
       
@@ -119,7 +124,8 @@ const oddsController = {
         });
         console.log(`[oddsController] 데이터베이스에 있는 모든 sportKey:`, allSportKeys.map(item => item.sportKey));
         
-        return res.status(404).json({ message: 'No odds data found for this sport' });
+        // 빈 배열 반환 (404 대신)
+        return res.status(200).json([]);
       }
 
       if (cachedData.length > 0) {
@@ -164,7 +170,7 @@ const oddsController = {
       }
 
       if (!uniqueGames || uniqueGames.length === 0) {
-        return res.status(404).json({ message: 'No odds data found for this sport' });
+        return res.status(200).json([]);
       }
 
       // 스포츠 제목 매핑
@@ -178,6 +184,7 @@ const oddsController = {
         'soccer_china_superleague': 'Chinese Super League',
         'soccer_spain_primera_division': 'La Liga',
         'soccer_germany_bundesliga': 'Bundesliga',
+        'soccer_england_premier_league': 'Premier League',
         'basketball_nba': 'NBA',
         'basketball_kbl': 'KBL',
         'baseball_mlb': 'MLB',
