@@ -23,6 +23,12 @@ console.log('🚀 [SCHEDULER_SYSTEM] Start Time:', new Date().toISOString());
 console.log('🚀 [SCHEDULER_SYSTEM] Node Version:', process.version);
 console.log('🚀 [SCHEDULER_SYSTEM] Environment:', process.env.NODE_ENV || 'development');
 
+// 스케줄러 상태 모니터링 추가
+setInterval(() => {
+  console.log('[SCHEDULER_STATUS] 💓 isUpdatingOdds:', isUpdatingOdds);
+  console.log('[SCHEDULER_STATUS] 💓 isUpdatingResults:', isUpdatingResults);
+}, 60000); // 1분마다
+
 // 리그별 우선순위 설정 (API 사용량 최적화)
 const highPriorityCategories = new Set([
   'NBA', 'MLB', 'KBO', 'NFL', '프리미어리그' // 활발한 시즌 또는 높은 베팅 볼륨
@@ -96,8 +102,10 @@ function saveUpdateLog(type, status, data = {}) {
 
 // 경기 결과 업데이트 - 5분마다 실행 (더 자주 실행)
 cron.schedule('*/5 * * * *', async () => {
+  console.log('[SCHEDULER_RESULTS] 🚀 Starting game results update at:', new Date().toISOString());
+  
   if (isUpdatingResults) {
-    console.log('Previous game results update is still running, skipping this update');
+    console.log('[SCHEDULER_RESULTS] ⏭️ Previous game results update is still running, skipping this update');
     return;
   }
 
@@ -109,6 +117,7 @@ cron.schedule('*/5 * * * *', async () => {
     const updateResult = await gameResultService.fetchAndUpdateResultsForCategories(Array.from(activeCategories));
     
     // 경기 결과 업데이트 후 배팅 결과도 업데이트
+    console.log('[SCHEDULER_BETS] 🚀 Starting bet results update after game results');
     saveUpdateLog('bets', 'start', { message: 'Starting bet results update after game results' });
     const betUpdateResult = await betResultService.updateBetResults();
     
@@ -123,6 +132,11 @@ cron.schedule('*/5 * * * *', async () => {
       categoriesProcessed: updateResult?.categories?.length || 0
     };
     
+    console.log('[SCHEDULER_RESULTS] ✅ Game results and bet results update completed:', {
+      gameResultsUpdated: gameResultsSummary.totalUpdated,
+      betResultsUpdated: betUpdateResult?.updatedCount || 0
+    });
+    
     saveUpdateLog('results', 'success', { 
       message: 'Game results and bet results update completed',
       gameResultsUpdated: gameResultsSummary.totalUpdated,
@@ -132,6 +146,8 @@ cron.schedule('*/5 * * * *', async () => {
     });
     
   } catch (error) {
+    console.log('[SCHEDULER_RESULTS] ❌ Game results update failed:', error.message);
+    
     saveUpdateLog('results', 'error', { 
       message: 'Game results update failed',
       error: error.message,
@@ -750,6 +766,7 @@ setInterval(() => {
   console.log('💓 [SCHEDULER_SYSTEM] Uptime:', Math.round(process.uptime()), 'seconds');
   console.log('💓 [SCHEDULER_SYSTEM] Memory:', Math.round(process.memoryUsage().heapUsed / 1024 / 1024), 'MB');
   console.log('💓 [SCHEDULER_SYSTEM] isUpdatingOdds:', isUpdatingOdds);
+  console.log('💓 [SCHEDULER_SYSTEM] isUpdatingResults:', isUpdatingResults);
   console.log('💓 [SCHEDULER_SYSTEM] Time:', new Date().toISOString());
 }, 5 * 60 * 1000); // 5분마다
 
