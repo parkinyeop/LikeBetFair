@@ -299,8 +299,8 @@ class OddsApiService {
               
               console.log(`[DEBUG] Upsert 데이터:`, JSON.stringify(upsertData, null, 2));
               
-              // where 조건을 사용한 안전한 upsert (fetchAndCacheOddsForCategories와 동일한 조건)
-              const [oddsRecord, created] = await OddsCache.upsert(upsertData, {
+              // findOrCreate 사용으로 unique constraint 의존성 완전 제거
+              const [oddsRecord, created] = await OddsCache.findOrCreate({
                 where: {
                   mainCategory,
                   subCategory,
@@ -308,8 +308,13 @@ class OddsApiService {
                   awayTeam: game.away_team,
                   commenceTime: new Date(game.commence_time)
                 },
-                returning: true
+                defaults: upsertData
               });
+              
+              // 기존 레코드 업데이트
+              if (!created) {
+                await oddsRecord.update(upsertData);
+              }
 
               if (created) {
                 totalNewCount++;
@@ -573,7 +578,7 @@ class OddsApiService {
                 lastUpdated: new Date()
               };
               
-              const [oddsRecord, created] = await OddsCache.upsert(upsertData, {
+              const [oddsRecord, created] = await OddsCache.findOrCreate({
                 where: {
                   mainCategory,
                   subCategory,
@@ -581,8 +586,13 @@ class OddsApiService {
                   awayTeam: game.away_team,
                   commenceTime: new Date(game.commence_time)
                 },
-                returning: true
+                defaults: upsertData
               });
+              
+              // 기존 레코드 업데이트
+              if (!created) {
+                await oddsRecord.update(upsertData);
+              }
 
               if (created) {
                 totalNewCount++;
