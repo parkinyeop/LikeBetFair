@@ -533,19 +533,27 @@ class BetResultService {
       return 'pending';
     }
 
-    // robust하게 옵션 추출 (예: 'Overbet365', 'UnderPinnacle' 등)
+    // robust하게 옵션 추출 (예: 'Overbet365', 'UnderPinnacle', 'Over 2.5' 등)
     let option = '';
+    let point = selection.point;
+    
     if (selection.option && selection.option !== '') {
       option = normalizeOption(selection.option);
     } else if (selection.team && selection.team !== '') {
-      option = normalizeOption(selection.team);
+      // "Over 2.5" 형식에서 옵션과 포인트 분리
+      const teamMatch = selection.team.match(/^(Over|Under)\s+([\d.]+)$/);
+      if (teamMatch) {
+        option = teamMatch[1];
+        point = parseFloat(teamMatch[2]);
+        console.log(`[언더/오버 파싱] 팀명에서 추출: 옵션="${option}", 포인트=${point}`);
+      } else {
+        option = normalizeOption(selection.team);
+      }
     } else {
       // option과 team이 모두 빈 문자열인 경우 기본값으로 Over 가정
-      // 이는 일반적인 스포츠 베팅에서 기본 선택이 Over이기 때문
       option = 'Over';
       console.log(`[언더/오버 판정] option과 team이 비어있음. 기본값 'Over'로 설정`);
     }
-    const point = selection.point;
     
     // 스코어에서 총 점수 계산 (방어 코드 사용)
     const totalScore = this.calculateTotalScore(gameResult.score);
@@ -591,19 +599,32 @@ class BetResultService {
     // 핸디캡 베팅에서 팀명과 핸디캡 분리 (개선된 로직)
     let selectedTeam, handicap;
     if (selection.team && (selection.team.includes(' -') || selection.team.includes(' +'))) {
-      // "Kia Tigers -1" 또는 "Lotte Giants +1" 형식에서 팀명과 핸디캡 분리
-      const match = selection.team.match(/^(.+?)\s*([+-]\d+)$/);
+      // "Kia Tigers -1", "Lotte Giants +1", "Ulsan Hyundai FC --0.75" 형식에서 팀명과 핸디캡 분리
+      const match = selection.team.match(/^(.+?)\s*([+-]+[\d.]+)$/);
       if (match) {
         selectedTeam = normalizeTeamNameForComparison(match[1].trim());
-        handicap = parseInt(match[2]) || 0;
+        // 핸디캡 값 파싱 (예: "--0.75" -> -0.75, "+1" -> 1)
+        const handicapStr = match[2];
+        if (handicapStr.startsWith('--')) {
+          handicap = -parseFloat(handicapStr.substring(2));
+        } else if (handicapStr.startsWith('-')) {
+          handicap = -parseFloat(handicapStr.substring(1));
+        } else if (handicapStr.startsWith('+')) {
+          handicap = parseFloat(handicapStr.substring(1));
+        } else {
+          handicap = parseFloat(handicapStr);
+        }
+        console.log(`[핸디캡 파싱] 팀명: "${selectedTeam}", 핸디캡: ${handicap} (원본: "${handicapStr}")`);
       } else {
         selectedTeam = normalizeTeamNameForComparison(selection.team);
         handicap = 0;
+        console.log(`[핸디캡 파싱] 정규식 매칭 실패, 팀명: "${selectedTeam}", 핸디캡: ${handicap}`);
       }
     } else {
       // 기존 방식 (selection.team이 팀명만 있는 경우)
       selectedTeam = normalizeTeamNameForComparison(selection.team);
       handicap = selection.handicap || 0;
+      console.log(`[핸디캡 파싱] 기본 방식, 팀명: "${selectedTeam}", 핸디캡: ${handicap}`);
     }
     
     // 스코어 계산 (방어 코드 사용)
