@@ -145,14 +145,27 @@ export default function Home() {
                 };
               });
               
-              // 4. 정렬: 베팅 가능한 경기 우선, 그 다음 시간순(가장 가까운 순)
+              // 4. 정렬: 미래 경기 우선(가까운 순), 과거 경기는 아래
               const sortedGames = categorizedGames.sort((a, b) => {
-                // 베팅 가능한 경기가 우선
-                if (a.isBettable && !b.isBettable) return -1;
-                if (!a.isBettable && b.isBettable) return 1;
+                const currentTime = now.getTime();
+                const aTime = a.gameTime.getTime();
+                const bTime = b.gameTime.getTime();
                 
-                // 둘 다 베팅 가능하거나 둘 다 불가능한 경우, 시간순 정렬(가장 가까운 순)
-                return a.gameTime.getTime() - b.gameTime.getTime();
+                // 미래 경기 vs 과거 경기 구분
+                const aIsFuture = aTime >= currentTime;
+                const bIsFuture = bTime >= currentTime;
+                
+                // 미래 경기가 과거 경기보다 우선
+                if (aIsFuture && !bIsFuture) return -1;
+                if (!aIsFuture && bIsFuture) return 1;
+                
+                // 둘 다 미래 경기인 경우: 가까운 시간 순
+                if (aIsFuture && bIsFuture) {
+                  return aTime - bTime;
+                }
+                
+                // 둘 다 과거 경기인 경우: 최근 순 (큰 시간 값이 먼저)
+                return bTime - aTime;
               });
               
               if (sortedGames.length > 0) {
@@ -237,14 +250,28 @@ export default function Home() {
     // todayGames를 평탄화(flatten)하여 전체 경기 리스트로 변환
     const allGames: any[] = Object.values(todayGames).flat();
     
-    // 전체 시간순 정렬: 베팅 가능한 경기 우선, 그 다음 시간순(가장 가까운 순)
+    // 전체 시간순 정렬: 미래 경기 우선(가까운 순), 과거 경기는 아래
+    const now = getCurrentLocalTime();
     const sortedAllGames = allGames.sort((a, b) => {
-      // 베팅 가능한 경기가 우선
-      if (a.isBettable && !b.isBettable) return -1;
-      if (!a.isBettable && b.isBettable) return 1;
+      const currentTime = now.getTime();
+      const aTime = a.gameTime.getTime();
+      const bTime = b.gameTime.getTime();
       
-      // 둘 다 베팅 가능하거나 둘 다 불가능한 경우, 시간순 정렬(가장 가까운 순)
-      return a.gameTime.getTime() - b.gameTime.getTime();
+      // 미래 경기 vs 과거 경기 구분
+      const aIsFuture = aTime >= currentTime;
+      const bIsFuture = bTime >= currentTime;
+      
+      // 미래 경기가 과거 경기보다 우선
+      if (aIsFuture && !bIsFuture) return -1;
+      if (!aIsFuture && bIsFuture) return 1;
+      
+      // 둘 다 미래 경기인 경우: 가까운 시간 순
+      if (aIsFuture && bIsFuture) {
+        return aTime - bTime;
+      }
+      
+      // 둘 다 과거 경기인 경우: 최근 순 (큰 시간 값이 먼저)
+      return bTime - aTime;
     });
     
     // Today Betting 전체 베팅 가능한 경기 개수 로깅
@@ -329,13 +356,13 @@ export default function Home() {
         const maxDate = new Date(today.getTime() + TIME_CONFIG.BETTING_WINDOW_DAYS * 24 * 60 * 60 * 1000);
         const bettingDeadlineMinutes = 10; // 경기 시작 10분 전까지 베팅 가능
         
-        // 과거 7일부터 미래 7일까지 필터링 (백엔드와 동일하게)
-        const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+        // 과거 1일부터 미래 7일까지 필터링 (투데이배팅과 동일하게)
+        const oneDayAgo = new Date(today.getTime() - 1 * 24 * 60 * 60 * 1000);
         const sevenDaysLater = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
         
         const filteredGames = data.filter((game: any) => {
           const localGameTime = convertUtcToLocal(game.commence_time); // UTC를 로컬로 변환
-          return localGameTime >= sevenDaysAgo && localGameTime <= sevenDaysLater;
+          return localGameTime >= oneDayAgo && localGameTime <= sevenDaysLater;
         });
         
         // KBO 필터링 로그
@@ -390,14 +417,27 @@ export default function Home() {
           };
         });
         
-        // 4. 정렬: 베팅 가능한 경기 우선, 그 다음 시간순
+        // 4. 정렬: 미래 경기 우선(가까운 순), 과거 경기는 아래
         const sortedGames = categorizedGames.sort((a, b) => {
-          // 베팅 가능한 경기가 우선
-          if (a.isBettable && !b.isBettable) return -1;
-          if (!a.isBettable && b.isBettable) return 1;
+          const currentTime = now.getTime();
+          const aTime = a.gameTime.getTime();
+          const bTime = b.gameTime.getTime();
           
-          // 둘 다 베팅 가능하거나 둘 다 불가능한 경우, 시간순 정렬
-          return a.gameTime.getTime() - b.gameTime.getTime();
+          // 미래 경기 vs 과거 경기 구분
+          const aIsFuture = aTime >= currentTime;
+          const bIsFuture = bTime >= currentTime;
+          
+          // 미래 경기가 과거 경기보다 우선
+          if (aIsFuture && !bIsFuture) return -1;
+          if (!aIsFuture && bIsFuture) return 1;
+          
+          // 둘 다 미래 경기인 경우: 가까운 시간 순
+          if (aIsFuture && bIsFuture) {
+            return aTime - bTime;
+          }
+          
+          // 둘 다 과거 경기인 경우: 최근 순 (큰 시간 값이 먼저)
+          return bTime - aTime;
         });
         
         // KBO 최종 데이터 로그

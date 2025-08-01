@@ -58,11 +58,14 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
         const now = new Date();
         const bettingDeadlineMinutes = 10; // 경기 시작 10분 전까지 베팅 가능
         
-        // 1. 기본 필터링: 현재 시간 이후의 경기만 표시 (과거 경기 제외)
+        // 1. 기본 필터링: 1일 전부터 7일 후까지의 경기 (홈페이지와 동일)
+        const oneDayAgo = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
+        const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        
         const filteredGames = data.filter((game: Game) => {
           // timeUtils를 사용하여 UTC 시간을 로컬 시간으로 변환
           const localGameTime = convertUtcToLocal(game.commence_time);
-          return localGameTime > now; // 현재 시간 이후 경기만
+          return localGameTime >= oneDayAgo && localGameTime <= sevenDaysLater;
         });
         
 
@@ -81,14 +84,27 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
           };
         });
         
-        // 3. 정렬: 베팅 가능한 경기 우선, 그 다음 시간순
+        // 3. 정렬: 미래 경기 우선(가까운 순), 과거 경기는 아래
         const sortedGames = categorizedGames.sort((a, b) => {
-          // 베팅 가능한 경기가 우선
-          if (a.isBettable && !b.isBettable) return -1;
-          if (!a.isBettable && b.isBettable) return 1;
+          const currentTime = now.getTime();
+          const aTime = a.gameTime.getTime();
+          const bTime = b.gameTime.getTime();
           
-          // 둘 다 베팅 가능하거나 둘 다 불가능한 경우, 시간순 정렬
-          return a.gameTime.getTime() - b.gameTime.getTime();
+          // 미래 경기 vs 과거 경기 구분
+          const aIsFuture = aTime >= currentTime;
+          const bIsFuture = bTime >= currentTime;
+          
+          // 미래 경기가 과거 경기보다 우선
+          if (aIsFuture && !bIsFuture) return -1;
+          if (!aIsFuture && bIsFuture) return 1;
+          
+          // 둘 다 미래 경기인 경우: 가까운 시간 순
+          if (aIsFuture && bIsFuture) {
+            return aTime - bTime;
+          }
+          
+          // 둘 다 과거 경기인 경우: 최근 순 (큰 시간 값이 먼저)
+          return bTime - aTime;
         });
         
         // odds 필드를 officialOdds로 매핑 (백엔드 호환성 보정)
