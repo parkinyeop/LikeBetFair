@@ -87,8 +87,8 @@ function saveUpdateLog(type, status, data = {}) {
   console.log(`${searchKeyword} ${emoji} [${now.toISOString()}] ${type.toUpperCase()} ${status.toUpperCase()}: ${message}`);
 }
 
-// 경기 결과 업데이트 - 10분마다 실행
-cron.schedule('*/10 * * * *', async () => {
+// 경기 결과 업데이트 - 5분마다 실행 (더 자주 실행)
+cron.schedule('*/5 * * * *', async () => {
   if (isUpdatingResults) {
     console.log('Previous game results update is still running, skipping this update');
     return;

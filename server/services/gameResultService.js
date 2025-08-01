@@ -1024,14 +1024,14 @@ class GameResultService {
       }
     }
     
-    // 3. 스코어가 있지만 status가 finished가 아닌 경우 - 보수적 시간 기반 처리
+    // 3. 스코어가 있지만 status가 finished가 아닌 경우 - 개선된 시간 기반 처리
     if (game.scores && Array.isArray(game.scores) && game.scores.length === 2) {
       const gameTime = new Date(game.commence_time);
       const now = new Date();
       const hoursSinceGame = (now - gameTime) / (1000 * 60 * 60);
       
-      // 48시간 이상 지났고 스코어가 있으면 완료로 처리 (보수적 접근)
-      if (hoursSinceGame > 48) {
+      // 스코어가 있고 경기 시간이 지났으면 완료로 처리 (더 유연한 접근)
+      if (hoursSinceGame > 0) {
         const homeScoreData = game.scores.find(score => score.name === game.home_team);
         const awayScoreData = game.scores.find(score => score.name === game.away_team);
         

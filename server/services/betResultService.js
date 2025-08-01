@@ -144,15 +144,28 @@ class BetResultService {
         continue;
       }
 
-      // 해당 경기의 GameResult 조회 (스코어 유무 확인)
+      // 해당 경기의 GameResult 조회 (스코어 유무 확인) - 정규화된 팀명으로 매칭
+      const normalizedHomeTeam = normalizeTeamNameForComparison(homeTeam);
+      const normalizedAwayTeam = normalizeTeamNameForComparison(awayTeam);
+      
       const gameResult = await GameResult.findOne({
         where: {
-          homeTeam: { [Op.iLike]: `%${homeTeam}%` },
-          awayTeam: { [Op.iLike]: `%${awayTeam}%` },
+          [Op.or]: [
+            // 정규화된 팀명으로 정확 매칭
+            {
+              homeTeam: { [Op.iLike]: `%${normalizedHomeTeam}%` },
+              awayTeam: { [Op.iLike]: `%${normalizedAwayTeam}%` }
+            },
+            // 원본 팀명으로도 매칭 (fallback)
+            {
+              homeTeam: { [Op.iLike]: `%${homeTeam}%` },
+              awayTeam: { [Op.iLike]: `%${awayTeam}%` }
+            }
+          ],
           commenceTime: {
             [Op.between]: [
-              new Date(commenceTime.getTime() - 24 * 60 * 60 * 1000), // 24시간 전
-              new Date(commenceTime.getTime() + 24 * 60 * 60 * 1000)  // 24시간 후
+              new Date(commenceTime.getTime() - 2 * 60 * 60 * 1000), // 2시간 전 (더 정확한 매칭)
+              new Date(commenceTime.getTime() + 2 * 60 * 60 * 1000)  // 2시간 후
             ]
           }
         },
@@ -161,8 +174,18 @@ class BetResultService {
 
       // 스코어가 없으면 pending 유지
       if (!gameResult || !gameResult.score || !Array.isArray(gameResult.score) || gameResult.score.length === 0) {
-        selection.result = 'pending';
-        hasPending = true;
+        // 경기 시간이 지났고 스코어가 없으면 cancelled로 처리 (연기/취소 가능성)
+        const gameTime = new Date(selection.commence_time);
+        const now = new Date();
+        const hoursSinceGame = (now - gameTime) / (1000 * 60 * 60);
+        
+        if (hoursSinceGame > 2) { // 2시간 이상 지났으면
+          selection.result = 'cancelled';
+          hasCancelled = true;
+        } else {
+          selection.result = 'pending';
+          hasPending = true;
+        }
         continue;
       }
 
