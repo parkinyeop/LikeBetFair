@@ -1112,10 +1112,10 @@ export default function Home() {
                         groupedSpreads[absPoint].away = { oddsData, handicap: handicapValue };
                       }
                     });
-                    // 0.5 단위 핸디캡만 필터링 (0.5, 1.0, 1.5, 2.0 등)
+                    // 0.5 단위 핸디캡만 필터링 (-1.5, -1, -0.5, 0.5, 1, 1.5 등)
                     const filteredSpreads = Object.entries(groupedSpreads).filter(([point, oddsPair]) => {
                       const pointValue = Math.abs(parseFloat(point));
-                      return pointValue >= 0.5 && pointValue % 0.5 === 0;
+                      return pointValue % 0.5 === 0;
                     });
                     
                     if (filteredSpreads.length === 0) {

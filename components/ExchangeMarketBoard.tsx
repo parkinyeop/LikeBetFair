@@ -732,16 +732,16 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                   }
                 });
                 
-                // 0.5 단위 핸디캡만 필터링 (0.5, 1.0, 1.5, 2.0 등)
+                // 0.5 단위 핸디캡만 필터링 (-1.5, -1, -0.5, 0.5, 1, 1.5 등)
                 const filteredSpreads = Object.entries(groupedSpreads).filter(([absPoint, oddsPair]) => {
                   const pointValue = Math.abs(parseFloat(absPoint));
-                  return pointValue >= 0.5 && pointValue % 0.5 === 0;
+                  return pointValue % 0.5 === 0;
                 });
                 
                 if (filteredSpreads.length === 0) {
                   return (
                     <div className="text-center text-gray-500 py-8">
-                      <p>핸디캡 배당 정보 없음 (0.5 이상)</p>
+                      <p>핸디캡 배당 정보 없음</p>
                     </div>
                   );
                 }
