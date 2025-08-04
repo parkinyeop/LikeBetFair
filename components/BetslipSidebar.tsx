@@ -304,7 +304,7 @@ function MyBetsPanel() {
                             <div key={idx} className="flex items-center justify-between text-sm">
                               <span className="font-medium text-black">
                                 {isOverUnder ? (
-                                  normalizeOverUnderOption(sel.option || sel.team, teamName, sel.point)
+                                  normalizeOverUnderOption(sel.option || sel.team, sel.desc, sel.point)
                                 ) : isHandicap ? (
                                   sel.team
                                 ) : (
