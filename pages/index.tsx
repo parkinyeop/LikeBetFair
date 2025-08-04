@@ -1610,6 +1610,11 @@ export default function Home() {
                                 <div key={idx} className="flex items-center gap-2">
                                   <button
                                     onClick={() => {
+                                      const isBettable = new Date(game.commence_time) > new Date(Date.now() + 10 * 60 * 1000);
+                                      if (!isBettable) {
+                                        alert('이 경기는 베팅 마감되었습니다.');
+                                        return;
+                                      }
                                       toggleSelection({
                                         team: `Over ${point}`,
                                         odds: overOdds,
@@ -1624,17 +1629,24 @@ export default function Home() {
                                     className={`flex-1 p-3 rounded-lg text-center transition-colors ${
                                       (selections || []).some(sel => sel.team === `Over ${point}` && sel.market === '언더/오버' && sel.gameId === game.id)
                                         ? 'bg-yellow-500 hover:bg-yellow-600'
-                                        : 'bg-blue-500 hover:bg-blue-600'
+                                        : game.isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                     } text-white`}
+                                    disabled={!game.isBettable || !overOdds}
                                   >
-                                    <div className="font-bold">{game.home_team}</div>
+                                    <div className="font-bold">Over {point}</div>
                                     <div className="text-sm">{overOdds ? overOdds.toFixed(2) : 'N/A'}</div>
+                                    {!game.isBettable && <div className="text-xs text-red-500 mt-1">베팅 마감</div>}
                                   </button>
                                   <div className="w-16 text-base font-bold text-gray-800 text-center">
                                     {point}
                                   </div>
                                   <button
                                     onClick={() => {
+                                      const isBettable = new Date(game.commence_time) > new Date(Date.now() + 10 * 60 * 1000);
+                                      if (!isBettable) {
+                                        alert('이 경기는 베팅 마감되었습니다.');
+                                        return;
+                                      }
                                       toggleSelection({
                                         team: `Under ${point}`,
                                         odds: underOdds,
@@ -1649,11 +1661,13 @@ export default function Home() {
                                     className={`flex-1 p-3 rounded-lg text-center transition-colors ${
                                       (selections || []).some(sel => sel.team === `Under ${point}` && sel.market === '언더/오버' && sel.gameId === game.id)
                                         ? 'bg-yellow-500 hover:bg-yellow-600'
-                                        : 'bg-blue-500 hover:bg-blue-600'
+                                        : game.isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                     } text-white`}
+                                    disabled={!game.isBettable || !underOdds}
                                   >
-                                    <div className="font-bold">{game.away_team}</div>
+                                    <div className="font-bold">Under {point}</div>
                                     <div className="text-sm">{underOdds ? underOdds.toFixed(2) : 'N/A'}</div>
+                                    {!game.isBettable && <div className="text-xs text-red-500 mt-1">베팅 마감</div>}
                                   </button>
                                 </div>
                               );
