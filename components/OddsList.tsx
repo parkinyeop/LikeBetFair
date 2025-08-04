@@ -169,7 +169,12 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
     };
 
     fetchOdds();
-    const interval = setInterval(fetchOdds, 5 * 60 * 1000); // 5분마다 갱신
+    
+    // 5분마다 갱신 (백그라운드에서도 동작하도록 강화)
+    const interval = setInterval(() => {
+      console.log('[OddsList] 주기적 배당률 갱신 시도');
+      fetchOdds();
+    }, 5 * 60 * 1000);
 
     // refreshOdds 이벤트 리스너 추가
     const handleRefreshOdds = () => {
@@ -182,6 +187,43 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
       clearInterval(interval);
       window.removeEventListener('refreshOdds', handleRefreshOdds);
     };
+  }, [sportKey]);
+
+  // Page Visibility API - 탭 활성화시 즉시 갱신
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('[OddsList] 탭 활성화 - 배당률 즉시 갱신');
+        const fetchOdds = async () => {
+          try {
+            setLoading(true);
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050'}/api/odds/${sportKey}`);
+            if (response.status === 404) {
+              setError('해당 리그의 배당 정보가 없습니다.');
+              setGames([]);
+              return;
+            }
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            setGames(data);
+            setError(null);
+          } catch (err) {
+            console.error('Error fetching odds:', err);
+            setError(err instanceof Error ? err.message : 'Failed to fetch odds');
+          } finally {
+            setLoading(false);
+          }
+        };
+        fetchOdds();
+      }
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
   }, [sportKey]);
 
   const isTeamSelected = (team: string, market: string, gameId: string, point?: number) => {

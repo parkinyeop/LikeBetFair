@@ -102,11 +102,12 @@ function MyBetsPanel() {
       setBets([]); // 토큰이 없으면 빈 배열로 초기화
     }
     
-    // 30초마다 배팅 내역 새로고침 (진행중인 배팅이 있을 때만)
+    // 30초마다 배팅 내역 새로고침 (진행중인 배팅이 있을 때만, 백그라운드에서도 동작)
     const interval = setInterval(() => {
       if (token) { // 토큰이 있을 때만 실행
         const hasPendingBets = bets.some(bet => bet.status === 'pending');
         if (hasPendingBets) {
+          console.log('[BetslipSidebar] 주기적 베팅 내역 갱신 시도');
           fetchBets();
         }
       }
@@ -114,6 +115,40 @@ function MyBetsPanel() {
 
     return () => clearInterval(interval);
   }, [token, username]); // token과 username을 의존성으로 추가
+
+  // Page Visibility API - 탭 활성화시 베팅 내역 즉시 갱신
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && token) {
+        console.log('[BetslipSidebar] 탭 활성화 - 베팅 내역 즉시 갱신');
+        const fetchBets = async () => {
+          try {
+            const response = await fetch('/api/bets/user', {
+              headers: {
+                'x-auth-token': token,
+                'Content-Type': 'application/json'
+              }
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              setBets(data);
+            } else {
+              console.error('Failed to fetch bets');
+            }
+          } catch (error) {
+            console.error('Error fetching bets:', error);
+          }
+        };
+        fetchBets();
+      }
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }, [token]);
 
   // 전역 이벤트 리스너로 배팅 완료 시 새로고침
   useEffect(() => {

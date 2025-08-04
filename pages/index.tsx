@@ -243,6 +243,16 @@ export default function Home() {
     };
 
     fetchTodayGames();
+    
+    // Today Betting 5분 주기 자동 갱신 (백그라운드에서도 동작)
+    if (viewMode === 'today') {
+      const interval = setInterval(() => {
+        console.log('[TodayBetting] 주기적 경기 데이터 갱신 시도');
+        fetchTodayGames();
+      }, 5 * 60 * 1000);
+      
+      return () => clearInterval(interval);
+    }
   }, [viewMode]);
 
   useEffect(() => {
@@ -305,6 +315,144 @@ export default function Home() {
     
     setTodayFlatGames(sortedAllGames);
   }, [todayGames, viewMode]);
+
+  // Page Visibility API - Today Betting 탭 활성화시 즉시 갱신
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && viewMode === 'today') {
+        console.log('[TodayBetting] 탭 활성화 - 경기 데이터 즉시 갱신');
+        const fetchTodayGames = async () => {
+          if (viewMode !== 'today') return;
+          
+          try {
+            setTodayLoading(true);
+            const activeLeagues = Object.entries(SPORT_CATEGORIES);
+            const gamesData: Record<string, any[]> = {};
+            
+            for (const [displayName, config] of activeLeagues) {
+              let apiUrl = '';
+              try {
+                apiUrl = buildApiUrl(`${API_CONFIG.ENDPOINTS.ODDS}/${config.sportKey}`);
+                const response = await fetch(apiUrl);
+                
+                if (response.ok) {
+                  const data = await response.json();
+                  
+                  const now = getCurrentLocalTime();
+                  const oneDayAgo = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
+                  const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+                  const bettingDeadlineMinutes = 10;
+                  
+                  const filteredGames = data.filter((game: any) => {
+                    const localGameTime = convertUtcToLocal(game.commence_time);
+                    const isValid = localGameTime >= oneDayAgo && localGameTime <= sevenDaysLater;
+                    return isValid;
+                  });
+                  
+                  const uniqueGamesMap = new Map();
+                  filteredGames.forEach((game: any) => {
+                    const key = `${game.home_team}|${game.away_team}|${game.commence_time}`;
+                    if (!uniqueGamesMap.has(key)) {
+                      uniqueGamesMap.set(key, game);
+                    } else {
+                      const prev = uniqueGamesMap.get(key);
+                      const prevBookmakersCount = Array.isArray(prev.bookmakers) ? prev.bookmakers.length : 0;
+                      const currBookmakersCount = Array.isArray(game.bookmakers) ? game.bookmakers.length : 0;
+                      if (currBookmakersCount > prevBookmakersCount) {
+                        uniqueGamesMap.set(key, game);
+                      }
+                    }
+                  });
+                  const uniqueGames = Array.from(uniqueGamesMap.values());
+                  
+                  const categorizedGames = uniqueGames.map((game: any) => {
+                    const localGameTime = convertUtcToLocal(game.commence_time);
+                    const bettingDeadline = new Date(localGameTime.getTime() - bettingDeadlineMinutes * 60 * 1000);
+                    const isBettable = now < bettingDeadline;
+                    
+                    let officialOdds = game.officialOdds;
+                    if (!officialOdds && game.bookmakers && Array.isArray(game.bookmakers)) {
+                      officialOdds = {};
+                      const h2hOutcomes: Record<string, { count: number; totalPrice: number }> = {};
+                      game.bookmakers.forEach((bookmaker: any) => {
+                        const h2hMarket = bookmaker.markets?.find((m: any) => m.key === 'h2h');
+                        if (h2hMarket) {
+                          h2hMarket.outcomes?.forEach((outcome: any) => {
+                            if (!h2hOutcomes[outcome.name]) {
+                              h2hOutcomes[outcome.name] = { count: 0, totalPrice: 0 };
+                            }
+                            h2hOutcomes[outcome.name].count++;
+                            h2hOutcomes[outcome.name].totalPrice += outcome.price;
+                          });
+                        }
+                      });
+                      
+                      if (Object.keys(h2hOutcomes).length > 0) {
+                        officialOdds.h2h = {};
+                        Object.entries(h2hOutcomes).forEach(([name, data]) => {
+                          officialOdds.h2h[name] = {
+                            count: data.count,
+                            averagePrice: data.totalPrice / data.count
+                          };
+                        });
+                      }
+                    }
+                    
+                    return {
+                      ...game,
+                      sport_key: game.sport || config.sportKey,
+                      sportTitle: displayName,
+                      sport_title: displayName,
+                      officialOdds: officialOdds || game.officialOdds,
+                      isBettable,
+                      gameTime: localGameTime,
+                      bettingDeadline
+                    };
+                  });
+                  
+                  const sortedGames = categorizedGames.sort((a, b) => {
+                    const currentTime = now.getTime();
+                    const aTime = a.gameTime.getTime();
+                    const bTime = b.gameTime.getTime();
+                    
+                    const aIsFuture = aTime >= currentTime;
+                    const bIsFuture = bTime >= currentTime;
+                    
+                    if (aIsFuture && !bIsFuture) return -1;
+                    if (!aIsFuture && bIsFuture) return 1;
+                    
+                    if (aIsFuture && bIsFuture) {
+                      return aTime - bTime;
+                    }
+                    
+                    return bTime - aTime;
+                  });
+                  
+                  if (sortedGames.length > 0) {
+                    gamesData[displayName] = sortedGames;
+                  }
+                }
+              } catch (err) {
+                console.error(`Error fetching ${displayName}:`, err);
+              }
+            }
+            
+            setTodayGames(gamesData);
+            setTodayLoading(false);
+          } catch (err) {
+            console.error('Error fetching today games:', err);
+            setTodayLoading(false);
+          }
+        };
+        fetchTodayGames();
+      }
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }, [viewMode]);
 
   useEffect(() => {
     const fetchGames = async () => {

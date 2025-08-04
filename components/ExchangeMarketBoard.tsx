@@ -107,13 +107,29 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
     fetchSportsbookOdds();
   }, [selectedGame, currentSportKey]);
 
-  // 실시간 시간 업데이트 (베팅 마감 시간 체크용)
+  // 실시간 시간 업데이트 (베팅 마감 시간 체크용, 백그라운드에서도 동작)
   useEffect(() => {
     const timer = setInterval(() => {
+      console.log('[ExchangeMarketBoard] 주기적 시간 업데이트');
       setCurrentTime(new Date());
     }, 60000); // 1분마다 업데이트
 
     return () => clearInterval(timer);
+  }, []);
+
+  // Page Visibility API - 탭 활성화시 즉시 시간 갱신
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('[ExchangeMarketBoard] 탭 활성화 - 시간 즉시 갱신');
+        setCurrentTime(new Date());
+      }
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
   }, []);
 
   // 선택된 경기의 스포츠북 배당률 추출

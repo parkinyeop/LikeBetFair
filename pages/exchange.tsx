@@ -125,9 +125,47 @@ export default function ExchangePage() {
 
     fetchSportGameCounts();
     
-    // 5분마다 경기 개수 업데이트
-    const interval = setInterval(fetchSportGameCounts, 5 * 60 * 1000);
+    // 5분마다 경기 개수 업데이트 (백그라운드에서도 동작하도록 강화)
+    const interval = setInterval(() => {
+      console.log('[Exchange] 주기적 스포츠 게임 수 갱신 시도');
+      fetchSportGameCounts();
+    }, 5 * 60 * 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Page Visibility API - 탭 활성화시 즉시 갱신
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('[Exchange] 탭 활성화 - 스포츠 게임 수 즉시 갱신');
+        const fetchSportGameCounts = async () => {
+          const counts: SportGameCounts = {};
+          
+          for (const [sportName, sportKey] of Object.entries(SPORT_KEYS)) {
+            try {
+              const response = await fetch(`/api/exchange/games/${sportKey}`);
+              if (response.ok) {
+                const data = await response.json();
+                counts[sportName] = data.length;
+              } else {
+                counts[sportName] = 0;
+              }
+            } catch (error) {
+              console.error(`Error fetching ${sportName} games:`, error);
+              counts[sportName] = 0;
+            }
+          }
+          
+          setSportGameCounts(counts);
+        };
+        fetchSportGameCounts();
+      }
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
   }, []);
 
   // 대표 경기의 호가 데이터 로드 (실제 데이터가 있는 게임 ID)
