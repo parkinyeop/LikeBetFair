@@ -464,14 +464,14 @@ export default function Home() {
         
         let allGames: any[] = [];
         
-        // 메인 카테고리가 축구인 경우 -> 항상 전체 축구 리그 데이터 로드
-        if (selectedMainCategory === '축구') {
-          console.log("=== 전체 축구 리그 데이터 로드 시작 ===");
+        // 메인 카테고리별 전체 리그 데이터 로드
+        if (SPORTS_TREE[selectedMainCategory as keyof typeof SPORTS_TREE]) {
+          console.log(`=== 전체 ${selectedMainCategory} 리그 데이터 로드 시작 ===`);
           
-          const soccerLeagues = SPORTS_TREE['축구'];
-          console.log("축구 리그 목록:", soccerLeagues);
+          const leagues = SPORTS_TREE[selectedMainCategory as keyof typeof SPORTS_TREE];
+          console.log(`${selectedMainCategory} 리그 목록:`, leagues);
           
-          for (const leagueName of soccerLeagues) {
+          for (const leagueName of leagues) {
             try {
               const leagueConfig = SPORT_CATEGORIES[leagueName];
               if (!leagueConfig) continue;
@@ -487,7 +487,8 @@ export default function Home() {
                   ...game,
                   leagueName: leagueName,
                   sport_key: leagueConfig.sportKey,
-                  sportTitle: leagueConfig.displayName
+                  sportTitle: leagueConfig.displayName,
+                  mainCategory: selectedMainCategory
                 }));
                 allGames.push(...gamesWithLeague);
                 console.log(`${leagueName}: ${gamesWithLeague.length}개 경기 로드됨`);
@@ -497,7 +498,7 @@ export default function Home() {
             }
           }
           
-          console.log(`전체 축구 경기 수: ${allGames.length}개`);
+          console.log(`전체 ${selectedMainCategory} 경기 수: ${allGames.length}개`);
         }
         // 하위 카테고리가 선택된 경우 -> 해당 리그만 로드
         else if (selectedCategory) {
@@ -547,9 +548,9 @@ export default function Home() {
         
         console.log(`필터링 결과: ${allGames.length} → ${filteredGames.length}개 경기`);
         
-        // 하위 카테고리 필터링 (축구의 경우)
+        // 하위 카테고리 필터링 (모든 스포츠)
         let finalFilteredGames = filteredGames;
-        if (selectedMainCategory === '축구' && selectedCategory) {
+        if (selectedCategory) {
           finalFilteredGames = filteredGames.filter((game: any) => game.leagueName === selectedCategory);
           console.log(`[리그 필터링] ${selectedCategory}: ${finalFilteredGames.length}개 경기`);
         }
@@ -1331,7 +1332,11 @@ export default function Home() {
               {Object.keys(SPORTS_TREE).map((mainCategory) => (
                 <button
                   key={mainCategory}
-                  onClick={() => setSelectedMainCategory(mainCategory)}
+                  onClick={() => {
+                    setSelectedMainCategory(mainCategory);
+                    setSelectedCategory(''); // 하위 카테고리 초기화
+                    console.log(`[메인 카테고리 변경] ${mainCategory} 선택 - 하위 카테고리 초기화`);
+                  }}
                   className={`px-6 py-3 rounded-lg font-medium transition-colors ${
                     selectedMainCategory === mainCategory
                       ? 'bg-blue-600 text-white'
@@ -1435,7 +1440,7 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 gap-4">
-            {selectedMainCategory === '축구' && games.length === 0 ? (
+            {SPORTS_TREE[selectedMainCategory as keyof typeof SPORTS_TREE] && games.length === 0 ? (
               <div className="text-center py-12 bg-blue-50 rounded-lg">
                 <div className="mb-4">
                   <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
@@ -1444,10 +1449,10 @@ export default function Home() {
                     </svg>
                   </div>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">⚽ 경기가 없습니다</h3>
-                <p className="text-gray-600">현재 {selectedCategory ? selectedCategory : '축구'} 경기가 예정되어 있지 않습니다.</p>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">🏟️ 경기가 없습니다</h3>
+                <p className="text-gray-600">현재 {selectedCategory ? selectedCategory : selectedMainCategory} 경기가 예정되어 있지 않습니다.</p>
               </div>
-            ) : !selectedCategory ? (
+            ) : !selectedCategory && !SPORTS_TREE[selectedMainCategory as keyof typeof SPORTS_TREE] ? (
               <div className="text-center py-12 bg-blue-50 rounded-lg">
                 <div className="mb-4">
                   <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
