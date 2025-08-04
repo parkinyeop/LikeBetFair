@@ -139,20 +139,48 @@ export default function ExchangePage() {
       if (!document.hidden) {
         console.log('[Exchange] 탭 활성화 - 스포츠 게임 수 즉시 갱신');
         const fetchSportGameCounts = async () => {
+          // 기존 코드와 동일한 sports 배열 사용
+          const sports = [
+            // 축구
+            { id: 'kleague', sport: 'soccer_korea_kleague1' },
+            { id: 'jleague', sport: 'soccer_japan_j_league' },
+            { id: 'seriea', sport: 'soccer_italy_serie_a' },
+            { id: 'brasileirao', sport: 'soccer_brazil_campeonato' },
+            { id: 'mls', sport: 'soccer_usa_mls' },
+            { id: 'argentina', sport: 'soccer_argentina_primera_division' },
+            { id: 'csl', sport: 'soccer_china_superleague' },
+            { id: 'laliga', sport: 'soccer_spain_primera_division' },
+            { id: 'bundesliga', sport: 'soccer_germany_bundesliga' },
+            // 농구
+            { id: 'nba', sport: 'basketball_nba' },
+            { id: 'kbl', sport: 'basketball_kbl' },
+            // 야구
+            { id: 'mlb', sport: 'baseball_mlb' },
+            { id: 'kbo', sport: 'baseball_kbo' },
+            // 미식축구
+            { id: 'nfl', sport: 'americanfootball_nfl' }
+          ];
+
           const counts: {[key: string]: number} = {};
           
-          for (const [sportName, sportKey] of Object.entries(SPORT_KEYS)) {
+          for (const { id, sport } of sports) {
             try {
-              const response = await fetch(`/api/exchange/games/${sportKey}`);
+              const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050'}/api/odds/${sport}`);
               if (response.ok) {
                 const data = await response.json();
-                counts[sportName] = data.length;
+                // 현재 시간 이후의 경기만 카운트
+                const now = new Date();
+                const futureGames = data.filter((game: any) => {
+                  const gameTime = new Date(game.commence_time);
+                  return gameTime > now;
+                });
+                counts[id] = futureGames.length;
               } else {
-                counts[sportName] = 0;
+                counts[id] = 0;
               }
             } catch (error) {
-              console.error(`Error fetching ${sportName} games:`, error);
-              counts[sportName] = 0;
+              console.error(`Error fetching ${sport} games:`, error);
+              counts[id] = 0;
             }
           }
           
