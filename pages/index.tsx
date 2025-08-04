@@ -1469,11 +1469,16 @@ export default function Home() {
             ) : (
               <div className="space-y-4">
                 {games.map((game, index) => (
-                  <div key={index} className="bg-white rounded-lg shadow p-4">
+                  <div key={index} className={`bg-white rounded-lg shadow p-4 ${!game.isBettable ? 'opacity-60' : ''}`}>
                     <div className="flex justify-between items-center mb-3">
                       <span className="text-lg font-bold">🏟️ {game.home_team} vs {game.away_team}</span>
                       <div className="text-right">
                         <span className="text-sm">📅 {new Date(game.commence_time).toLocaleDateString()} {new Date(game.commence_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        {!game.isBettable && (
+                          <div className="text-xs text-red-500 mt-1">
+                            ⏰ 베팅 마감 (경기 시작 10분 전)
+                          </div>
+                        )}
                       </div>
                     </div>
                     
@@ -1543,24 +1548,28 @@ export default function Home() {
                                       <button
                                         key={idx}
                                         onClick={() => {
-                                          toggleSelection({
-                                            team: outcome.name,
-                                            odds: outcome.odds.averagePrice,
-                                            desc: `${game.home_team} vs ${game.away_team}`,
+                                          if (game.isBettable && outcome.odds.averagePrice) {
+                                            toggleSelection({
+                                              team: outcome.name,
+                                              odds: outcome.odds.averagePrice,
+                                              desc: `${game.home_team} vs ${game.away_team}`,
                                             commence_time: game.commence_time,
                                             market: '승/패',
                                             gameId: game.id,
                                             sport_key: game.sport_key
-                                          });
+                                            });
+                                          }
                                         }}
                                         className={`flex-1 p-3 rounded-lg text-center transition-colors ${
                                           (selections || []).some(sel => sel.team === outcome.name && sel.market === '승/패' && sel.gameId === game.id)
                                             ? 'bg-yellow-500 hover:bg-yellow-600'
-                                            : 'bg-blue-500 hover:bg-blue-600'
+                                            : game.isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                         } text-white`}
+                                        disabled={!game.isBettable || !outcome.odds.averagePrice}
                                       >
                                         <div className="font-bold">{label}</div>
                                         <div className="text-sm">{outcome.odds.averagePrice.toFixed(2)}</div>
+                                        {!game.isBettable && <div className="text-xs text-red-500 mt-1">베팅 마감</div>}
                                       </button>
                                     );
                                   });
