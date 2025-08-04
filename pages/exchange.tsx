@@ -139,7 +139,7 @@ export default function ExchangePage() {
       if (!document.hidden) {
         console.log('[Exchange] 탭 활성화 - 스포츠 게임 수 즉시 갱신');
         const fetchSportGameCounts = async () => {
-          const counts: SportGameCounts = {};
+          const counts: {[key: string]: number} = {};
           
           for (const [sportName, sportKey] of Object.entries(SPORT_KEYS)) {
             try {
