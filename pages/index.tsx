@@ -1633,8 +1633,8 @@ export default function Home() {
                                     } text-white`}
                                     disabled={!game.isBettable || !overOdds}
                                   >
-                                    <div className="font-bold">Over {point}</div>
-                                    <div className="text-sm">{overOdds ? overOdds.toFixed(2) : 'N/A'}</div>
+                                    <div className="font-bold">{game.home_team}</div>
+                                    <div className="text-sm">오버 ({overOdds ? overOdds.toFixed(2) : 'N/A'})</div>
                                     {!game.isBettable && <div className="text-xs text-red-500 mt-1">베팅 마감</div>}
                                   </button>
                                   <div className="w-16 text-base font-bold text-gray-800 text-center">
@@ -1665,8 +1665,8 @@ export default function Home() {
                                     } text-white`}
                                     disabled={!game.isBettable || !underOdds}
                                   >
-                                    <div className="font-bold">Under {point}</div>
-                                    <div className="text-sm">{underOdds ? underOdds.toFixed(2) : 'N/A'}</div>
+                                    <div className="font-bold">{game.away_team}</div>
+                                    <div className="text-sm">언더 ({underOdds ? underOdds.toFixed(2) : 'N/A'})</div>
                                     {!game.isBettable && <div className="text-xs text-red-500 mt-1">베팅 마감</div>}
                                   </button>
                                 </div>
@@ -1704,10 +1704,10 @@ export default function Home() {
                               }
                             });
                             
-                            // 0.5 단위 핸디캡만 필터링 (0.5, 1.0, 1.5, 2.0 등)
+                            // 0.5 단위 핸디캡만 필터링 (-1.5, -1, -0.5, 0.5, 1, 1.5 등)
                             const filteredSpreads = Object.entries(groupedSpreads).filter(([point, oddsPair]) => {
                               const pointValue = Math.abs(parseFloat(point));
-                              return pointValue >= 0.5 && pointValue % 0.5 === 0;
+                              return pointValue % 0.5 === 0;
                             });
                             
                             if (filteredSpreads.length === 0) {
