@@ -271,7 +271,7 @@ const BetSelectionPanel = () => {
             <div>
               {((sel as any)?.market === '언더/오버' || (sel as any)?.market === 'totals') ? (
                 <p className="text-sm font-medium">
-                  {normalizeOverUnderOption((sel as any)?.option || sel.team, sel.team, (sel as any)?.point)}
+                  {normalizeOverUnderOption((sel as any)?.option || sel.team, sel.desc, (sel as any)?.point)}
                 </p>
               ) : ((sel as any)?.market === '핸디캡' || (sel as any)?.market === 'spreads') ? (
                 <p className="text-sm font-medium">{sel.team}</p>

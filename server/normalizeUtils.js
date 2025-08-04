@@ -302,7 +302,7 @@ function normalizeOption(option) {
 }
 
 // 언더/오버 배팅을 위한 새로운 함수 추가
-function normalizeOverUnderOption(option, teamName, point) {
+function normalizeOverUnderOption(option, teamDesc, point) {
   if (!option) return '';
   
   let ouType = '';
@@ -312,6 +312,15 @@ function normalizeOverUnderOption(option, teamName, point) {
     ouType = '언더';
   } else {
     return option;
+  }
+  
+  // 팀명 추출 (desc에서 추출)
+  let teamName = '';
+  if (teamDesc && teamDesc.includes(' vs ')) {
+    const teams = teamDesc.split(' vs ');
+    if (teams.length >= 2) {
+      teamName = teams[0].trim(); // 첫 번째 팀명 사용
+    }
   }
   
   // 팀명이 있으면 팀명과 함께 표시
