@@ -1731,6 +1731,11 @@ export default function Home() {
                                       {homeOdds != null && (
                                         <button
                                           onClick={() => {
+                                            const isBettable = new Date(game.commence_time) > new Date(Date.now() + 10 * 60 * 1000);
+                                            if (!isBettable) {
+                                              alert('이 경기는 베팅 마감되었습니다.');
+                                              return;
+                                            }
                                             toggleSelection({
                                               team: `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`,
                                               odds: homeOdds,
@@ -1745,20 +1750,27 @@ export default function Home() {
                                           className={`flex-1 p-3 rounded-lg text-center transition-colors ${
                                                                                           (selections || []).some(sel => sel.team === `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}` && sel.market === '핸디캡' && sel.gameId === game.id)
                                               ? 'bg-yellow-500 hover:bg-yellow-600'
-                                              : 'bg-blue-500 hover:bg-blue-600'
+                                              : game.isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                           } text-white`}
+                                          disabled={!game.isBettable || !homeOdds}
                                         >
                                           <div className="font-bold">{game.home_team}</div>
                                           <div className="text-sm">
                                             {homeOdds.toFixed(2)} 
                                             <span className="ml-1 text-xs">{homeHandicap > 0 ? '+' : ''}{homeHandicap}</span>
                                           </div>
+                                          {!game.isBettable && <div className="text-xs text-red-500 mt-1">베팅 마감</div>}
                                         </button>
                                       )}
                                       <div className="w-16 text-base font-bold text-gray-800 text-center">{homeHandicap > 0 ? '+' : ''}{homeHandicap}</div>
                                       {awayOdds != null && (
                                         <button
                                           onClick={() => {
+                                            const isBettable = new Date(game.commence_time) > new Date(Date.now() + 10 * 60 * 1000);
+                                            if (!isBettable) {
+                                              alert('이 경기는 베팅 마감되었습니다.');
+                                              return;
+                                            }
                                             toggleSelection({
                                               team: `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`,
                                               odds: awayOdds,
@@ -1773,14 +1785,16 @@ export default function Home() {
                                           className={`flex-1 p-3 rounded-lg text-center transition-colors ${
                                                                                           (selections || []).some(sel => sel.team === `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}` && sel.market === '핸디캡' && sel.gameId === game.id)
                                               ? 'bg-yellow-500 hover:bg-yellow-600'
-                                              : 'bg-blue-500 hover:bg-blue-600'
+                                              : game.isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                           } text-white`}
+                                          disabled={!game.isBettable || !awayOdds}
                                         >
                                           <div className="font-bold">{game.away_team}</div>
                                           <div className="text-sm">
                                             {awayOdds.toFixed(2)} 
                                             <span className="ml-1 text-xs">{awayHandicap > 0 ? '+' : ''}{awayHandicap}</span>
                                           </div>
+                                          {!game.isBettable && <div className="text-xs text-red-500 mt-1">베팅 마감</div>}
                                         </button>
                                       )}
                                     </div>
