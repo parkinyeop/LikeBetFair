@@ -640,15 +640,9 @@ export default function Home() {
         console.log(`최종 처리 완료: ${sortedGames.length}개 경기`);
         console.log(`베팅 가능: ${sortedGames.filter(game => game.isBettable).length}개`);
         console.log(`베팅 불가능: ${sortedGames.filter(game => !game.isBettable).length}개`);
+        
         setGames(sortedGames);
         setLoading(false);
-        
-        } else {
-          // 데이터가 없는 경우
-          setGames([]);
-          setLoading(false);
-          console.log("로드할 데이터가 없습니다.");
-        }
         
       } catch (err) {
         console.error('데이터 로드 오류:', err);
