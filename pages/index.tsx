@@ -29,8 +29,8 @@ export default function Home() {
   const [games, setGames] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>("KBO");
-  const [selectedMainCategory, setSelectedMainCategory] = useState<string>("야구");
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedMainCategory, setSelectedMainCategory] = useState<string>("축구");
   const [currentSportKey, setCurrentSportKey] = useState<string>("");
   const [viewMode, setViewMode] = useState<'today' | 'league'>('today');
   const [todayGames, setTodayGames] = useState<Record<string, any[]>>({});
@@ -456,7 +456,7 @@ export default function Home() {
 
   useEffect(() => {
     const fetchGames = async () => {
-      if (viewMode !== 'league' || selectedCategory === currentSportKey) return;
+      if (viewMode !== 'league' || !selectedCategory || selectedCategory === currentSportKey) return;
       
       try {
         setLoading(true);
@@ -1271,7 +1271,16 @@ export default function Home() {
           🎯 Today Betting
         </button>
         <button
-          onClick={() => setViewMode('league')}
+          onClick={() => {
+            setViewMode('league');
+            // 리그별 보기 선택시 축구를 기본 메인 카테고리로 설정하고 하위 카테고리는 선택 해제
+            setSelectedMainCategory('축구');
+            setSelectedCategory('');
+            setCurrentSportKey('');
+            setGames([]);
+            setError(null);
+            setLoading(false);
+          }}
           className={`px-6 py-2 rounded-lg font-medium transition-colors ${
             viewMode === 'league'
               ? 'bg-blue-600 text-white'
@@ -1396,7 +1405,19 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 gap-4">
-            {games.length === 0 ? (
+            {!selectedCategory ? (
+              <div className="text-center py-12 bg-blue-50 rounded-lg">
+                <div className="mb-4">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                    <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                    </svg>
+                  </div>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">⚽ 리그를 선택해주세요</h3>
+                <p className="text-gray-600">위에서 원하는 리그를 선택하면 해당 리그의 경기 정보를 볼 수 있습니다.</p>
+              </div>
+            ) : games.length === 0 ? (
               <SeasonInfoDisplay category={selectedCategory} />
             ) : (
               <div className="space-y-4">
