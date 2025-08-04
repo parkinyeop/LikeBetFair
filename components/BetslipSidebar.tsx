@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import BetSelectionPanel from "./BetSelectionPanel";
 import { useAuth } from '../contexts/AuthContext';
-import { normalizeOption } from '../server/normalizeUtils';
+import { normalizeOption, normalizeOverUnderOption } from '../server/normalizeUtils';
 
 interface BetslipSidebarProps {
   activeTab?: 'betslip' | 'mybets';
@@ -290,13 +290,21 @@ function MyBetsPanel() {
                         {bet.selections.slice(0, 2).map((sel: any, idx: number) => {
                           const isOverUnder = sel.market === '언더/오버' || sel.market === 'totals';
                           const isHandicap = sel.market === '핸디캡' || sel.market === 'spreads';
-                          const ouType = normalizeOption(sel.option || sel.team);
+                          
+                          // 팀명 추출 (desc에서 추출)
+                          let teamName = '';
+                          if (sel.desc) {
+                            const teams = sel.desc.split(' vs ');
+                            if (teams.length >= 2) {
+                              teamName = teams[0].trim(); // 첫 번째 팀명 사용
+                            }
+                          }
                           
                           return (
                             <div key={idx} className="flex items-center justify-between text-sm">
                               <span className="font-medium text-black">
                                 {isOverUnder ? (
-                                  `${ouType} ${sel.point !== undefined ? `(${sel.point})` : ''}`
+                                  normalizeOverUnderOption(sel.option || sel.team, teamName, sel.point)
                                 ) : isHandicap ? (
                                   sel.team
                                 ) : (

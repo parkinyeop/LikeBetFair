@@ -301,6 +301,28 @@ function normalizeOption(option) {
   return option;
 }
 
+// 언더/오버 배팅을 위한 새로운 함수 추가
+function normalizeOverUnderOption(option, teamName, point) {
+  if (!option) return '';
+  
+  let ouType = '';
+  if (/over/i.test(option)) {
+    ouType = '오버';
+  } else if (/under/i.test(option)) {
+    ouType = '언더';
+  } else {
+    return option;
+  }
+  
+  // 팀명이 있으면 팀명과 함께 표시
+  if (teamName) {
+    return `${teamName} (${ouType}${point !== undefined ? ` ${point}` : ''})`;
+  }
+  
+  // 팀명이 없으면 기존 방식
+  return `${ouType}${point !== undefined ? ` ${point}` : ''}`;
+}
+
 /**
  * 메인/서브 카테고리 정규화 매핑 및 함수 (2024-06-23 기준)
  */
@@ -502,6 +524,7 @@ export {
   extractTeamsFromDesc,
   normalizeMarket,
   normalizeOption,
+  normalizeOverUnderOption,
   mainCategoryMap,
   subCategoryMap,
   normalizeMainCategory,

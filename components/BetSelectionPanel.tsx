@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useBetStore } from '../stores/useBetStore';
 import { useAuth } from '../contexts/AuthContext';
-import { normalizeOption } from '../server/normalizeUtils';
+import { normalizeOption, normalizeOverUnderOption } from '../server/normalizeUtils';
 
 // 배당율 변경 확인 모달
 const OddsChangeModal = ({ 
@@ -270,7 +270,9 @@ const BetSelectionPanel = () => {
           <li key={sel.team} className="flex justify-between items-center">
             <div>
               {((sel as any)?.market === '언더/오버' || (sel as any)?.market === 'totals') ? (
-                <p className="text-sm font-medium">{normalizeOption((sel as any)?.option || sel.team)} {(sel as any)?.point !== undefined ? `(${(sel as any).point})` : ''}</p>
+                <p className="text-sm font-medium">
+                  {normalizeOverUnderOption((sel as any)?.option || sel.team, sel.team, (sel as any)?.point)}
+                </p>
               ) : ((sel as any)?.market === '핸디캡' || (sel as any)?.market === 'spreads') ? (
                 <p className="text-sm font-medium">{sel.team}</p>
               ) : (
