@@ -287,18 +287,9 @@ function MyBetsPanel() {
                   <div className="flex-1">
                     {Array.isArray(bet.selections) && bet.selections.length > 0 ? (
                       <div className="space-y-1">
-                        {bet.selections.slice(0, 2).map((sel: any, idx: number) => {
+                        {bet.selections.map((sel: any, idx: number) => {
                           const isOverUnder = sel.market === '언더/오버' || sel.market === 'totals';
                           const isHandicap = sel.market === '핸디캡' || sel.market === 'spreads';
-                          
-                          // 팀명 추출 (desc에서 추출)
-                          let teamName = '';
-                          if (sel.desc) {
-                            const teams = sel.desc.split(' vs ');
-                            if (teams.length >= 2) {
-                              teamName = teams[0].trim(); // 첫 번째 팀명 사용
-                            }
-                          }
                           
                           return (
                             <div key={idx} className="flex items-center justify-between text-sm">
@@ -315,9 +306,6 @@ function MyBetsPanel() {
                             </div>
                           );
                         })}
-                        {bet.selections.length > 2 && (
-                          <div className="text-xs text-gray-500">외 {bet.selections.length - 2}건</div>
-                        )}
                       </div>
                     ) : (
                       <span className="text-gray-500">경기 정보 없음</span>
