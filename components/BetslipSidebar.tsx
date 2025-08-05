@@ -293,15 +293,47 @@ function MyBetsPanel() {
                           
                           return (
                             <div key={idx} className="flex items-center justify-between text-sm">
-                              <span className="font-medium text-black">
-                                {isOverUnder ? (
-                                  normalizeOverUnderOption(sel.option || sel.team, sel.desc, sel.point)
-                                ) : isHandicap ? (
-                                  sel.team
-                                ) : (
-                                  sel.desc ? sel.desc.split(' vs ').find(t => t && sel.team && t.replace(/\\s/g, '').toLowerCase().includes(sel.team.replace(/\\s/g, '').toLowerCase())) || sel.team : sel.team
+                              <div className="flex flex-col">
+                                <span className="font-medium text-black">
+                                  {isOverUnder ? (
+                                    normalizeOverUnderOption(sel.option || sel.team, sel.desc, sel.point)
+                                  ) : isHandicap ? (
+                                    sel.team
+                                  ) : sel.result === 'draw' ? (
+                                    `${sel.desc ? sel.desc.replace(' vs ', ' vs ') : sel.team} (무)`
+                                  ) : (
+                                    (() => {
+                                      // desc에서 홈팀과 원정팀 파악
+                                      if (sel.desc) {
+                                        const teams = sel.desc.split(' vs ');
+                                        const homeTeam = teams[0];
+                                        const awayTeam = teams[1];
+                                        
+                                        // 베팅한 팀이 홈팀인지 원정팀인지 확인
+                                        if (sel.team === homeTeam) {
+                                          return `${sel.team} 승`;
+                                        } else if (sel.team === awayTeam) {
+                                          return `${sel.team} 승`;
+                                        } else {
+                                          // 베팅한 팀이 홈/원정과 다르면 패 베팅일 가능성
+                                          if (sel.team.includes(homeTeam) || homeTeam.includes(sel.team)) {
+                                            return `${homeTeam} 패`;
+                                          } else if (sel.team.includes(awayTeam) || awayTeam.includes(sel.team)) {
+                                            return `${awayTeam} 패`;
+                                          }
+                                        }
+                                      }
+                                      return `${sel.team} 승`;
+                                    })()
+                                  )}
+                                </span>
+                                {/* 경기명 표시 (무승부가 아닌 경우만) */}
+                                {sel.result !== 'draw' && (
+                                  <span className="text-xs text-gray-500">
+                                    {sel.desc || `${sel.team} 경기`}
+                                  </span>
                                 )}
-                              </span>
+                              </div>
                               <span className="text-blue-600 font-medium">@ {sel.odds}</span>
                             </div>
                           );
@@ -404,22 +436,51 @@ function MyBetsPanel() {
                                 <div className="flex items-center justify-between text-sm">
                                   <div className="flex items-center">
                                     <span className={`mr-2 ${color}`}>{icon}</span>
-                                    <span className={`font-medium ${color}`}>
-                                      {isOverUnder ? (
-                                        ouType
-                                      ) : isHandicap ? (
-                                        sel.team
-                                      ) : (
-                                        sel.desc ? sel.desc.split(' vs ').find(t => t && sel.team && t.replace(/\\s/g, '').toLowerCase().includes(sel.team.replace(/\\s/g, '').toLowerCase())) || sel.team : sel.team
+                                    <div className="flex flex-col">
+                                      <span className={`font-medium ${color}`}>
+                                        {isOverUnder ? (
+                                          ouType
+                                        ) : isHandicap ? (
+                                          sel.team
+                                        ) : actualResult === 'draw' ? (
+                                          `${sel.desc ? sel.desc.replace(' vs ', ' vs ') : sel.team} (무)`
+                                        ) : (
+                                          (() => {
+                                            // desc에서 홈팀과 원정팀 파악
+                                            if (sel.desc) {
+                                              const teams = sel.desc.split(' vs ');
+                                              const homeTeam = teams[0];
+                                              const awayTeam = teams[1];
+                                              
+                                              // 베팅한 팀이 홈팀인지 원정팀인지 확인
+                                              if (sel.team === homeTeam) {
+                                                return `${sel.team} 승`;
+                                              } else if (sel.team === awayTeam) {
+                                                return `${sel.team} 승`;
+                                              } else {
+                                                // 베팅한 팀이 홈/원정과 다르면 패 베팅일 가능성
+                                                if (sel.team.includes(homeTeam) || homeTeam.includes(sel.team)) {
+                                                  return `${homeTeam} 패`;
+                                                } else if (sel.team.includes(awayTeam) || awayTeam.includes(sel.team)) {
+                                                  return `${awayTeam} 패`;
+                                                }
+                                              }
+                                            }
+                                            return `${sel.team} 승`;
+                                          })()
+                                        )}
+                                      </span>
+                                      {/* 경기명 표시 (무승부가 아닌 경우만) */}
+                                      {actualResult !== 'draw' && (
+                                        <span className="text-xs text-gray-500">
+                                          {sel.desc || `${sel.team} 경기`}
+                                        </span>
                                       )}
-                                    </span>
+                                    </div>
                                     <span className="ml-2 text-gray-600">@ {sel.odds}</span>
                                   </div>
                                   <span className={`text-xs font-medium ${color}`}>{label}</span>
                                 </div>
-                                {sel.desc && (
-                                  <div className="text-xs text-gray-500 mt-1 ml-6">{sel.desc}</div>
-                                )}
                                 {/* 경기 결과 스코어 표시 - 조건 완화 */}
                                 {['won', 'lost'].includes(actualResult) && sel.gameResult && (
                                   <div className="text-xs text-blue-600 mt-1 ml-6">
