@@ -357,49 +357,8 @@ function MyBetsPanel() {
                     {/* 경기 결과 표시 (적중/미적중일 때) */}
                     {['won', 'lost'].includes(bet.status) && Array.isArray(bet.selections) && (
                       <div className="mb-3">
-                        {(() => {
-                          // 멀티베팅 전체 결과 재계산 로직
-                          const calculatedResults = bet.selections.map((sel: any) => {
-                            if (sel.gameResult && sel.gameResult.score && (sel.market === '언더/오버' || sel.market === 'totals')) {
-                              const scores = sel.gameResult.score;
-                              let totalScore = 0;
-                              
-                              if (Array.isArray(scores)) {
-                                totalScore = scores.reduce((sum, score) => {
-                                  const scoreValue = typeof score === 'string' ? parseInt(score) : (score?.score ? parseInt(score.score) : 0);
-                                  return sum + (isNaN(scoreValue) ? 0 : scoreValue);
-                                }, 0);
-                              } else if (sel.gameResult.homeScore !== undefined && sel.gameResult.awayScore !== undefined) {
-                                totalScore = parseInt(sel.gameResult.homeScore) + parseInt(sel.gameResult.awayScore);
-                              }
-                              
-                              const betPoint = parseFloat(sel.point) || 0;
-                              const isOver = (sel.option || sel.team || '').toLowerCase().includes('over');
-                              
-                              if (isOver) {
-                                return totalScore > betPoint ? 'won' : 'lost';
-                              } else {
-                                return totalScore < betPoint ? 'won' : 'lost';
-                              }
-                            }
-                            return sel.result || 'pending';
-                          });
-                          
-                          // 멀티베팅 전체 결과: 모두 성공해야 성공
-                          const correctMultiBetResult = calculatedResults.every(result => result === 'won') ? 'won' : 'lost';
-                          const currentBetStatus = bet.status;
-                          
-                          return (
-                            <>
-                              <div className="text-sm font-medium text-gray-700 mb-2 flex items-center justify-between">
-                                <span>📊 경기 결과</span>
-                                {correctMultiBetResult !== currentBetStatus && (
-                                  <div className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded">
-                                    ⚠️ 계산 오류: 실제로는 {correctMultiBetResult === 'won' ? '적중' : '실패'}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="space-y-2">
+                        <div className="text-sm font-medium text-gray-700 mb-2">📊 경기 결과</div>
+                        <div className="space-y-2">
                           {bet.selections.map((sel: any, idx: number) => {
                             // 디버깅용 로그
                             console.log(`[배팅내역] 선택 ${idx}:`, {
@@ -551,9 +510,7 @@ function MyBetsPanel() {
                               </div>
                             );
                           })}
-                            </>
-                          );
-                        })()}
+                        </div>
                       </div>
                     )}
                     
