@@ -533,19 +533,38 @@ function MyBetsPanel() {
                             className="px-2 py-0.5 text-xs border border-red-500 text-red-500 rounded hover:bg-red-500 hover:text-white transition-colors ml-1"
                             onClick={async () => {
                               if (!window.confirm('정말 이 베팅을 취소하시겠습니까?')) return;
-                              const token = localStorage.getItem('token');
-                              const res = await fetch(`http://localhost:5050/api/bet/${bet.id}/cancel`, {
+                              
+                              // API URL 동적 설정
+                              const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
+                                            (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+                                             ? 'http://localhost:5050' 
+                                             : 'https://likebetfair.onrender.com');
+                              
+                              console.log('[배팅취소] API 요청 시작:', `${apiUrl}/api/bet/${bet.id}/cancel`);
+                              console.log('[배팅취소] 토큰 존재:', !!token);
+                              
+                              const res = await fetch(`${apiUrl}/api/bet/${bet.id}/cancel`, {
                                 method: 'POST',
-                                headers: { 'x-auth-token': token || '' },
+                                headers: { 
+                                  'x-auth-token': token || '',
+                                  'Content-Type': 'application/json'
+                                },
                               });
+                              
+                              console.log('[배팅취소] 응답 상태:', res.status, res.statusText);
+                              
                               if (res.ok) {
                                 const data = await res.json();
+                                console.log('[배팅취소] 성공 응답:', data);
                                 alert('베팅이 취소되었습니다.');
                                 if (data.balance !== undefined) setBalance(Number(data.balance));
                                 setBets((prev: any[]) => prev.map(b => b.id === bet.id ? { ...b, status: 'cancelled' } : b));
                                 window.dispatchEvent(new Event('betCancelled'));
+                                forceRefreshBalance(); // 잔액 새로고침
                               } else {
-                                alert('경기 시작 10분 전까지만 베팅 취소가 가능합니다.');
+                                const errorData = await res.json().catch(() => ({}));
+                                console.error('[배팅취소] 오류 응답:', errorData);
+                                alert(errorData.message || '베팅 취소에 실패했습니다.');
                               }
                             }}
                             disabled={bet.status === 'cancelled' || bet.selections.some((sel: any) => {
