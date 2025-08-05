@@ -1482,8 +1482,21 @@ export default function Home() {
                       </div>
                     </div>
                     
+                    {/* 마켓 탭 - 투데이 배팅과 동일 */}
+                    <div className="flex gap-2 mb-3">
+                      {['승/패', '언더/오버', '핸디캡'].map(marketTab => (
+                        <button
+                          key={marketTab}
+                          className={`px-3 py-1 rounded ${(selectedMarkets[game.id] || '승/패') === marketTab ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                          onClick={() => setSelectedMarkets((prev: any) => ({ ...prev, [game.id]: marketTab }))}
+                        >
+                          {marketTab}
+                        </button>
+                      ))}
+                    </div>
+                    
                     {/* 승/패 배당 */}
-                    {game.officialOdds?.h2h && Object.keys(game.officialOdds.h2h).length > 0 && (
+                    {(selectedMarkets[game.id] || '승/패') === '승/패' && game.officialOdds?.h2h && Object.keys(game.officialOdds.h2h).length > 0 && (
                       <div className="mb-3">
                         <div className="text-sm font-medium text-gray-700 mb-2">🏆 승/패</div>
                         <div className="space-y-2">
@@ -1582,7 +1595,7 @@ export default function Home() {
                     )}
                     
                     {/* 언더/오버 배당 */}
-                    {game.officialOdds?.totals && Object.keys(game.officialOdds.totals).length > 0 && (
+                    {(selectedMarkets[game.id] || '승/패') === '언더/오버' && game.officialOdds?.totals && Object.keys(game.officialOdds.totals).length > 0 && (
                       <div className="mb-3">
                         <div className="text-sm font-medium text-gray-700 mb-2">📊 오버/언더</div>
                         <div className="space-y-2">
@@ -1678,7 +1691,7 @@ export default function Home() {
                     )}
                     
                     {/* 핸디캡 배당 */}
-                    {game.officialOdds?.spreads && Object.keys(game.officialOdds.spreads).length > 0 && (
+                    {(selectedMarkets[game.id] || '승/패') === '핸디캡' && game.officialOdds?.spreads && Object.keys(game.officialOdds.spreads).length > 0 && (
                       <div>
                         <div className="text-sm font-medium text-gray-700 mb-2">⚖️ 핸디캡</div>
                         <div className="space-y-2">
