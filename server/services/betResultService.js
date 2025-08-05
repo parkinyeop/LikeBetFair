@@ -213,8 +213,18 @@ class BetResultService {
       else if (selection.result === 'cancelled') hasCancelled = true;
     }
 
-    // 전체 베팅 상태 집계 (기존 로직)
+    // 전체 베팅 상태 집계 (멀티베팅 로직 포함)
     let betStatus = this.determineBetStatus(hasPending, hasWon, hasLost, hasCancelled, selections);
+    
+    // 멀티베팅 디버깅 로그
+    if (selections.length > 1) {
+      console.log(`[멀티베팅 처리] 베팅 ID: ${bet.id}, 선택 개수: ${selections.length}`);
+      selections.forEach((sel, idx) => {
+        console.log(`[멀티베팅 처리] 선택 ${idx + 1}: ${sel.desc} → ${sel.result}`);
+      });
+      console.log(`[멀티베팅 처리] 최종 상태: ${betStatus} (이전: ${prevStatus})`);
+    }
+    
     const newSelectionsStr = JSON.stringify(selections);
     const statusChanged = betStatus !== prevStatus;
     const selectionsChanged = newSelectionsStr !== prevSelections;
@@ -238,7 +248,7 @@ class BetResultService {
     return bet.status !== 'pending';
   }
 
-  // 🆕 베팅 전체 상태 결정 로직 (취소 경기 포함)
+  // 🆕 베팅 전체 상태 결정 로직 (취소 경기 포함) - 멀티베팅 수정
   determineBetStatus(hasPending, hasWon, hasLost, hasCancelled, selections) {
     // 모든 selection이 취소된 경우
     if (hasCancelled && !hasWon && !hasLost && !hasPending) {
@@ -250,24 +260,28 @@ class BetResultService {
       return 'pending';
     }
 
+    // 멀티베팅 핵심 로직: 하나라도 실패하면 전체 실패
     // draw 결과도 lost로 처리
-    const hasDrawOrLost = selections.some(s => s.result === 'lost' || s.result === 'draw');
+    const hasAnyFailure = selections.some(s => s.result === 'lost' || s.result === 'draw');
     
-    // 하나라도 실패하면 전체 실패 (취소된 것은 무시)
-    if (hasLost || hasDrawOrLost) {
+    if (hasAnyFailure) {
+      console.log(`[멀티베팅 판정] 실패한 선택 발견 - 전체 베팅 실패`);
       return 'lost';
     }
 
-    // 모든 완료된 selection이 성공 또는 취소인 경우
-    if (hasWon || hasCancelled) {
-      // 실제로 승리한 selection이 있는지 확인
-      const hasActualWin = selections.some(s => s.result === 'won');
-      if (hasActualWin) {
-        return 'won';
-      } else if (hasCancelled) {
-        // 모든 selection이 취소된 경우
-        return 'cancelled';
-      }
+    // 멀티베팅에서는 모든 선택이 성공해야 전체 성공
+    const allNonCancelledSelections = selections.filter(s => s.result !== 'cancelled');
+    const allWonSelections = allNonCancelledSelections.filter(s => s.result === 'won');
+    
+    // 취소되지 않은 모든 선택이 성공인 경우만 전체 성공
+    if (allNonCancelledSelections.length > 0 && allWonSelections.length === allNonCancelledSelections.length) {
+      console.log(`[멀티베팅 판정] 모든 선택 성공 (${allWonSelections.length}/${allNonCancelledSelections.length}) - 전체 베팅 성공`);
+      return 'won';
+    }
+
+    // 모든 selection이 취소된 경우
+    if (selections.every(s => s.result === 'cancelled')) {
+      return 'cancelled';
     }
 
     return 'pending';
