@@ -68,6 +68,13 @@ const BetSelectionPanel = () => {
   const { isLoggedIn, setBalance, token, refreshBalance, forceRefreshBalance } = useAuth();
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // selections 변경 시 메시지 초기화
+  useEffect(() => {
+    if (message) {
+      setMessage('');
+    }
+  }, [selections]);
   
   // 배당율 변경 모달 상태
   const [oddsChangeModal, setOddsChangeModal] = useState<{
@@ -87,6 +94,10 @@ const BetSelectionPanel = () => {
     const value = e.target.value.replace(/,/g, ''); // 콤마 제거 후 숫자 변환
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
       setStake(value === '' ? 0 : parseFloat(value));
+      // 베팅금 변경 시 메시지 초기화
+      if (message) {
+        setMessage('');
+      }
     }
   };
 
@@ -263,7 +274,13 @@ const BetSelectionPanel = () => {
     <div className="w-full p-4 bg-white rounded shadow">
       <div className="flex justify-between items-center mb-3">
         <h2 className="text-lg font-bold">베팅 선택</h2>
-        <button className="text-sm text-red-500" onClick={clearAll}>전체 삭제</button>
+        <button className="text-sm text-red-500" onClick={() => {
+          clearAll();
+          // 전체 삭제 시 메시지 초기화
+          if (message) {
+            setMessage('');
+          }
+        }}>전체 삭제</button>
       </div>
       <ul className="space-y-2 mb-4">
         {selections.map((sel) => (
@@ -282,7 +299,13 @@ const BetSelectionPanel = () => {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold">{sel.odds.toFixed(2)}</span>
-              <button onClick={() => removeSelection(sel.team)} className="text-red-500 text-xs">X</button>
+              <button onClick={() => {
+                removeSelection(sel.team);
+                // 선택 제거 시 메시지 초기화
+                if (message) {
+                  setMessage('');
+                }
+              }} className="text-red-500 text-xs">X</button>
             </div>
           </li>
         ))}
