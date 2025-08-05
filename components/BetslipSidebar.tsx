@@ -328,11 +328,29 @@ function MyBetsPanel() {
                         <div className="text-sm font-medium text-gray-700 mb-2">📊 경기 결과</div>
                         <div className="space-y-2">
                           {bet.selections.map((sel: any, idx: number) => {
+                            // 디버깅용 로그
+                            console.log(`[배팅내역] 선택 ${idx}:`, {
+                              result: sel.result,
+                              market: sel.market,
+                              team: sel.team,
+                              option: sel.option,
+                              desc: sel.desc,
+                              gameResult: sel.gameResult,
+                              betStatus: bet.status
+                            });
+                            
+                            // 베팅 전체 상태가 적중/실패인 경우, 개별 선택도 같은 상태로 추정
+                            let actualResult = sel.result;
+                            if (!actualResult || actualResult === 'pending') {
+                              if (bet.status === 'won') actualResult = 'won';
+                              else if (bet.status === 'lost') actualResult = 'lost';
+                            }
+                            
                             let icon = '⏳', color = 'text-gray-400', label = '대기';
-                            if (sel.result === 'won') { icon = '✔️'; color = 'text-green-600'; label = '적중'; }
-                            else if (sel.result === 'lost') { icon = '❌'; color = 'text-red-500'; label = '실패'; }
-                            else if (sel.result === 'cancelled') { icon = '🚫'; color = 'text-orange-500'; label = '경기취소'; }
-                            else if (sel.result === 'draw') { icon = '⚖️'; color = 'text-blue-500'; label = '무승부'; }
+                            if (actualResult === 'won') { icon = '✔️'; color = 'text-green-600'; label = '적중'; }
+                            else if (actualResult === 'lost') { icon = '❌'; color = 'text-red-500'; label = '실패'; }
+                            else if (actualResult === 'cancelled') { icon = '🚫'; color = 'text-orange-500'; label = '경기취소'; }
+                            else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; label = '무승부'; }
                             
                             const isOverUnder = sel.market === '언더/오버' || sel.market === 'totals';
                             const isHandicap = sel.market === '핸디캡' || sel.market === 'spreads';
@@ -359,17 +377,30 @@ function MyBetsPanel() {
                                 {sel.desc && (
                                   <div className="text-xs text-gray-500 mt-1 ml-6">{sel.desc}</div>
                                 )}
-                                {['won', 'lost'].includes(sel.result) && sel.gameResult && sel.gameResult.score && Array.isArray(sel.gameResult.score) && (
+                                {/* 경기 결과 스코어 표시 - 조건 완화 */}
+                                {['won', 'lost'].includes(actualResult) && sel.gameResult && (
                                   <div className="text-xs text-blue-600 mt-1 ml-6">
-                                    결과: {sel.gameResult.homeTeam} {
-                                      typeof sel.gameResult.score[0] === 'string' 
-                                        ? sel.gameResult.score[0] 
-                                        : sel.gameResult.score[0]?.score ?? '-'
-                                    } : {sel.gameResult.awayTeam} {
-                                      typeof sel.gameResult.score[1] === 'string' 
-                                        ? sel.gameResult.score[1] 
-                                        : sel.gameResult.score[1]?.score ?? '-'
-                                    }
+                                    {sel.gameResult.score && Array.isArray(sel.gameResult.score) ? (
+                                      `결과: ${sel.gameResult.homeTeam || '홈팀'} ${
+                                        typeof sel.gameResult.score[0] === 'string' 
+                                          ? sel.gameResult.score[0] 
+                                          : sel.gameResult.score[0]?.score ?? '-'
+                                      } : ${sel.gameResult.awayTeam || '원정팀'} ${
+                                        typeof sel.gameResult.score[1] === 'string' 
+                                          ? sel.gameResult.score[1] 
+                                          : sel.gameResult.score[1]?.score ?? '-'
+                                      }`
+                                    ) : sel.gameResult.homeScore !== undefined && sel.gameResult.awayScore !== undefined ? (
+                                      `결과: ${sel.gameResult.homeTeam || '홈팀'} ${sel.gameResult.homeScore} : ${sel.gameResult.awayTeam || '원정팀'} ${sel.gameResult.awayScore}`
+                                    ) : (
+                                      `경기 결과: ${JSON.stringify(sel.gameResult)}`
+                                    )}
+                                  </div>
+                                )}
+                                {/* 언더/오버 추가 정보 */}
+                                {isOverUnder && sel.point && (
+                                  <div className="text-xs text-gray-400 mt-1 ml-6">
+                                    기준점: {sel.point}
                                   </div>
                                 )}
                               </div>
