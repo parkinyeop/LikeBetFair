@@ -322,6 +322,63 @@ function MyBetsPanel() {
                     {expectedResultDate && (
                       <div className="text-xs text-blue-600 font-semibold mb-2">정산예정일: {expectedResultDate}</div>
                     )}
+                    {/* 경기 결과 표시 (적중/미적중일 때) */}
+                    {['won', 'lost'].includes(bet.status) && Array.isArray(bet.selections) && (
+                      <div className="mb-3">
+                        <div className="text-sm font-medium text-gray-700 mb-2">📊 경기 결과</div>
+                        <div className="space-y-2">
+                          {bet.selections.map((sel: any, idx: number) => {
+                            let icon = '⏳', color = 'text-gray-400', label = '대기';
+                            if (sel.result === 'won') { icon = '✔️'; color = 'text-green-600'; label = '적중'; }
+                            else if (sel.result === 'lost') { icon = '❌'; color = 'text-red-500'; label = '실패'; }
+                            else if (sel.result === 'cancelled') { icon = '🚫'; color = 'text-orange-500'; label = '경기취소'; }
+                            else if (sel.result === 'draw') { icon = '⚖️'; color = 'text-blue-500'; label = '무승부'; }
+                            
+                            const isOverUnder = sel.market === '언더/오버' || sel.market === 'totals';
+                            const isHandicap = sel.market === '핸디캡' || sel.market === 'spreads';
+                            const ouType = normalizeOverUnderOption(sel.option || sel.team, sel.desc, sel.point);
+                            
+                            return (
+                              <div key={idx} className="border-l-2 border-gray-200 pl-3 py-1">
+                                <div className="flex items-center justify-between text-sm">
+                                  <div className="flex items-center">
+                                    <span className={`mr-2 ${color}`}>{icon}</span>
+                                    <span className={`font-medium ${color}`}>
+                                      {isOverUnder ? (
+                                        ouType
+                                      ) : isHandicap ? (
+                                        sel.team
+                                      ) : (
+                                        sel.desc ? sel.desc.split(' vs ').find(t => t && sel.team && t.replace(/\\s/g, '').toLowerCase().includes(sel.team.replace(/\\s/g, '').toLowerCase())) || sel.team : sel.team
+                                      )}
+                                    </span>
+                                    <span className="ml-2 text-gray-600">@ {sel.odds}</span>
+                                  </div>
+                                  <span className={`text-xs font-medium ${color}`}>{label}</span>
+                                </div>
+                                {sel.desc && (
+                                  <div className="text-xs text-gray-500 mt-1 ml-6">{sel.desc}</div>
+                                )}
+                                {['won', 'lost'].includes(sel.result) && sel.gameResult && sel.gameResult.score && Array.isArray(sel.gameResult.score) && (
+                                  <div className="text-xs text-blue-600 mt-1 ml-6">
+                                    결과: {sel.gameResult.homeTeam} {
+                                      typeof sel.gameResult.score[0] === 'string' 
+                                        ? sel.gameResult.score[0] 
+                                        : sel.gameResult.score[0]?.score ?? '-'
+                                    } : {sel.gameResult.awayTeam} {
+                                      typeof sel.gameResult.score[1] === 'string' 
+                                        ? sel.gameResult.score[1] 
+                                        : sel.gameResult.score[1]?.score ?? '-'
+                                    }
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between items-center">
                         <span>💰 배팅금:</span>
