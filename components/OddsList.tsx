@@ -38,7 +38,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { selections, toggleSelection } = useBetStore();
-  const [selectedMarkets, setSelectedMarkets] = useState<{ [gameId: string]: '승/패' | '언더/오버' | '핸디캡' }>({});
+  const [selectedMarket, setSelectedMarket] = useState<'승/패' | '언더/오버' | '핸디캡'>('승/패');
 
   useEffect(() => {
     const fetchOdds = async () => {
@@ -266,16 +266,33 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
   }
 
   return (
-    <div className="space-y-4 h-full flex-1 min-h-0 px-1 overflow-y-auto">
-      {games.map((game: any) => {
-        const gameTime = game.gameTime || new Date(game.commence_time);
-        const isBettable = game.isBettable !== undefined ? game.isBettable : true;
-        const selectedMarket = selectedMarkets[game.id] || '승/패';
-        const marketKey = marketKeyMap[selectedMarket];
-        
-        // officialOdds에서 해당 마켓의 평균 배당률 가져오기
-        const officialOdds = game.officialOdds || {};
-        const marketOdds = officialOdds[marketKey] || {};
+    <div className="h-full flex flex-col">
+      {/* 전체 페이지 탭 */}
+      <div className="flex gap-2 mb-4 bg-white p-4 rounded-lg shadow">
+        {['승/패', '언더/오버', '핸디캡'].map(marketTab => (
+          <button
+            key={marketTab}
+            className={`flex-1 py-2 px-4 rounded-lg font-semibold transition-colors ${
+              selectedMarket === marketTab 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+            onClick={() => setSelectedMarket(marketTab as any)}
+          >
+            {marketTab}
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-4 flex-1 min-h-0 px-1 overflow-y-auto">
+        {games.map((game: any) => {
+          const gameTime = game.gameTime || new Date(game.commence_time);
+          const isBettable = game.isBettable !== undefined ? game.isBettable : true;
+          const marketKey = marketKeyMap[selectedMarket];
+          
+          // officialOdds에서 해당 마켓의 평균 배당률 가져오기
+          const officialOdds = game.officialOdds || {};
+          const marketOdds = officialOdds[marketKey] || {};
         
         return (
           <div
@@ -297,19 +314,6 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                   </div>
                 )}
               </div>
-            </div>
-            
-            {/* 마켓 탭 */}
-            <div className="flex gap-2 mb-3">
-              {['승/패', '언더/오버', '핸디캡'].map(marketTab => (
-                <button
-                  key={marketTab}
-                  className={`px-3 py-1 rounded ${selectedMarket === marketTab ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
-                  onClick={() => setSelectedMarkets(prev => ({ ...prev, [game.id]: marketTab as any }))}
-                >
-                  {marketTab}
-                </button>
-              ))}
             </div>
             
             {/* 마켓별 선택 영역 */}
@@ -636,6 +640,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
           </div>
         );
       })}
+      </div>
     </div>
   );
 });
