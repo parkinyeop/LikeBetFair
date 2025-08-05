@@ -339,11 +339,54 @@ function MyBetsPanel() {
                               betStatus: bet.status
                             });
                             
-                            // 베팅 전체 상태가 적중/실패인 경우, 개별 선택도 같은 상태로 추정
+                            // 개별 선택의 실제 결과 계산
                             let actualResult = sel.result;
+                            
+                            // sel.result가 없거나 pending인 경우, 경기 결과를 직접 계산
                             if (!actualResult || actualResult === 'pending') {
-                              if (bet.status === 'won') actualResult = 'won';
-                              else if (bet.status === 'lost') actualResult = 'lost';
+                              if (sel.gameResult && sel.gameResult.score) {
+                                // 언더/오버 베팅의 경우 점수 계산
+                                if (sel.market === '언더/오버' || sel.market === 'totals') {
+                                  const scores = sel.gameResult.score;
+                                  let totalScore = 0;
+                                  
+                                  if (Array.isArray(scores)) {
+                                    totalScore = scores.reduce((sum, score) => {
+                                      const scoreValue = typeof score === 'string' ? parseInt(score) : (score?.score ? parseInt(score.score) : 0);
+                                      return sum + (isNaN(scoreValue) ? 0 : scoreValue);
+                                    }, 0);
+                                  } else if (sel.gameResult.homeScore !== undefined && sel.gameResult.awayScore !== undefined) {
+                                    totalScore = parseInt(sel.gameResult.homeScore) + parseInt(sel.gameResult.awayScore);
+                                  }
+                                  
+                                  const betPoint = parseFloat(sel.point) || 0;
+                                  const isOver = (sel.option || sel.team || '').toLowerCase().includes('over');
+                                  
+                                  if (isOver) {
+                                    actualResult = totalScore > betPoint ? 'won' : 'lost';
+                                  } else {
+                                    actualResult = totalScore < betPoint ? 'won' : 'lost';
+                                  }
+                                  
+                                  console.log(`[언더/오버 계산] ${sel.desc}: 총점 ${totalScore}, 기준 ${betPoint}, ${isOver ? 'Over' : 'Under'} 베팅 → ${actualResult}`);
+                                }
+                                // 승/패 베팅의 경우 (추후 필요시 구현)
+                                else if (sel.market === '승/패' || sel.market === 'h2h') {
+                                  // 승부 결과 계산 로직 (현재는 기존 result 사용)
+                                  actualResult = sel.result;
+                                }
+                                // 핸디캡 베팅의 경우 (추후 필요시 구현)
+                                else if (sel.market === '핸디캡' || sel.market === 'spreads') {
+                                  // 핸디캡 결과 계산 로직 (현재는 기존 result 사용)
+                                  actualResult = sel.result;
+                                }
+                              }
+                              
+                              // 여전히 결과가 없으면 전체 베팅 상태 기준으로 추정 (단일 베팅인 경우)
+                              if (!actualResult || actualResult === 'pending') {
+                                if (bet.status === 'won') actualResult = 'won';
+                                else if (bet.status === 'lost') actualResult = 'lost';
+                              }
                             }
                             
                             let icon = '⏳', color = 'text-gray-400', label = '대기';
