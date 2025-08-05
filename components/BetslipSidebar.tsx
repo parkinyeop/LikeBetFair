@@ -528,26 +528,8 @@ function MyBetsPanel() {
                         <b className="text-black">{Math.floor(Number(bet.potentialWinnings)).toLocaleString()}원</b>
                       </div>
                       <div className="flex items-center justify-end pt-1">
-                        {/* 배팅 취소 버튼 - 디버깅용 로그 추가 */}
-                        {(() => {
-                          const isPending = bet.status === 'pending';
-                          const hasSelections = Array.isArray(bet.selections);
-                          const allPending = hasSelections && bet.selections.every((sel: any) => sel.result === 'pending' || !sel.result);
-                          
-                          console.log(`[배팅취소버튼] 베팅 ${bet.id}:`, {
-                            status: bet.status,
-                            isPending,
-                            hasSelections,
-                            selectionsCount: bet.selections?.length,
-                            allPending,
-                            selections: bet.selections?.map((sel: any) => ({
-                              result: sel.result,
-                              commence_time: sel.commence_time
-                            }))
-                          });
-                          
-                          return isPending && hasSelections && allPending;
-                        })() && (
+                        {/* 배팅 취소 버튼 - 임시로 조건 완화 */}
+                        {bet.status === 'pending' && (
                           <button
                             className="px-2 py-0.5 text-xs border border-red-500 text-red-500 rounded hover:bg-red-500 hover:text-white transition-colors ml-1"
                             onClick={async () => {
@@ -590,32 +572,7 @@ function MyBetsPanel() {
                                 alert(errorData.message || '베팅 취소에 실패했습니다.');
                               }
                             }}
-                            disabled={(() => {
-                              const isCancelled = bet.status === 'cancelled';
-                              const isTimeExpired = bet.selections.some((sel: any) => {
-                                if (!sel.commence_time) return false;
-                                // UTC 시간을 로컬 시간으로 변환하여 비교
-                                const gameTime = new Date(sel.commence_time);
-                                const localGameTime = new Date(gameTime.getTime() + (gameTime.getTimezoneOffset() * 60 * 1000));
-                                const isExpired = localGameTime <= new Date(Date.now() + 10 * 60 * 1000);
-                                
-                                if (isExpired) {
-                                  console.log(`[배팅취소] 시간 만료: ${sel.desc} - ${sel.commence_time}`);
-                                }
-                                
-                                return isExpired;
-                              });
-                              
-                              const isDisabled = isCancelled || isTimeExpired;
-                              console.log(`[배팅취소] 버튼 상태:`, {
-                                betId: bet.id,
-                                isCancelled,
-                                isTimeExpired,
-                                isDisabled
-                              });
-                              
-                              return isDisabled;
-                            })()}
+                            disabled={false}
                           >
                             베팅취소
                           </button>
