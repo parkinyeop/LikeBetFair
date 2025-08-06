@@ -528,8 +528,8 @@ function MyBetsPanel() {
                         <b className="text-black">{Math.floor(Number(bet.potentialWinnings)).toLocaleString()}원</b>
                       </div>
                       <div className="flex items-center justify-end pt-1">
-                        {/* 배팅 취소 버튼 - 임시로 조건 완화 */}
-                        {bet.status === 'pending' && (
+                        {/* 배팅 취소 버튼 - 정상 조건으로 복원 */}
+                        {bet.status === 'pending' && Array.isArray(bet.selections) && bet.selections.every((sel: any) => sel.result === 'pending' || !sel.result) && (
                           <button
                             className="px-2 py-0.5 text-xs border border-red-500 text-red-500 rounded hover:bg-red-500 hover:text-white transition-colors ml-1"
                             onClick={async () => {
@@ -572,7 +572,12 @@ function MyBetsPanel() {
                                 alert(errorData.message || '베팅 취소에 실패했습니다.');
                               }
                             }}
-                            disabled={false}
+                            disabled={bet.status === 'cancelled' || bet.selections.some((sel: any) => {
+                              if (!sel.commence_time) return false;
+                              // 경기 시작 10분 전까지만 취소 가능
+                              const gameTime = new Date(sel.commence_time);
+                              return gameTime <= new Date(Date.now() + 10 * 60 * 1000);
+                            })}
                           >
                             베팅취소
                           </button>
