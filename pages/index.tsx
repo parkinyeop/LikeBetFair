@@ -1492,7 +1492,7 @@ export default function Home() {
                     
                     {/* 마켓 탭 - 투데이 배팅과 동일 */}
                     <div className="flex gap-2 mb-3">
-                      {['승/패', '언더/오버', '핸디캡'].map(marketTab => (
+                      {['Win/Loss', 'Over/Under', 'Handicap'].map(marketTab => (
                         <button
                           key={marketTab}
                           className={`px-3 py-1 rounded ${(selectedMarkets[game.id] || '승/패') === marketTab ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
@@ -1504,9 +1504,9 @@ export default function Home() {
                     </div>
                     
                     {/* 승/패 배당 */}
-                    {(selectedMarkets[game.id] || '승/패') === '승/패' && game.officialOdds?.h2h && Object.keys(game.officialOdds.h2h).length > 0 && (
+                    {(selectedMarkets[game.id] || 'Win/Loss') === 'Win/Loss' && game.officialOdds?.h2h && Object.keys(game.officialOdds.h2h).length > 0 && (
                       <div className="mb-3">
-                        <div className="text-sm font-medium text-gray-700 mb-2">🏆 승/패</div>
+                        <div className="text-sm font-medium text-gray-700 mb-2">🏆 Win/Loss</div>
                         <div className="space-y-2">
                           {(() => {
                             const h2hOdds = game.officialOdds.h2h;
@@ -1547,7 +1547,7 @@ export default function Home() {
                             return (
                               <div className="flex items-center gap-2">
                                 <div className="w-16 text-base font-bold text-gray-800 text-center">
-                                  승/패
+                                  Win/Loss
                                 </div>
                                 {(() => {
                                   // 홈팀, 무승부, 어웨이팀 순서로 정렬
@@ -1561,7 +1561,7 @@ export default function Home() {
                                   
                                   return sortedOutcomes.map((outcome: any, idx: number) => {
                                     let label = outcome.name;
-                                    if (outcome.name.toLowerCase() === 'draw') label = '무승부';
+                                    if (outcome.name.toLowerCase() === 'draw') label = 'Draw';
                                     else if (outcome.name === game.home_team) label = game.home_team;
                                     else if (outcome.name === game.away_team) label = game.away_team;
                                     
@@ -1575,14 +1575,14 @@ export default function Home() {
                                               odds: outcome.odds.averagePrice,
                                               desc: `${game.home_team} vs ${game.away_team}`,
                                             commence_time: game.commence_time,
-                                            market: '승/패',
+                                            market: 'Win/Loss',
                                             gameId: game.id,
                                             sport_key: game.sport_key
                                             });
                                           }
                                         }}
                                         className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                                          (selections || []).some(sel => sel.team === outcome.name && sel.market === '승/패' && sel.gameId === game.id)
+                                          (selections || []).some(sel => sel.team === outcome.name && sel.market === 'Win/Loss' && sel.gameId === game.id)
                                             ? 'bg-yellow-500 hover:bg-yellow-600'
                                             : game.isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                         } text-white`}
@@ -1603,9 +1603,9 @@ export default function Home() {
                     )}
                     
                     {/* 언더/오버 배당 */}
-                    {(selectedMarkets[game.id] || '승/패') === '언더/오버' && game.officialOdds?.totals && Object.keys(game.officialOdds.totals).length > 0 && (
+                    {(selectedMarkets[game.id] || 'Win/Loss') === 'Over/Under' && game.officialOdds?.totals && Object.keys(game.officialOdds.totals).length > 0 && (
                       <div className="mb-3">
-                        <div className="text-sm font-medium text-gray-700 mb-2">📊 오버/언더</div>
+                                                  <div className="text-sm font-medium text-gray-700 mb-2">📊 Over/Under</div>
                         <div className="space-y-2">
                           {(() => {
                             const totalsOdds = game.officialOdds.totals;
@@ -1706,9 +1706,9 @@ export default function Home() {
                     )}
                     
                     {/* 핸디캡 배당 */}
-                    {(selectedMarkets[game.id] || '승/패') === '핸디캡' && game.officialOdds?.spreads && Object.keys(game.officialOdds.spreads).length > 0 && (
+                    {(selectedMarkets[game.id] || 'Win/Loss') === 'Handicap' && game.officialOdds?.spreads && Object.keys(game.officialOdds.spreads).length > 0 && (
                       <div>
-                        <div className="text-sm font-medium text-gray-700 mb-2">⚖️ 핸디캡</div>
+                                                  <div className="text-sm font-medium text-gray-700 mb-2">⚖️ Handicap</div>
                         <div className="space-y-2">
                           {(() => {
                             const spreadsOdds = game.officialOdds.spreads;
