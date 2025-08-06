@@ -270,7 +270,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
       {/* 전체 페이지 탭 제거 - 각 게임마다 개별 탭으로 변경 */}
 
       <div className="space-y-4 flex-1 min-h-0 px-1 overflow-y-auto">
-        {games.map((game: any) => {
+        {games?.map((game: any) => {
           const gameTime = game.gameTime || new Date(game.commence_time);
           const isBettable = game.isBettable !== undefined ? game.isBettable : true;
           const selectedMarket = selectedMarkets[game.id] || '승/패';

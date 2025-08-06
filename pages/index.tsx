@@ -818,7 +818,7 @@ export default function Home() {
           </div>
         </div>
         
-        {todayFlatGames.map((game: any) => {
+        {todayFlatGames?.map((game: any) => {
           const gameTime = new Date(game.commence_time);
           const isBettable = game.isBettable !== undefined ? game.isBettable : true;
           const selectedMarket = selectedMarkets[game.id] || '승/패';
@@ -1337,7 +1337,7 @@ export default function Home() {
           {/* 상위 카테고리 탭 */}
           <div className="mb-6">
             <div className="flex gap-2 mb-4">
-              {Object.keys(SPORTS_TREE).map((mainCategory) => (
+              {Object.keys(SPORTS_TREE || {}).map((mainCategory) => (
                 <button
                   key={mainCategory}
                   onClick={() => {
@@ -1361,7 +1361,7 @@ export default function Home() {
               <div className="mb-6">
                 <div className="text-lg font-bold mb-3 text-blue-800">{selectedMainCategory}</div>
                 <div className="flex flex-wrap gap-2">
-                  {SPORTS_TREE[selectedMainCategory].map((category) => {
+                  {SPORTS_TREE[selectedMainCategory]?.map((category) => {
                     const sportKey = getSportKey(category);
                     const seasonInfo = getSeasonInfo(sportKey);
                     const statusBadge = seasonInfo ? getSeasonStatusBadge(seasonInfo.status) : null;
@@ -1419,8 +1419,8 @@ export default function Home() {
             
             {/* 경기 수 정보 표시 */}
             {(() => {
-              const bettableGames = games.filter(game => game.isBettable);
-              const totalGames = games.length;
+              const bettableGames = games?.filter(game => game.isBettable) || [];
+              const totalGames = games?.length || 0;
               
               return (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-2">
@@ -1476,7 +1476,7 @@ export default function Home() {
               <SeasonInfoDisplay category={selectedCategory} />
             ) : (
               <div className="space-y-4">
-                {games.map((game, index) => (
+                {games?.map((game, index) => (
                   <div key={index} className={`bg-white rounded-lg shadow p-4 ${!game.isBettable ? 'opacity-60' : ''}`}>
                     <div className="flex justify-between items-center mb-3">
                       <span className="text-lg font-bold">🏟️ {game.home_team} vs {game.away_team}</span>
