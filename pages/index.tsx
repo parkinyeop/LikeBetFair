@@ -1022,7 +1022,15 @@ export default function Home() {
                         groupedTotals[point].under = oddsData;
                       }
                     });
-                    return Object.entries(groupedTotals).map(([point, oddsPair]) => {
+                    
+                    // 0.5 단위 포인트만 필터링 (0.25, 0.75 등 제외)
+                    const filteredTotals = Object.entries(groupedTotals).filter(([point, oddsPair]) => {
+                      const pointValue = parseFloat(point);
+                      // NaN이거나 0.5 단위가 아니면 제외 (0.5, 1, 1.5, 2, 2.5... 만 허용)
+                      return !isNaN(pointValue) && (pointValue % 0.5 === 0) && (pointValue % 1 === 0 || pointValue % 1 === 0.5);
+                    });
+                    
+                    return filteredTotals.map(([point, oddsPair]) => {
                       const overOdds = oddsPair.over?.averagePrice;
                       const underOdds = oddsPair.under?.averagePrice;
                       return (
@@ -1615,7 +1623,14 @@ export default function Home() {
                               }
                             });
                             
-                            return Object.entries(groupedTotals).map(([point, oddsPair], idx: number) => {
+                            // 0.5 단위 포인트만 필터링 (0.25, 0.75 등 제외)
+                            const filteredTotals = Object.entries(groupedTotals).filter(([point, oddsPair]) => {
+                              const pointValue = parseFloat(point);
+                              // NaN이거나 0.5 단위가 아니면 제외 (0.5, 1, 1.5, 2, 2.5... 만 허용)
+                              return !isNaN(pointValue) && (pointValue % 0.5 === 0) && (pointValue % 1 === 0 || pointValue % 1 === 0.5);
+                            });
+                            
+                            return filteredTotals.map(([point, oddsPair], idx: number) => {
                               const overOdds = oddsPair.over?.averagePrice;
                               const underOdds = oddsPair.under?.averagePrice;
                               

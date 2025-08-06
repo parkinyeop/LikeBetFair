@@ -439,7 +439,22 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                     }
                   });
                   
-                  return Object.entries(groupedTotals).map(([point, oddsPair]) => {
+                  // 0.5 단위 포인트만 필터링 (0.25, 0.75 등 제외)
+                  const filteredTotals = Object.entries(groupedTotals).filter(([point, oddsPair]) => {
+                    const pointValue = parseFloat(point);
+                    // NaN이거나 0.5 단위가 아니면 제외 (0.5, 1, 1.5, 2, 2.5... 만 허용)
+                    return !isNaN(pointValue) && (pointValue % 0.5 === 0) && (pointValue % 1 === 0 || pointValue % 1 === 0.5);
+                  });
+                  
+                  if (filteredTotals.length === 0) {
+                    return (
+                      <div className="text-center text-gray-500 py-6">
+                        언더오버 배당 정보 없음 (0.5 단위만 지원)
+                      </div>
+                    );
+                  }
+                  
+                  return filteredTotals.map(([point, oddsPair]) => {
                     const overOdds = oddsPair.over?.averagePrice;
                     const underOdds = oddsPair.under?.averagePrice;
                     
