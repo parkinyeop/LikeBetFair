@@ -689,7 +689,7 @@ export default function Home() {
       );
       
       if (parentCategory) {
-        // "축구 > K리그" 형태로 설정
+        // "Soccer > K League" 형태로 설정
         categoryToSet = `${parentCategory[0]} > ${leagueName}`;
       } else {
         // 메인 카테고리에 속하지 않는 경우
@@ -710,7 +710,7 @@ export default function Home() {
         );
         
         if (parentCategory) {
-          // "축구 > K리그" 형태로 설정
+          // "Soccer > K League" 형태로 설정
           categoryToSet = `${parentCategory[0]} > ${displayName}`;
         } else {
           // 메인 카테고리에 속하지 않는 경우
@@ -1511,8 +1511,8 @@ export default function Home() {
                           {(() => {
                             const h2hOdds = game.officialOdds.h2h;
                             
-                            // 축구 경기인지 확인
-                            const isSoccer = selectedCategory === '축구' || 
+                                // 축구 경기인지 확인
+    const isSoccer = selectedCategory === 'Soccer' || 
                                            selectedCategory.includes('K League 1') || 
                                            selectedCategory.includes('Premier League') || 
                                            selectedCategory.includes('Serie A') || 

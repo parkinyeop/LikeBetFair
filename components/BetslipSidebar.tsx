@@ -189,9 +189,9 @@ function MyBetsPanel() {
 
   // 상태 한글 변환 및 색상
   const statusLabel = (status: string) => {
-    if (status === 'pending') return '진행중';
-    if (status === 'won') return '적중';
-    if (status === 'lost') return '실패';
+    if (status === 'pending') return 'In Progress';
+      if (status === 'won') return 'Won';
+  if (status === 'lost') return 'Lost';
     if (status === 'cancelled') return 'Bet Cancelled';
     return status;
   };
@@ -221,10 +221,10 @@ function MyBetsPanel() {
       {/* 필터 버튼 */}
       <div className="flex gap-2 mb-2">
         {[
-          { key: 'pending', label: '진행중' },
-          { key: 'won', label: '적중' },
-          { key: 'lost', label: '미적중' },
-          { key: 'all', label: '전체' },
+          { key: 'pending', label: 'In Progress' },
+              { key: 'won', label: 'Won' },
+    { key: 'lost', label: 'Lost' },
+          { key: 'all', label: 'All' },
         ].map(btn => (
           <button
             key={btn.key}
@@ -340,7 +340,7 @@ function MyBetsPanel() {
                         })}
                       </div>
                     ) : (
-                      <span className="text-gray-500">경기 정보 없음</span>
+                      <span className="text-gray-500">No game info</span>
                     )}
                   </div>
                   <button className="ml-2 px-2 py-0.5 text-xs border rounded text-blue-600 border-blue-300 hover:bg-blue-50" onClick={e => { e.stopPropagation(); toggleBet(bet.id); }}>{isOpen ? '접기 ▲' : '펼치기 ▼'}</button>
@@ -357,7 +357,7 @@ function MyBetsPanel() {
                     {/* 경기 결과 표시 (적중/미적중일 때) */}
                     {['won', 'lost'].includes(bet.status) && Array.isArray(bet.selections) && (
                       <div className="mb-3">
-                        <div className="text-sm font-medium text-gray-700 mb-2">📊 경기 결과</div>
+                        <div className="text-sm font-medium text-gray-700 mb-2">📊 Game Result</div>
                         <div className="space-y-2">
                           {bet.selections.map((sel: any, idx: number) => {
                             // 디버깅용 로그
@@ -421,11 +421,11 @@ function MyBetsPanel() {
                               }
                             }
                             
-                            let icon = '⏳', color = 'text-gray-400', label = '대기';
-                            if (actualResult === 'won') { icon = '✔️'; color = 'text-green-600'; label = '적중'; }
-                            else if (actualResult === 'lost') { icon = '❌'; color = 'text-red-500'; label = '실패'; }
-                            else if (actualResult === 'cancelled') { icon = '🚫'; color = 'text-orange-500'; label = '경기취소'; }
-                            else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; label = '무승부'; }
+                                                          let icon = '⏳', color = 'text-gray-400', label = 'Pending';
+                                                          if (actualResult === 'won') { icon = '✔️'; color = 'text-green-600'; label = 'Won'; }
+                              else if (actualResult === 'lost') { icon = '❌'; color = 'text-red-500'; label = 'Lost'; }
+                            else if (actualResult === 'cancelled') { icon = '🚫'; color = 'text-orange-500'; label = 'Game Cancelled'; }
+else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; label = 'Draw'; }
                             
                             const isOverUnder = sel.market === '언더/오버' || sel.market === 'totals';
                             const isHandicap = sel.market === '핸디캡' || sel.market === 'spreads';

@@ -41,26 +41,26 @@ export const SPORT_CATEGORIES: Record<string, SportCategory> = {
   },
   
   // 축구
-  "K리그": {
-    displayName: "K리그",
+  "K League": {
+    displayName: "K League",
     sportKey: "soccer_korea_kleague1", 
     backendCategory: "KOREA_KLEAGUE1",
     sportTitle: "K-League"
   },
-  "J리그": {
-    displayName: "J리그",
+  "J League": {
+    displayName: "J League",
     sportKey: "soccer_japan_j_league",
     backendCategory: "JAPAN_J_LEAGUE", 
     sportTitle: "J-League"
   },
-  "세리에 A": {
-    displayName: "세리에 A",
+  "Serie A": {
+    displayName: "Serie A",
     sportKey: "soccer_italy_serie_a",
     backendCategory: "ITALY_SERIE_A",
     sportTitle: "Serie A"
   },
-  "브라질 세리에 A": {
-    displayName: "브라질 세리에 A", 
+  "Brasileirao": {
+    displayName: "Brasileirao", 
     sportKey: "soccer_brazil_campeonato",
     backendCategory: "BRAZIL_CAMPEONATO",
     sportTitle: "Brasileirao"
@@ -71,32 +71,32 @@ export const SPORT_CATEGORIES: Record<string, SportCategory> = {
     backendCategory: "USA_MLS", 
     sportTitle: "MLS"
   },
-  "아르헨티나 프리메라": {
-    displayName: "아르헨티나 프리메라",
+  "Argentina Primera": {
+    displayName: "Argentina Primera",
     sportKey: "soccer_argentina_primera_division",
     backendCategory: "ARGENTINA_PRIMERA_DIVISION",
     sportTitle: "Argentina Primera"
   },
-  "중국 슈퍼리그": {
-    displayName: "중국 슈퍼리그", 
+  "Chinese Super League": {
+    displayName: "Chinese Super League", 
     sportKey: "soccer_china_superleague",
     backendCategory: "CHINA_SUPERLEAGUE",
     sportTitle: "Chinese Super League"
   },
-  "라리가": {
-    displayName: "라리가",
+  "La Liga": {
+    displayName: "La Liga",
     sportKey: "soccer_spain_primera_division",
     backendCategory: "LALIGA",
     sportTitle: "La Liga"
   },
-  "분데스리가": {
-    displayName: "분데스리가",
+  "Bundesliga": {
+    displayName: "Bundesliga",
     sportKey: "soccer_germany_bundesliga", 
     backendCategory: "BUNDESLIGA",
     sportTitle: "Bundesliga"
   },
-  "프리미어리그": {
-    displayName: "프리미어리그",
+  "Premier League": {
+    displayName: "Premier League",
     sportKey: "soccer_england_premier_league",
     backendCategory: "EPL",
     sportTitle: "English Premier League"
@@ -113,21 +113,21 @@ export const SPORT_CATEGORIES: Record<string, SportCategory> = {
 
 // 프론트엔드 카테고리 트리 구조
 export const SPORTS_TREE = {
-  축구: [
-    "K리그",
-    "J리그", 
-    "세리에 A",
-    "브라질 세리에 A",
+  Soccer: [
+    "K League",
+    "J League", 
+    "Serie A",
+    "Brasileirao",
     "MLS",
-    "아르헨티나 프리메라",
-    "중국 슈퍼리그",
-    "라리가",
-    "분데스리가",
-    "프리미어리그"
+    "Argentina Primera",
+    "Chinese Super League",
+    "La Liga",
+    "Bundesliga",
+    "Premier League"
   ],
-  농구: ["NBA", "KBL"],
-  야구: ["MLB", "KBO"], 
-  미식축구: ["NFL"]
+  Basketball: ["NBA", "KBL"],
+  Baseball: ["MLB", "KBO"], 
+  "American Football": ["NFL"]
 };
 
 // 유틸리티 함수들
@@ -177,77 +177,77 @@ export interface SeasonInfo {
 export const SEASON_SCHEDULES: Record<string, SeasonInfo> = {
   // 축구
   'soccer_korea_kleague1': {
-    name: 'K리그',
+    name: 'K League',
     status: 'active',
     currentSeason: '2025',
     nextSeasonStart: '2025-03-01',
-    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (1경기))'
+    description: '2025 Season in progress (Auto-detected: Odds available (1 game))'
   },
     'soccer_japan_j_league': {
-    name: 'J리그',
+    name: 'J League',
     status: 'active',
     currentSeason: '2025',
     nextSeasonStart: '2025-03-01',
-    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (10경기))'
+    description: '2025 Season in progress (Auto-detected: Odds available (10 games))'
   },
   'soccer_italy_serie_a': {
-    name: '세리에 A',
+    name: 'Serie A',
     status: 'offseason',
     currentSeason: '2025',
     nextSeasonStart: '2025-03-01',
-    description: '시즌오프 (자동 감지: 시즌 시작 예정, 배당율 조기 제공 중)'
+    description: 'Season Off (Auto-detected: Season starting soon, early odds available)'
   },
   'soccer_brazil_campeonato': {
-    name: '브라질 세리에 A',
+    name: 'Brasileirao',
     status: 'active',
     currentSeason: '2025',
     nextSeasonStart: '2025-03-01',
-    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (24경기))'
+    description: '2025 Season in progress (Auto-detected: Odds available (24 games))'
   },
   'soccer_usa_mls': {
     name: 'MLS',
     status: 'active',
     currentSeason: '2025',
     nextSeasonStart: '2025-03-01',
-    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (15경기), 최근 30일 43경기 완료)'
+    description: '2025 Season in progress (Auto-detected: Odds available (15 games), 43 games completed in last 30 days)'
   },
   'soccer_argentina_primera_division': {
-    name: '아르헨티나 프리메라',
+    name: 'Argentina Primera',
     status: 'active',
     currentSeason: '2025',
     nextSeasonStart: '2025-03-01',
-    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (20경기))'
+    description: '2025 Season in progress (Auto-detected: Odds available (20 games))'
   },
     'soccer_china_superleague': {
-    name: '중국 슈퍼리그',
+    name: 'Chinese Super League',
     status: 'active',
     currentSeason: '2025',
     nextSeasonStart: '2025-03-01',
-    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (4경기))'
+    description: '2025 Season in progress (Auto-detected: Odds available (4 games))'
   },
   'soccer_spain_primera_division': {
-    name: '라리가',
+    name: 'La Liga',
     status: 'offseason',
     currentSeason: '2024-25',
     seasonEnd: '2025-05-25',
     nextSeasonStart: '2025-08-17',
-    description: '시즌오프 (자동 감지: 최근 경기 없음, 예정 경기 없음, 배당율 미제공)'
+    description: 'Season Off (Auto-detected: No recent games, no scheduled games, no odds available)'
   },
   'soccer_germany_bundesliga': {
-    name: '분데스리가',
+    name: 'Bundesliga',
     status: 'offseason',
     currentSeason: '2025',
     nextSeasonStart: '2025-03-01',
-    description: '시즌오프 (자동 감지: 시즌 시작 예정, 배당율 조기 제공 중)'
+    description: 'Season Off (Auto-detected: Season starting soon, early odds available)'
   },
   'soccer_england_premier_league': {
-    name: '프리미어리그',
+    name: 'Premier League',
     status: 'offseason',
     currentSeason: '2025-26',
     seasonStart: '2025-08-15',
     seasonEnd: '2026-05-25',
     nextSeasonStart: '2026-08-15',
-    description: '2025-26 시즌 8월 15일 개막 예정'
+    description: '2025-26 Season starting August 15th'
   },
 
   // 농구
@@ -257,7 +257,7 @@ export const SEASON_SCHEDULES: Record<string, SeasonInfo> = {
     currentSeason: '2024-25',
     seasonEnd: '2025-06-19',
     nextSeasonStart: '2025-10-15',
-    description: '시즌오프 (자동 감지: 최근 경기 없음, 예정 경기 없음, 배당율 미제공)'
+    description: 'Season Off (Auto-detected: No recent games, no scheduled games, no odds available)'
   },
   'basketball_kbl': {
     name: 'KBL',
@@ -265,7 +265,7 @@ export const SEASON_SCHEDULES: Record<string, SeasonInfo> = {
     currentSeason: '2024-25',
     seasonEnd: '2025-04-26',
     nextSeasonStart: '2025-10-05',
-    description: '시즌오프 (자동 감지: 최근 경기 없음, 예정 경기 없음, 배당율 미제공)'
+    description: 'Season Off (Auto-detected: No recent games, no scheduled games, no odds available)'
   },
 
   // 야구
@@ -274,7 +274,7 @@ export const SEASON_SCHEDULES: Record<string, SeasonInfo> = {
     status: 'active',
     currentSeason: '2025',
     nextSeasonStart: '2025-03-01',
-    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (5경기))'
+    description: '2025 Season in progress (Auto-detected: Odds available (5 games))'
   },
   'baseball_mlb': {
     name: 'MLB',
@@ -282,7 +282,7 @@ export const SEASON_SCHEDULES: Record<string, SeasonInfo> = {
     currentSeason: '2025',
     seasonStart: '2025-03-27',
     seasonEnd: '2025-10-30',
-    description: '2025 시즌 진행 중'
+    description: '2025 Season in progress'
   },
 
   // 미식축구
@@ -292,7 +292,7 @@ export const SEASON_SCHEDULES: Record<string, SeasonInfo> = {
     currentSeason: '2025',
     seasonEnd: '2025-02-09',
     nextSeasonStart: '2025-09-05',
-    description: '시즌오프 (자동 감지: 시즌 시작 예정 (65일 후), 배당율 조기 제공 중)'
+    description: 'Season Off (Auto-detected: Season starting soon (65 days), early odds available)'
   }
 };
 
