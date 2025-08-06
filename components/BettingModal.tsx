@@ -32,7 +32,7 @@ export default function BettingModal({ isOpen, onClose, onConfirm, selection }: 
     const numValue = parseFloat(value);
     if (isNaN(numValue) || numValue <= 0) {
       setAmount(value);
-      setError('유효한 금액을 입력해주세요.');
+      setError('Please enter a valid amount.');
       return;
     }
     
@@ -54,17 +54,17 @@ export default function BettingModal({ isOpen, onClose, onConfirm, selection }: 
   const handleConfirm = () => {
     const stake = parseFloat(amount);
     if (isNaN(stake) || stake <= 0) {
-      setError('유효한 금액을 입력해주세요.');
+      setError('Please enter a valid amount.');
       return;
     }
 
     if (stake < 1000) {
-      setError('최소 배팅 금액은 1,000원입니다.');
+      setError('Minimum bet amount is 1,000 KRW.');
       return;
     }
 
     if (balance && stake > balance) {
-      setError('잔액이 부족합니다.');
+      setError('Insufficient balance.');
       return;
     }
 
@@ -88,7 +88,7 @@ export default function BettingModal({ isOpen, onClose, onConfirm, selection }: 
       <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">
-            {selection.type === 'back' ? 'Back' : 'Lay'} 배팅
+            {selection.type === 'back' ? 'Back' : 'Lay'} Betting
           </h2>
           <button
             onClick={onClose}
@@ -99,7 +99,7 @@ export default function BettingModal({ isOpen, onClose, onConfirm, selection }: 
         </div>
 
         <div className="space-y-4">
-          {/* 선택 정보 */}
+          {/* Selection Info */}
           <div className="bg-gray-50 p-4 rounded">
             <div className="flex justify-between items-center">
               <span className="font-semibold">{selection.team}</span>
@@ -110,20 +110,20 @@ export default function BettingModal({ isOpen, onClose, onConfirm, selection }: 
               </span>
             </div>
             <div className="text-sm text-gray-600 mt-1">
-              {selection.type === 'back' ? '승리 시 배당' : '레이 배당'}
+              {selection.type === 'back' ? 'Win Odds' : 'Lay Odds'}
             </div>
           </div>
 
-          {/* 배팅 금액 입력 */}
+          {/* Bet Amount Input */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              배팅 금액 (원)
+              Bet Amount (KRW)
             </label>
             <input
               type="number"
               value={amount}
               onChange={(e) => handleAmountChange(e.target.value)}
-              placeholder="배팅 금액을 입력하세요"
+              placeholder="Enter bet amount"
               className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               min="1000"
               step="1000"
@@ -133,48 +133,48 @@ export default function BettingModal({ isOpen, onClose, onConfirm, selection }: 
             )}
           </div>
 
-          {/* 배팅 정보 */}
+          {/* Betting Info */}
           {amount && !error && (
             <div className="bg-blue-50 p-4 rounded">
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span>배팅 금액:</span>
-                  <span className="font-semibold">{parseFloat(amount).toLocaleString()}원</span>
+                  <span>Bet Amount:</span>
+                  <span className="font-semibold">{parseFloat(amount).toLocaleString()} KRW</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>배당율:</span>
+                  <span>Odds:</span>
                   <span className="font-semibold">{selection.price.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>예상 수익:</span>
+                  <span>Expected Profit:</span>
                   <span className="font-semibold text-green-600">
-                    {profit.toFixed(0)}원
+                    {profit.toFixed(0)} KRW
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>총 반환금:</span>
+                  <span>Total Return:</span>
                   <span className="font-semibold">
-                    {(parseFloat(amount) + profit).toFixed(0)}원
+                    {(parseFloat(amount) + profit).toFixed(0)} KRW
                   </span>
                 </div>
               </div>
             </div>
           )}
 
-          {/* 사용자 잔액 */}
+          {/* User Balance */}
           {balance && (
             <div className="text-sm text-gray-600">
-              현재 잔액: {balance.toLocaleString()}원
+              Current Balance: {balance.toLocaleString()} KRW
             </div>
           )}
 
-          {/* 버튼 */}
+          {/* Buttons */}
           <div className="flex space-x-3 pt-4">
             <button
               onClick={onClose}
               className="flex-1 px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 transition-colors"
             >
-              취소
+              Cancel
             </button>
             <button
               onClick={handleConfirm}
@@ -187,7 +187,7 @@ export default function BettingModal({ isOpen, onClose, onConfirm, selection }: 
                   : 'bg-pink-600 text-white hover:bg-pink-700'
               }`}
             >
-              {selection.type === 'back' ? 'Back' : 'Lay'} 배팅
+              {selection.type === 'back' ? 'Back' : 'Lay'} Betting
             </button>
           </div>
         </div>

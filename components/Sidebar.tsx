@@ -4,36 +4,36 @@ interface SidebarProps {
   categories: string[];
   selected: string;
   onSelect: (category: string) => void;
-  resetToHome?: boolean; // 홈으로 리셋 신호
+  resetToHome?: boolean; // Reset to home signal
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ categories, selected, onSelect, resetToHome }) => {
-  // 메인/서브 분리
+  // Separate main/sub categories
   const mainCategories = categories.filter(cat => !cat.includes(" > "));
   const subCategories = categories.filter(cat => cat.includes(" > "));
 
-  // 현재 선택된 메인/서브
+  // Currently selected main/sub
   const [currentMain, currentSub] = selected.includes(" > ")
     ? selected.split(" > ")
     : [selected, ""];
 
-  // 하위 카테고리 열림 상태를 별도 관리
+  // Separately manage subcategory open state
   const [openMain, setOpenMain] = useState<string | null>(currentMain || null);
 
-  // resetToHome이 true일 때 모든 카테고리 닫기
+  // Close all categories when resetToHome is true
   useEffect(() => {
     if (resetToHome) {
       setOpenMain(null);
     }
   }, [resetToHome]);
 
-  // selected가 변경될 때 openMain 동기화
+  // Sync openMain when selected changes
   useEffect(() => {
     if (selected.includes(" > ")) {
       const [main] = selected.split(" > ");
       setOpenMain(main);
     } else if (selected && mainCategories.includes(selected)) {
-      // 메인 카테고리만 선택된 경우
+      // When only main category is selected
       setOpenMain(selected);
     }
   }, [selected, mainCategories]);
@@ -48,12 +48,12 @@ const Sidebar: React.FC<SidebarProps> = ({ categories, selected, onSelect, reset
           <div key={category}>
             <button
               onClick={() => {
-                // 토글 방식으로 변경
+                // Change to toggle method
                 if (isOpen) {
-                  setOpenMain(null); // 열려있으면 닫기
+                  setOpenMain(null); // Close if open
                 } else {
-                  setOpenMain(category); // 닫혀있으면 열기
-                  onSelect(category); // 메인 카테고리 선택
+                  setOpenMain(category); // Open if closed
+                  onSelect(category); // Select main category
                 }
               }}
               className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
@@ -65,7 +65,7 @@ const Sidebar: React.FC<SidebarProps> = ({ categories, selected, onSelect, reset
               {category}
             </button>
 
-            {/* openMain(열린 메인)만 하위 표시 */}
+            {/* Only show subcategories for openMain (open main) */}
             {isOpen && (
               <div className="ml-4 mt-1 space-y-1">
                 {subCategories

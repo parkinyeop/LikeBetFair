@@ -19,35 +19,35 @@ export default function LoginForm({ onClose }: { onClose: () => void }) {
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
-      console.log('로그인 응답:', data);
-      console.log('로그인 응답 balance:', data.balance, typeof data.balance);
+      console.log('Login response:', data);
+      console.log('Login response balance:', data.balance, typeof data.balance);
       if (res.ok) {
-        // localStorage 직접 조작 제거 - AuthContext의 login 함수가 처리
+        // Remove direct localStorage manipulation - handled by AuthContext login function
         await login(
           data.username || data.email, 
           Number(data.balance), 
           data.token,
           data.isAdmin || false, 
           data.adminLevel || 0,
-          data.userId // userId 추가
+          data.userId // Add userId
         );
         onClose();
       } else {
-        setMessage(data.message || '로그인 실패');
+        setMessage(data.message || 'Login failed');
       }
     } catch (err) {
-      setMessage('서버 오류');
+      setMessage('Server error');
     }
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white p-8 rounded-lg shadow-lg w-96">
-        <h2 className="text-2xl font-bold mb-6 text-center">로그인</h2>
+        <h2 className="text-2xl font-bold mb-6 text-center">Login</h2>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label className="block text-gray-700 text-sm font-bold mb-2">
-              이메일 또는 사용자명
+              Email or Username
             </label>
             <input
               type="text"
@@ -59,7 +59,7 @@ export default function LoginForm({ onClose }: { onClose: () => void }) {
           </div>
           <div className="mb-6">
             <label className="block text-gray-700 text-sm font-bold mb-2">
-              비밀번호
+              Password
             </label>
             <input
               type="password"
@@ -79,14 +79,14 @@ export default function LoginForm({ onClose }: { onClose: () => void }) {
               type="submit"
               className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
             >
-              로그인
+              Login
             </button>
             <button
               type="button"
               onClick={onClose}
               className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
             >
-              취소
+              Cancel
             </button>
           </div>
         </form>

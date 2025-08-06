@@ -18,8 +18,8 @@ export default function JoinForm({ onClose }: { onClose: () => void }) {
     setIsLoading(true);
 
     try {
-      console.log('[회원가입] 폼 제출 시작');
-      console.log('[회원가입] 입력 데이터:', { 
+      console.log('[Registration] Form submission started');
+      console.log('[Registration] Input data:', { 
         username: username ? `${username.substring(0, 3)}***` : null,
         email: email ? `${email.substring(0, 3)}***` : null,
         hasPassword: !!password,
@@ -29,19 +29,19 @@ export default function JoinForm({ onClose }: { onClose: () => void }) {
 
       // 클라이언트 측 검증
       if (!username.trim() || !email.trim() || !password.trim()) {
-        setError('모든 필수 필드를 입력해주세요');
+        setError('Please fill in all required fields');
         setIsLoading(false);
         return;
       }
 
       if (username.length < 2 || username.length > 50) {
-        setError('사용자명은 2-50자 사이여야 합니다');
+        setError('Username must be 2-50 characters');
         setIsLoading(false);
         return;
       }
 
       if (password.length < 6) {
-        setError('비밀번호는 최소 6자 이상이어야 합니다');
+        setError('Password must be at least 6 characters');
         setIsLoading(false);
         return;
       }
@@ -51,9 +51,9 @@ export default function JoinForm({ onClose }: { onClose: () => void }) {
         requestBody.referralCode = referralCode.trim();
       }
 
-      console.log('[회원가입] API 요청 시작');
-      console.log('[회원가입] 요청 URL:', `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.REGISTER}`);
-      console.log('[회원가입] 요청 바디:', requestBody);
+      console.log('[Registration] API request started');
+      console.log('[Registration] Request URL:', `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.REGISTER}`);
+      console.log('[Registration] Request body:', requestBody);
 
       const res = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.REGISTER}`, {
         method: 'POST',
@@ -64,38 +64,38 @@ export default function JoinForm({ onClose }: { onClose: () => void }) {
         body: JSON.stringify(requestBody),
       });
 
-      console.log('[회원가입] API 응답 상태:', res.status);
-      console.log('[회원가입] API 응답 헤더:', Object.fromEntries(res.headers.entries()));
+      console.log('[Registration] API response status:', res.status);
+      console.log('[Registration] API response headers:', Object.fromEntries(res.headers.entries()));
 
       // 응답을 텍스트로 먼저 읽기
       const responseText = await res.text();
-      console.log('[회원가입] API 응답 텍스트:', responseText);
+      console.log('[Registration] API response text:', responseText);
 
       let data;
       try {
         data = JSON.parse(responseText);
       } catch (parseError) {
-        console.error('[회원가입] JSON 파싱 실패:', parseError);
-        console.error('[회원가입] 원본 응답 텍스트:', responseText);
-        setError('서버 응답 형식 오류가 발생했습니다');
+        console.error('[Registration] JSON parsing failed:', parseError);
+        console.error('[Registration] Original response text:', responseText);
+        setError('Server response format error occurred');
         setIsLoading(false);
         return;
       }
 
-      console.log('[회원가입] API 응답 데이터:', data);
+      console.log('[Registration] API response data:', data);
 
       if (res.ok) {
-        console.log('[회원가입] 성공');
+        console.log('[Registration] Success');
         setShowSuccessModal(true);
         setUsername('');
         setEmail('');
         setPassword('');
         setReferralCode('');
-        setMessage(data.message || '회원가입이 완료되었습니다');
+        setMessage(data.message || 'Registration completed successfully');
       } else {
-        console.log('[회원가입] 실패:', data);
-        console.error('[회원가입] HTTP 상태:', res.status);
-        console.error('[회원가입] 응답 데이터:', data);
+        console.log('[Registration] Failed:', data);
+        console.error('[Registration] HTTP status:', res.status);
+        console.error('[Registration] Response data:', data);
         
         // 서버에서 반환한 오류 메시지 처리
         if (data.error) {
@@ -103,21 +103,21 @@ export default function JoinForm({ onClose }: { onClose: () => void }) {
         } else if (data.message) {
           setError(data.message);
         } else {
-          setError(`회원가입에 실패했습니다 (${res.status})`);
+          setError(`Registration failed (${res.status})`);
         }
 
         // 상세 오류 정보가 있으면 콘솔에 출력
         if (data.details) {
-          console.error('[회원가입] 상세 오류:', data.details);
+          console.error('[Registration] Detailed error:', data.details);
         }
         if (data.missing) {
-          console.error('[회원가입] 누락된 필드:', data.missing);
+          console.error('[Registration] Missing fields:', data.missing);
         }
       }
     } catch (err) {
-      console.error('[회원가입] 네트워크 오류:', err);
-      console.error('[회원가입] 전체 오류:', err);
-      setError('서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      console.error('[Registration] Network error:', err);
+      console.error('[Registration] Full error:', err);
+      setError('Server connection failed. Please try again later.');
     } finally {
       setIsLoading(false);
     }
@@ -132,10 +132,10 @@ export default function JoinForm({ onClose }: { onClose: () => void }) {
     <>
       <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow w-80">
-          <h2 className="text-xl font-bold mb-4">회원가입</h2>
+          <h2 className="text-xl font-bold mb-4">Sign Up</h2>
           <input
             className="w-full mb-2 p-2 border rounded text-black"
-            placeholder="Username (2-50자)"
+            placeholder="Username (2-50 characters)"
             value={username}
             onChange={e => setUsername(e.target.value)}
             required
@@ -154,7 +154,7 @@ export default function JoinForm({ onClose }: { onClose: () => void }) {
           />
           <input
             className="w-full mb-2 p-2 border rounded text-black"
-            placeholder="Password (6자 이상)"
+            placeholder="Password (min 6 characters)"
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
@@ -164,14 +164,14 @@ export default function JoinForm({ onClose }: { onClose: () => void }) {
           />
           <input
             className="w-full mb-4 p-2 border rounded text-black"
-            placeholder="추천코드 (선택사항)"
+            placeholder="Referral Code (optional)"
             value={referralCode}
             onChange={e => setReferralCode(e.target.value)}
             disabled={isLoading}
           />
           {referralCode && (
             <div className="mb-2 text-xs text-blue-600 bg-blue-50 p-2 rounded">
-              💡 추천코드를 입력하시면 특별 혜택을 받을 수 있습니다!
+              💡 Enter a referral code to receive special benefits!
             </div>
           )}
           <button 
@@ -183,7 +183,7 @@ export default function JoinForm({ onClose }: { onClose: () => void }) {
             } text-white`}
             disabled={isLoading}
           >
-            {isLoading ? '처리 중...' : '가입하기'}
+            {isLoading ? 'Processing...' : 'Sign Up'}
           </button>
           <button 
             type="button" 
@@ -191,7 +191,7 @@ export default function JoinForm({ onClose }: { onClose: () => void }) {
             onClick={onClose}
             disabled={isLoading}
           >
-            닫기
+            Close
           </button>
           {error && (
             <div className="mt-2 text-center text-sm text-red-500 bg-red-50 p-2 rounded">
@@ -210,19 +210,19 @@ export default function JoinForm({ onClose }: { onClose: () => void }) {
       {showSuccessModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-60">
           <div className="bg-white p-6 rounded shadow w-80 text-center">
-            <h3 className="text-lg font-bold mb-4 text-green-600">🎉 회원가입 완료!</h3>
+            <h3 className="text-lg font-bold mb-4 text-green-600">🎉 Registration Complete!</h3>
             <p className="mb-4 text-gray-700">
               {referralCode 
-                ? `추천코드 "${referralCode}"로 가입이 완료되었습니다!` 
-                : '회원가입이 완료되었습니다!'
+                ? `Registration completed with referral code "${referralCode}"!` 
+                : 'Registration completed successfully!'
               }
             </p>
-            <p className="mb-4 text-sm text-gray-500">이제 로그인하여 서비스를 이용하세요.</p>
+            <p className="mb-4 text-sm text-gray-500">Please log in to use the service.</p>
             <button 
               onClick={handleSuccessModalClose}
               className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
             >
-              확인
+              OK
             </button>
           </div>
         </div>

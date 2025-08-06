@@ -30,7 +30,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [selectedMainCategory, setSelectedMainCategory] = useState<string>("축구");
+  const [selectedMainCategory, setSelectedMainCategory] = useState<string>("Soccer");
   const [currentSportKey, setCurrentSportKey] = useState<string>("");
   const [viewMode, setViewMode] = useState<'today' | 'league'>('today');
   const [todayGames, setTodayGames] = useState<Record<string, any[]>>({});
@@ -785,8 +785,8 @@ export default function Home() {
               </svg>
             </div>
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">📅 오늘 예정된 경기가 없습니다</h3>
-          <p className="text-gray-600 mb-4">현재 활성화된 리그에 오늘~내일 경기가 없습니다.</p>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">📅 No Games Scheduled for Today</h3>
+          <p className="text-gray-600 mb-4">No games found for today and tomorrow in active leagues.</p>
         </div>
       );
     }
@@ -879,7 +879,7 @@ export default function Home() {
                   <span className="text-sm">📅 {gameTime.toLocaleDateString()} {gameTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   {!isBettable && (
                     <div className="text-xs text-red-500 mt-1">
-                      ⏰ 베팅 마감 (경기 시작 10분 전)
+                      ⏰ Betting Closed (10 min before game)
                     </div>
                   )}
                 </div>
@@ -990,7 +990,7 @@ export default function Home() {
                               >
                                 <div className="font-bold">{label}</div>
                                 <div className="text-sm">{outcome.price ? outcome.price.toFixed(2) : 'N/A'}</div>
-                                {!isBettable && <div className="text-xs text-red-500 mt-1">베팅 마감</div>}
+                                {!isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
                               </button>
                             );
                           });
@@ -1293,10 +1293,10 @@ export default function Home() {
   return (
     <div className="p-6">
       <div className="mb-4 p-3 bg-blue-50 text-blue-700 rounded">
-        홈화면은 정보 제공용입니다. 경기를 클릭하면 상세 페이지로 이동합니다.
+        Home screen is for information only. Click on games to go to detailed pages.
       </div>
       
-      <h1 className="text-2xl font-bold mb-6">스포츠 베팅</h1>
+      <h1 className="text-2xl font-bold mb-6">Sports Betting</h1>
       
       <div className="mb-6 flex gap-2">
         <button
@@ -1313,7 +1313,7 @@ export default function Home() {
           onClick={() => {
             setViewMode('league');
             // 리그별 보기 선택시 축구를 기본 메인 카테고리로 설정하고 하위 카테고리는 선택 해제
-            setSelectedMainCategory('축구');
+            setSelectedMainCategory('Soccer');
             setSelectedCategory('');
             setCurrentSportKey('');
             setGames([]);
@@ -1326,7 +1326,7 @@ export default function Home() {
               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
           }`}
         >
-          🏟️ 리그별 보기
+          🏟️ League View
         </button>
       </div>
 
@@ -1469,8 +1469,8 @@ export default function Home() {
                     </svg>
                   </div>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">⚽ 리그를 선택해주세요</h3>
-                <p className="text-gray-600">위에서 원하는 리그를 선택하면 해당 리그의 경기 정보를 볼 수 있습니다.</p>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">⚽ Please Select a League</h3>
+                <p className="text-gray-600">Select your desired league from above to view game information for that league.</p>
               </div>
             ) : games.length === 0 ? (
               <SeasonInfoDisplay category={selectedCategory} />
@@ -1484,7 +1484,7 @@ export default function Home() {
                         <span className="text-sm">📅 {new Date(game.commence_time).toLocaleDateString()} {new Date(game.commence_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         {!game.isBettable && (
                           <div className="text-xs text-red-500 mt-1">
-                            ⏰ 베팅 마감 (경기 시작 10분 전)
+                            ⏰ Betting Closed (10 min before game)
                           </div>
                         )}
                       </div>
@@ -1590,7 +1590,7 @@ export default function Home() {
                                       >
                                         <div className="font-bold">{label}</div>
                                         <div className="text-sm">{outcome.odds.averagePrice.toFixed(2)}</div>
-                                        {!game.isBettable && <div className="text-xs text-red-500 mt-1">베팅 마감</div>}
+                                        {!game.isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
                                       </button>
                                     );
                                   });
@@ -1640,7 +1640,7 @@ export default function Home() {
                                     onClick={() => {
                                       const isBettable = new Date(game.commence_time) > new Date(Date.now() + 10 * 60 * 1000);
                                       if (!isBettable) {
-                                        alert('이 경기는 베팅 마감되었습니다.');
+                                        alert('This game is closed for betting.');
                                         return;
                                       }
                                       toggleSelection({
@@ -1663,7 +1663,7 @@ export default function Home() {
                                   >
                                     <div className="font-bold">{game.home_team}</div>
                                     <div className="text-sm">오버 ({overOdds ? overOdds.toFixed(2) : 'N/A'})</div>
-                                    {!game.isBettable && <div className="text-xs text-red-500 mt-1">베팅 마감</div>}
+                                    {!game.isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
                                   </button>
                                   <div className="w-16 text-base font-bold text-gray-800 text-center">
                                     {point}
@@ -1672,7 +1672,7 @@ export default function Home() {
                                     onClick={() => {
                                       const isBettable = new Date(game.commence_time) > new Date(Date.now() + 10 * 60 * 1000);
                                       if (!isBettable) {
-                                        alert('이 경기는 베팅 마감되었습니다.');
+                                        alert('This game is closed for betting.');
                                         return;
                                       }
                                       toggleSelection({
@@ -1695,7 +1695,7 @@ export default function Home() {
                                   >
                                     <div className="font-bold">{game.away_team}</div>
                                     <div className="text-sm">언더 ({underOdds ? underOdds.toFixed(2) : 'N/A'})</div>
-                                    {!game.isBettable && <div className="text-xs text-red-500 mt-1">베팅 마감</div>}
+                                    {!game.isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
                                   </button>
                                 </div>
                               );
@@ -1761,7 +1761,7 @@ export default function Home() {
                                           onClick={() => {
                                             const isBettable = new Date(game.commence_time) > new Date(Date.now() + 10 * 60 * 1000);
                                             if (!isBettable) {
-                                              alert('이 경기는 베팅 마감되었습니다.');
+                                              alert('This game is closed for betting.');
                                               return;
                                             }
                                             toggleSelection({
@@ -1787,7 +1787,7 @@ export default function Home() {
                                             {homeOdds.toFixed(2)} 
                                             <span className="ml-1 text-xs">{homeHandicap > 0 ? '+' : ''}{homeHandicap}</span>
                                           </div>
-                                          {!game.isBettable && <div className="text-xs text-red-500 mt-1">베팅 마감</div>}
+                                          {!game.isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
                                         </button>
                                       )}
                                       <div className="w-16 text-base font-bold text-gray-800 text-center">{homeHandicap > 0 ? '+' : ''}{homeHandicap}</div>
@@ -1796,7 +1796,7 @@ export default function Home() {
                                           onClick={() => {
                                             const isBettable = new Date(game.commence_time) > new Date(Date.now() + 10 * 60 * 1000);
                                             if (!isBettable) {
-                                              alert('이 경기는 베팅 마감되었습니다.');
+                                              alert('This game is closed for betting.');
                                               return;
                                             }
                                             toggleSelection({
@@ -1822,7 +1822,7 @@ export default function Home() {
                                             {awayOdds.toFixed(2)} 
                                             <span className="ml-1 text-xs">{awayHandicap > 0 ? '+' : ''}{awayHandicap}</span>
                                           </div>
-                                          {!game.isBettable && <div className="text-xs text-red-500 mt-1">베팅 마감</div>}
+                                          {!game.isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
                                         </button>
                                       )}
                                     </div>

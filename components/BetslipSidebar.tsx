@@ -83,7 +83,7 @@ function MyBetsPanel() {
         setBets(data);
       } else {
         console.error('[클라이언트] API 에러:', data.message);
-        setError(data.message || '배팅내역 불러오기 실패');
+        setError(data.message || 'Failed to load betting history');
       }
     } catch (err) {
       console.error('[클라이언트] fetch 에러:', err);
@@ -192,7 +192,7 @@ function MyBetsPanel() {
     if (status === 'pending') return '진행중';
     if (status === 'won') return '적중';
     if (status === 'lost') return '실패';
-    if (status === 'cancelled') return '배팅취소';
+    if (status === 'cancelled') return 'Bet Cancelled';
     return status;
   };
   const statusColor = (status: string) => {
@@ -203,14 +203,14 @@ function MyBetsPanel() {
     return '';
   };
 
-  if (loading) return <div className="p-4">불러오는 중...</div>;
+      if (loading) return <div className="p-4">Loading...</div>;
   if (error) return <div className="p-4 text-red-500">{error}</div>;
-  if (!bets.length) return <div className="p-4 text-gray-500 text-sm">최근 배팅내역이 없습니다.</div>;
+        if (!bets.length) return <div className="p-4 text-gray-500 text-sm">No recent betting history.</div>;
 
   return (
     <div className="w-full p-4 bg-white rounded shadow">
       <div className="flex justify-between items-center mb-3">
-        <h2 className="text-lg font-bold">배팅내역</h2>
+        <h2 className="text-lg font-bold">Betting History</h2>
         <button 
           onClick={fetchBets}
           className="text-sm text-blue-600 hover:text-blue-800 px-2 py-1 rounded border border-blue-300 hover:bg-blue-50"
@@ -349,7 +349,7 @@ function MyBetsPanel() {
                 {isOpen && (
                   <div className="mt-2">
                     <div className="flex items-center mb-2">
-                      <span className="text-sm">🧾 멀티베팅 {Array.isArray(bet.selections) ? bet.selections.length : 0}건</span>
+                      <span className="text-sm">🧾 Multi Bet {Array.isArray(bet.selections) ? bet.selections.length : 0} selections</span>
                     </div>
                     {expectedResultDate && (
                       <div className="text-xs text-blue-600 font-semibold mb-2">정산예정일: {expectedResultDate}</div>
@@ -516,7 +516,7 @@ function MyBetsPanel() {
                     
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between items-center">
-                        <span>💰 배팅금:</span>
+                        <span>💰 Stake:</span>
                         <b className="text-black">{Number(bet.stake).toLocaleString()}원</b>
                       </div>
                       <div className="flex justify-between items-center">
@@ -534,8 +534,8 @@ function MyBetsPanel() {
                             className="px-2 py-0.5 text-xs border border-red-500 text-red-500 rounded hover:bg-red-500 hover:text-white transition-colors ml-1"
                             onClick={async () => {
                               console.log('[배팅취소] 버튼 클릭됨:', bet.id);
-                              if (!window.confirm('정말 이 베팅을 취소하시겠습니까?')) {
-                                console.log('[배팅취소] 사용자가 취소함');
+                                                          if (!window.confirm('Are you sure you want to cancel this bet?')) {
+                              console.log('[배팅취소] 사용자가 취소함');
                                 return;
                               }
                               
@@ -561,7 +561,7 @@ function MyBetsPanel() {
                               if (res.ok) {
                                 const data = await res.json();
                                 console.log('[배팅취소] 성공 응답:', data);
-                                alert('베팅이 취소되었습니다.');
+                                alert('Bet has been cancelled.');
                                 if (data.balance !== undefined) setBalance(Number(data.balance));
                                 setBets((prev: any[]) => prev.map(b => b.id === bet.id ? { ...b, status: 'cancelled' } : b));
                                 window.dispatchEvent(new Event('betCancelled'));
@@ -569,7 +569,7 @@ function MyBetsPanel() {
                               } else {
                                 const errorData = await res.json().catch(() => ({}));
                                 console.error('[배팅취소] 오류 응답:', errorData);
-                                alert(errorData.message || '베팅 취소에 실패했습니다.');
+                                alert(errorData.message || 'Failed to cancel bet.');
                               }
                             }}
                             disabled={bet.status === 'cancelled' || bet.selections.some((sel: any) => {
@@ -579,13 +579,13 @@ function MyBetsPanel() {
                               return gameTime <= new Date(Date.now() + 10 * 60 * 1000);
                             })}
                           >
-                            베팅취소
+                            Cancel Bet
                           </button>
                         )}
                       </div>
                     </div>
                     {bet.status === 'pending' && Array.isArray(bet.selections) && !bet.selections.every((sel: any) => sel.result === 'pending' || !sel.result) && (
-                      <div className="mt-2 text-xs text-gray-400">이미 일부 경기가 시작되어 취소할 수 없습니다.</div>
+                      <div className="mt-2 text-xs text-gray-400">Some games have already started and cannot be cancelled.</div>
                     )}
                   </div>
                 )}
@@ -601,7 +601,7 @@ function MyBetsPanel() {
             onChange={e => setHidePastResults(e.target.checked)}
             className="mr-1"
           />
-          <label htmlFor="hidePastResults" className="text-xs text-gray-600 select-none">지난 결과 숨기기</label>
+          <label htmlFor="hidePastResults" className="text-xs text-gray-600 select-none">Hide Past Results</label>
         </div>
       </div>
     </div>
@@ -633,7 +633,7 @@ export default function BetslipSidebar({
   if (!isLoggedIn) {
     return (
       <aside className="w-80 bg-white text-black p-4 space-y-4 border-l border-gray-200 flex items-center justify-center min-h-full">
-        <span className="text-gray-500 text-base font-semibold">로그인 후 배팅이 가능합니다</span>
+        <span className="text-gray-500 text-base font-semibold">Please login to place bets</span>
       </aside>
     );
   }
@@ -643,11 +643,11 @@ export default function BetslipSidebar({
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-lg font-bold">BET</h2>
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-blue-600">잔액: {balance !== null ? Math.round(Number(balance)).toLocaleString() : '-'}원</span>
+          <span className="text-sm font-semibold text-blue-600">Balance: {balance !== null ? Math.round(Number(balance)).toLocaleString() : '-'}원</span>
           <button
             onClick={forceRefreshBalance}
             className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-            title="잔액 동기화"
+            title="Sync Balance"
           >
             🔄
           </button>
@@ -658,13 +658,13 @@ export default function BetslipSidebar({
           className={`flex-1 py-1 rounded ${activeTab === 'betslip' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
           onClick={() => handleTabChange('betslip')}
         >
-          베팅슬립
+          Bet Slip
         </button>
         <button
           className={`flex-1 py-1 rounded ${activeTab === 'mybets' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
           onClick={() => handleTabChange('mybets')}
         >
-          배팅내역
+          My Bets
         </button>
       </div>
       <div className="flex-1 min-h-0 flex flex-col">
