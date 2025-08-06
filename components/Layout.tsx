@@ -6,6 +6,7 @@ import BetslipSidebar from "./BetslipSidebar";
 import ExchangeSidebar from "./ExchangeSidebar";
 import ResizableMainLayout from "./ResizableMainLayout";
 import { SPORTS_TREE, getSportKey, getDisplayNameFromSportKey, getAllCategories } from "../config/sportsMapping";
+import { useBetStore } from '../stores/useBetStore';
 
 interface LayoutProps {
   children: ReactNode;
@@ -16,6 +17,7 @@ const Layout = memo(({ children }: LayoutProps) => {
   const [selected, setSelected] = useState("NBA");
   const [betslipTab, setBetslipTab] = useState<'betslip' | 'mybets'>('betslip'); // 배팅슬립 탭 상태 추가
   const [resetToHome, setResetToHome] = useState(false); // 홈 리셋 상태
+  const { setTabChangeCallback } = useBetStore();
   
   // 페이지 체크 메모화
   const isExchange = useMemo(() => router.pathname.startsWith("/exchange"), [router.pathname]);
@@ -77,6 +79,11 @@ const Layout = memo(({ children }: LayoutProps) => {
   const handleBettingAreaSelect = useCallback(() => {
     setBetslipTab('betslip'); // 배팅슬립 탭으로 변경
   }, []);
+
+  // useBetStore에 탭 변경 콜백 설정
+  useEffect(() => {
+    setTabChangeCallback(setBetslipTab);
+  }, [setTabChangeCallback]);
 
   // 전역 이벤트 리스너 추가
   useEffect(() => {

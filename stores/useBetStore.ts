@@ -15,17 +15,20 @@ export type BetSelection = {
 interface BetState {
   selections: BetSelection[];
   stake: number;
+  onTabChange?: (tab: 'betslip' | 'mybets') => void;
   addSelection: (bet: BetSelection) => void;
   removeSelection: (team: string) => void;
   toggleSelection: (bet: BetSelection) => void;
   updateSelection: (index: number, updates: Partial<BetSelection>) => void;
   setStake: (amount: number) => void;
   clearAll: () => void;
+  setTabChangeCallback: (callback: (tab: 'betslip' | 'mybets') => void) => void;
 }
 
 export const useBetStore = create<BetState>((set, get) => ({
   selections: [],
   stake: 0,
+  onTabChange: undefined,
 
   addSelection: (bet) =>
     set((state) => ({ selections: [...state.selections, { ...bet, market: bet.market || '승/패' }] })),
@@ -36,7 +39,7 @@ export const useBetStore = create<BetState>((set, get) => ({
     })),
 
   toggleSelection: (bet) => {
-    const { selections } = get();
+    const { selections, onTabChange } = get();
     // market 필드 강제 보장
     const safeBet = { ...bet, market: bet.market || '승/패' };
     // 이미 같은 팀, 마켓, 경기 선택되어 있으면 해제
@@ -51,6 +54,11 @@ export const useBetStore = create<BetState>((set, get) => ({
         ),
       }));
     } else {
+      // 새로운 선택이 추가될 때 Bet Slip 탭으로 변경
+      if (onTabChange) {
+        onTabChange('betslip');
+      }
+      
       // 같은 경기에서 승패(h2h)와 핸디캡(spreads)은 동시에 선택 불가
       if (
         (safeBet.market === '승/패' || safeBet.market === '핸디캡') &&
@@ -97,4 +105,6 @@ export const useBetStore = create<BetState>((set, get) => ({
   setStake: (amount) => set(() => ({ stake: amount })),
 
   clearAll: () => set(() => ({ selections: [], stake: 0 })),
+  
+  setTabChangeCallback: (callback) => set(() => ({ onTabChange: callback })),
 })); 
