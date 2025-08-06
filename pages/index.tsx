@@ -771,7 +771,7 @@ export default function Home() {
   };
 
   const { selections, toggleSelection } = useBetStore();
-  const [selectedMarkets, setSelectedMarkets] = useState<{ [gameId: string]: '승/패' | '언더/오버' | '핸디캡' }>({});
+  const [selectedMarkets, setSelectedMarkets] = useState<{ [gameId: string]: 'Win/Loss' | 'Over/Under' | 'Handicap' }>({});
 
   const TodayBettingView = () => {
     if (todayLoading) return <div className="text-center py-8">로딩 중...</div>;
@@ -813,7 +813,7 @@ export default function Home() {
               <div className="text-sm text-gray-600">
                 📅 {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}
               </div>
-              <div className="text-xs text-gray-500">Updated: {new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>
+              <div className="text-xs text-gray-500">Updated: {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>
             </div>
           </div>
         </div>
@@ -821,8 +821,8 @@ export default function Home() {
         {todayFlatGames?.map((game: any) => {
           const gameTime = new Date(game.commence_time);
           const isBettable = game.isBettable !== undefined ? game.isBettable : true;
-          const selectedMarket = selectedMarkets[game.id] || '승/패';
-          const marketKeyMap = { '승/패': 'h2h', '언더/오버': 'totals', '핸디캡': 'spreads' };
+          const selectedMarket = selectedMarkets[game.id] || 'Win/Loss';
+          const marketKeyMap = { 'Win/Loss': 'h2h', 'Over/Under': 'totals', 'Handicap': 'spreads' };
           const marketKey = marketKeyMap[selectedMarket];
           const officialOdds = game.officialOdds || {};
           const marketOdds = officialOdds[marketKey] || {};
@@ -876,7 +876,7 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-sm">📅 {gameTime.toLocaleDateString()} {gameTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="text-sm">📅 {gameTime.toLocaleDateString()} {gameTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
                   {!isBettable && (
                     <div className="text-xs text-red-500 mt-1">
                       ⏰ Betting Closed (10 min before game)
@@ -886,7 +886,7 @@ export default function Home() {
               </div>
               {/* 마켓 탭 */}
               <div className="flex gap-2 mb-3">
-                {['승/패', '언더/오버', '핸디캡'].map(marketTab => (
+                {['Win/Loss', 'Over/Under', 'Handicap'].map(marketTab => (
                   <button
                     key={marketTab}
                     className={`px-3 py-1 rounded ${selectedMarket === marketTab ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
@@ -897,7 +897,7 @@ export default function Home() {
                 ))}
               </div>
               {/* 마켓별 선택 영역 - OddsList.tsx와 동일하게 구현 */}
-              {selectedMarket === '승/패' && (
+              {selectedMarket === 'Win/Loss' && (
                 <div className="space-y-2">
                   {(() => {
                     const h2hOdds = officialOdds.h2h || {};
@@ -1001,7 +1001,7 @@ export default function Home() {
                 </div>
               )}
               {/* 언더/오버 */}
-              {selectedMarket === '언더/오버' && (
+              {selectedMarket === 'Over/Under' && (
                 <div className="space-y-2">
                   {(() => {
                     const totalsOdds = officialOdds.totals || {};
@@ -1093,7 +1093,7 @@ export default function Home() {
                 </div>
               )}
               {/* 핸디캡 */}
-              {selectedMarket === '핸디캡' && (
+              {selectedMarket === 'Handicap' && (
                 <div className="space-y-2">
                   {(() => {
                     const spreadsOdds = officialOdds.spreads || {};

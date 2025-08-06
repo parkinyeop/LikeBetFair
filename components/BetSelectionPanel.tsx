@@ -26,21 +26,21 @@ const OddsChangeModal = ({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-        <h3 className="text-lg font-bold mb-4 text-red-600">⚠️ 배당율 변경 알림</h3>
+        <h3 className="text-lg font-bold mb-4 text-red-600">⚠️ Odds Change Alert</h3>
         
         <div className="mb-4">
           <p className="text-gray-700 mb-3">{message}</p>
           
           <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-3">
-            <p className="text-sm font-medium text-gray-700">경기: {selection}</p>
+            <p className="text-sm font-medium text-gray-700">Game: {selection}</p>
             <div className="flex items-center justify-between mt-2">
-              <span className="text-red-600">기존: {oldOdds}</span>
-              <span className="text-blue-600 font-bold">→ 현재: {newOdds}</span>
+              <span className="text-red-600">Previous: {oldOdds}</span>
+              <span className="text-blue-600 font-bold">→ Current: {newOdds}</span>
             </div>
           </div>
           
           <p className="text-sm text-gray-600">
-            현재 배당율로 베팅을 진행하시겠습니까?
+            Would you like to proceed with the current odds?
           </p>
         </div>
         
@@ -49,13 +49,13 @@ const OddsChangeModal = ({
             onClick={onReject}
             className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50"
           >
-            취소
+            Cancel
           </button>
           <button
             onClick={onAccept}
             className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
-            새 배당율로 베팅
+            Bet with New Odds
           </button>
         </div>
       </div>
@@ -273,14 +273,14 @@ const BetSelectionPanel = () => {
   return (
     <div className="w-full p-4 bg-white rounded shadow">
       <div className="flex justify-between items-center mb-3">
-        <h2 className="text-lg font-bold">베팅 선택</h2>
+        <h2 className="text-lg font-bold">Bet Selection</h2>
         <button className="text-sm text-red-500" onClick={() => {
           clearAll();
           // 전체 삭제 시 메시지 초기화
           if (message) {
             setMessage('');
           }
-        }}>전체 삭제</button>
+        }}>Clear All</button>
       </div>
       <ul className="space-y-2 mb-4">
         {selections.map((sel) => (
@@ -311,7 +311,7 @@ const BetSelectionPanel = () => {
         ))}
       </ul>
       <div className="mb-3">
-        <label className="text-sm">배팅 금액</label>
+        <label className="text-sm">Betting Amount</label>
         <input
           type="text"
           value={stakeDisplay}
@@ -321,15 +321,15 @@ const BetSelectionPanel = () => {
         />
       </div>
       <div className="text-sm">
-        <p className="mb-1">총 배당률: <span className="font-semibold">{totalOdds.toFixed(2)}</span></p>
-        <p className="mb-1">예상 수익: <span className="font-semibold">{Math.floor(expectedReturn).toLocaleString()} ₩</span></p>
+        <p className="mb-1">Total Odds: <span className="font-semibold">{totalOdds.toFixed(2)}</span></p>
+        <p className="mb-1">Estimated Profit: <span className="font-semibold">{Math.floor(expectedReturn).toLocaleString()} ₩</span></p>
       </div>
       <button
         className="w-full mt-4 bg-blue-600 text-white py-2 rounded text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
         disabled={selections.length === 0 || stake <= 0 || loading || hasPastGame}
         onClick={handleBet}
       >
-        {loading ? '베팅 중...' : '베팅하기'}
+        {loading ? 'Betting...' : 'Place Bet'}
       </button>
       {hasPastGame && (
         <div className="mt-2 text-center text-sm text-red-600">이미 시작된 경기가 포함되어 있어 베팅이 불가합니다.</div>

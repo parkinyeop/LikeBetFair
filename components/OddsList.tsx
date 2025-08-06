@@ -38,7 +38,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { selections, toggleSelection } = useBetStore();
-  const [selectedMarkets, setSelectedMarkets] = useState<{ [gameId: string]: '승/패' | '언더/오버' | '핸디캡' }>({});
+  const [selectedMarkets, setSelectedMarkets] = useState<{ [gameId: string]: 'Win/Loss' | 'Over/Under' | 'Handicap' }>({});
 
   useEffect(() => {
     const fetchOdds = async () => {
@@ -299,7 +299,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
             
             {/* 마켓 탭 - 투데이 배팅과 동일한 구조 */}
             <div className="flex gap-2 mb-3">
-              {['승/패', '언더/오버', '핸디캡'].map(marketTab => (
+              {['Win/Loss', 'Over/Under', 'Handicap'].map(marketTab => (
                 <button
                   key={marketTab}
                   className={`px-3 py-1 rounded ${selectedMarket === marketTab ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
@@ -314,7 +314,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
             </div>
             
             {/* 마켓별 선택 영역 */}
-            {selectedMarket === '승/패' && (
+            {selectedMarket === 'Win/Loss' && (
               <div className="space-y-2">
                 {(() => {
                   const h2hOdds = officialOdds.h2h || {};
@@ -407,7 +407,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
               </div>
             )}
             
-            {selectedMarket === '언더/오버' && (
+            {selectedMarket === 'Over/Under' && (
               <div className="space-y-2">
                 {(() => {
                   const totalsOdds = officialOdds.totals || {};
@@ -519,7 +519,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
               </div>
             )}
             
-            {selectedMarket === '핸디캡' && (
+            {selectedMarket === 'Handicap' && (
               <div className="space-y-2">
                 {(() => {
                   const spreadsOdds = officialOdds.spreads || {};

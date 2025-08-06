@@ -31,7 +31,7 @@ export const useBetStore = create<BetState>((set, get) => ({
   onTabChange: undefined,
 
   addSelection: (bet) =>
-    set((state) => ({ selections: [...state.selections, { ...bet, market: bet.market || '승/패' }] })),
+    set((state) => ({ selections: [...state.selections, { ...bet, market: bet.market || 'Win/Loss' }] })),
 
   removeSelection: (team) =>
     set((state) => ({
@@ -41,7 +41,7 @@ export const useBetStore = create<BetState>((set, get) => ({
   toggleSelection: (bet) => {
     const { selections, onTabChange } = get();
     // market 필드 강제 보장
-    const safeBet = { ...bet, market: bet.market || '승/패' };
+    const safeBet = { ...bet, market: bet.market || 'Win/Loss' };
     // 이미 같은 팀, 마켓, 경기 선택되어 있으면 해제
     const exists = selections.some(
       (s) => s.team === safeBet.team && s.market === safeBet.market && s.gameId === safeBet.gameId
@@ -61,12 +61,12 @@ export const useBetStore = create<BetState>((set, get) => ({
       
       // 같은 경기에서 승패(h2h)와 핸디캡(spreads)은 동시에 선택 불가
       if (
-        (safeBet.market === '승/패' || safeBet.market === '핸디캡') &&
+        (safeBet.market === 'Win/Loss' || safeBet.market === 'Handicap') &&
         selections.some(
           (s) =>
             s.gameId === safeBet.gameId &&
-            ((s.market === '승/패' && safeBet.market === '핸디캡') ||
-              (s.market === '핸디캡' && safeBet.market === '승/패'))
+            ((s.market === 'Win/Loss' && safeBet.market === 'Handicap') ||
+              (s.market === 'Handicap' && safeBet.market === 'Win/Loss'))
         )
       ) {
         // 기존 승패 또는 핸디캡 선택 해제 후 추가
@@ -76,8 +76,8 @@ export const useBetStore = create<BetState>((set, get) => ({
               (s) =>
                 !(
                   s.gameId === safeBet.gameId &&
-                  ((s.market === '승/패' && safeBet.market === '핸디캡') ||
-                    (s.market === '핸디캡' && safeBet.market === '승/패'))
+                              ((s.market === 'Win/Loss' && safeBet.market === 'Handicap') ||
+              (s.market === 'Handicap' && safeBet.market === 'Win/Loss'))
                 )
             ),
             safeBet,
