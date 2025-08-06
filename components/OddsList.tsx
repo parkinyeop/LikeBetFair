@@ -38,7 +38,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { selections, toggleSelection } = useBetStore();
-  const [selectedMarket, setSelectedMarket] = useState<'승/패' | '언더/오버' | '핸디캡'>('승/패');
+  const [selectedMarkets, setSelectedMarkets] = useState<{ [gameId: string]: '승/패' | '언더/오버' | '핸디캡' }>({});
 
   useEffect(() => {
     const fetchOdds = async () => {
@@ -46,7 +46,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
         setLoading(true);
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050'}/api/odds/${sportKey}`);
         if (response.status === 404) {
-          setError('해당 리그의 배당 정보가 없습니다.');
+          setError('No odds information available for this league.');
           setGames([]);
           return;
         }
@@ -260,34 +260,20 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
   if (games.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
-        해당 리그의 경기 데이터가 없습니다.
+        No game data available for this league.
       </div>
     );
   }
 
   return (
     <div className="h-full flex flex-col">
-      {/* 전체 페이지 탭 */}
-      <div className="flex gap-2 mb-4 bg-white p-4 rounded-lg shadow">
-        {['승/패', '언더/오버', '핸디캡'].map(marketTab => (
-          <button
-            key={marketTab}
-            className={`flex-1 py-2 px-4 rounded-lg font-semibold transition-colors ${
-              selectedMarket === marketTab 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-            onClick={() => setSelectedMarket(marketTab as any)}
-          >
-            {marketTab}
-          </button>
-        ))}
-      </div>
+      {/* 전체 페이지 탭 제거 - 각 게임마다 개별 탭으로 변경 */}
 
       <div className="space-y-4 flex-1 min-h-0 px-1 overflow-y-auto">
         {games.map((game: any) => {
           const gameTime = game.gameTime || new Date(game.commence_time);
           const isBettable = game.isBettable !== undefined ? game.isBettable : true;
+          const selectedMarket = selectedMarkets[game.id] || '승/패';
           const marketKey = marketKeyMap[selectedMarket];
           
           // officialOdds에서 해당 마켓의 평균 배당률 가져오기
@@ -297,12 +283,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
         return (
           <div
             key={game.id}
-            className={`bg-white rounded-lg shadow p-4 ${!isBettable ? 'opacity-60' : ''} cursor-pointer`}
-            onClick={() => {
-              if (game.sport_key) {
-                router.push(`/odds/${game.sport_key}`);
-              }
-            }}
+            className={`bg-white rounded-lg shadow p-4 ${!isBettable ? 'opacity-60' : ''}`}
           >
             <div className="flex justify-between items-center mb-1">
               <span className="text-lg font-bold">🏟️ {game.home_team} vs {game.away_team}</span>
@@ -310,10 +291,26 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                 <span className="text-sm">📅 {gameTime.toLocaleDateString()} {gameTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} [{game.sport_title}]</span>
                 {!isBettable && (
                   <div className="text-xs text-red-500 mt-1">
-                    ⏰ 베팅 마감 (경기 시작 10분 전)
+                    ⏰ Betting Closed (10 min before game)
                   </div>
                 )}
               </div>
+            </div>
+            
+            {/* 마켓 탭 - 투데이 배팅과 동일한 구조 */}
+            <div className="flex gap-2 mb-3">
+              {['승/패', '언더/오버', '핸디캡'].map(marketTab => (
+                <button
+                  key={marketTab}
+                  className={`px-3 py-1 rounded ${selectedMarket === marketTab ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                  onClick={(e) => {
+                    e.stopPropagation(); // 게임 클릭 이벤트 방지
+                    setSelectedMarkets((prev: any) => ({ ...prev, [game.id]: marketTab }));
+                  }}
+                >
+                  {marketTab}
+                </button>
+              ))}
             </div>
             
             {/* 마켓별 선택 영역 */}
@@ -358,7 +355,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                   if (outcomes.length === 0) {
                     return (
                       <div className="text-center text-gray-500 py-6">
-                        승/패 배당 정보 없음
+                        No Win/Loss odds available
                       </div>
                     );
                   }
@@ -400,7 +397,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                           >
                             <div className="font-bold">{label}</div>
                             <div className="text-sm">{outcome.price ? outcome.price.toFixed(2) : 'N/A'}</div>
-                            {!isBettable && <div className="text-xs text-red-500 mt-1">베팅 마감</div>}
+                            {!isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
                           </button>
                         );
                       })}
@@ -419,7 +416,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                   if (totalEntries.length === 0) {
                     return (
                       <div className="text-center text-gray-500 py-6">
-                        언더오버 배당 정보 없음
+                        No Over/Under odds available
                       </div>
                     );
                   }
@@ -449,7 +446,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                   if (filteredTotals.length === 0) {
                     return (
                       <div className="text-center text-gray-500 py-6">
-                        언더오버 배당 정보 없음 (0.5 단위만 지원)
+                        No Over/Under odds available (0.5 unit only)
                       </div>
                     );
                   }

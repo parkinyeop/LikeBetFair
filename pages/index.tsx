@@ -802,18 +802,18 @@ export default function Home() {
             <div className="flex items-center space-x-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">{bettableGames.length}</div>
-                <div className="text-sm text-blue-700">배팅 가능</div>
+                <div className="text-sm text-blue-700">Betting Available</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-gray-600">{totalGames}</div>
-                <div className="text-sm text-gray-700">전체 경기</div>
+                <div className="text-sm text-gray-700">Total Games</div>
               </div>
             </div>
             <div className="text-right">
               <div className="text-sm text-gray-600">
                 📅 {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}
               </div>
-              <div className="text-xs text-gray-500">업데이트: {new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>
+              <div className="text-xs text-gray-500">Updated: {new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</div>
             </div>
           </div>
         </div>
@@ -940,7 +940,7 @@ export default function Home() {
                       });
                       return (
                         <div className="text-center text-gray-500 py-6">
-                          <div>승/패 배당 정보 없음</div>
+                          <div>No Win/Loss odds available</div>
                           <div className="text-xs mt-1">
                             {game.sport_key} | {game.sportTitle}
                           </div>
@@ -1007,7 +1007,7 @@ export default function Home() {
                     const totalsOdds = officialOdds.totals || {};
                     const totalEntries = Object.entries(totalsOdds);
                     if (totalEntries.length === 0) {
-                      return <div className="text-center text-gray-500 py-6">언더오버 배당 정보 없음</div>;
+                      return <div className="text-center text-gray-500 py-6">No Over/Under odds available</div>;
                     }
                     // Over/Under 쌍으로 그룹화
                     const groupedTotals: { [point: string]: { over?: any, under?: any } } = {};
@@ -1099,7 +1099,7 @@ export default function Home() {
                     const spreadsOdds = officialOdds.spreads || {};
                     const spreadEntries = Object.entries(spreadsOdds);
                     if (spreadEntries.length === 0) {
-                      return <div className="text-center text-gray-500 py-6">핸디캡 배당 정보 없음</div>;
+                      return <div className="text-center text-gray-500 py-6">No Handicap odds available</div>;
                     }
                     // 핸디캡 쌍으로 그룹화
                     const groupedSpreads: { [point: string]: { home?: any, away?: any } } = {};
