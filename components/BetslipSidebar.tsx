@@ -288,8 +288,8 @@ function MyBetsPanel() {
                     {Array.isArray(bet.selections) && bet.selections.length > 0 ? (
                       <div className="space-y-1">
                         {bet.selections.map((sel: any, idx: number) => {
-                          const isOverUnder = sel.market === '언더/오버' || sel.market === 'totals';
-                          const isHandicap = sel.market === '핸디캡' || sel.market === 'spreads';
+                          const isOverUnder = sel.market === 'Over/Under' || sel.market === 'totals';
+                          const isHandicap = sel.market === 'Handicap' || sel.market === 'spreads';
                           
                           return (
                             <div key={idx} className="flex items-center justify-between text-sm">
@@ -427,8 +427,8 @@ function MyBetsPanel() {
                             else if (actualResult === 'cancelled') { icon = '🚫'; color = 'text-orange-500'; label = 'Game Cancelled'; }
 else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; label = 'Draw'; }
                             
-                            const isOverUnder = sel.market === '언더/오버' || sel.market === 'totals';
-                            const isHandicap = sel.market === '핸디캡' || sel.market === 'spreads';
+                            const isOverUnder = sel.market === 'Over/Under' || sel.market === 'totals';
+                            const isHandicap = sel.market === 'Handicap' || sel.market === 'spreads';
                             const ouType = normalizeOverUnderOption(sel.option || sel.team, sel.desc, sel.point);
                             
                             return (

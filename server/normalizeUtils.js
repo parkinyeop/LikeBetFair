@@ -307,9 +307,9 @@ function normalizeOverUnderOption(option, teamDesc, point) {
   
   let ouType = '';
   if (/over/i.test(option)) {
-    ouType = '오버';
+    ouType = 'Over';
   } else if (/under/i.test(option)) {
-    ouType = '언더';
+    ouType = 'Under';
   } else {
     return option;
   }
@@ -323,9 +323,9 @@ function normalizeOverUnderOption(option, teamDesc, point) {
     }
   }
   
-  // 팀명이 있으면 팀명과 함께 표시
+  // 팀명이 있으면 팀명과 함께 표시 (예: "Hanwha Eagles Over 7")
   if (teamName) {
-    return `${teamName} (${ouType}${point !== undefined ? ` ${point}` : ''})`;
+    return `${teamName} ${ouType}${point !== undefined ? ` ${point}` : ''}`;
   }
   
   // 팀명이 없으면 기존 방식
