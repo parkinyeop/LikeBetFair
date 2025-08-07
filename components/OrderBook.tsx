@@ -187,7 +187,7 @@ export default function OrderBook({ gameId, market, line, onOrderClick }: OrderB
             </div>
           </div>
           <div className="text-right">
-            <div className="text-lg font-bold text-gray-900">{order.amount.toLocaleString()}원</div>
+                            <div className="text-lg font-bold text-gray-900">{order.amount.toLocaleString()} KRW</div>
             <div className="text-xs text-gray-500">
               {new Date(order.createdAt).toLocaleTimeString('ko-KR', { 
                 hour: '2-digit', 

@@ -493,7 +493,7 @@ export default function ExchangePage() {
                   </div>
                 );
               })() : (
-                <strong>🏀 경기 정보 로딩 중...</strong>
+                <strong>🏀 Loading game information...</strong>
               )}
             </div>
             <div className="mt-3 text-center">

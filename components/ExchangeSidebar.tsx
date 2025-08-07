@@ -191,7 +191,7 @@ function OrderPanel() {
         <h3 className="font-semibold mb-2 text-sm text-gray-700">Exchange 주문</h3>
         <div className="space-y-2">
           <div>
-            <label className="block text-sm font-medium mb-1">Odds (배당률)</label>
+                            <label className="block text-sm font-medium mb-1">Odds</label>
             <input 
               type="number" 
               step="0.01"
@@ -207,7 +207,7 @@ function OrderPanel() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Amount (원)</label>
+                            <label className="block text-sm font-medium mb-1">Amount (KRW)</label>
             <input 
               type="text" 
               value={form.amount.toLocaleString()} 
@@ -432,9 +432,9 @@ function OrderHistoryPanel() {
               <div className="font-bold text-yellow-600">{stats.open}개</div>
             </div>
             <div className="text-center">
-              <div className="text-gray-500">잠재 수익</div>
+                              <div className="text-gray-500">Potential Profit</div>
               <div className={`font-bold ${stats.totalPotentialProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {stats.totalPotentialProfit >= 0 ? '+' : ''}{Math.round(stats.totalPotentialProfit).toLocaleString()}원
+                                  {stats.totalPotentialProfit >= 0 ? '+' : ''}{Math.round(stats.totalPotentialProfit).toLocaleString()} KRW
               </div>
             </div>
           </div>
@@ -558,7 +558,7 @@ function OrderHistoryPanel() {
                   {/* 배당률과 금액 정보 */}
                   <div className="flex justify-between items-center mb-2">
                     <div className="text-center">
-                      <div className="text-xs text-gray-500">배당률</div>
+                      <div className="text-xs text-gray-500">Odds</div>
                       <div className="text-lg font-bold text-gray-800">
                         {(order.side === 'back' 
                           ? (order.backOdds || order.price) 
@@ -568,12 +568,12 @@ function OrderHistoryPanel() {
                     </div>
                     <div className="text-center">
                       <div className="text-xs text-gray-500">주문 금액</div>
-                      <div className="text-lg font-bold text-gray-800">{order.amount.toLocaleString()}원</div>
+                      <div className="text-lg font-bold text-gray-800">{order.amount.toLocaleString()} KRW</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-xs text-gray-500">잠재 수익</div>
+                      <div className="text-xs text-gray-500">Potential Profit</div>
                       <div className={`text-lg font-bold ${potentialProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {potentialProfit >= 0 ? '+' : ''}{potentialProfit.toLocaleString()}원
+                                                  {potentialProfit >= 0 ? '+' : ''}{potentialProfit.toLocaleString()} KRW
                       </div>
                     </div>
                   </div>
@@ -686,7 +686,7 @@ export default function ExchangeSidebar() {
     <aside className="w-80 bg-white text-black p-4 space-y-4 border-l border-gray-200 h-full flex flex-col min-h-0 overflow-y-auto">
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-lg font-bold">EXCHANGE</h2>
-        <span className="text-sm font-semibold text-blue-600">잔액: {balance !== null ? Math.round(Number(balance)).toLocaleString() : '-'}원</span>
+                        <span className="text-sm font-semibold text-blue-600">Balance: {balance !== null ? Math.round(Number(balance)).toLocaleString() : '-'} KRW</span>
       </div>
       
       {/* 탭 네비게이션 */}

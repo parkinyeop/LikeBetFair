@@ -774,7 +774,7 @@ export default function Home() {
   const [selectedMarkets, setSelectedMarkets] = useState<{ [gameId: string]: 'Win/Loss' | 'Over/Under' | 'Handicap' }>({});
 
   const TodayBettingView = () => {
-    if (todayLoading) return <div className="text-center py-8">로딩 중...</div>;
+    if (todayLoading) return <div className="text-center py-8">Loading...</div>;
     if (todayFlatGames.length === 0) {
       return (
         <div className="text-center py-12">

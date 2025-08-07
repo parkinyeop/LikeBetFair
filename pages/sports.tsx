@@ -198,9 +198,9 @@ export default function SportsPage() {
                           {/* 경기 수 */}
                           <div className="text-gray-600">
                             {isLoading ? (
-                              <span className="text-gray-400">로딩중...</span>
+                              <span className="text-gray-400">Loading...</span>
                             ) : data ? (
-                              <span>{data.gameCount}경기</span>
+                              <span>{data.gameCount} games</span>
                             ) : (
                               <span className="text-gray-400">-</span>
                             )}
@@ -209,16 +209,16 @@ export default function SportsPage() {
                           {/* 샘플 배당율 */}
                           <div className="text-gray-600">
                             {isLoading ? (
-                              <span className="text-gray-400">로딩중...</span>
+                              <span className="text-gray-400">Loading...</span>
                             ) : data?.sampleOdds ? (
                               <Link 
                                 href={`/odds/${league.key}`}
                                 className="font-medium text-green-600 hover:text-green-800 transition-colors cursor-pointer"
                               >
-                                배당 {data.sampleOdds.toFixed(2)}
+                                Odds {data.sampleOdds.toFixed(2)}
                               </Link>
                             ) : (
-                              <span className="text-gray-400">배당 없음</span>
+                              <span className="text-gray-400">No odds</span>
                             )}
                           </div>
                           
@@ -227,7 +227,7 @@ export default function SportsPage() {
                             href={`/odds/${league.key}`}
                             className="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors"
                           >
-                            보기 →
+                            View →
                           </Link>
                         </div>
                       </div>
@@ -242,11 +242,11 @@ export default function SportsPage() {
 
       {/* 사용법 안내 */}
       <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
-        <h3 className="font-semibold text-blue-900 mb-2">💡 사용법</h3>
+        <h3 className="font-semibold text-blue-900 mb-2">💡 How to Use</h3>
         <ul className="text-sm text-blue-800 space-y-1">
-          <li>• 상위 카테고리를 클릭하면 하위 리그들이 표시됩니다</li>
-          <li>• 각 리그의 경기 수와 샘플 배당율을 확인할 수 있습니다</li>
-          <li>• "보기 →" 버튼을 클릭하면 해당 리그의 상세 배당 정보로 이동합니다</li>
+          <li>• Click on a category to view its leagues</li>
+          <li>• Check the number of games and sample odds for each league</li>
+          <li>• Click "View →" to see detailed odds information for that league</li>
         </ul>
       </div>
     </div>

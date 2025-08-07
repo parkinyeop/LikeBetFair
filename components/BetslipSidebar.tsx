@@ -520,11 +520,11 @@ else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; la
                         <b className="text-black">{Number(bet.stake).toLocaleString()} KRW</b>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span>📈 배당률:</span>
+                        <span>📈 Odds:</span>
                         <b className="text-black">{Number(bet.totalOdds).toFixed(2)}</b>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span>🏆 예상수익:</span>
+                        <span>🏆 Estimated Profit:</span>
                         <b className="text-black">{Math.floor(Number(bet.potentialWinnings)).toLocaleString()} KRW</b>
                       </div>
                       <div className="flex items-center justify-end pt-1">
