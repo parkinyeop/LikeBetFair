@@ -955,7 +955,7 @@ export default function Home() {
                     }
                     return (
                       <div className="flex items-center gap-2">
-                        <div className="w-16 text-base font-bold text-gray-800 text-center">승/패</div>
+                        <div className="w-16 text-base font-bold text-gray-800 text-center">Win/Loss</div>
                         {(() => {
                           // 홈팀, 무승부, 어웨이팀 순서로 정렬
                           const sortedOutcomes = outcomes.sort((a, b) => {
@@ -968,7 +968,7 @@ export default function Home() {
                           
                           return sortedOutcomes.map((outcome) => {
                             let label = outcome.name;
-                            if (outcome.name.toLowerCase() === 'draw') label = '무승부';
+                            if (outcome.name.toLowerCase() === 'draw') label = 'Draw';
                             else if (outcome.name === game.home_team) label = game.home_team;
                             else if (outcome.name === game.away_team) label = game.away_team;
                             return (
@@ -981,14 +981,14 @@ export default function Home() {
                                       odds: outcome.price,
                                       desc: `${game.home_team} vs ${game.away_team}`,
                                       commence_time: game.commence_time,
-                                      market: '승/패',
+                                      market: 'Win/Loss',
                                       gameId: game.id,
                                       sport_key: game.sport_key
                                     });
                                   }
                                 }}
                                 className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                                  (selections || []).some(sel => sel.team === outcome.name && sel.market === '승/패' && sel.gameId === game.id)
+                                  (selections || []).some(sel => sel.team === outcome.name && sel.market === 'Win/Loss' && sel.gameId === game.id)
                                     ? 'bg-yellow-500 hover:bg-yellow-600'
                                     : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                 } text-white`}
@@ -1133,7 +1133,7 @@ export default function Home() {
                     });
                     
                     if (filteredSpreads.length === 0) {
-                      return <div className="text-center text-gray-500 py-6">핸디캡 배당 정보 없음</div>;
+                      return <div className="text-center text-gray-500 py-6">No Handicap odds available</div>;
                     }
                     
                     return (
@@ -1159,7 +1159,7 @@ export default function Home() {
                                         odds: homeOdds,
                                         desc: `${game.home_team} vs ${game.away_team}`,
                                         commence_time: game.commence_time,
-                                        market: '핸디캡',
+                                        market: 'Handicap',
                                         gameId: game.id,
                                         sport_key: game.sport_key,
                                         point: pointValue
@@ -1167,7 +1167,7 @@ export default function Home() {
                                     }
                                   }}
                                   className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                                    (selections || []).some(sel => sel.team === `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}` && sel.market === '핸디캡' && sel.gameId === game.id)
+                                    (selections || []).some(sel => sel.team === `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}` && sel.market === 'Handicap' && sel.gameId === game.id)
                                       ? 'bg-yellow-500 hover:bg-yellow-600'
                                       : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                   } text-white`}
@@ -1187,7 +1187,7 @@ export default function Home() {
                                         odds: awayOdds,
                                         desc: `${game.home_team} vs ${game.away_team}`,
                                         commence_time: game.commence_time,
-                                        market: '핸디캡',
+                                        market: 'Handicap',
                                         gameId: game.id,
                                         sport_key: game.sport_key,
                                         point: pointValue
@@ -1195,7 +1195,7 @@ export default function Home() {
                                     }
                                   }}
                                   className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                                    (selections || []).some(sel => sel.team === `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}` && sel.market === '핸디캡' && sel.gameId === game.id)
+                                    (selections || []).some(sel => sel.team === `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}` && sel.market === 'Handicap' && sel.gameId === game.id)
                                       ? 'bg-yellow-500 hover:bg-yellow-600'
                                       : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                   } text-white`}
@@ -1749,7 +1749,7 @@ export default function Home() {
                             });
                             
                             if (filteredSpreads.length === 0) {
-                              return <div className="text-center text-gray-500 py-6">핸디캡 배당 정보 없음</div>;
+                              return <div className="text-center text-gray-500 py-6">No Handicap odds available</div>;
                             }
                             
                             return (
@@ -1779,14 +1779,14 @@ export default function Home() {
                                               odds: homeOdds,
                                               desc: `${game.home_team} vs ${game.away_team}`,
                                               commence_time: game.commence_time,
-                                              market: '핸디캡',
+                                              market: 'Handicap',
                                               gameId: game.id,
                                               sport_key: game.sport_key,
                                               point: pointValue
                                             });
                                           }}
                                           className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                                                                                          (selections || []).some(sel => sel.team === `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}` && sel.market === '핸디캡' && sel.gameId === game.id)
+                                                                                          (selections || []).some(sel => sel.team === `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}` && sel.market === 'Handicap' && sel.gameId === game.id)
                                               ? 'bg-yellow-500 hover:bg-yellow-600'
                                               : game.isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                           } text-white`}
@@ -1814,14 +1814,14 @@ export default function Home() {
                                               odds: awayOdds,
                                               desc: `${game.home_team} vs ${game.away_team}`,
                                               commence_time: game.commence_time,
-                                              market: '핸디캡',
+                                              market: 'Handicap',
                                               gameId: game.id,
                                               sport_key: game.sport_key,
                                               point: pointValue
                                             });
                                           }}
                                           className={`flex-1 p-3 rounded-lg text-center transition-colors ${
-                                                                                          (selections || []).some(sel => sel.team === `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}` && sel.market === '핸디캡' && sel.gameId === game.id)
+                                                                                          (selections || []).some(sel => sel.team === `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}` && sel.market === 'Handicap' && sel.gameId === game.id)
                                               ? 'bg-yellow-500 hover:bg-yellow-600'
                                               : game.isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                           } text-white`}

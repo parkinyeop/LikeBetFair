@@ -69,6 +69,9 @@ export const useBetStore = create<BetState>((set, get) => ({
               (s.market === 'Handicap' && safeBet.market === 'Win/Loss'))
         )
       ) {
+        // 사용자에게 알림
+        alert('You cannot bet on both Win/Loss and Handicap for the same game. The previous selection will be replaced.');
+        
         // 기존 승패 또는 핸디캡 선택 해제 후 추가
         set((state) => ({
           selections: [
