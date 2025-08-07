@@ -42,6 +42,19 @@ export const useBetStore = create<BetState>((set, get) => ({
     const { selections, onTabChange } = get();
     // market 필드 강제 보장
     const safeBet = { ...bet, market: bet.market || 'Win/Loss' };
+    
+    // 디버깅 로그
+    console.log('[toggleSelection] 새로운 선택:', {
+      team: safeBet.team,
+      market: safeBet.market,
+      gameId: safeBet.gameId,
+      desc: safeBet.desc
+    });
+    console.log('[toggleSelection] 현재 선택들:', selections.map(s => ({
+      team: s.team,
+      market: s.market,
+      gameId: s.gameId
+    })));
     // 이미 같은 팀, 마켓, 경기 선택되어 있으면 해제
     const exists = selections.some(
       (s) => s.team === safeBet.team && s.market === safeBet.market && s.gameId === safeBet.gameId
@@ -60,14 +73,26 @@ export const useBetStore = create<BetState>((set, get) => ({
       }
       
       // 같은 경기에서 승패(h2h)와 핸디캡(spreads)은 동시에 선택 불가
+      const conflictingSelection = selections.find(
+        (s) =>
+          s.gameId === safeBet.gameId &&
+          ((s.market === 'Win/Loss' && safeBet.market === 'Handicap') ||
+            (s.market === 'Handicap' && safeBet.market === 'Win/Loss'))
+      );
+      
+      console.log('[toggleSelection] 충돌 검사:', {
+        newMarket: safeBet.market,
+        newGameId: safeBet.gameId,
+        conflictingSelection: conflictingSelection ? {
+          team: conflictingSelection.team,
+          market: conflictingSelection.market,
+          gameId: conflictingSelection.gameId
+        } : null
+      });
+      
       if (
         (safeBet.market === 'Win/Loss' || safeBet.market === 'Handicap') &&
-        selections.some(
-          (s) =>
-            s.gameId === safeBet.gameId &&
-            ((s.market === 'Win/Loss' && safeBet.market === 'Handicap') ||
-              (s.market === 'Handicap' && safeBet.market === 'Win/Loss'))
-        )
+        conflictingSelection
       ) {
         // 사용자에게 알림
         alert('You cannot bet on both Win/Loss and Handicap for the same game. The previous selection will be replaced.');
