@@ -27,9 +27,9 @@ interface Game {
 }
 
 const marketKeyMap = { 
-  '승/패': 'h2h', 
-  '언더/오버': 'totals', 
-  '핸디캡': 'spreads'
+  'Win/Loss': 'h2h', 
+  'Over/Under': 'totals', 
+  'Handicap': 'spreads'
 };
 
 const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect }) => {
@@ -273,7 +273,13 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
         {games?.map((game: any) => {
           const gameTime = game.gameTime || new Date(game.commence_time);
           const isBettable = game.isBettable !== undefined ? game.isBettable : true;
-          const selectedMarket = selectedMarkets[game.id] || '승/패';
+          
+          // 게임이 selectedMarkets에 없으면 기본값 'Win/Loss'로 설정
+          if (!selectedMarkets[game.id]) {
+            setSelectedMarkets((prev: any) => ({ ...prev, [game.id]: 'Win/Loss' }));
+          }
+          
+          const selectedMarket = selectedMarkets[game.id] || 'Win/Loss';
           const marketKey = marketKeyMap[selectedMarket];
           
           // officialOdds에서 해당 마켓의 평균 배당률 가져오기

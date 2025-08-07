@@ -821,6 +821,12 @@ export default function Home() {
         {todayFlatGames?.map((game: any) => {
           const gameTime = new Date(game.commence_time);
           const isBettable = game.isBettable !== undefined ? game.isBettable : true;
+          
+          // 게임이 selectedMarkets에 없으면 기본값 'Win/Loss'로 설정
+          if (!selectedMarkets[game.id]) {
+            setSelectedMarkets((prev: any) => ({ ...prev, [game.id]: 'Win/Loss' }));
+          }
+          
           const selectedMarket = selectedMarkets[game.id] || 'Win/Loss';
           const marketKeyMap = { 'Win/Loss': 'h2h', 'Over/Under': 'totals', 'Handicap': 'spreads' };
           const marketKey = marketKeyMap[selectedMarket];
@@ -1474,8 +1480,14 @@ export default function Home() {
               <SeasonInfoDisplay category={selectedCategory} />
             ) : (
               <div className="space-y-4">
-                {games?.map((game, index) => (
-                  <div key={index} className={`bg-white rounded-lg shadow p-4 ${!game.isBettable ? 'opacity-60' : ''}`}>
+                {games?.map((game, index) => {
+                  // 게임이 selectedMarkets에 없으면 기본값 'Win/Loss'로 설정
+                  if (!selectedMarkets[game.id]) {
+                    setSelectedMarkets((prev: any) => ({ ...prev, [game.id]: 'Win/Loss' }));
+                  }
+                  
+                  return (
+                    <div key={index} className={`bg-white rounded-lg shadow p-4 ${!game.isBettable ? 'opacity-60' : ''}`}>
                     <div className="flex justify-between items-center mb-3">
                       <span className="text-lg font-bold">🏟️ {game.home_team} vs {game.away_team}</span>
                       <div className="text-right">
@@ -1833,7 +1845,8 @@ export default function Home() {
                       </div>
                     )}
                   </div>
-                ))}
+                );
+              })}
               </div>
             )}
           </div>
