@@ -738,7 +738,7 @@ export default function Home() {
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('ko-KR', { 
+    return date.toLocaleDateString('en-US', { 
       month: 'long', 
       day: 'numeric',
       weekday: 'short'
@@ -1292,9 +1292,7 @@ export default function Home() {
 
   return (
     <div className="p-6">
-      <div className="mb-4 p-3 bg-blue-50 text-blue-700 rounded">
-        Home screen is for information only. Click on games to go to detailed pages.
-      </div>
+
       
       <h1 className="text-2xl font-bold mb-6">Sports Betting</h1>
       

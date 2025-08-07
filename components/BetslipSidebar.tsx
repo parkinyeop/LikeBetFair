@@ -300,7 +300,7 @@ function MyBetsPanel() {
                                   ) : isHandicap ? (
                                     sel.team
                                   ) : sel.result === 'draw' ? (
-                                    `${sel.desc ? sel.desc.replace(' vs ', ' vs ') : sel.team} (무)`
+                                    `${sel.desc ? sel.desc.replace(' vs ', ' vs ') : sel.team} (Draw)`
                                   ) : (
                                     (() => {
                                       // desc에서 홈팀과 원정팀 파악
@@ -311,15 +311,15 @@ function MyBetsPanel() {
                                         
                                         // 베팅한 팀이 홈팀인지 원정팀인지 확인
                                         if (sel.team === homeTeam) {
-                                          return `${sel.team} 승`;
+                                          return `${sel.team} (Win)`;
                                         } else if (sel.team === awayTeam) {
-                                          return `${sel.team} 승`;
+                                          return `${sel.team} (Win)`;
                                         } else {
                                           // 베팅한 팀이 홈/원정과 다르면 패 베팅일 가능성
                                           if (sel.team.includes(homeTeam) || homeTeam.includes(sel.team)) {
-                                            return `${homeTeam} 패`;
+                                            return `${homeTeam} (Lose)`;
                                           } else if (sel.team.includes(awayTeam) || awayTeam.includes(sel.team)) {
-                                            return `${awayTeam} 패`;
+                                            return `${awayTeam} (Lose)`;
                                           }
                                         }
                                       }
@@ -343,7 +343,7 @@ function MyBetsPanel() {
                       <span className="text-gray-500">No game info</span>
                     )}
                   </div>
-                  <button className="ml-2 px-2 py-0.5 text-xs border rounded text-blue-600 border-blue-300 hover:bg-blue-50" onClick={e => { e.stopPropagation(); toggleBet(bet.id); }}>{isOpen ? '접기 ▲' : '펼치기 ▼'}</button>
+                  <button className="ml-2 px-2 py-0.5 text-xs border rounded text-blue-600 border-blue-300 hover:bg-blue-50" onClick={e => { e.stopPropagation(); toggleBet(bet.id); }}>{isOpen ? 'Collapse ▲' : 'Expand ▼'}</button>
                 </div>
                 {/* 펼친 상태: 배팅금, 배당율, 예상수익 */}
                 {isOpen && (
@@ -352,12 +352,12 @@ function MyBetsPanel() {
                       <span className="text-sm">🧾 Multi Bet {Array.isArray(bet.selections) ? bet.selections.length : 0} selections</span>
                     </div>
                     {expectedResultDate && (
-                      <div className="text-xs text-blue-600 font-semibold mb-2">정산예정일: {expectedResultDate}</div>
+                      <div className="text-xs text-blue-600 font-semibold mb-2">Settlement Date: {expectedResultDate}</div>
                     )}
                     {/* 경기 결과 표시 (적중/미적중일 때) */}
                     {['won', 'lost'].includes(bet.status) && Array.isArray(bet.selections) && (
                       <div className="mb-3">
-                        <div className="text-sm font-medium text-gray-700 mb-2">📊 Game Result</div>
+                        <div className="text-sm font-medium text-gray-700 mb-2">📊 Result</div>
                         <div className="space-y-2">
                           {bet.selections.map((sel: any, idx: number) => {
                             // 디버깅용 로그
@@ -495,9 +495,9 @@ else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; la
                                           : sel.gameResult.score[1]?.score ?? '-'
                                       }`
                                     ) : sel.gameResult.homeScore !== undefined && sel.gameResult.awayScore !== undefined ? (
-                                      `결과: ${sel.gameResult.homeTeam || '홈팀'} ${sel.gameResult.homeScore} : ${sel.gameResult.awayTeam || '원정팀'} ${sel.gameResult.awayScore}`
+                                      `Result: ${sel.gameResult.homeTeam || 'Home'} ${sel.gameResult.homeScore} : ${sel.gameResult.awayTeam || 'Away'} ${sel.gameResult.awayScore}`
                                     ) : (
-                                      `경기 결과: ${JSON.stringify(sel.gameResult)}`
+                                                                              `Game Result: ${JSON.stringify(sel.gameResult)}`
                                     )}
                                   </div>
                                 )}
@@ -517,7 +517,7 @@ else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; la
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between items-center">
                         <span>💰 Stake:</span>
-                        <b className="text-black">{Number(bet.stake).toLocaleString()}원</b>
+                        <b className="text-black">{Number(bet.stake).toLocaleString()} KRW</b>
                       </div>
                       <div className="flex justify-between items-center">
                         <span>📈 배당률:</span>
@@ -525,7 +525,7 @@ else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; la
                       </div>
                       <div className="flex justify-between items-center">
                         <span>🏆 예상수익:</span>
-                        <b className="text-black">{Math.floor(Number(bet.potentialWinnings)).toLocaleString()}원</b>
+                        <b className="text-black">{Math.floor(Number(bet.potentialWinnings)).toLocaleString()} KRW</b>
                       </div>
                       <div className="flex items-center justify-end pt-1">
                         {/* 배팅 취소 버튼 - 정상 조건으로 복원 */}
@@ -643,7 +643,7 @@ export default function BetslipSidebar({
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-lg font-bold">BET</h2>
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-blue-600">Balance: {balance !== null ? Math.round(Number(balance)).toLocaleString() : '-'}원</span>
+          <span className="text-sm font-semibold text-blue-600">Balance: {balance !== null ? Math.round(Number(balance)).toLocaleString() : '-'} KRW</span>
           <button
             onClick={forceRefreshBalance}
             className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"

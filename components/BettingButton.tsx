@@ -42,7 +42,7 @@ const BettingButton = memo(({
       return {
         isBettable: false,
         status: 'season_off',
-        message: '시즌오프'
+        message: 'Off Season'
       };
     }
     

@@ -332,7 +332,7 @@ const BetSelectionPanel = () => {
         {loading ? 'Betting...' : 'Place Bet'}
       </button>
       {hasPastGame && (
-        <div className="mt-2 text-center text-sm text-red-600">이미 시작된 경기가 포함되어 있어 베팅이 불가합니다.</div>
+        <div className="mt-2 text-center text-sm text-red-600">Some games have already started and cannot be bet on.</div>
       )}
       {message && <div className="mt-2 text-center text-sm text-blue-600">{message}</div>}
 

@@ -591,8 +591,8 @@ export default function ExchangePage() {
                             ? `${seasonInfo.currentSeason}시즌 진행중`
                             : seasonInfo.status === 'offseason'
                             ? (seasonInfo.nextSeasonStart && seasonInfo.nextSeasonStart !== 'TBD' 
-                               ? `시즌오프 (${new Date(seasonInfo.nextSeasonStart).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} 시작예정)`
-                               : '시즌오프 (일정 미정)')
+                                               ? `Off Season (Starts ${new Date(seasonInfo.nextSeasonStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
+                : 'Off Season (Schedule TBD)')
                             : `휴식기${seasonInfo.breakPeriod ? ` (${new Date(seasonInfo.breakPeriod.end).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} 재개)` : ''}`
                           }
                         </div>
