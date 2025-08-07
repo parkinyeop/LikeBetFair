@@ -141,7 +141,7 @@ function OrderPanel() {
         <div className="flex justify-between items-center">
           <h3 className="font-semibold text-sm text-blue-800">실시간 업데이트</h3>
           <div className="text-xs text-blue-600">
-            {lastUpdate.toLocaleTimeString('ko-KR', { 
+                            {lastUpdate.toLocaleTimeString('en-US', { 
               hour: '2-digit', 
               minute: '2-digit' 
             })}
@@ -287,7 +287,7 @@ function OrderHistoryPanel() {
     const date = new Date(dateString);
     return {
       date: date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }),
-      time: date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+                      time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
     };
   };
 
@@ -411,7 +411,7 @@ function OrderHistoryPanel() {
           <div className="text-right">
             <div className="text-xs text-gray-500">{filteredOrders.length}/{(userOrders || []).length}개 주문</div>
             <div className="text-xs text-gray-400">
-              마지막 업데이트: {lastUpdate.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                              Last Update: {lastUpdate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
             </div>
           </div>
         </div>

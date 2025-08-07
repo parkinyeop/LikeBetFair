@@ -189,7 +189,7 @@ export default function OrderBook({ gameId, market, line, onOrderClick }: OrderB
           <div className="text-right">
                             <div className="text-lg font-bold text-gray-900">{order.amount.toLocaleString()} KRW</div>
             <div className="text-xs text-gray-500">
-              {new Date(order.createdAt).toLocaleTimeString('ko-KR', { 
+                              {new Date(order.createdAt).toLocaleTimeString('en-US', { 
                 hour: '2-digit', 
                 minute: '2-digit' 
               })}
@@ -261,7 +261,7 @@ export default function OrderBook({ gameId, market, line, onOrderClick }: OrderB
           </div>
           <div className="text-right">
             <div className="text-xs text-gray-500 font-medium">
-              마지막 업데이트: {lastUpdate.toLocaleTimeString('ko-KR', { 
+                              Last Update: {lastUpdate.toLocaleTimeString('en-US', { 
                 hour: '2-digit', 
                 minute: '2-digit' 
               })}

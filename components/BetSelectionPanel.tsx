@@ -293,7 +293,32 @@ const BetSelectionPanel = () => {
               ) : ((sel as any)?.market === 'Handicap' || (sel as any)?.market === 'spreads') ? (
                 <p className="text-sm font-medium">{sel.team}</p>
               ) : (
-                <p className="text-sm font-medium">{sel.team}</p>
+                <p className="text-sm font-medium">
+                  {(() => {
+                    // Win/Loss 배팅의 경우 (Win), (Draw), (Lose) 표시
+                    if (sel.team.toLowerCase() === 'draw') {
+                      return 'Draw';
+                    } else if (sel.desc) {
+                      const teams = sel.desc.split(' vs ');
+                      const homeTeam = teams[0];
+                      const awayTeam = teams[1];
+                      
+                      if (sel.team === homeTeam) {
+                        return `${sel.team} (Win)`;
+                      } else if (sel.team === awayTeam) {
+                        return `${sel.team} (Win)`;
+                      } else {
+                        // 베팅한 팀이 홈/원정과 다르면 패 베팅일 가능성
+                        if (sel.team.includes(homeTeam) || homeTeam.includes(sel.team)) {
+                          return `${homeTeam} (Lose)`;
+                        } else if (sel.team.includes(awayTeam) || awayTeam.includes(sel.team)) {
+                          return `${awayTeam} (Lose)`;
+                        }
+                      }
+                    }
+                    return `${sel.team} (Win)`;
+                  })()}
+                </p>
               )}
               <p className="text-xs text-gray-500">{sel.desc}</p>
             </div>
@@ -322,7 +347,7 @@ const BetSelectionPanel = () => {
       </div>
       <div className="text-sm">
         <p className="mb-1">Total Odds: <span className="font-semibold">{totalOdds.toFixed(2)}</span></p>
-        <p className="mb-1">Estimated Profit: <span className="font-semibold">{Math.floor(expectedReturn).toLocaleString()} ₩</span></p>
+        <p className="mb-1">Estimated Profit: <span className="font-semibold">{Math.floor(expectedReturn).toLocaleString()} KRW</span></p>
       </div>
       <button
         className="w-full mt-4 bg-blue-600 text-white py-2 rounded text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
