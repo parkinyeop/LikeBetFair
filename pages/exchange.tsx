@@ -593,7 +593,7 @@ export default function ExchangePage() {
                             ? (seasonInfo.nextSeasonStart && seasonInfo.nextSeasonStart !== 'TBD' 
                                                ? `Off Season (Starts ${new Date(seasonInfo.nextSeasonStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
                 : 'Off Season (Schedule TBD)')
-                            : `휴식기${seasonInfo.breakPeriod ? ` (${new Date(seasonInfo.breakPeriod.end).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} 재개)` : ''}`
+                            : `Break${seasonInfo.breakPeriod ? ` (Resume ${new Date(seasonInfo.breakPeriod.end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})` : ''}`
                           }
                         </div>
                       )}

@@ -215,7 +215,7 @@ function MyBetsPanel() {
           onClick={fetchBets}
           className="text-sm text-blue-600 hover:text-blue-800 px-2 py-1 rounded border border-blue-300 hover:bg-blue-50"
         >
-          새로고침
+                            Refresh
         </button>
       </div>
       {/* 필터 버튼 */}
@@ -323,14 +323,14 @@ function MyBetsPanel() {
                                           }
                                         }
                                       }
-                                      return `${sel.team} 승`;
+                                      return `${sel.team} Win`;
                                     })()
                                   )}
                                 </span>
                                 {/* 경기명 표시 (무승부가 아닌 경우만) */}
                                 {sel.result !== 'draw' && (
                                   <span className="text-xs text-gray-500">
-                                    {sel.desc || `${sel.team} 경기`}
+                                    {sel.desc || `${sel.team} Game`}
                                   </span>
                                 )}
                               </div>
@@ -377,8 +377,8 @@ function MyBetsPanel() {
                             // sel.result가 없거나 pending인 경우, 경기 결과를 직접 계산
                             if (!actualResult || actualResult === 'pending') {
                               if (sel.gameResult && sel.gameResult.score) {
-                                // 언더/오버 베팅의 경우 점수 계산
-                                if (sel.market === '언더/오버' || sel.market === 'totals') {
+                                // Over/Under 베팅의 경우 점수 계산
+                                if (sel.market === 'Over/Under' || sel.market === 'totals') {
                                   const scores = sel.gameResult.score;
                                   let totalScore = 0;
                                   
@@ -400,15 +400,15 @@ function MyBetsPanel() {
                                     actualResult = totalScore < betPoint ? 'won' : 'lost';
                                   }
                                   
-                                  console.log(`[언더/오버 계산] ${sel.desc}: 총점 ${totalScore}, 기준 ${betPoint}, ${isOver ? 'Over' : 'Under'} 베팅 → ${actualResult}`);
+                                  console.log(`[Over/Under 계산] ${sel.desc}: 총점 ${totalScore}, 기준 ${betPoint}, ${isOver ? 'Over' : 'Under'} 베팅 → ${actualResult}`);
                                 }
-                                // 승/패 베팅의 경우 (추후 필요시 구현)
-                                else if (sel.market === '승/패' || sel.market === 'h2h') {
+                                // Win/Loss 베팅의 경우 (추후 필요시 구현)
+                                else if (sel.market === 'Win/Loss' || sel.market === 'h2h') {
                                   // 승부 결과 계산 로직 (현재는 기존 result 사용)
                                   actualResult = sel.result;
                                 }
-                                // 핸디캡 베팅의 경우 (추후 필요시 구현)
-                                else if (sel.market === '핸디캡' || sel.market === 'spreads') {
+                                // Handicap 베팅의 경우 (추후 필요시 구현)
+                                else if (sel.market === 'Handicap' || sel.market === 'spreads') {
                                   // 핸디캡 결과 계산 로직 (현재는 기존 result 사용)
                                   actualResult = sel.result;
                                 }
@@ -443,7 +443,7 @@ else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; la
                                         ) : isHandicap ? (
                                           sel.team
                                         ) : actualResult === 'draw' ? (
-                                          `${sel.desc ? sel.desc.replace(' vs ', ' vs ') : sel.team} (무)`
+                                          `${sel.desc ? sel.desc.replace(' vs ', ' vs ') : sel.team} (Draw)`
                                         ) : (
                                           (() => {
                                             // desc에서 홈팀과 원정팀 파악
@@ -454,27 +454,27 @@ else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; la
                                               
                                               // 베팅한 팀이 홈팀인지 원정팀인지 확인
                                               if (sel.team === homeTeam) {
-                                                return `${sel.team} 승`;
+                                                return `${sel.team} Win`;
                                               } else if (sel.team === awayTeam) {
-                                                return `${sel.team} 승`;
+                                                return `${sel.team} Win`;
                                               } else {
                                                 // 베팅한 팀이 홈/원정과 다르면 패 베팅일 가능성
                                                 if (sel.team.includes(homeTeam) || homeTeam.includes(sel.team)) {
-                                                  return `${homeTeam} 패`;
+                                                  return `${homeTeam} Lose`;
                                                 } else if (sel.team.includes(awayTeam) || awayTeam.includes(sel.team)) {
-                                                  return `${awayTeam} 패`;
+                                                  return `${awayTeam} Lose`;
                                                 }
                                               }
                                             }
-                                            return `${sel.team} 승`;
+                                            return `${sel.team} Win`;
                                           })()
                                         )}
                                       </span>
                                       {/* 경기명 표시 (무승부가 아닌 경우만) */}
                                       {actualResult !== 'draw' && (
-                                        <span className="text-xs text-gray-500">
-                                          {sel.desc || `${sel.team} 경기`}
-                                        </span>
+                                                                              <span className="text-xs text-gray-500">
+                                        {sel.desc || `${sel.team} Game`}
+                                      </span>
                                       )}
                                     </div>
                                     <span className="ml-2 text-gray-600">@ {sel.odds}</span>
@@ -485,11 +485,11 @@ else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; la
                                 {['won', 'lost'].includes(actualResult) && sel.gameResult && (
                                   <div className="text-xs text-blue-600 mt-1 ml-6">
                                     {sel.gameResult.score && Array.isArray(sel.gameResult.score) ? (
-                                      `결과: ${sel.gameResult.homeTeam || '홈팀'} ${
+                                      `Result: ${sel.gameResult.homeTeam || 'Home'} ${
                                         typeof sel.gameResult.score[0] === 'string' 
                                           ? sel.gameResult.score[0] 
                                           : sel.gameResult.score[0]?.score ?? '-'
-                                      } : ${sel.gameResult.awayTeam || '원정팀'} ${
+                                                                              } : ${sel.gameResult.awayTeam || 'Away'} ${
                                         typeof sel.gameResult.score[1] === 'string' 
                                           ? sel.gameResult.score[1] 
                                           : sel.gameResult.score[1]?.score ?? '-'
@@ -501,10 +501,10 @@ else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; la
                                     )}
                                   </div>
                                 )}
-                                {/* 언더/오버 추가 정보 */}
+                                {/* Over/Under 추가 정보 */}
                                 {isOverUnder && sel.point && (
                                   <div className="text-xs text-gray-400 mt-1 ml-6">
-                                    기준점: {sel.point}
+                                    Point: {sel.point}
                                   </div>
                                 )}
                               </div>

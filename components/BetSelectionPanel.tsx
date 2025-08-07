@@ -166,7 +166,7 @@ const BetSelectionPanel = () => {
         window.dispatchEvent(new Event('betPlaced'));
         setLoading(false);
       } else {
-        setMessage(responseData.message || '베팅 저장 실패');
+                  setMessage(responseData.message || 'Betting save failed');
         setLoading(false);
       }
     } catch (err) {
@@ -250,7 +250,7 @@ const BetSelectionPanel = () => {
         }
         
         // 기타 오류
-        setMessage(data.message || '베팅 저장 실패');
+        setMessage(data.message || 'Betting save failed');
         setLoading(false);
       }
     } catch (err) {
@@ -286,7 +286,7 @@ const BetSelectionPanel = () => {
         {selections.map((sel) => (
           <li key={sel.team} className="flex justify-between items-center">
             <div>
-              {((sel as any)?.market === '언더/오버' || (sel as any)?.market === 'totals') ? (
+                              {((sel as any)?.market === 'Over/Under' || (sel as any)?.market === 'totals') ? (
                 <p className="text-sm font-medium">
                   {normalizeOverUnderOption((sel as any)?.option || sel.team, sel.desc, (sel as any)?.point)}
                 </p>
