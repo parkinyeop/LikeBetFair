@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_CONFIG, buildApiUrl } from '../config/apiConfig';
 import { useExchange, ExchangeOrder } from '../hooks/useExchange';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -24,13 +25,8 @@ export default function OrderBook({ gameId, market, line, onOrderClick }: OrderB
       const sportKey = gameId.split('_').slice(0, -1).join('_');
       if (!sportKey) return;
 
-      // API URL 결정
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
-                    (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                     ? 'http://localhost:5050' 
-                     : 'https://likebetfair.onrender.com');
-      
-      const response = await fetch(`${apiUrl}/api/odds/${sportKey}`);
+      const url = buildApiUrl(`${API_CONFIG.ENDPOINTS.ODDS}/${sportKey}`);
+      const response = await fetch(url);
       if (!response.ok) return;
       
       const data = await response.json();

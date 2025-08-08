@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { API_CONFIG } from '../config/apiConfig';
 
 interface WebSocketMessage {
   type: string;
@@ -23,8 +24,9 @@ export const useExchangeWebSocket = (
     }
 
     try {
-      // WebSocket 연결 (서버 포트에 맞게 수정)
-      const ws = new WebSocket('ws://localhost:5050');
+      // WebSocket URL은 BASE_URL에서 프로토콜만 ws(s)로 변환
+      const wsBase = API_CONFIG.BASE_URL.replace(/^http/, 'ws');
+      const ws = new WebSocket(wsBase);
       
       ws.onopen = () => {
         console.log('Exchange WebSocket 연결됨');

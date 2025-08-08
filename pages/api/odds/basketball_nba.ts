@@ -1,11 +1,12 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { API_CONFIG, buildApiUrl } from '../../../config/apiConfig';
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  const apiKey = process.env.ODDS_API_KEY;
-  const url = `https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=${apiKey}&regions=us&markets=h2h`;
+  // 내부 표준 프록시 경유 (직접 외부 호출 대신 서버 API 사용)
+  const url = buildApiUrl(`${API_CONFIG.ENDPOINTS.ODDS}/basketball_nba`);
 
   try {
     const response = await fetch(url);

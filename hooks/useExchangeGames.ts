@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { buildApiUrl } from '../config/apiConfig';
 
 export interface ExchangeGame {
   id: string;
@@ -36,7 +37,8 @@ export function useExchangeGames(category?: string) {
         params.append('category', category);
       }
 
-      const response = await fetch(`http://localhost:5050/api/exchange/games?${params}`);
+      const url = buildApiUrl('/api/exchange/games', Object.fromEntries(params as any));
+      const response = await fetch(url);
       
       if (!response.ok) {
         throw new Error(`게임 목록 조회 실패: ${response.status}`);

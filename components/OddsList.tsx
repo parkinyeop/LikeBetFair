@@ -1,4 +1,5 @@
 import React, { useEffect, useState, memo, useMemo, useCallback } from 'react';
+import { API_CONFIG, buildApiUrl } from '../config/apiConfig';
 import { useBetStore } from '../stores/useBetStore';
 import { normalizeTeamName } from '../server/normalizeUtils';
 import { convertUtcToLocal, getBettingStatus } from '../utils/timeUtils';
@@ -44,7 +45,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
     const fetchOdds = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050'}/api/odds/${sportKey}`);
+        const response = await fetch(buildApiUrl(`${API_CONFIG.ENDPOINTS.ODDS}/${sportKey}`));
         if (response.status === 404) {
           setError('No odds information available for this league.');
           setGames([]);
@@ -197,7 +198,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
         const fetchOdds = async () => {
           try {
             setLoading(true);
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050'}/api/odds/${sportKey}`);
+            const response = await fetch(buildApiUrl(`${API_CONFIG.ENDPOINTS.ODDS}/${sportKey}`));
             if (response.status === 404) {
               setError('해당 리그의 배당 정보가 없습니다.');
               setGames([]);
