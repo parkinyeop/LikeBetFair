@@ -63,14 +63,14 @@ export function useExchangeGames(category?: string) {
       
       // ExchangeGame 형태로 변환
       const exchangeGames: ExchangeGame[] = data.map((game: any) => ({
-        id: game.id,
-        eventId: game.id,
-        homeTeam: game.home_team,
-        awayTeam: game.away_team,
-        commenceTime: game.commence_time,
+        id: game.id || '',
+        eventId: game.id || '',
+        homeTeam: game.home_team || '',
+        awayTeam: game.away_team || '',
+        commenceTime: game.commence_time || '',
         status: 'upcoming',
-        sportKey: game.sport_key,
-        league: game.sport_key.split('_').pop() || '',
+        sportKey: game.sport_key || '',
+        league: game.sport_key ? game.sport_key.split('_').pop() || '' : '',
         category: category || '',
         availableMarkets: game.bookmakers?.[0]?.markets || []
       }));
