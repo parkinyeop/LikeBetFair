@@ -7,6 +7,13 @@
     "build:fast": "NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS='--max-old-space-size=4096' next build --no-lint",
     "start": "npm run build:fast && cd server && node app.js",
     "start:server": "cd server && node app.js",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "cd server && node app.js",
+    "dev:client": "npx next dev",
+    "dev:watch": "concurrently \"npm run dev:server:watch\" \"npm run dev:client\"",
+    "dev:server:watch": "cd server && nodemon app.js --watch . --ext js,json",
+    "dev:restart": "npm run dev:stop && npm run dev",
+    "dev:stop": "pkill -f 'node app.js' && pkill -f 'next dev'",
     "migrate": "cd server && node runMigrations.js",
     "lint": "next lint",
     "postinstall": "cd server && npm install --only=production",
@@ -29,7 +36,6 @@
     "axios": "^1.9.0",
     "bcryptjs": "^2.4.3",
     "cheerio": "^1.1.0",
-    "concurrently": "^9.1.2",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^4.18.2",
@@ -52,8 +58,10 @@
     "zustand": "^5.0.5"
   },
   "devDependencies": {
+    "concurrently": "^9.2.0",
     "eslint": "^8.56.0",
-    "eslint-config-next": "14.1.0"
+    "eslint-config-next": "14.1.0",
+    "nodemon": "^3.1.10"
   },
   "type": "module"
 }
