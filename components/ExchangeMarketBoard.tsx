@@ -194,13 +194,13 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       <button
                         onClick={() => handleBetClick(game, game.homeTeam, 1.8, 'back')}
                         disabled={!isOpen}
-                        className={`flex-1 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 ${
+                        className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                       >
-                        <div>{game.homeTeam}</div>
+                        <div className="text-center truncate max-w-full">{game.homeTeam}</div>
                         <div className="text-xs mt-1 opacity-90">
                           배당: 1.80
                         </div>
@@ -212,13 +212,13 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       <button
                         onClick={() => handleBetClick(game, '무승부', 3.2, 'back')}
                         disabled={!isOpen}
-                        className={`flex-1 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 ${
+                        className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                       >
-                        <div>무승부</div>
+                        <div className="text-center">무승부</div>
                         <div className="text-xs mt-1 opacity-90">
                           배당: 3.20
                         </div>
@@ -230,13 +230,13 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       <button
                         onClick={() => handleBetClick(game, game.awayTeam, 2.1, 'back')}
                         disabled={!isOpen}
-                        className={`flex-1 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 ${
+                        className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                       >
-                        <div>{game.awayTeam}</div>
+                        <div className="text-center truncate max-w-full">{game.awayTeam}</div>
                         <div className="text-xs mt-1 opacity-90">
                           배당: 2.10
                         </div>
@@ -254,13 +254,13 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       <button
                         onClick={() => handleBetClick(game, 'Over 2.5', 1.9, 'back')}
                         disabled={!isOpen}
-                        className={`flex-1 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 ${
+                        className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                       >
-                        <div>Over 2.5</div>
+                        <div className="text-center">Over 2.5</div>
                         <div className="text-xs mt-1 opacity-90">
                           배당: 1.90
                         </div>
@@ -270,13 +270,13 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       <button
                         onClick={() => handleBetClick(game, 'Under 2.5', 1.9, 'back')}
                         disabled={!isOpen}
-                        className={`flex-1 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 ${
+                        className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                       >
-                        <div>Under 2.5</div>
+                        <div className="text-center">Under 2.5</div>
                         <div className="text-xs mt-1 opacity-90">
                           배당: 1.90
                         </div>
@@ -294,13 +294,13 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       <button
                         onClick={() => handleBetClick(game, `${game.homeTeam} -1.5`, 2.0, 'back')}
                         disabled={!isOpen}
-                        className={`flex-1 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 ${
+                        className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                       >
-                        <div>{game.homeTeam} -1.5</div>
+                        <div className="text-center truncate max-w-full">{game.homeTeam} -1.5</div>
                         <div className="text-xs mt-1 opacity-90">
                           배당: 2.00
                         </div>
@@ -310,13 +310,13 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       <button
                         onClick={() => handleBetClick(game, `${game.awayTeam} +1.5`, 1.8, 'back')}
                         disabled={!isOpen}
-                        className={`flex-1 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 ${
+                        className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                       >
-                        <div>{game.awayTeam} +1.5</div>
+                        <div className="text-center truncate max-w-full">{game.awayTeam} +1.5</div>
                         <div className="text-xs mt-1 opacity-90">
                           배당: 1.80
                         </div>
