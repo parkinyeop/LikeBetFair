@@ -566,77 +566,30 @@ export default function ExchangePage() {
                   </div>
                 </button>
 
-                {/* 리그 목록 */}
+                {/* 리그 목록 - 간소화된 그리드 형태 */}
                 {isExpanded && (
-                  <div className="border-t border-gray-200 p-4 space-y-3">
-                    {sports.map((sport) => {
-                      const count = sportGameCounts[sport.id] ?? 0;
-                      const seasonInfo = getSeasonInfo(sport.sport);
-                      const isAvailable = count > 0 || (seasonInfo?.status === 'active');
-                      const hasGames = count > 0;
-                      const statusStyle = seasonInfo ? getSeasonStatusStyle(seasonInfo.status) : { color: '#6B7280', backgroundColor: '#F3F4F6' };
-                      const statusBadge = seasonInfo ? getSeasonStatusBadge(seasonInfo.status) : '알 수 없음';
+                  <div className="border-t border-gray-200 p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {sports.map((sport) => {
+                        const count = sportGameCounts[sport.id] ?? 0;
+                        const hasGames = count > 0;
 
-                      return (
-                        <div key={sport.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                          <div className="flex items-center space-x-3">
-                            <button 
-                              onClick={() => router.push(`/exchange/${sport.sport}`)}
-                              className="font-medium text-blue-600 hover:text-blue-800 transition-colors disabled:text-gray-500 disabled:cursor-not-allowed"
-                              disabled={!isAvailable}
-                            >
-                              {sport.name}
-                            </button>
-                            <span 
-                              className="px-2 py-1 text-xs rounded-full"
-                              style={{ 
-                                color: statusStyle.color, 
-                                backgroundColor: statusStyle.backgroundColor 
-                              }}
-                            >
-                              {statusBadge}
-                            </span>
-                          </div>
-                          
-                          <div className="flex items-center space-x-4 text-sm">
-                            {/* Exchange 탭 스타일 버튼들 */}
-                            <div className="flex bg-gray-100 rounded-lg p-1">
-                              <button className="px-3 py-1 bg-blue-500 text-white text-xs rounded">
-                                Back/Lay
-                              </button>
-                              <button className="px-3 py-1 text-gray-600 text-xs rounded hover:bg-gray-200">
-                                Over/Under
-                              </button>
-                              <button className="px-3 py-1 text-gray-600 text-xs rounded hover:bg-gray-200">
-                                Handicap
-                              </button>
+                        return (
+                          <button
+                            key={sport.id}
+                            onClick={() => router.push(`/exchange/${sport.sport}`)}
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-blue-50 hover:border-blue-200 border border-gray-200 transition-colors text-left"
+                          >
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">{sport.name}</div>
+                              <div className="text-sm text-gray-500">
+                                {hasGames ? `${count}경기` : '경기없음'}
+                              </div>
                             </div>
-                            
-                            {/* 경기 수 표시 */}
-                            <div className="text-gray-600">
-                              {hasGames ? (
-                                <span>{count} games</span>
-                              ) : (
-                                <span className="text-gray-400">No games</span>
-                              )}
-                            </div>
-                            
-                            {/* 이동 버튼 */}
-                            <button 
-                              onClick={() => router.push(`/exchange/${sport.sport}`)}
-                              className={`px-3 py-1 text-xs rounded transition-colors ${
-                                isAvailable
-                                  ? 'bg-blue-500 text-white hover:bg-blue-600'
-                                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              }`}
-                              disabled={!isAvailable}
-                            >
-                              View →
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
