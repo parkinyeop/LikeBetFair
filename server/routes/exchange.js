@@ -37,6 +37,17 @@ router.post('/order', verifyToken, async (req, res) => {
     // 잔고를 정수로 변환하여 비교
     const userBalance = parseInt(user.balance);
     
+    console.log('🔍 잔고 검증 상세:', { 
+      userId,
+      originalBalance: user.balance,
+      userBalance, 
+      required, 
+      side, 
+      price, 
+      amount,
+      calculation: side === 'back' ? `${amount} (back)` : `Math.floor((${price} - 1) * ${amount}) = ${Math.floor((price - 1) * amount)} (lay)`
+    });
+    
     if (!user || userBalance < required) {
       console.log('❌ 잔고 부족:', { userBalance, required, side, price, amount });
       return res.status(400).json({ message: '잔고 부족' });
