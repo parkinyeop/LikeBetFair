@@ -582,18 +582,24 @@ export default function ExchangePage() {
                           ? `${count}경기 예정` 
                           : seasonInfo?.status === 'active' 
                           ? '경기 일정 확인중...'
+                          : seasonInfo?.status === 'offseason'
+                          ? '시즌 오프'
+                          : seasonInfo?.status === 'break'
+                          ? '휴식기'
                           : '경기 없음'
                         }
                       </div>
-                      {seasonInfo && (
+                      {seasonInfo && !hasGames && (
                         <div className="text-xs text-gray-400 mt-1">
                           {seasonInfo.status === 'active' 
                             ? `${seasonInfo.currentSeason}시즌 진행중`
                             : seasonInfo.status === 'offseason'
                             ? (seasonInfo.nextSeasonStart && seasonInfo.nextSeasonStart !== 'TBD' 
-                                               ? `Off Season (Starts ${new Date(seasonInfo.nextSeasonStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
-                : 'Off Season (Schedule TBD)')
-                            : `Break${seasonInfo.breakPeriod ? ` (Resume ${new Date(seasonInfo.breakPeriod.end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})` : ''}`
+                                               ? `다음 시즌: ${new Date(seasonInfo.nextSeasonStart).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}`
+                                   : '다음 시즌 준비중')
+                            : seasonInfo.status === 'break'
+                            ? `휴식기${seasonInfo.breakPeriod ? ` (${new Date(seasonInfo.breakPeriod.end).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} 재개)` : ''}`
+                            : '일정 미정'
                           }
                         </div>
                       )}
@@ -604,6 +610,8 @@ export default function ExchangePage() {
                           ? '클릭하여 보기 →'
                           : seasonInfo?.status === 'offseason'
                           ? '시즌 준비중'
+                          : seasonInfo?.status === 'break'
+                          ? '휴식기'
                           : '준비 중'
                         }
                       </div>
