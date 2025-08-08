@@ -23,6 +23,10 @@ export type ExchangeOrder = {
   sportKey?: string; // 스포츠 키 추가
   backOdds?: number;
   layOdds?: number;
+  stakeAmount?: number; // 베팅 금액
+  potentialProfit?: number; // 예상 수익
+  oddsSource?: string; // 배당율 출처
+  oddsUpdatedAt?: string; // 배당율 업데이트 시간
 };
 
 export interface ExchangeBalance {
