@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { buildApiUrl } from '../config/apiConfig';
+import { getSportKey } from '../config/sportsMapping';
 
 export interface ExchangeGame {
   id: string;
@@ -32,12 +33,25 @@ export function useExchangeGames(category?: string) {
       setLoading(true);
       setError(null);
 
-      const params = new URLSearchParams();
+      // 카테고리에서 스포츠 키 추출
+      let sportKey = '';
       if (category) {
-        params.append('category', category);
+        if (category.includes(" > ")) {
+          const subCategory = category.split(" > ")[1];
+          sportKey = getSportKey(subCategory) || '';
+        } else {
+          sportKey = getSportKey(category) || '';
+        }
       }
 
-      const url = buildApiUrl('/api/exchange/games', Object.fromEntries(params as any));
+      if (!sportKey) {
+        console.log('❌ 스포츠 키를 찾을 수 없음:', category);
+        setGames([]);
+        return;
+      }
+
+      // /api/odds/{sport} API 사용 (익스체인지 홈과 동일한 데이터 소스)
+      const url = buildApiUrl(`/api/odds/${sportKey}`);
       const response = await fetch(url);
       
       if (!response.ok) {
@@ -45,9 +59,23 @@ export function useExchangeGames(category?: string) {
       }
 
       const data = await response.json();
-      console.log('🎮 Exchange 게임 목록 조회 성공:', data.games.length, '개');
+      console.log('🎮 Exchange 게임 목록 조회 성공:', data.length, '개');
       
-      setGames(data.games);
+      // ExchangeGame 형태로 변환
+      const exchangeGames: ExchangeGame[] = data.map((game: any) => ({
+        id: game.id,
+        eventId: game.id,
+        homeTeam: game.home_team,
+        awayTeam: game.away_team,
+        commenceTime: game.commence_time,
+        status: 'upcoming',
+        sportKey: game.sport_key,
+        league: game.sport_key.split('_').pop() || '',
+        category: category || '',
+        availableMarkets: game.bookmakers?.[0]?.markets || []
+      }));
+      
+      setGames(exchangeGames);
     } catch (err) {
       console.error('❌ Exchange 게임 목록 조회 오류:', err);
       setError(err instanceof Error ? err.message : '게임 목록 조회 중 오류 발생');
