@@ -539,60 +539,38 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                     <>
                       {/* 홈팀 Back */}
                       <button
-                        className={`flex-1 p-4 border-2 rounded-lg text-center transition relative ${
+                        className={`flex-1 p-3 rounded-lg text-center transition-colors ${
                           isDisabled
-                            ? 'border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed'
-                            : 'border-blue-300 bg-blue-50 hover:bg-blue-100'
-                        }`}
+                            ? 'bg-gray-300 cursor-not-allowed'
+                            : 'bg-blue-500 hover:bg-blue-600'
+                        } text-white`}
                         onClick={() => {
                           const odds = getSportsbookOdds('승패', selectedGame.homeTeam);
                           if (odds) handleBetClick(selectedGame.homeTeam, odds, 'back');
                         }}
                         disabled={isDisabled}
                       >
-                        <div className={`text-lg font-bold ${isDisabled ? 'text-gray-600' : 'text-blue-800'}`}>
-                          {selectedGame.homeTeam}
-                        </div>
-                        <div className={`text-xl font-extrabold mt-1 ${isDisabled ? 'text-gray-700' : 'text-blue-900'}`}>
-                          {getSportsbookOdds('승패', selectedGame.homeTeam)?.toFixed(2) || 'N/A'}
-                        </div>
-                        <div className={`text-xs mt-1 ${isDisabled ? 'text-gray-500' : 'text-blue-600'}`}>
-                          Back (이길 것)
-                        </div>
-                        {isDisabled && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-gray-500 bg-opacity-20 rounded-lg">
-                            <div className="text-xs font-medium text-gray-600">마감</div>
-                          </div>
-                        )}
+                        <div className="font-bold">{selectedGame.homeTeam}</div>
+                        <div className="text-sm">{getSportsbookOdds('승패', selectedGame.homeTeam)?.toFixed(2) || 'N/A'}</div>
+                        {isDisabled && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
                       </button>
 
                       {/* 원정팀 Lay */}
                       <button
-                        className={`flex-1 p-4 border-2 rounded-lg text-center transition relative ${
+                        className={`flex-1 p-3 rounded-lg text-center transition-colors ${
                           isDisabled
-                            ? 'border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed'
-                            : 'border-pink-300 bg-pink-50 hover:bg-pink-100'
-                        }`}
+                            ? 'bg-gray-300 cursor-not-allowed'
+                            : 'bg-pink-500 hover:bg-pink-600'
+                        } text-white`}
                         onClick={() => {
                           const odds = getSportsbookOdds('승패', selectedGame.awayTeam);
                           if (odds) handleBetClick(selectedGame.awayTeam, odds, 'lay');
                         }}
                         disabled={isDisabled}
                       >
-                        <div className={`text-lg font-bold ${isDisabled ? 'text-gray-600' : 'text-pink-800'}`}>
-                          {selectedGame.awayTeam}
-                        </div>
-                        <div className={`text-xl font-extrabold mt-1 ${isDisabled ? 'text-gray-700' : 'text-pink-900'}`}>
-                          {getSportsbookOdds('승패', selectedGame.awayTeam)?.toFixed(2) || 'N/A'}
-                        </div>
-                        <div className={`text-xs mt-1 ${isDisabled ? 'text-gray-500' : 'text-pink-600'}`}>
-                          Lay (질 것)
-                        </div>
-                        {isDisabled && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-gray-500 bg-opacity-20 rounded-lg">
-                            <div className="text-xs font-medium text-gray-600">마감</div>
-                          </div>
-                        )}
+                        <div className="font-bold">{selectedGame.awayTeam}</div>
+                        <div className="text-sm">{getSportsbookOdds('승패', selectedGame.awayTeam)?.toFixed(2) || 'N/A'}</div>
+                        {isDisabled && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
                       </button>
                     </>
                   );
