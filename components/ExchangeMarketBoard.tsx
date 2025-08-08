@@ -585,60 +585,38 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                   <>
                     {/* Over Back */}
                     <button
-                      className={`flex-1 p-4 border-2 rounded-lg text-center transition relative ${
+                      className={`flex-1 p-3 rounded-lg text-center transition-colors ${
                         isDisabled
-                          ? 'border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed'
-                          : 'border-green-300 bg-green-50 hover:bg-green-100'
-                      }`}
+                          ? 'bg-gray-300 cursor-not-allowed'
+                          : 'bg-green-500 hover:bg-green-600'
+                      } text-white`}
                       onClick={() => {
                         const odds = getSportsbookOdds('총점', 'Over 2.5');
                         if (odds) handleBetClick('Over 2.5', odds, 'back');
                       }}
                       disabled={isDisabled}
                     >
-                      <div className={`text-lg font-bold ${isDisabled ? 'text-gray-600' : 'text-green-800'}`}>
-                        Over 2.5
-                      </div>
-                      <div className={`text-xl font-extrabold mt-1 ${isDisabled ? 'text-gray-700' : 'text-green-900'}`}>
-                        {getSportsbookOdds('총점', 'Over 2.5')?.toFixed(2) || 'N/A'}
-                      </div>
-                      <div className={`text-xs mt-1 ${isDisabled ? 'text-gray-500' : 'text-green-600'}`}>
-                        Back (초과)
-                      </div>
-                      {isDisabled && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-gray-500 bg-opacity-20 rounded-lg">
-                          <div className="text-xs font-medium text-gray-600">마감</div>
-                        </div>
-                      )}
+                      <div className="font-bold">Over 2.5</div>
+                      <div className="text-sm">{getSportsbookOdds('총점', 'Over 2.5')?.toFixed(2) || 'N/A'}</div>
+                      {isDisabled && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
                     </button>
 
                     {/* Under Lay */}
                     <button
-                      className={`flex-1 p-4 border-2 rounded-lg text-center transition relative ${
+                      className={`flex-1 p-3 rounded-lg text-center transition-colors ${
                         isDisabled
-                          ? 'border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed'
-                          : 'border-orange-300 bg-orange-50 hover:bg-orange-100'
-                      }`}
+                          ? 'bg-gray-300 cursor-not-allowed'
+                          : 'bg-orange-500 hover:bg-orange-600'
+                      } text-white`}
                       onClick={() => {
                         const odds = getSportsbookOdds('총점', 'Under 2.5');
                         if (odds) handleBetClick('Under 2.5', odds, 'lay');
                       }}
                       disabled={isDisabled}
                     >
-                      <div className={`text-lg font-bold ${isDisabled ? 'text-gray-600' : 'text-orange-800'}`}>
-                        Under 2.5
-                      </div>
-                      <div className={`text-xl font-extrabold mt-1 ${isDisabled ? 'text-gray-700' : 'text-orange-900'}`}>
-                        {getSportsbookOdds('총점', 'Under 2.5')?.toFixed(2) || 'N/A'}
-                      </div>
-                      <div className={`text-xs mt-1 ${isDisabled ? 'text-gray-500' : 'text-orange-600'}`}>
-                        Lay (미만)
-                      </div>
-                      {isDisabled && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-gray-500 bg-opacity-20 rounded-lg">
-                          <div className="text-xs font-medium text-gray-600">마감</div>
-                        </div>
-                      )}
+                      <div className="font-bold">Under 2.5</div>
+                      <div className="text-sm">{getSportsbookOdds('총점', 'Under 2.5')?.toFixed(2) || 'N/A'}</div>
+                      {isDisabled && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
                     </button>
                   </>
                 );
