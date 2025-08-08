@@ -60,20 +60,32 @@ export function useExchangeGames(category?: string) {
 
       const data = await response.json();
       console.log('🎮 Exchange 게임 목록 조회 성공:', data.length, '개');
+      console.log('🔍 첫 번째 게임 데이터 구조:', data[0]);
       
       // ExchangeGame 형태로 변환
-      const exchangeGames: ExchangeGame[] = data.map((game: any) => ({
-        id: game.id || '',
-        eventId: game.id || '',
-        homeTeam: game.home_team || '',
-        awayTeam: game.away_team || '',
-        commenceTime: game.commence_time || '',
-        status: 'upcoming',
-        sportKey: game.sport_key || '',
-        league: game.sport_key ? game.sport_key.split('_').pop() || '' : '',
-        category: category || '',
-        availableMarkets: game.bookmakers?.[0]?.markets || []
-      }));
+      const exchangeGames: ExchangeGame[] = data.map((game: any) => {
+        // sportKey를 직접 설정 (API 응답에서 가져오지 않고 현재 요청한 sportKey 사용)
+        const gameSportKey = sportKey;
+        console.log('🔍 게임 변환:', {
+          originalSportKey: game.sport_key,
+          usingSportKey: gameSportKey,
+          homeTeam: game.home_team,
+          awayTeam: game.away_team
+        });
+        
+        return {
+          id: game.id || '',
+          eventId: game.id || '',
+          homeTeam: game.home_team || '',
+          awayTeam: game.away_team || '',
+          commenceTime: game.commence_time || '',
+          status: 'upcoming',
+          sportKey: gameSportKey,
+          league: gameSportKey ? gameSportKey.split('_').pop() || '' : '',
+          category: category || '',
+          availableMarkets: game.bookmakers?.[0]?.markets || []
+        };
+      });
       
       setGames(exchangeGames);
     } catch (err) {
