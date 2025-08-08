@@ -141,6 +141,7 @@ const OrderbookPage: React.FC = () => {
   };
 
   const formatAmount = (amount: number) => {
+    if (!amount || isNaN(amount)) return '0';
     if (amount >= 1000000) {
       return `${(amount / 1000000).toFixed(1)}M`;
     } else if (amount >= 1000) {
@@ -150,6 +151,7 @@ const OrderbookPage: React.FC = () => {
   };
 
   const formatCurrency = (amount: number) => {
+    if (!amount || isNaN(amount)) return '0';
     return amount.toLocaleString('ko-KR');
   };
 
@@ -311,7 +313,7 @@ const OrderbookPage: React.FC = () => {
                   </div>
                   <div className="text-right">
                     <div className="text-3xl font-bold text-blue-600">
-                      {order.odds.toFixed(2)}
+                      {order.odds ? order.odds.toFixed(2) : 'N/A'}
                     </div>
                     <div className="text-sm text-gray-600">
                       배당률
