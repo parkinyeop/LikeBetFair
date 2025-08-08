@@ -38,6 +38,7 @@ export default function ExchangePage() {
   const [gameInfo, setGameInfo] = useState<any>(null);
   const [sportGameCounts, setSportGameCounts] = useState<{[key: string]: number}>({});
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'warning' | 'success' } | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<{[key: string]: boolean}>({});
 
   // 취소된 주문 확인 및 알림
   const checkCancelledOrders = async () => {
@@ -514,113 +515,133 @@ export default function ExchangePage() {
         <div className="text-center mb-4">
           <p className="text-gray-600 text-sm">원하는 스포츠를 선택하여 호가 거래를 시작하세요.</p>
         </div>
-        <div className="space-y-6">
-          {/* 카테고리별로 그룹핑해서 표시 */}
+        <div className="space-y-4">
+          {/* 카테고리별로 스포츠북 스타일의 접는/펼치는 레이아웃 */}
           {Object.entries({
             '축구': [
-              { id: 'kleague', name: 'K League 1', sport: 'soccer_korea_kleague1', emoji: '⚽' },
-              { id: 'jleague', name: 'J League', sport: 'soccer_japan_j_league', emoji: '⚽' },
-              { id: 'seriea', name: 'Serie A', sport: 'soccer_italy_serie_a', emoji: '⚽' },
-              { id: 'brasileirao', name: 'Brasileirao', sport: 'soccer_brazil_campeonato', emoji: '⚽' },
-              { id: 'mls', name: 'MLS', sport: 'soccer_usa_mls', emoji: '⚽' },
-              { id: 'argentina', name: 'Primera Division', sport: 'soccer_argentina_primera_division', emoji: '⚽' },
-              { id: 'csl', name: 'Chinese Super League', sport: 'soccer_china_superleague', emoji: '⚽' },
-              { id: 'laliga', name: 'La Liga', sport: 'soccer_spain_primera_division', emoji: '⚽' },
-              { id: 'bundesliga', name: 'Bundesliga', sport: 'soccer_germany_bundesliga', emoji: '⚽' }
+              { id: 'kleague', name: 'K League 1', sport: 'soccer_korea_kleague1' },
+              { id: 'jleague', name: 'J League', sport: 'soccer_japan_j_league' },
+              { id: 'seriea', name: 'Serie A', sport: 'soccer_italy_serie_a' },
+              { id: 'brasileirao', name: 'Brasileirao', sport: 'soccer_brazil_campeonato' },
+              { id: 'mls', name: 'MLS', sport: 'soccer_usa_mls' },
+              { id: 'argentina', name: 'Primera Division', sport: 'soccer_argentina_primera_division' },
+              { id: 'csl', name: 'Chinese Super League', sport: 'soccer_china_superleague' },
+              { id: 'laliga', name: 'La Liga', sport: 'soccer_spain_primera_division' },
+              { id: 'bundesliga', name: 'Bundesliga', sport: 'soccer_germany_bundesliga' }
             ],
             '농구': [
-              { id: 'nba', name: 'NBA', sport: 'basketball_nba', emoji: '🏀' },
-              { id: 'kbl', name: 'KBL', sport: 'basketball_kbl', emoji: '🏀' }
+              { id: 'nba', name: 'NBA', sport: 'basketball_nba' },
+              { id: 'kbl', name: 'KBL', sport: 'basketball_kbl' }
             ],
             '야구': [
-              { id: 'mlb', name: 'MLB', sport: 'baseball_mlb', emoji: '⚾' },
-              { id: 'kbo', name: 'KBO', sport: 'baseball_kbo', emoji: '⚾' }
+              { id: 'mlb', name: 'MLB', sport: 'baseball_mlb' },
+              { id: 'kbo', name: 'KBO', sport: 'baseball_kbo' }
             ],
             '미식축구': [
-              { id: 'nfl', name: 'NFL', sport: 'americanfootball_nfl', emoji: '🏈' }
+              { id: 'nfl', name: 'NFL', sport: 'americanfootball_nfl' }
             ]
-          }).map(([categoryName, sports]) => (
-            <div key={categoryName} className="space-y-3">
-              <h4 className="text-lg font-semibold text-gray-700 border-b border-gray-200 pb-2">
-                {categoryName}
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {sports.map((sport) => {
-                  const count = sportGameCounts[sport.id] ?? 0;
-                  const seasonInfo = getSeasonInfo(sport.sport);
-                  // 시즌 정보와 경기 개수를 모두 고려하여 활성 상태 결정
-                  const isAvailable = count > 0 || (seasonInfo?.status === 'active');
-                  const hasGames = count > 0;
-                  const statusStyle = seasonInfo ? getSeasonStatusStyle(seasonInfo.status) : { color: '#6B7280', backgroundColor: '#F3F4F6' };
-                  const statusBadge = seasonInfo ? getSeasonStatusBadge(seasonInfo.status) : '알 수 없음';
-                  
-                  return (
-                    <button
-                      key={sport.id}
-                      onClick={() => router.push(`/exchange/${sport.sport}`)}
-                      className={`p-4 rounded-lg border text-left transition-colors ${
-                        isAvailable 
-                          ? 'border-gray-200 bg-gray-50 hover:bg-blue-50 hover:border-blue-300 hover:shadow-md' 
-                          : 'border-gray-200 bg-gray-100 opacity-60 cursor-not-allowed'
-                      }`}
-                      disabled={!isAvailable}
+          }).map(([categoryName, sports]) => {
+            const isExpanded = expandedCategories[categoryName] || false;
+            
+            return (
+              <div key={categoryName} className="bg-white rounded-lg shadow-md border border-gray-200">
+                {/* 카테고리 헤더 */}
+                <button
+                  onClick={() => setExpandedCategories(prev => ({ ...prev, [categoryName]: !isExpanded }))}
+                  className="w-full p-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors rounded-lg"
+                >
+                  <div className="flex items-center space-x-3">
+                    <span className="text-xl font-semibold text-gray-900">{categoryName}</span>
+                    <span className="text-sm text-gray-500">({sports.length}개 리그)</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <svg
+                      className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="text-2xl">{sport.emoji}</div>
-                        <div 
-                          className="px-2 py-1 rounded text-xs font-medium"
-                          style={statusStyle}
-                        >
-                          {statusBadge}
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </button>
+
+                {/* 리그 목록 */}
+                {isExpanded && (
+                  <div className="border-t border-gray-200 p-4 space-y-3">
+                    {sports.map((sport) => {
+                      const count = sportGameCounts[sport.id] ?? 0;
+                      const seasonInfo = getSeasonInfo(sport.sport);
+                      const isAvailable = count > 0 || (seasonInfo?.status === 'active');
+                      const hasGames = count > 0;
+                      const statusStyle = seasonInfo ? getSeasonStatusStyle(seasonInfo.status) : { color: '#6B7280', backgroundColor: '#F3F4F6' };
+                      const statusBadge = seasonInfo ? getSeasonStatusBadge(seasonInfo.status) : '알 수 없음';
+
+                      return (
+                        <div key={sport.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                          <div className="flex items-center space-x-3">
+                            <button 
+                              onClick={() => router.push(`/exchange/${sport.sport}`)}
+                              className="font-medium text-blue-600 hover:text-blue-800 transition-colors disabled:text-gray-500 disabled:cursor-not-allowed"
+                              disabled={!isAvailable}
+                            >
+                              {sport.name}
+                            </button>
+                            <span 
+                              className="px-2 py-1 text-xs rounded-full"
+                              style={{ 
+                                color: statusStyle.color, 
+                                backgroundColor: statusStyle.backgroundColor 
+                              }}
+                            >
+                              {statusBadge}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center space-x-4 text-sm">
+                            {/* Exchange 탭 스타일 버튼들 */}
+                            <div className="flex bg-gray-100 rounded-lg p-1">
+                              <button className="px-3 py-1 bg-blue-500 text-white text-xs rounded">
+                                Back/Lay
+                              </button>
+                              <button className="px-3 py-1 text-gray-600 text-xs rounded hover:bg-gray-200">
+                                Over/Under
+                              </button>
+                              <button className="px-3 py-1 text-gray-600 text-xs rounded hover:bg-gray-200">
+                                Handicap
+                              </button>
+                            </div>
+                            
+                            {/* 경기 수 표시 */}
+                            <div className="text-gray-600">
+                              {hasGames ? (
+                                <span>{count} games</span>
+                              ) : (
+                                <span className="text-gray-400">No games</span>
+                              )}
+                            </div>
+                            
+                            {/* 이동 버튼 */}
+                            <button 
+                              onClick={() => router.push(`/exchange/${sport.sport}`)}
+                              className={`px-3 py-1 text-xs rounded transition-colors ${
+                                isAvailable
+                                  ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              }`}
+                              disabled={!isAvailable}
+                            >
+                              View →
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                      <div className={`font-semibold text-sm ${isAvailable ? 'text-blue-600' : 'text-gray-500'}`}>
-                        {sport.name}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {hasGames 
-                          ? `${count}경기 예정` 
-                          : seasonInfo?.status === 'active' 
-                          ? '경기 일정 확인중...'
-                          : seasonInfo?.status === 'offseason'
-                          ? '시즌 오프'
-                          : seasonInfo?.status === 'break'
-                          ? '휴식기'
-                          : '경기 없음'
-                        }
-                      </div>
-                      {seasonInfo && !hasGames && (
-                        <div className="text-xs text-gray-400 mt-1">
-                          {seasonInfo.status === 'active' 
-                            ? `${seasonInfo.currentSeason}시즌 진행중`
-                            : seasonInfo.status === 'offseason'
-                            ? (seasonInfo.nextSeasonStart && seasonInfo.nextSeasonStart !== 'TBD' 
-                                               ? `다음 시즌: ${new Date(seasonInfo.nextSeasonStart).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}`
-                                   : '다음 시즌 준비중')
-                            : seasonInfo.status === 'break'
-                            ? `휴식기${seasonInfo.breakPeriod ? ` (${new Date(seasonInfo.breakPeriod.end).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} 재개)` : ''}`
-                            : '일정 미정'
-                          }
-                        </div>
-                      )}
-                      <div className="text-xs text-blue-500 mt-1">
-                        {hasGames 
-                          ? '클릭하여 보기 →' 
-                          : seasonInfo?.status === 'active' 
-                          ? '클릭하여 보기 →'
-                          : seasonInfo?.status === 'offseason'
-                          ? '시즌 준비중'
-                          : seasonInfo?.status === 'break'
-                          ? '휴식기'
-                          : '준비 중'
-                        }
-                      </div>
-                    </button>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
