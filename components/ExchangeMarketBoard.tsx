@@ -43,6 +43,11 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
   // 해당 카테고리의 경기만 필터링 후 중복 제거
   const filteredGamesRaw = exchangeGames.filter(game => {
     if (!currentSportKey) return false;
+    console.log('🔍 게임 필터링:', {
+      gameSportKey: game.sportKey,
+      currentSportKey: currentSportKey,
+      match: game.sportKey === currentSportKey
+    });
     return game.sportKey === currentSportKey;
   });
   // 중복 제거: homeTeam, awayTeam, commenceTime 조합
