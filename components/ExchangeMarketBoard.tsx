@@ -15,6 +15,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
   const { setSelectedBet } = useExchangeContext();
   const { games: exchangeGames, loading: gamesLoading, error: gamesError, refetch } = useExchangeGames(selectedCategory);
   const [gameMarkets, setGameMarkets] = useState<{[gameId: string]: '승패' | '총점' | '핸디캡'}>({});
+  const [selectedBets, setSelectedBets] = useState<{[key: string]: boolean}>({});
 
   // 선택된 카테고리에서 스포츠 키 추출
   const getSportKeyFromCategory = (category: string): string | null => {
@@ -74,16 +75,32 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
     }
 
     const currentMarket = getGameMarket(game.id);
-    setSelectedBet({
-      team,
-      price,
-      type,
-      gameId: game.id,
-      market: currentMarket,
-      homeTeam: game.homeTeam,
-      awayTeam: game.awayTeam,
-      commenceTime: game.commenceTime
-    });
+    const betKey = `${game.id}-${currentMarket}-${team}`;
+    
+    // 같은 베팅을 다시 클릭하면 선택 해제, 다른 베팅을 클릭하면 선택
+    if (selectedBets[betKey]) {
+      setSelectedBets(prev => ({ ...prev, [betKey]: false }));
+      setSelectedBet(null);
+    } else {
+      // 이전 선택을 모두 해제하고 새로운 베팅 선택
+      setSelectedBets({ [betKey]: true });
+      setSelectedBet({
+        team,
+        price,
+        type,
+        gameId: game.id,
+        market: currentMarket,
+        homeTeam: game.homeTeam,
+        awayTeam: game.awayTeam,
+        commenceTime: game.commenceTime
+      });
+    }
+  };
+
+  // 베팅 선택 상태 확인 함수
+  const isBetSelected = (gameId: string, market: string, team: string): boolean => {
+    const betKey = `${gameId}-${market}-${team}`;
+    return !!selectedBets[betKey];
   };
 
   // 로딩 상태
@@ -197,6 +214,8 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                         className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
+                            : isBetSelected(game.id, currentMarket, game.homeTeam)
+                            ? 'bg-yellow-400 hover:bg-yellow-500'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                       >
@@ -215,6 +234,8 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                         className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
+                            : isBetSelected(game.id, currentMarket, '무승부')
+                            ? 'bg-yellow-400 hover:bg-yellow-500'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                       >
@@ -233,6 +254,8 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                         className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
+                            : isBetSelected(game.id, currentMarket, game.awayTeam)
+                            ? 'bg-yellow-400 hover:bg-yellow-500'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                       >
@@ -257,6 +280,8 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                         className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
+                            : isBetSelected(game.id, currentMarket, 'Over 2.5')
+                            ? 'bg-yellow-400 hover:bg-yellow-500'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                       >
@@ -273,6 +298,8 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                         className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
+                            : isBetSelected(game.id, currentMarket, 'Under 2.5')
+                            ? 'bg-yellow-400 hover:bg-yellow-500'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                       >
@@ -297,6 +324,8 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                         className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
+                            : isBetSelected(game.id, currentMarket, `${game.homeTeam} -1.5`)
+                            ? 'bg-yellow-400 hover:bg-yellow-500'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                       >
@@ -313,6 +342,8 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                         className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
+                            : isBetSelected(game.id, currentMarket, `${game.awayTeam} +1.5`)
+                            ? 'bg-yellow-400 hover:bg-yellow-500'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                       >
