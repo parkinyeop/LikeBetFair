@@ -330,15 +330,9 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
 
   // 메인 UI 렌더링
   return (
-    <div className="flex flex-col h-full bg-white rounded-lg shadow-lg">
-      {/* 헤더 - 카테고리 정보 */}
-      <div className="p-3 border-b border-gray-200 bg-gray-50">
-        <h2 className="text-lg font-bold text-gray-800">{selectedCategory} Exchange</h2>
-        <p className="text-xs text-gray-600">주문 생성 영역 - 스포츠북 배당률 기반</p>
-      </div>
-
+    <div className="flex flex-col h-full">
       {/* 경기 선택 - 고정 높이 스크롤 영역 */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-gray-200 bg-white">
         <div className="p-3 pb-2">
           <h3 className="text-sm font-semibold text-gray-700">경기 선택</h3>
         </div>
