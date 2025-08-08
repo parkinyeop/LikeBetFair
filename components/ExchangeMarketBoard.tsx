@@ -476,31 +476,21 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
 
                       {/* 무승부 Back */}
                       <button
-                        className={`flex-1 p-4 border-2 rounded-lg text-center transition relative ${
+                        className={`flex-1 p-3 rounded-lg text-center transition-colors ${
                           isDisabled
-                            ? 'border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed'
-                            : 'border-green-300 bg-green-50 hover:bg-green-100'
-                        }`}
+                            ? 'bg-gray-300 cursor-not-allowed'
+                            : 'bg-green-500 hover:bg-green-600'
+                        } text-white`}
                         onClick={() => {
                           const odds = getSportsbookOdds('승패', 'Draw');
                           if (odds) handleBetClick('Draw', odds, 'back');
                         }}
                         disabled={isDisabled}
                       >
-                        <div className={`text-lg font-bold ${isDisabled ? 'text-gray-600' : 'text-green-800'}`}>
-                          무승부
-                        </div>
-                        <div className={`text-xl font-extrabold mt-1 ${isDisabled ? 'text-gray-700' : 'text-green-900'}`}>
-                          {getSportsbookOdds('승패', 'Draw')?.toFixed(2) || 'N/A'}
-                        </div>
-                        <div className={`text-xs mt-1 ${isDisabled ? 'text-gray-500' : 'text-green-600'}`}>
-                          Back (무승부)
-                        </div>
-                        {isDisabled && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-gray-500 bg-opacity-20 rounded-lg">
-                            <div className="text-xs font-medium text-gray-600">마감</div>
-                          </div>
-                        )}
+                        <div className="font-bold">무승부</div>
+                        <div className="text-sm">{getSportsbookOdds('승패', 'Draw')?.toFixed(2) || 'N/A'}</div>
+                        <div className="text-xs mt-1">Back (무승부)</div>
+                        {isDisabled && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
                       </button>
 
                       {/* 원정팀 Back */}
@@ -552,6 +542,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       >
                         <div className="font-bold">{selectedGame.homeTeam}</div>
                         <div className="text-sm">{getSportsbookOdds('승패', selectedGame.homeTeam)?.toFixed(2) || 'N/A'}</div>
+                        <div className="text-xs mt-1">Back (이길 것)</div>
                         {isDisabled && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
                       </button>
 
@@ -570,6 +561,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       >
                         <div className="font-bold">{selectedGame.awayTeam}</div>
                         <div className="text-sm">{getSportsbookOdds('승패', selectedGame.awayTeam)?.toFixed(2) || 'N/A'}</div>
+                        <div className="text-xs mt-1">Lay (질 것)</div>
                         {isDisabled && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
                       </button>
                     </>
