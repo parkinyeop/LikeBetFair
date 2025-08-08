@@ -30,15 +30,19 @@ router.post('/order', verifyToken, async (req, res) => {
       sportKey: orderData.sportKey
     });
     
-    // 일반 잔고 사용
+    // 일반 잔고 사용 (데이터 타입 통일)
     const user = await User.findByPk(userId);
     const required = side === 'back' ? amount : Math.floor((price - 1) * amount);
     
-    if (!user || user.balance < required) {
+    // 잔고를 정수로 변환하여 비교
+    const userBalance = parseInt(user.balance);
+    
+    if (!user || userBalance < required) {
+      console.log('❌ 잔고 부족:', { userBalance, required, side, price, amount });
       return res.status(400).json({ message: '잔고 부족' });
     }
     
-    user.balance -= required;
+    user.balance = userBalance - required;
     await user.save();
     
     const opposite = side === 'back' ? 'lay' : 'back';
