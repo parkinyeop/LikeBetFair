@@ -30,6 +30,7 @@ export function useExchangeGames(category?: string) {
 
   const fetchGames = useCallback(async () => {
     try {
+      console.log('🔄 fetchGames 호출됨, category:', category);
       setLoading(true);
       setError(null);
 
@@ -52,7 +53,11 @@ export function useExchangeGames(category?: string) {
 
       // /api/odds/{sport} API 사용 (익스체인지 홈과 동일한 데이터 소스)
       const url = buildApiUrl(`/api/odds/${sportKey}`);
+      console.log('⏱️ API 요청 시작:', url);
+      const startTime = Date.now();
       const response = await fetch(url);
+      const endTime = Date.now();
+      console.log('⏱️ API 응답 완료:', endTime - startTime, 'ms');
       
       if (!response.ok) {
         throw new Error(`게임 목록 조회 실패: ${response.status}`);
@@ -61,6 +66,9 @@ export function useExchangeGames(category?: string) {
       const data = await response.json();
       console.log('🎮 Exchange 게임 목록 조회 성공:', data.length, '개');
       console.log('🔍 첫 번째 게임 데이터 구조:', data[0]);
+      
+      // 데이터 변환 시작 시간
+      const transformStartTime = Date.now();
       
       // ExchangeGame 형태로 변환
       const exchangeGames: ExchangeGame[] = data.map((game: any) => {
@@ -86,6 +94,9 @@ export function useExchangeGames(category?: string) {
           availableMarkets: game.bookmakers?.[0]?.markets || []
         };
       });
+      
+      const transformEndTime = Date.now();
+      console.log('⏱️ 데이터 변환 완료:', transformEndTime - transformStartTime, 'ms');
       
       setGames(exchangeGames);
     } catch (err) {

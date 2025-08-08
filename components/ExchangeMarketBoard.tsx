@@ -41,6 +41,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
   console.log('🎯 현재 스포츠 키:', currentSportKey);
 
   // 해당 카테고리의 경기만 필터링 후 중복 제거
+  const filterStartTime = Date.now();
   const filteredGamesRaw = exchangeGames.filter(game => {
     if (!currentSportKey) return false;
     console.log('🔍 게임 필터링:', {
@@ -50,6 +51,8 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
     });
     return game.sportKey === currentSportKey;
   });
+  const filterEndTime = Date.now();
+  console.log('⏱️ 필터링 완료:', filterEndTime - filterStartTime, 'ms');
   // 중복 제거: homeTeam, awayTeam, commenceTime 조합
   const uniqueGamesMap = new Map();
   filteredGamesRaw.forEach((game) => {
@@ -217,14 +220,14 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
   const checkBettingCutoff = (commenceTime: string): { isAllowed: boolean; message: string; timeLeft?: number } => {
     const now = currentTime;
     const gameTime = new Date(commenceTime);
-    const cutoffTime = new Date(gameTime.getTime() - 10 * 60 * 1000); // 경기 시작 10분 전
+    const cutoffTime = new Date(gameTime.getTime() - 5 * 60 * 1000); // 경기 시작 5분 전 (10분에서 5분으로 단축)
     const maxTime = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7일 후
     
     // 이미 마감된 경기
     if (now >= cutoffTime) {
       return {
         isAllowed: false,
-        message: '베팅 마감됨 (경기 시작 10분 전 마감)'
+        message: '베팅 마감됨 (경기 시작 5분 전 마감)'
       };
     }
     
