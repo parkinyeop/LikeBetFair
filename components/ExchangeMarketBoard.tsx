@@ -20,7 +20,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
   const [selectedMarket, setSelectedMarket] = useState<'승패' | '총점' | '핸디캡'>('승패');
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  // 선택된 카테고리에서 스포츠 키 추출
+  // 선택된 카테고리에서 스포츠 키 추출 (sportsMapping.ts 사용)
   const getSportKeyFromCategory = (category: string): string | null => {
     console.log('🔍 카테고리에서 스포츠 키 추출:', category);
     
@@ -28,28 +28,11 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
       const subCategory = category.split(" > ")[1];
       const sportKey = getSportKey(subCategory);
       console.log('🔍 서브카테고리 스포츠 키:', subCategory, '->', sportKey);
-      return sportKey;
+      return sportKey || null;
     }
     
-    // 직접 카테고리명으로 매핑
-    const directMapping: Record<string, string> = {
-      "K리그": "soccer_korea_kleague1",
-      "J리그": "soccer_japan_j_league", 
-      "세리에 A": "soccer_italy_serie_a",
-      "브라질 세리에 A": "soccer_brazil_campeonato",
-      "MLS": "soccer_usa_mls",
-      "아르헨티나 프리메라": "soccer_argentina_primera_division",
-      "중국 슈퍼리그": "soccer_china_superleague",
-      "라리가": "soccer_spain_primera_division",
-      "분데스리가": "soccer_germany_bundesliga",
-      "NBA": "basketball_nba",
-      "KBL": "basketball_kbl",
-      "KBO": "baseball_kbo",
-      "MLB": "baseball_mlb",
-      "NFL": "americanfootball_nfl"
-    };
-    
-    const sportKey = directMapping[category];
+    // 직접 카테고리명으로 매핑 (sportsMapping.ts의 SPORT_CATEGORIES 사용)
+    const sportKey = getSportKey(category);
     console.log('🔍 직접 매핑 스포츠 키:', category, '->', sportKey);
     return sportKey || null;
   };
