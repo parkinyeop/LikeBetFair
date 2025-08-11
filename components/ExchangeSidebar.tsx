@@ -270,10 +270,8 @@ function OrderHistoryPanel() {
 
   // 잠재 수익 계산
   const calculatePotentialProfit = (order: ExchangeOrder) => {
-    // 올바른 배당률 사용
-    const odds = order.side === 'back' 
-      ? (order.backOdds || order.price) 
-      : (order.layOdds || order.price);
+    // 호가 배당률 사용 (order.price)
+    const odds = order.price;
     
     if (order.side === 'back') {
       return Math.round(order.amount * (odds - 1));
@@ -560,11 +558,19 @@ function OrderHistoryPanel() {
                     <div className="text-center">
                       <div className="text-xs text-gray-500">Odds</div>
                       <div className="text-lg font-bold text-gray-800">
-                        {(order.side === 'back' 
-                          ? (order.backOdds || order.price) 
-                          : (order.layOdds || order.price)
-                        ).toFixed(2)}
+                        {order.price.toFixed(2)}
                       </div>
+                      {/* 스포츠북 참고 배당률 표시 */}
+                      {order.side === 'back' && order.backOdds && (
+                        <div className="text-xs text-blue-600">
+                          참고: {order.backOdds.toFixed(2)}
+                        </div>
+                      )}
+                      {order.side === 'lay' && order.layOdds && (
+                        <div className="text-xs text-blue-600">
+                          참고: {order.layOdds.toFixed(2)}
+                        </div>
+                      )}
                     </div>
                     <div className="text-center">
                       <div className="text-xs text-gray-500">주문 금액</div>
