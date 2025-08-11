@@ -357,18 +357,25 @@ router.get('/all-orders', async (req, res) => {
       id: order.id,
       gameId: order.gameId,
       userId: order.userId,
-      type: order.side,
-      odds: order.price,
+      side: order.side,
+      price: order.price,
       amount: order.amount,
       status: order.status,
       createdAt: order.createdAt,
-      game: {
-        homeTeam: order.homeTeam,
-        awayTeam: order.awayTeam,
-        startTime: order.commenceTime,
-        sportKey: order.sportKey,
-        subCategory: order.sportKey
-      }
+      selection: order.selection,
+      market: order.market,
+      line: order.line,
+      // 게임 정보를 직접 필드로 반환
+      homeTeam: order.homeTeam,
+      awayTeam: order.awayTeam,
+      commenceTime: order.commenceTime,
+      sportKey: order.sportKey,
+      stakeAmount: order.stakeAmount,
+      potentialProfit: order.potentialProfit,
+      backOdds: order.backOdds,
+      layOdds: order.layOdds,
+      oddsSource: order.oddsSource,
+      oddsUpdatedAt: order.oddsUpdatedAt
     }));
     
     console.log('전체 오픈 주문 조회:', ordersWithGameInfo.length, '개');

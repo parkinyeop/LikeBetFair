@@ -40,7 +40,9 @@ const OrderbookPage: React.FC = () => {
     const loadOrders = async () => {
       try {
         const allOrders = await fetchAllOpenOrders();
-        // ExchangeOrder를 Order 타입으로 변환
+        console.log('🔍 원본 주문 데이터:', allOrders);
+        
+        // 백엔드에서 이미 올바른 구조로 반환하므로 직접 사용
         const convertedOrders: Order[] = allOrders.map(order => ({
           id: order.id.toString(),
           gameId: order.gameId,
@@ -62,6 +64,8 @@ const OrderbookPage: React.FC = () => {
           oddsSource: order.oddsSource,
           oddsUpdatedAt: order.oddsUpdatedAt
         }));
+        
+        console.log('🔍 변환된 주문 데이터:', convertedOrders);
         setOrders(convertedOrders);
       } catch (error) {
         console.error('Failed to fetch orders:', error);
@@ -294,55 +298,64 @@ const OrderbookPage: React.FC = () => {
                   <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded">
                     {getSportDisplayName(order.sportKey || '')}
                   </span>
-                  <span className={`px-2 py-1 text-white text-xs font-semibold rounded ${
-                    order.type === 'back' ? 'bg-green-500' : 'bg-pink-500'
+                  <span className={`px-3 py-1 text-white text-sm font-bold rounded ${
+                    order.type === 'back' ? 'bg-green-600' : 'bg-pink-600'
                   }`}>
-                    {order.type === 'back' ? 'Back' : 'Lay'}
+                    {order.type === 'back' ? '🎯 Back (이길 것)' : '📉 Lay (질 것)'}
                   </span>
                   <span className="text-xs text-gray-500">
                     {formatDateTime(order.createdAt)}
                   </span>
                 </div>
                 <div className="text-right">
-                  <div className="text-xl font-bold text-blue-600">
+                  <div className="text-2xl font-bold text-blue-600">
                     {order.odds ? order.odds.toFixed(2) : 'N/A'}
                   </div>
-                  <div className="text-xs text-gray-600">
-                    배당률
+                  <div className="text-xs text-gray-600 font-medium">
+                    호가 배당률
                   </div>
                 </div>
               </div>
 
-              {/* 경기 정보 */}
-              <div className="mb-3">
-                <div className="text-lg font-bold text-gray-800 mb-1">
-                  {order.homeTeam} vs {order.awayTeam}
+              {/* 경기 정보 - 더 명확하게 표시 */}
+              <div className="mb-4 bg-white p-3 rounded-lg border border-gray-200">
+                <div className="text-xl font-bold text-gray-800 mb-2 text-center">
+                  🏈 {order.homeTeam || '홈팀'} vs {order.awayTeam || '원정팀'}
+                  {!order.homeTeam && !order.awayTeam && (
+                    <div className="text-sm text-red-600 mt-1">
+                      ⚠️ 경기 정보 없음 (Game ID: {order.gameId})
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-3 text-sm text-gray-600">
-                  <span>🏆 {order.selection}</span>
-                  <span>⏰ {order.commenceTime ? formatGameTime(order.commenceTime) : '시간 미정'}</span>
+                <div className="flex items-center justify-center gap-4 text-sm text-gray-600">
+                  <span className="bg-yellow-100 px-2 py-1 rounded text-yellow-800 font-medium">
+                    🏆 {order.selection || '선택 없음'}
+                  </span>
+                  <span className="bg-blue-100 px-2 py-1 rounded text-blue-800 font-medium">
+                    ⏰ {order.commenceTime ? formatGameTime(order.commenceTime) : '시간 미정'}
+                  </span>
                 </div>
               </div>
 
-              {/* 금액 정보 */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                <div className="bg-white p-3 rounded border">
-                  <div className="text-xs text-gray-600 mb-1">호가 금액</div>
+              {/* 금액 정보 - 더 명확하게 표시 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                <div className="bg-white p-3 rounded-lg border border-gray-200">
+                  <div className="text-xs text-gray-600 mb-1 font-medium">💰 호가 금액</div>
                   <div className="text-lg font-bold text-gray-800">
                     {formatCurrency(order.amount)}원
                   </div>
                 </div>
                 {order.stakeAmount && (
-                  <div className="bg-white p-3 rounded border">
-                    <div className="text-xs text-gray-600 mb-1">베팅 금액</div>
+                  <div className="bg-white p-3 rounded-lg border border-gray-200">
+                    <div className="text-xs text-gray-600 mb-1 font-medium">🎯 베팅 금액</div>
                     <div className="text-lg font-bold text-gray-800">
                       {formatCurrency(order.stakeAmount)}원
                     </div>
                   </div>
                 )}
                 {order.potentialProfit && (
-                  <div className="bg-white p-3 rounded border">
-                    <div className="text-xs text-gray-600 mb-1">예상 수익</div>
+                  <div className="bg-white p-3 rounded-lg border border-gray-200">
+                    <div className="text-xs text-gray-600 mb-1 font-medium">💵 예상 수익</div>
                     <div className="text-lg font-bold text-green-600">
                       +{formatCurrency(order.potentialProfit)}원
                     </div>
@@ -350,42 +363,45 @@ const OrderbookPage: React.FC = () => {
                 )}
               </div>
 
-              {/* 스포츠북 배당율 정보 */}
+              {/* 스포츠북 배당율 정보 - 더 명확하게 표시 */}
               {(order.backOdds || order.layOdds) && (
-                <div className="bg-blue-50 p-3 rounded border border-blue-200 mb-3">
-                  <div className="text-xs text-blue-600 mb-1 font-semibold">
-                    📊 스포츠북 참고 배당율 ({order.oddsSource})
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200 mb-4">
+                  <div className="text-sm text-blue-700 mb-2 font-semibold flex items-center gap-2">
+                    📊 스포츠북 참고 배당율 
+                    <span className="text-xs bg-blue-200 px-2 py-1 rounded">
+                      {order.oddsSource || 'OddsAPI'}
+                    </span>
                   </div>
-                  <div className="flex gap-3 text-sm">
+                  <div className="flex gap-4 text-sm">
                     {order.backOdds && (
-                      <span className="text-green-600">
-                        Back: <strong>{order.backOdds.toFixed(2)}</strong>
+                      <span className="bg-green-100 px-3 py-2 rounded text-green-700 font-medium">
+                        🎯 Back: <strong className="text-lg">{order.backOdds.toFixed(2)}</strong>
                       </span>
                     )}
                     {order.layOdds && (
-                      <span className="text-pink-600">
-                        Lay: <strong>{order.layOdds.toFixed(2)}</strong>
+                      <span className="bg-pink-100 px-3 py-2 rounded text-pink-700 font-medium">
+                        📉 Lay: <strong className="text-lg">{order.layOdds.toFixed(2)}</strong>
                       </span>
                     )}
                   </div>
                   {order.oddsUpdatedAt && (
-                    <div className="text-xs text-blue-500 mt-1">
-                      업데이트: {formatDateTime(order.oddsUpdatedAt)}
+                    <div className="text-xs text-blue-600 mt-2 font-medium">
+                      🔄 업데이트: {formatDateTime(order.oddsUpdatedAt)}
                     </div>
                   )}
                 </div>
               )}
 
-              {/* 상태 표시 */}
-              <div className="flex justify-between items-center">
-                <div className="text-xs text-gray-500">
-                  주문 ID: {order.id}
+              {/* 상태 표시 - 더 명확하게 표시 */}
+              <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
+                <div className="text-xs text-gray-600 font-medium">
+                  🆔 주문 ID: {order.id}
                 </div>
-                <div className={`px-2 py-1 rounded text-xs font-semibold ${
-                  order.status === 'open' ? 'bg-yellow-100 text-yellow-800' :
-                  order.status === 'matched' ? 'bg-green-100 text-green-800' :
-                  order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                  'bg-gray-100 text-gray-800'
+                <div className={`px-3 py-2 rounded text-sm font-bold ${
+                  order.status === 'open' ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' :
+                  order.status === 'matched' ? 'bg-green-100 text-green-800 border border-green-300' :
+                  order.status === 'cancelled' ? 'bg-red-100 text-red-800 border border-red-300' :
+                  'bg-gray-100 text-gray-800 border border-gray-300'
                 }`}>
                   {order.status === 'open' ? '🔄 대기중' :
                    order.status === 'matched' ? '✅ 체결됨' :
