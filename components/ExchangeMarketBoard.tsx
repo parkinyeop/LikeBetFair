@@ -42,15 +42,80 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
       uniqueGamesMap.set(key, game);
     }
   });
-  const filteredGames = Array.from(uniqueGamesMap.values());
-
-  // 베팅 마감 시간 체크 함수
+  
+  // 베팅 마감 시간 체크 함수 (스포츠북 규칙) - 먼저 선언
   const isBettingOpen = (commenceTime: string): boolean => {
     const now = new Date();
     const gameTime = new Date(commenceTime);
     const cutoffTime = new Date(gameTime.getTime() - 5 * 60 * 1000); // 5분 전 마감
     return now < cutoffTime;
   };
+
+  // 경기 표시 여부 체크 함수 (스포츠북 규칙)
+  const shouldDisplayGame = (commenceTime: string): boolean => {
+    const now = new Date();
+    const gameTime = new Date(commenceTime);
+    const timeDiff = gameTime.getTime() - now.getTime();
+    
+    // 스포츠북 규칙: 과거 경기도 표시하되 배당율만 다르게 처리
+    // 1. 미래 경기: 표시 (베팅 가능)
+    // 2. 현재 진행 중 경기: 표시 (베팅 불가)
+    // 3. 과거 경기: 표시 (베팅 불가, 결과 표시)
+    
+    return true; // 모든 경기 표시
+  };
+
+  // 스포츠북 스타일: 현재에 가까운 미래 순으로 정렬
+  // 1. 현재 시간 기준으로 진행 중이거나 예정된 경기만 필터링
+  // 2. 시작 시간 순으로 정렬 (가장 가까운 경기부터)
+  const now = new Date();
+  console.log('🕐 현재 시간:', now.toISOString());
+  
+  const sortedGames = Array.from(uniqueGamesMap.values())
+    .filter(game => {
+      const gameTime = new Date(game.commenceTime);
+      const timeDiff = gameTime.getTime() - now.getTime();
+      const shouldDisplay = shouldDisplayGame(game.commenceTime);
+      
+      // 디버깅: 각 경기의 시간 정보 로그
+      console.log(`🏈 경기: ${game.homeTeam} vs ${game.awayTeam}`, {
+        gameTime: gameTime.toISOString(),
+        timeDiff: timeDiff,
+        timeDiffHours: Math.round(timeDiff / (1000 * 60 * 60) * 100) / 100,
+        shouldDisplay: shouldDisplay,
+        status: timeDiff > 0 ? '미래' : timeDiff > -2 * 60 * 60 * 1000 ? '진행중' : '과거'
+      });
+      
+      // 스포츠북 규칙 적용: 표시 여부 결정
+      return shouldDisplay;
+    })
+    .sort((a, b) => {
+      const timeA = new Date(a.commenceTime);
+      const timeB = new Date(b.commenceTime);
+      const now = new Date();
+      
+      // 1. 미래 경기 우선 (가까운 순)
+      // 2. 과거 경기는 나중에 (최근 순)
+      
+      const timeDiffA = timeA.getTime() - now.getTime();
+      const timeDiffB = timeB.getTime() - now.getTime();
+      
+      // 둘 다 미래: 가까운 순
+      if (timeDiffA > 0 && timeDiffB > 0) {
+        return timeA.getTime() - timeB.getTime(); // 오름차순
+      }
+      
+      // 둘 다 과거: 최근 순  
+      if (timeDiffA < 0 && timeDiffB < 0) {
+        return timeB.getTime() - timeA.getTime(); // 내림차순
+      }
+      
+      // 미래 vs 과거: 미래가 우선
+      return timeDiffA > 0 ? -1 : 1;
+    });
+  
+  console.log('✅ 필터링 후 경기 수:', sortedGames.length);
+  const filteredGames = sortedGames;
 
   // 경기별 마켓 선택 핸들러
   const setGameMarket = (gameId: string, market: '승패' | '총점' | '핸디캡') => {
@@ -134,9 +199,38 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
 
   return (
     <div className="flex flex-col h-full">
+      {/* 정렬 정보 및 필터 헤더 */}
+      <div className="bg-gray-50 border-b border-gray-200 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="text-sm font-medium text-gray-700">
+              총 {filteredGames.length}경기
+            </div>
+            <div className="text-xs text-gray-500 bg-blue-100 px-2 py-1 rounded">
+              ⏰ 미래 경기 우선 + 과거 경기 후순위 정렬
+            </div>
+          </div>
+          <div className="text-xs text-gray-500">
+            {(() => {
+              if (filteredGames.length === 0) return '';
+              const nextGame = filteredGames[0];
+              const nextGameTime = new Date(nextGame.commenceTime);
+              const now = new Date();
+              const timeDiff = nextGameTime.getTime() - now.getTime();
+              if (timeDiff > 0) {
+                const hours = Math.floor(timeDiff / (1000 * 60 * 60));
+                const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+                return `다음 경기: ${hours > 0 ? `${hours}시간 ` : ''}${minutes}분 후`;
+              }
+              return '다음 경기: 곧 시작';
+            })()}
+          </div>
+        </div>
+      </div>
+      
       {/* 경기 리스트 - 각 경기마다 개별 탭 구조 */}
       <div className="flex-1 overflow-auto p-4 space-y-4">
-        {filteredGames.map((game) => {
+                {filteredGames.map((game) => {
           const isOpen = isBettingOpen(game.commenceTime);
           const currentMarket = getGameMarket(game.id);
           
@@ -149,13 +243,42 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                     <div className="text-sm font-semibold text-gray-900">
                       {game.homeTeam} vs {game.awayTeam}
                     </div>
-                    <div className="text-xs text-gray-500">
-                      {new Date(game.commenceTime).toLocaleString('ko-KR', {
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
+                    <div className="flex flex-col items-end">
+                      <div className="text-xs text-gray-500">
+                        {(() => {
+                          const gameTime = new Date(game.commenceTime);
+                          const now = new Date();
+                          const timeDiff = gameTime.getTime() - now.getTime();
+                          const hoursDiff = Math.floor(timeDiff / (1000 * 60 * 60));
+                          const minutesDiff = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+                          
+                          // 스포츠북 스타일: 상대적 시간 표시
+                          if (timeDiff < 0) {
+                            // 이미 시작된 경기 - 경과 시간 표시
+                            const elapsedHours = Math.abs(hoursDiff);
+                            const elapsedMinutes = Math.abs(minutesDiff);
+                            if (elapsedHours > 0) {
+                              return `진행 중 (${elapsedHours}시간 ${elapsedMinutes}분 경과)`;
+                            } else {
+                              return `진행 중 (${elapsedMinutes}분 경과)`;
+                            }
+                          } else if (hoursDiff > 0) {
+                            return `${hoursDiff}시간 ${minutesDiff}분 후`;
+                          } else if (minutesDiff > 0) {
+                            return `${minutesDiff}분 후`;
+                          } else {
+                            return '곧 시작';
+                          }
+                        })()}
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        {new Date(game.commenceTime).toLocaleString('ko-KR', {
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </div>
                     </div>
                   </div>
                   <div className={`px-2 py-1 text-xs rounded ${
