@@ -218,9 +218,19 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
               const now = new Date();
               const timeDiff = nextGameTime.getTime() - now.getTime();
               if (timeDiff > 0) {
-                const hours = Math.floor(timeDiff / (1000 * 60 * 60));
+                const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                 const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
-                return `다음 경기: ${hours > 0 ? `${hours}시간 ` : ''}${minutes}분 후`;
+                
+                let timeString = '다음 경기: ';
+                if (days > 0) {
+                  timeString += `${days}일 `;
+                }
+                if (hours > 0 || days > 0) {
+                  timeString += `${hours}시간 `;
+                }
+                timeString += `${minutes}분 후`;
+                return timeString;
               }
               return '다음 경기: 곧 시작';
             })()}
@@ -249,19 +259,25 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                           const gameTime = new Date(game.commenceTime);
                           const now = new Date();
                           const timeDiff = gameTime.getTime() - now.getTime();
-                          const hoursDiff = Math.floor(timeDiff / (1000 * 60 * 60));
+                          const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+                          const hoursDiff = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                           const minutesDiff = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
                           
                           // 스포츠북 스타일: 상대적 시간 표시
                           if (timeDiff < 0) {
                             // 이미 시작된 경기 - 경과 시간 표시
+                            const elapsedDays = Math.abs(daysDiff);
                             const elapsedHours = Math.abs(hoursDiff);
                             const elapsedMinutes = Math.abs(minutesDiff);
-                            if (elapsedHours > 0) {
+                            if (elapsedDays > 0) {
+                              return `진행 중 (${elapsedDays}일 ${elapsedHours}시간 ${elapsedMinutes}분 경과)`;
+                            } else if (elapsedHours > 0) {
                               return `진행 중 (${elapsedHours}시간 ${elapsedMinutes}분 경과)`;
                             } else {
                               return `진행 중 (${elapsedMinutes}분 경과)`;
                             }
+                          } else if (daysDiff > 0) {
+                            return `${daysDiff}일 ${hoursDiff}시간 ${minutesDiff}분 후`;
                           } else if (hoursDiff > 0) {
                             return `${hoursDiff}시간 ${minutesDiff}분 후`;
                           } else if (minutesDiff > 0) {
