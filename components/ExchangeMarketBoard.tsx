@@ -230,7 +230,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
       
       {/* 경기 리스트 - 각 경기마다 개별 탭 구조 */}
       <div className="flex-1 overflow-auto p-4 space-y-4">
-                {filteredGames.map((game) => {
+        {filteredGames.map((game) => {
           const isOpen = isBettingOpen(game.commenceTime);
           const currentMarket = getGameMarket(game.id);
           
