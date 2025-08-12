@@ -57,10 +57,6 @@ router.post('/match-order', verifyToken, async (req, res) => {
     // 대상 주문에 매칭 정보 추가
     targetOrder.status = 'matched';
     targetOrder.matchedOrderId = null; // 매칭 배팅임을 표시
-    targetOrder.matchedBy = userId; // 매칭한 사용자 ID
-    targetOrder.matchedAt = new Date(); // 매칭 시간
-    targetOrder.matchedAmount = matchAmount; // 매칭된 금액
-    targetOrder.matchedType = matchType; // 매칭된 타입
     await targetOrder.save();
     
     // 거래 내역 기록
@@ -73,8 +69,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
       referenceId: targetOrder.id,
       metadata: {
         matchType: matchType,
-        matchAmount: matchAmount,
-        matchedBy: userId
+        matchAmount: matchAmount
       }
     });
     
@@ -97,7 +92,6 @@ router.post('/match-order', verifyToken, async (req, res) => {
       type: 'order_matched',
       targetOrder: targetOrder,
       matchInfo: {
-        matchedBy: userId,
         matchedAmount: matchAmount,
         matchedType: matchType
       }
