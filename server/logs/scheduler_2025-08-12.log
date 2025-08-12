@@ -85,3 +85,10 @@
 {"timestamp":"2025-08-12T04:20:05.335Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":13},"betResultsUpdated":0,"categoryCount":14}
 {"timestamp":"2025-08-12T04:22:40.431Z","type":"init","status":"start","message":"Starting initial data caching for active categories","categoryCount":14}
 {"timestamp":"2025-08-12T04:22:52.429Z","type":"init","status":"success","message":"Initial data cached successfully for active categories","oddsUpdated":167,"resultsUpdated":"N/A","betsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-08-12T04:30:00.767Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-08-12T04:30:00.772Z","type":"odds","status":"start","message":"Starting high-priority leagues odds update (30min interval)","priority":"high","leagues":["NBA","MLB","KBO","NFL","프리미어리그"]}
+{"timestamp":"2025-08-12T04:30:00.777Z","type":"epl","status":"start","message":"EPL 프리미어리그 데이터 강제 업데이트"}
+{"timestamp":"2025-08-12T04:30:02.456Z","type":"epl","status":"success","message":"EPL 프리미어리그 데이터 업데이트 완료"}
+{"timestamp":"2025-08-12T04:30:03.995Z","type":"odds","status":"success","message":"High-priority odds update completed (30min interval)","priority":"medium","leagues":["NBA","MLB","KBO","NFL","프리미어리그"],"dynamicPriority":"low","oddsUpdated":20,"oddsDetail":{"totalUpdated":20,"newOdds":0,"existingOddsUpdated":20,"skippedOdds":1,"apiCalls":5,"categoriesProcessed":5}}
+{"timestamp":"2025-08-12T04:30:07.696Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-08-12T04:30:07.708Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":13},"betResultsUpdated":0,"categoryCount":14}
