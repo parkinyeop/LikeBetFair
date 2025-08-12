@@ -13,6 +13,11 @@ export interface ExchangeGame {
   league: string;
   category: string;
   availableMarkets: Market[];
+  // 배당률 필드 추가
+  homeTeamOdds?: number;
+  awayTeamOdds?: number;
+  drawOdds?: number;
+  officialOdds?: any;
 }
 
 interface Market {
@@ -91,7 +96,12 @@ export function useExchangeGames(category?: string) {
           sportKey: gameSportKey,
           league: gameSportKey ? gameSportKey.split('_').pop() || '' : '',
           category: category || '',
-          availableMarkets: game.bookmakers?.[0]?.markets || []
+          availableMarkets: game.bookmakers?.[0]?.markets || [],
+          // 실제 배당률 추출 (officialOdds 사용)
+          homeTeamOdds: game.officialOdds?.h2h?.[game.home_team]?.averagePrice || null,
+          awayTeamOdds: game.officialOdds?.h2h?.[game.away_team]?.averagePrice || null,
+          drawOdds: game.officialOdds?.h2h?.Draw?.averagePrice || null,
+          officialOdds: game.officialOdds || null
         };
       });
       

@@ -34,12 +34,23 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
     return game.sportKey === currentSportKey;
   });
 
-  // 중복 제거: homeTeam, awayTeam, commenceTime 조합
+  // 중복 제거: homeTeam, awayTeam, commenceTime 조합 (UTC 시간 기준)
   const uniqueGamesMap = new Map();
   filteredGamesRaw.forEach((game) => {
-    const key = `${game.homeTeam}|${game.awayTeam}|${game.commenceTime}`;
+    // UTC 시간을 기준으로 정확한 중복 제거
+    const gameTime = new Date(game.commenceTime);
+    const timeKey = gameTime.toISOString().split('T')[0]; // YYYY-MM-DD 형식
+    const key = `${game.homeTeam}|${game.awayTeam}|${timeKey}`;
+    
     if (!uniqueGamesMap.has(key)) {
       uniqueGamesMap.set(key, game);
+    } else {
+      // 더 최신 데이터가 있으면 교체
+      const existingGame = uniqueGamesMap.get(key);
+      const existingTime = new Date(existingGame.commenceTime);
+      if (gameTime > existingTime) {
+        uniqueGamesMap.set(key, game);
+      }
     }
   });
   
@@ -256,8 +267,11 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                     <div className="flex flex-col items-end">
                       <div className="text-xs text-gray-500">
                         {(() => {
+                          // UTC 시간을 올바르게 처리
                           const gameTime = new Date(game.commenceTime);
                           const now = new Date();
+                          
+                          // UTC 기준으로 시간 차이 계산
                           const timeDiff = gameTime.getTime() - now.getTime();
                           const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
                           const hoursDiff = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -288,12 +302,18 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                         })()}
                       </div>
                       <div className="text-xs text-gray-400">
-                        {new Date(game.commenceTime).toLocaleString('ko-KR', {
-                          month: '2-digit',
-                          day: '2-digit',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
+                        {/* UTC 시간을 한국 시간으로 변환하여 표시 */}
+                        {(() => {
+                          const gameTime = new Date(game.commenceTime);
+                          // UTC를 한국 시간(KST)으로 변환 (UTC+9)
+                          const kstTime = new Date(gameTime.getTime() + 9 * 60 * 60 * 1000);
+                          return kstTime.toLocaleString('ko-KR', {
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          });
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -348,7 +368,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                     {/* 홈팀 승리 */}
                     <div className="flex-1">
                       <button
-                        onClick={() => handleBetClick(game, game.homeTeam, 1.8, 'back')}
+                        onClick={() => handleBetClick(game, game.homeTeam, game.homeTeamOdds || 2.5, 'back')}
                         disabled={!isOpen}
                         className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
@@ -360,7 +380,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       >
                         <div className="text-center truncate max-w-full">{game.homeTeam}</div>
                         <div className="text-xs mt-1 opacity-90">
-                          배당: 1.80
+                          배당: {(game.homeTeamOdds || 2.5).toFixed(2)}
                         </div>
                       </button>
                     </div>
@@ -368,7 +388,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                     {/* 무승부 */}
                     <div className="flex-1">
                       <button
-                        onClick={() => handleBetClick(game, '무승부', 3.2, 'back')}
+                        onClick={() => handleBetClick(game, '무승부', game.drawOdds || 3.5, 'back')}
                         disabled={!isOpen}
                         className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
@@ -380,7 +400,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       >
                         <div className="text-center">무승부</div>
                         <div className="text-xs mt-1 opacity-90">
-                          배당: 3.20
+                          배당: {(game.drawOdds || 3.5).toFixed(2)}
                         </div>
                       </button>
                     </div>
@@ -388,7 +408,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                     {/* 원정팀 승리 */}
                     <div className="flex-1">
                       <button
-                        onClick={() => handleBetClick(game, game.awayTeam, 2.1, 'back')}
+                        onClick={() => handleBetClick(game, game.awayTeam, game.awayTeamOdds || 2.5, 'back')}
                         disabled={!isOpen}
                         className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
@@ -400,7 +420,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       >
                         <div className="text-center truncate max-w-full">{game.awayTeam}</div>
                         <div className="text-xs mt-1 opacity-90">
-                          배당: 2.10
+                          배당: {(game.awayTeamOdds || 2.5).toFixed(2)}
                         </div>
                       </button>
                     </div>
