@@ -448,7 +448,7 @@ const OrderbookPage: React.FC = () => {
                 <button 
                   onClick={() => handleMatchBet(order.id)}
                   disabled={order.status !== 'open' || order.userId === userId}
-                  className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
+                  className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors text-white ${
                     order.status === 'open' && order.userId !== userId
                       ? order.type === 'back' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
                       : 'bg-gray-400 text-gray-600 cursor-not-allowed'
