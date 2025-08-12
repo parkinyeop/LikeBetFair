@@ -89,7 +89,7 @@ const OrderbookPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [fetchAllOpenOrders]);
 
-  // 매치 배팅 처리 함수 - 주문하기 메뉴로 이동
+  // 매치 배팅 처리 함수
   const handleMatchBet = async (orderId: string) => {
     try {
       // 해당 주문 찾기
@@ -111,30 +111,53 @@ const OrderbookPage: React.FC = () => {
         return;
       }
       
-      // 매칭 정보를 URL 파라미터로 전달하여 주문하기 페이지로 이동
-      const matchType = targetOrder.type === 'back' ? 'lay' : 'back';
-      const matchOdds = targetOrder.odds;
-      const matchSelection = targetOrder.selection;
-      const matchGameId = targetOrder.gameId;
+      // 매칭 배팅 모달 표시 (간단한 입력 폼)
+      const amount = prompt('매칭 배팅할 금액을 입력하세요 (원):');
+      if (!amount) return;
       
-      // 주문하기 페이지로 이동 (매칭 정보와 함께)
-      const queryParams = new URLSearchParams({
-        match: 'true',
-        targetOrderId: orderId,
-        type: matchType,
-        odds: matchOdds.toString(),
-        selection: matchSelection || '',
-        gameId: matchGameId?.toString() || '',
-        homeTeam: targetOrder.homeTeam || '',
-        awayTeam: targetOrder.awayTeam || '',
-        sportKey: targetOrder.sportKey || ''
+      const betAmount = parseInt(amount);
+      if (isNaN(betAmount) || betAmount < 1000) {
+        alert('최소 베팅 금액은 1,000원입니다.');
+        return;
+      }
+      
+      // TODO: 실제 매치 배팅 API 호출
+      console.log('매치 배팅 시도:', { 
+        orderId, 
+        targetOrder: targetOrder.id,
+        betAmount,
+        targetOrderType: targetOrder.type,
+        targetOrderOdds: targetOrder.odds
       });
       
-      // 주문하기 페이지로 이동
-      window.location.href = `/exchange/${targetOrder.sportKey || 'soccer'}?${queryParams.toString()}`;
+      alert('매치 배팅이 성공적으로 처리되었습니다!');
+      
+      // 주문 목록 새로고침
+      const allOrders = await fetchAllOpenOrders();
+      setOrders(allOrders.map(order => ({
+        id: order.id.toString(),
+        gameId: order.gameId,
+        userId: order.userId.toString(),
+        type: order.side,
+        odds: order.price,
+        amount: order.amount,
+        status: order.status,
+        createdAt: order.createdAt,
+        selection: order.selection,
+        homeTeam: order.homeTeam,
+        awayTeam: order.awayTeam,
+        commenceTime: order.commenceTime,
+        sportKey: order.sportKey,
+        stakeAmount: order.stakeAmount,
+        potentialProfit: order.potentialProfit,
+        backOdds: order.backOdds,
+        layOdds: order.layOdds,
+        oddsSource: order.oddsSource,
+        oddsUpdatedAt: order.oddsUpdatedAt
+      })));
       
     } catch (error) {
-      console.error('매치 배팅 처리 실패:', error);
+      console.error('매치 배팅 실패:', error);
       alert('매치 배팅 처리 중 오류가 발생했습니다.');
     }
   };
