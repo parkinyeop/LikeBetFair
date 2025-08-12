@@ -251,7 +251,14 @@ function OrderHistoryPanel() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   // 주문 상태별 한글 표시
-  const getStatusDisplay = (status: string) => {
+  const getStatusDisplay = (status: string, commenceTime?: string) => {
+    // 경기 시간이 지났는지 확인
+    const isExpired = commenceTime && new Date(commenceTime) < new Date();
+    
+    if (isExpired && status === 'open') {
+      return { text: '경기 만료', color: 'text-red-600', bg: 'bg-red-50' };
+    }
+    
     switch (status) {
       case 'open': return { text: '미체결', color: 'text-yellow-600', bg: 'bg-yellow-50' };
       case 'matched': return { text: '체결', color: 'text-green-600', bg: 'bg-green-50' };
@@ -497,7 +504,7 @@ function OrderHistoryPanel() {
         ) : (
           <div className="space-y-2">
             {filteredOrders.slice(0, 10).map((order) => {
-              const statusInfo = getStatusDisplay(order.status);
+              const statusInfo = getStatusDisplay(order.status, order.commenceTime);
               const sideInfo = getSideDisplay(order.side);
               const dateInfo = formatDate(order.createdAt);
               const potentialProfit = calculatePotentialProfit(order);
@@ -549,6 +556,12 @@ function OrderHistoryPanel() {
                     {order.selection && (
                       <div className="text-xs text-blue-600 mt-1">
                         선택: {order.selection} ({order.side === 'back' ? '이길 것' : '질 것'})
+                      </div>
+                    )}
+                    {/* 만료된 주문 표시 */}
+                    {commenceTime && new Date(commenceTime) < new Date() && (
+                      <div className="text-xs text-red-600 mt-1 font-medium">
+                        ⚠️ 경기 만료됨
                       </div>
                     )}
                   </div>

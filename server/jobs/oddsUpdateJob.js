@@ -792,6 +792,30 @@ cron.schedule('*/5 18-23 * * *', async () => {
   }
 });
 
+// 🔄 Exchange 주문 자동 만료 처리 - 매 10분마다 실행
+cron.schedule('*/10 * * * *', async () => {
+  try {
+    console.log('🔄 [Exchange] 만료된 주문 자동 취소 시작...');
+    
+    // Exchange 주문 만료 처리 실행
+    const { stdout } = await execAsync('node -e "import ExchangeSettlementService from \'./services/exchangeSettlementService.js\'; const service = new ExchangeSettlementService(); service.cancelUnmatchedOrdersAtKickoff().then(() => console.log(\'완료\')).catch(e => console.error(\'실패:\', e.message));"', {
+      cwd: process.cwd()
+    });
+    
+    console.log('✅ [Exchange] 만료된 주문 자동 취소 완료');
+    
+  } catch (error) {
+    console.error('❌ [Exchange] 만료된 주문 자동 취소 실패:', error.message);
+    
+    // 오류 로그 저장
+    saveUpdateLog('exchange_order_expiry', 'error', {
+      message: 'Exchange 주문 자동 만료 처리 실패',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // EPL 경기 결과/odds 별도 30분마다 강제 실행 (10분에서 변경)
 cron.schedule('*/30 * * * *', async () => {
   saveUpdateLog('epl', 'start', { message: 'EPL 프리미어리그 데이터 강제 업데이트' });

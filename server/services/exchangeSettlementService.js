@@ -343,23 +343,27 @@ class ExchangeSettlementService {
 
   /**
    * 경기 시작 시점에 매칭되지 않은 주문 자동 취소
+   * 개선: 경기 시작 후 3시간 경과 시 자동 취소
    */
   async cancelUnmatchedOrdersAtKickoff() {
     try {
-      console.log('🔄 경기 시작 시점 매칭되지 않은 주문 자동 취소 시작...');
+      console.log('🔄 경기 시작 후 매칭되지 않은 주문 자동 취소 시작...');
       
-      // 매칭되지 않은 주문들 조회 (경기 시작 시간이 지난 주문들)
+      const now = new Date();
+      const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000); // 3시간 전
+      
+      // 매칭되지 않은 주문들 조회 (경기 시작 후 3시간이 지난 주문들)
       const unmatchedOrders = await ExchangeOrder.findAll({
         where: {
           status: 'open',
           matchedOrderId: null,
           commenceTime: {
-            [Op.lte]: new Date() // 경기 시작 시간이 지난 주문
+            [Op.lte]: threeHoursAgo // 경기 시작 후 3시간 경과
           }
         }
       });
 
-      console.log(`📊 매칭되지 않은 주문 수: ${unmatchedOrders.length}`);
+      console.log(`📊 만료된 미매칭 주문 수: ${unmatchedOrders.length}`);
 
       if (unmatchedOrders.length === 0) {
         console.log('✅ 취소할 주문이 없습니다.');
@@ -371,8 +375,13 @@ class ExchangeSettlementService {
 
       for (const order of unmatchedOrders) {
         try {
+          const gameTime = new Date(order.commenceTime);
+          const hoursSinceGame = (now.getTime() - gameTime.getTime()) / (1000 * 60 * 60);
+          
           console.log(`\n🎯 주문 취소 처리: ID ${order.id}`);
           console.log(`   경기: ${order.homeTeam} vs ${order.awayTeam}`);
+          console.log(`   경기 시간: ${gameTime.toISOString()}`);
+          console.log(`   경과 시간: ${hoursSinceGame.toFixed(1)}시간`);
           console.log(`   사이드: ${order.side}, 금액: ${order.amount}원`);
           console.log(`   스테이크: ${order.stakeAmount}원`);
 
@@ -382,7 +391,7 @@ class ExchangeSettlementService {
             // 1. 주문 상태 업데이트
             await order.update({
               status: 'cancelled',
-              settlementNote: '경기 시작 시점에 매칭되지 않아 자동 취소',
+              settlementNote: `경기 시작 후 ${hoursSinceGame.toFixed(1)}시간 경과로 매칭되지 않아 자동 취소`,
               settledAt: new Date()
             }, { transaction });
 
@@ -401,7 +410,7 @@ class ExchangeSettlementService {
               betId: null,
               amount: order.stakeAmount,
               type: 'refund',
-              memo: 'Exchange 주문 매칭 실패로 인한 환불',
+              memo: `Exchange 주문 만료로 인한 자동 환불 (경기: ${order.homeTeam} vs ${order.awayTeam})`,
               status: 'completed',
               balanceAfter: user.balance,
               paidAt: new Date()
@@ -412,7 +421,7 @@ class ExchangeSettlementService {
             cancelledCount++;
             totalRefund += order.stakeAmount;
 
-            console.log(`   ✅ 취소 완료 - 환불: ${order.stakeAmount}원`);
+            console.log(`   ✅ 취소 완료 - 환불: ${order.stakeAmount}원, 새 잔액: ${user.balance}원`);
 
           } catch (error) {
             await transaction.rollback();
@@ -424,12 +433,10 @@ class ExchangeSettlementService {
         }
       }
 
-      console.log(`\n📈 자동 취소 완료:`);
-      console.log(`   - 취소된 주문: ${cancelledCount}개`);
-      console.log(`   - 총 환불 금액: ${totalRefund}원`);
-
+      console.log(`\n📊 자동 취소 완료: ${cancelledCount}개 주문, 총 환불: ${totalRefund.toLocaleString()}원`);
+      
       return { cancelledCount, totalRefund };
-
+      
     } catch (error) {
       console.error('❌ 매칭되지 않은 주문 자동 취소 중 오류:', error);
       throw error;
