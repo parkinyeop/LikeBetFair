@@ -455,7 +455,7 @@ const OrderbookPage: React.FC = () => {
                   }`}
                 >
                   {order.status === 'open' && order.userId !== userId 
-                    ? (order.type === 'back' ? '📉 Lay(Loss)로 매칭' : '🎯 Back(Win)으로 매칭')
+                    ? (order.type === 'back' ? '📉 Lay(Loss)로 매칭배팅' : '🎯 Back(Win)으로 매칭배팅')
                     : order.userId === userId 
                       ? '내 주문' 
                       : '매칭 불가'}
