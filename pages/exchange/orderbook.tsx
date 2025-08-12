@@ -396,4 +396,3 @@ const OrderbookPage: React.FC = () => {
 };
  
 export default OrderbookPage; 
-export default OrderbookPage; 
