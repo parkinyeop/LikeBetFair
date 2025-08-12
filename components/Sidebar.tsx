@@ -39,7 +39,7 @@ const Sidebar: React.FC<SidebarProps> = ({ categories, selected, onSelect, reset
   }, [selected, mainCategories]);
 
   return (
-    <div className="flex flex-col p-4 space-y-1 h-full min-h-0 overflow-y-auto">
+    <div className="flex flex-col p-2 space-y-1 h-full min-h-0 overflow-y-auto">
       {mainCategories.map((category) => {
         const isOpen = openMain === category;
         const isSelected = currentMain === category;

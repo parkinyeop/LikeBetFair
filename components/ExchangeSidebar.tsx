@@ -695,14 +695,14 @@ export default function ExchangeSidebar() {
 
   if (!isLoggedIn) {
     return (
-      <aside className="w-80 bg-white text-black p-4 space-y-4 border-l border-gray-200 flex items-center justify-center min-h-full">
+      <aside className="w-64 bg-white text-black p-4 space-y-4 border-l border-gray-200 flex items-center justify-center min-h-full">
         <span className="text-gray-500 text-base font-semibold">로그인 후 Exchange 기능을 사용할 수 있습니다</span>
       </aside>
     );
   }
 
   return (
-    <aside className="w-80 bg-white text-black p-4 space-y-4 border-l border-gray-200 h-full flex flex-col min-h-0 overflow-y-auto">
+    <aside className="w-64 bg-white text-black p-4 space-y-4 border-l border-gray-200 h-full flex flex-col min-h-0 overflow-y-auto">
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-lg font-bold">EXCHANGE</h2>
                         <span className="text-sm font-semibold text-blue-600">Balance: {balance !== null ? Math.round(Number(balance)).toLocaleString() : '-'} KRW</span>

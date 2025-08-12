@@ -83,3 +83,5 @@
 {"timestamp":"2025-08-12T04:20:00.040Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
 {"timestamp":"2025-08-12T04:20:05.323Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
 {"timestamp":"2025-08-12T04:20:05.335Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":13},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-08-12T04:22:40.431Z","type":"init","status":"start","message":"Starting initial data caching for active categories","categoryCount":14}
+{"timestamp":"2025-08-12T04:22:52.429Z","type":"init","status":"success","message":"Initial data cached successfully for active categories","oddsUpdated":167,"resultsUpdated":"N/A","betsUpdated":0,"categoryCount":14}
