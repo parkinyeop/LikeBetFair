@@ -10,6 +10,139 @@ import { Op } from 'sequelize';
 
 const router = express.Router();
 
+// 매칭 배팅 API - 즉시 매칭 방식
+router.post('/match-order', verifyToken, async (req, res) => {
+  try {
+    const { targetOrderId, matchAmount, matchType } = req.body;
+    const userId = req.user.userId;
+    
+    console.log('🎯 매칭 배팅 요청:', { targetOrderId, matchAmount, matchType, userId });
+    
+    // 대상 주문 찾기
+    const targetOrder = await ExchangeOrder.findByPk(targetOrderId);
+    if (!targetOrder) {
+      return res.status(404).json({ success: false, message: '대상 주문을 찾을 수 없습니다.' });
+    }
+    
+    // 주문 상태 확인
+    if (targetOrder.status !== 'open') {
+      return res.status(400).json({ success: false, message: '이미 체결되었거나 취소된 주문입니다.' });
+    }
+    
+    // 본인 주문인지 확인
+    if (targetOrder.userId === userId) {
+      return res.status(400).json({ success: false, message: '자신이 생성한 주문에는 매칭 배팅을 할 수 없습니다.' });
+    }
+    
+    // 매칭 타입 확인 (반대 타입이어야 함)
+    if (targetOrder.side === matchType) {
+      return res.status(400).json({ success: false, message: '매칭 배팅은 반대 타입으로만 가능합니다.' });
+    }
+    
+    // 사용자 잔고 확인
+    const user = await User.findByPk(userId);
+    const required = matchType === 'back' ? matchAmount : Math.floor((targetOrder.price - 1) * matchAmount);
+    
+    if (!user || parseInt(user.balance) < required) {
+      return res.status(400).json({ success: false, message: '잔고 부족' });
+    }
+    
+    // 잔고 차감
+    user.balance = parseInt(user.balance) - required;
+    await user.save();
+    
+    // 매칭 주문 생성 (매칭 결과 기록용)
+    const matchOrder = await ExchangeOrder.create({
+      userId,
+      gameId: targetOrder.gameId,
+      market: targetOrder.market,
+      line: targetOrder.line,
+      side: matchType,
+      price: targetOrder.price,
+      amount: matchAmount,
+      selection: targetOrder.selection,
+      stakeAmount: required,
+      potentialProfit: matchType === 'back' ? Math.floor((targetOrder.price - 1) * matchAmount) : matchAmount,
+      homeTeam: targetOrder.homeTeam,
+      awayTeam: targetOrder.awayTeam,
+      commenceTime: targetOrder.commenceTime,
+      sportKey: targetOrder.sportKey,
+      gameResultId: targetOrder.gameResultId,
+      selectionDetails: targetOrder.selectionDetails,
+      autoSettlement: true,
+      backOdds: targetOrder.backOdds,
+      layOdds: targetOrder.layOdds,
+      oddsSource: targetOrder.oddsSource,
+      oddsUpdatedAt: targetOrder.oddsUpdatedAt,
+      status: 'matched', // 즉시 매칭됨
+      matchedOrderId: targetOrder.id, // 매칭된 주문 ID
+
+    });
+    
+    // 대상 주문 상태 변경
+    targetOrder.status = 'matched';
+    targetOrder.matchedOrderId = matchOrder.id;
+    await targetOrder.save();
+    
+    // 거래 내역 기록
+    await PaymentHistory.create({
+      userId: targetOrder.userId,
+      type: 'exchange_match',
+      amount: targetOrder.amount,
+      description: `매칭 배팅 체결: ${targetOrder.homeTeam} vs ${targetOrder.awayTeam}`,
+      status: 'completed',
+      referenceId: targetOrder.id,
+      metadata: {
+        matchOrderId: matchOrder.id,
+        matchType: matchType,
+        matchAmount: matchAmount
+      }
+    });
+    
+    await PaymentHistory.create({
+      userId: userId,
+      type: 'exchange_match',
+      amount: matchAmount,
+      description: `매칭 배팅 체결: ${targetOrder.homeTeam} vs ${targetOrder.awayTeam}`,
+      status: 'completed',
+      referenceId: matchOrder.id,
+      metadata: {
+        targetOrderId: targetOrder.id,
+        matchType: matchType,
+        matchAmount: matchAmount
+      }
+    });
+    
+    // WebSocket으로 실시간 업데이트
+    exchangeWebSocketService.broadcastOrderUpdate({
+      type: 'order_matched',
+      targetOrder: targetOrder,
+      matchOrder: matchOrder
+    });
+    
+    console.log('✅ 매칭 배팅 성공:', { 
+      targetOrderId, 
+      matchOrderId: matchOrder.id, 
+      matchAmount, 
+      matchType 
+    });
+    
+    res.json({ 
+      success: true, 
+      message: '매칭 배팅이 성공적으로 처리되었습니다.',
+      matchOrderId: matchOrder.id,
+      targetOrderId: targetOrder.id
+    });
+    
+  } catch (error) {
+    console.error('❌ 매칭 배팅 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: '매칭 배팅 처리 중 오류가 발생했습니다.' 
+    });
+  }
+});
+
 // 주문 등록 (게임 데이터 연동 포함)
 router.post('/order', verifyToken, async (req, res) => {
   try {
