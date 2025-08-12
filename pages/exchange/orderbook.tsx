@@ -411,7 +411,7 @@ const OrderbookPage: React.FC = () => {
                       <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${
                         order.type === 'back' 
                           ? 'bg-green-500 text-white' 
-                          : 'bg-pink-500 text-white'
+                          : 'bg-red-500 text-white'
                       }`}>
                         {order.type === 'back' ? '🎯 Back(Win)' : '📉 Lay(Loss)'}
                       </span>
@@ -450,7 +450,7 @@ const OrderbookPage: React.FC = () => {
                   disabled={order.status !== 'open' || order.userId === userId}
                   className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
                     order.status === 'open' && order.userId !== userId
-                      ? order.type === 'back' ? 'bg-pink-600 hover:bg-pink-700' : 'bg-green-600 hover:bg-green-700'
+                      ? order.type === 'back' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
                       : 'bg-gray-400 text-gray-600 cursor-not-allowed'
                   }`}
                 >
