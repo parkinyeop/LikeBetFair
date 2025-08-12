@@ -33,7 +33,7 @@ class ExchangeSettlementService {
       console.log(`🏟️ 경기 정보: ${gameResult.homeTeam} vs ${gameResult.awayTeam}`);
       console.log(`📊 경기 결과: ${gameResult.result}, 스코어:`, gameResult.score);
       
-      // 정산 대상 주문들 조회 (매칭된 상태의 주문들)
+      // 정산 대상 주문들 조회 (매칭된 상태의 주문들 + 연결된 주문들)
       const orders = await ExchangeOrder.findAll({
         where: {
           gameResultId: gameResultId,
@@ -45,12 +45,39 @@ class ExchangeSettlementService {
       
       console.log(`📋 정산 대상 주문 수: ${orders.length}`);
       
+      // 연결된 주문들도 함께 조회 (matchedOrderId가 있는 주문들)
+      const connectedOrders = await ExchangeOrder.findAll({
+        where: {
+          gameResultId: gameResultId,
+          status: 'matched',
+          settledAt: null
+        },
+        transaction
+      });
+      
+      // matchedOrderId가 null이 아닌 주문들만 필터링
+      const filteredConnectedOrders = connectedOrders.filter(order => order.matchedOrderId !== null);
+      
+      console.log(`🔗 연결된 주문 수: ${filteredConnectedOrders.length}`);
+      
+      // 모든 정산 대상 주문들을 합침 (중복 제거)
+      const allOrders = [...orders];
+      filteredConnectedOrders.forEach(connectedOrder => {
+        if (!allOrders.find(order => order.id === connectedOrder.id)) {
+          allOrders.push(connectedOrder);
+        }
+      });
+      
+      console.log(`📊 총 정산 대상 주문 수: ${allOrders.length}`);
+      
       let settledCount = 0;
       let totalWinnings = 0;
       const settlementResults = [];
       
       // 주문을 쌍으로 그룹화 (매칭된 주문들)
-      const orderPairs = this.groupMatchedOrders(orders);
+      const orderPairs = this.groupMatchedOrders(allOrders);
+      
+      console.log(`🤝 생성된 주문 쌍 수: ${orderPairs.length}`);
       
       for (const pair of orderPairs) {
         try {
@@ -86,7 +113,7 @@ class ExchangeSettlementService {
   }
 
   /**
-   * 매칭된 주문 쌍으로 그룹화
+   * 매칭된 주문 쌍으로 그룹화 (개선된 버전)
    * @param {Array} orders - 주문 목록
    * @returns {Array} 주문 쌍 배열
    */
@@ -94,21 +121,67 @@ class ExchangeSettlementService {
     const pairs = [];
     const processedIds = new Set();
     
+    console.log(`\n🔍 주문 쌍 그룹화 시작: ${orders.length}개 주문`);
+    
+    // 1. matchedOrderId가 있는 주문들 먼저 처리
     for (const order of orders) {
       if (processedIds.has(order.id)) continue;
       
-      // 매칭된 상대 주문 찾기
-      const matchedOrder = orders.find(o => 
-        o.id === order.matchedOrderId && !processedIds.has(o.id)
-      );
-      
-      if (matchedOrder) {
-        pairs.push([order, matchedOrder]);
-        processedIds.add(order.id);
-        processedIds.add(matchedOrder.id);
+      if (order.matchedOrderId) {
+        // 매칭된 상대 주문 찾기
+        const matchedOrder = orders.find(o => 
+          o.id === order.matchedOrderId && !processedIds.has(o.id)
+        );
+        
+        if (matchedOrder) {
+          pairs.push([order, matchedOrder]);
+          processedIds.add(order.id);
+          processedIds.add(matchedOrder.id);
+          console.log(`   ✅ 쌍 생성: ${order.id} ↔ ${matchedOrder.id} (${order.side} ↔ ${matchedOrder.side})`);
+        }
       }
     }
     
+    // 2. 아직 처리되지 않은 주문들을 Back/Lay로 쌍 만들기
+    const remainingOrders = orders.filter(order => !processedIds.has(order.id));
+    console.log(`   📝 남은 주문 수: ${remainingOrders.length}개`);
+    
+    if (remainingOrders.length >= 2) {
+      // Back과 Lay 주문 분리
+      const backOrders = remainingOrders.filter(order => order.side === 'back');
+      const layOrders = remainingOrders.filter(order => order.side === 'lay');
+      
+      console.log(`   🎯 Back 주문: ${backOrders.length}개, Lay 주문: ${layOrders.length}개`);
+      
+      // 같은 선택(selection)을 가진 Back/Lay 주문들을 쌍으로 만들기
+      const ordersBySelection = {};
+      remainingOrders.forEach(order => {
+        if (!ordersBySelection[order.selection]) {
+          ordersBySelection[order.selection] = { back: [], lay: [] };
+        }
+        ordersBySelection[order.selection][order.side].push(order);
+      });
+      
+      for (const [selection, sideOrders] of Object.entries(ordersBySelection)) {
+        if (sideOrders.back.length > 0 && sideOrders.lay.length > 0) {
+          const maxPairs = Math.min(sideOrders.back.length, sideOrders.lay.length);
+          
+          for (let i = 0; i < maxPairs; i++) {
+            const backOrder = sideOrders.back[i];
+            const layOrder = sideOrders.lay[i];
+            
+            if (!processedIds.has(backOrder.id) && !processedIds.has(layOrder.id)) {
+              pairs.push([backOrder, layOrder]);
+              processedIds.add(backOrder.id);
+              processedIds.add(layOrder.id);
+              console.log(`   ✅ 자동 쌍 생성: ${backOrder.id} ↔ ${layOrder.id} (${selection})`);
+            }
+          }
+        }
+      }
+    }
+    
+    console.log(`   🎉 총 생성된 쌍: ${pairs.length}개`);
     return pairs;
   }
 
@@ -302,10 +375,10 @@ class ExchangeSettlementService {
     
     await user.update({ balance: newBalance }, { transaction });
     
-    // 결제 내역 생성
+    // 결제 내역 생성 (Exchange 주문의 경우 betId는 null)
     await PaymentHistory.create({
       userId,
-      betId: orderId,
+      betId: null, // Exchange 주문은 Bet 테이블과 연결되지 않음
       amount,
       memo: amount > 0 ? 'Exchange 베팅 승리 수익' : 'Exchange 베팅 손실',
       paidAt: new Date(),
@@ -494,6 +567,116 @@ class ExchangeSettlementService {
       
     } catch (error) {
       console.error('❌ 전체 자동 정산 중 오류:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 연결된 모든 매칭 주문들을 경기별로 그룹화하여 정산
+   * @returns {Object} 정산 결과 요약
+   */
+  async settleAllConnectedOrders() {
+    try {
+      console.log('🎯 연결된 모든 매칭 주문 정산 시작...');
+      
+      // 1. 연결된 모든 매칭 주문들 조회
+      const allMatchedOrders = await ExchangeOrder.findAll({
+        where: { 
+          status: 'matched',
+          settledAt: null  // 아직 정산되지 않은 주문들
+        }
+      });
+      
+      // matchedOrderId가 null이 아닌 주문들만 필터링
+      const connectedOrders = allMatchedOrders.filter(order => order.matchedOrderId !== null);
+      
+      console.log(`📊 매칭된 주문 총 수: ${allMatchedOrders.length}개`);
+      console.log(`🔗 연결된 매칭 주문 수: ${connectedOrders.length}개`);
+      
+      if (connectedOrders.length === 0) {
+        console.log('❌ 정산할 수 있는 연결된 주문이 없습니다.');
+        return { totalSettled: 0, totalWinnings: 0, results: [] };
+      }
+      
+      // 2. 전체 주문 목록에서 연결된 쌍들을 먼저 찾기
+      console.log('\n🔍 전체 주문 목록에서 연결된 쌍 찾기...');
+      const allPairs = this.groupMatchedOrders(allMatchedOrders);
+      console.log(`🤝 전체에서 찾은 주문 쌍 수: ${allPairs.length}`);
+      
+      if (allPairs.length === 0) {
+        console.log('❌ 정산할 수 있는 주문 쌍이 없습니다.');
+        return { totalSettled: 0, totalWinnings: 0, results: [] };
+      }
+      
+      // 3. 쌍들을 경기별로 그룹화
+      const pairsByGame = {};
+      for (const pair of allPairs) {
+        const [order1, order2] = pair;
+        const gameResultId = order1.gameResultId || order2.gameResultId;
+        
+        if (gameResultId) {
+          if (!pairsByGame[gameResultId]) {
+            pairsByGame[gameResultId] = [];
+          }
+          pairsByGame[gameResultId].push(pair);
+        }
+      }
+      
+      console.log(`🎯 정산 대상 경기 수: ${Object.keys(pairsByGame).length}개`);
+      
+      // 4. 각 경기별로 정산 실행
+      let totalSettled = 0;
+      let totalWinnings = 0;
+      const allSettlementResults = [];
+      
+      for (const [gameResultId, pairs] of Object.entries(pairsByGame)) {
+        try {
+          // GameResult 정보 조회
+          const gameResult = await GameResult.findByPk(gameResultId);
+          if (!gameResult) {
+            console.log(`⚠️ GameResult ${gameResultId}를 찾을 수 없습니다.`);
+            continue;
+          }
+          
+          console.log(`\n🏟️ 경기 정산 시작: ${gameResult.homeTeam} vs ${gameResult.awayTeam}`);
+          console.log(`   📊 결과: ${gameResult.result}, 스코어: ${JSON.stringify(gameResult.score)}`);
+          console.log(`   🤝 정산할 쌍 수: ${pairs.length}개`);
+          
+          // 각 쌍에 대해 정산 실행
+          for (const pair of pairs) {
+            try {
+              const result = await this.settlePair(pair, gameResult, null); // transaction 없이
+              totalSettled += 2; // back + lay 주문
+              totalWinnings += result.totalWinnings || 0;
+              allSettlementResults.push(result);
+              
+              console.log(`   ✅ 주문 쌍 정산 완료: ${result.winnerSide} 승리, 수익: ${result.totalWinnings}`);
+              
+            } catch (error) {
+              console.error(`   ❌ 주문 쌍 정산 실패:`, error.message);
+            }
+          }
+          
+        } catch (error) {
+          console.error(`   ❌ 경기 ${gameResultId} 정산 실패:`, error.message);
+        }
+      }
+      
+      // 5. 정산 결과 요약
+      const summary = {
+        totalSettled,
+        totalWinnings,
+        results: allSettlementResults
+      };
+      
+      console.log('\n🎉 모든 연결된 주문 정산 완료!');
+      console.log(`📊 총 정산된 주문: ${totalSettled}개`);
+      console.log(`💰 총 수익: ${totalWinnings.toLocaleString()}원`);
+      
+      return summary;
+      
+    } catch (error) {
+      console.error('❌ 모든 연결된 주문 정산 실패:', error.message);
       throw error;
     }
   }
