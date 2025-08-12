@@ -351,225 +351,42 @@ const OrderbookPage: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-2">
           {filteredOrders.map((order) => (
             <div
               key={order.id}
-              className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-md transition-shadow"
+              className="bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow"
             >
-              {/* 헤더: 스포츠/타입/시간 */}
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded">
-                    {getSportDisplayName(order.sportKey || '')}
-                  </span>
-                  <span className={`px-3 py-1 text-white text-sm font-bold rounded ${
-                    order.type === 'back' ? 'bg-green-600' : 'bg-pink-600'
-                  }`}>
-                    {order.type === 'back' ? '🎯 Back (이길 것)' : '📉 Lay (질 것)'}
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    {formatDateTime(order.createdAt)}
-                  </span>
+              {/* 간소화된 정보 표시 */}
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900">
+                    {order.homeTeam || '홈팀'} vs {order.awayTeam || '원정팀'}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    {order.selection || '선택 없음'} • {order.commenceTime ? formatGameTime(order.commenceTime) : '시간 미정'}
+                  </div>
                 </div>
+                
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-blue-600">
+                  <div className="text-lg font-bold text-blue-600">
                     {order.odds ? order.odds.toFixed(2) : 'N/A'}
                   </div>
-                  <div className="text-xs text-gray-600 font-medium">
-                    호가 배당률
-                  </div>
-                </div>
-              </div>
-
-              {/* 경기 정보 - 더 명확하게 표시 */}
-              <div className="mb-4 bg-white p-3 rounded-lg border border-gray-200">
-                <div className="text-xl font-bold text-gray-800 mb-2 text-center">
-                  🏈 {order.homeTeam || '홈팀'} vs {order.awayTeam || '원정팀'}
-                  {!order.homeTeam && !order.awayTeam && (
-                    <div className="text-sm text-red-600 mt-1">
-                      ⚠️ 경기 정보 없음 (Game ID: {order.gameId})
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center justify-center gap-4 text-sm text-gray-600">
-                  <span className="bg-yellow-100 px-2 py-1 rounded text-yellow-800 font-medium">
-                    🏆 {order.selection || '선택 없음'}
-                  </span>
-                  <span className="bg-blue-100 px-2 py-1 rounded text-blue-800 font-medium">
-                    ⏰ {order.commenceTime ? formatGameTime(order.commenceTime) : '시간 미정'}
-                  </span>
-                </div>
-              </div>
-
-              {/* 금액 정보 - 더 명확하게 표시 */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-                <div className="bg-white p-3 rounded-lg border border-gray-200">
-                  <div className="text-xs text-gray-600 mb-1 font-medium">💰 호가 금액</div>
-                  <div className="text-lg font-bold text-gray-800">
+                  <div className="text-sm text-gray-500">
                     {formatCurrency(order.amount)}원
                   </div>
                 </div>
-                {order.stakeAmount && (
-                  <div className="bg-white p-3 rounded-lg border border-gray-200">
-                    <div className="text-xs text-gray-600 mb-1 font-medium">🎯 베팅 금액</div>
-                    <div className="text-lg font-bold text-gray-800">
-                      {formatCurrency(order.stakeAmount)}원
-                    </div>
-                  </div>
-                )}
-                {order.potentialProfit && (
-                  <div className="bg-white p-3 rounded-lg border border-gray-200">
-                    <div className="text-xs text-gray-600 mb-1 font-medium">💵 예상 수익</div>
-                    <div className="text-lg font-bold text-green-600">
-                      +{formatCurrency(order.potentialProfit)}원
-                    </div>
-                  </div>
-                )}
               </div>
-
-              {/* 스포츠북 배당율 정보 - 더 명확하게 표시 */}
-              {(order.backOdds || order.layOdds) && (
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200 mb-4">
-                  <div className="text-sm text-blue-700 mb-2 font-semibold flex items-center gap-2">
-                    📊 스포츠북 참고 배당율 
-                    <span className="text-xs bg-blue-200 px-2 py-1 rounded">
-                      {order.oddsSource || 'OddsAPI'}
-                    </span>
-                  </div>
-                  <div className="flex gap-4 text-sm">
-                    {order.backOdds && (
-                      <span className="bg-green-100 px-3 py-2 rounded text-green-700 font-medium">
-                        🎯 Back: <strong className="text-lg">{order.backOdds.toFixed(2)}</strong>
-                      </span>
-                    )}
-                    {order.layOdds && (
-                      <span className="bg-pink-100 px-3 py-2 rounded text-pink-700 font-medium">
-                        📉 Lay: <strong className="text-lg">{order.layOdds.toFixed(2)}</strong>
-                      </span>
-                    )}
-                  </div>
-                  {order.oddsUpdatedAt && (
-                    <div className="text-xs text-blue-600 mt-2 font-medium">
-                      🔄 업데이트: {formatDateTime(order.oddsUpdatedAt)}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* 상태 표시 - 더 명확하게 표시 */}
-              <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
-                <div className="text-xs text-gray-600 font-medium">
-                  🆔 주문 ID: {order.id}
-                </div>
-                <div className={`px-3 py-2 rounded text-sm font-bold ${
-                  order.status === 'open' ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' :
-                  order.status === 'matched' ? 'bg-green-100 text-green-800 border border-green-300' :
-                  order.status === 'cancelled' ? 'bg-red-100 text-red-800 border border-red-300' :
-                  'bg-gray-100 text-gray-800 border border-gray-300'
-                }`}>
-                  {order.status === 'open' ? '🔄 대기중' :
-                   order.status === 'matched' ? '✅ 체결됨' :
-                   order.status === 'cancelled' ? '❌ 취소됨' :
-                   '📋 정산됨'}
-                </div>
+              
+              {/* 간단한 매칭 배팅 버튼 */}
+              <div className="mt-3 flex gap-2">
+                <button className="flex-1 bg-green-600 text-white py-2 px-3 rounded text-sm font-medium hover:bg-green-700">
+                  매칭 배팅
+                </button>
+                <button className="px-3 py-2 text-gray-600 hover:text-gray-800 text-sm">
+                  상세보기
+                </button>
               </div>
-
-              {/* 매치 배팅 UI - 오픈 상태의 주문에만 표시 */}
-              {order.status === 'open' && (
-                <div className="mt-4 bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200">
-                  <div className="text-center mb-3">
-                    <h4 className="text-lg font-bold text-gray-800 mb-2">
-                      🎯 이 주문과 매치하시겠습니까?
-                    </h4>
-                    <p className="text-sm text-gray-600">
-                      {order.type === 'back' ? 'Lay' : 'Back'} 주문으로 상대방의 호가를 받아주세요
-                    </p>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* 매치 배팅 폼 */}
-                    <div className="bg-white p-4 rounded-lg border border-gray-200">
-                      <div className="mb-3">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          💰 베팅 금액
-                        </label>
-                        <input
-                          type="number"
-                          placeholder="베팅할 금액을 입력하세요"
-                          value={matchBetAmount[order.id] || ''}
-                          onChange={(e) => setMatchBetAmount(prev => ({ 
-                            ...prev, 
-                            [order.id]: Number(e.target.value) || 0 
-                          }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          min="1000"
-                          step="1000"
-                        />
-                      </div>
-                      
-                      <div className="mb-3">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          🎯 배당률
-                        </label>
-                        <input
-                          type="number"
-                          placeholder="원하는 배당률"
-                          value={matchBetOdds[order.id] || ''}
-                          onChange={(e) => setMatchBetOdds(prev => ({ 
-                            ...prev, 
-                            [order.id]: Number(e.target.value) || 0 
-                          }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          step="0.01"
-                          min="1.01"
-                        />
-                      </div>
-                      
-                      <button
-                        onClick={() => handleMatchBet(order.id)}
-                        className={`w-full py-3 px-4 rounded-lg font-bold text-white transition-colors ${
-                          order.type === 'back' 
-                            ? 'bg-pink-600 hover:bg-pink-700' 
-                            : 'bg-green-600 hover:bg-green-700'
-                        }`}
-                      >
-                        {order.type === 'back' ? '📉 Lay 주문' : '🎯 Back 주문'}
-                      </button>
-                    </div>
-                    
-                    {/* 매치 정보 요약 */}
-                    <div className="bg-white p-4 rounded-lg border border-gray-200">
-                      <h5 className="font-bold text-gray-800 mb-3 text-center">📊 매치 정보</h5>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">상대방 호가:</span>
-                          <span className="font-medium">{order.odds.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">상대방 금액:</span>
-                          <span className="font-medium">{formatCurrency(order.amount)}원</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">상대방 타입:</span>
-                          <span className={`font-medium px-2 py-1 rounded text-xs ${
-                            order.type === 'back' ? 'bg-green-100 text-green-800' : 'bg-pink-100 text-pink-800'
-                          }`}>
-                            {order.type === 'back' ? 'Back' : 'Lay'}
-                          </span>
-                        </div>
-                        <hr className="my-2" />
-                        <div className="text-center">
-                          <div className="text-xs text-gray-500 mb-1">매치 시 즉시 체결됩니다</div>
-                          <div className="text-xs text-blue-600 font-medium">
-                            💡 수수료는 거래 금액의 2%입니다
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           ))}
         </div>
@@ -577,5 +394,6 @@ const OrderbookPage: React.FC = () => {
     </div>
   );
 };
-
+ 
+export default OrderbookPage; 
 export default OrderbookPage; 
