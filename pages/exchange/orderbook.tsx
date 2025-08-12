@@ -91,33 +91,46 @@ const OrderbookPage: React.FC = () => {
 
   // 매치 배팅 처리 함수
   const handleMatchBet = async (orderId: string) => {
-    const amount = matchBetAmount[orderId];
-    const odds = matchBetOdds[orderId];
-    
-    if (!amount || !odds) {
-      alert('베팅 금액과 배당률을 모두 입력해주세요.');
-      return;
-    }
-    
-    if (amount < 1000) {
-      alert('최소 베팅 금액은 1,000원입니다.');
-      return;
-    }
-    
-    if (odds < 1.01) {
-      alert('배당률은 1.01 이상이어야 합니다.');
-      return;
-    }
-    
     try {
-      // TODO: 실제 매치 배팅 API 호출
-      console.log('매치 배팅 시도:', { orderId, amount, odds });
-      alert('매치 배팅이 성공적으로 처리되었습니다!');
+      // 해당 주문 찾기
+      const targetOrder = orders.find(order => order.id === orderId);
+      if (!targetOrder) {
+        alert('주문을 찾을 수 없습니다.');
+        return;
+      }
       
-      // 입력 필드 초기화
-      setMatchBetAmount(prev => ({ ...prev, [orderId]: 0 }));
-      setMatchBetOdds(prev => ({ ...prev, [orderId]: 0 }));
-      setMatchingOrder(null);
+      // 본인 주문인지 확인
+      if (targetOrder.userId === userId) {
+        alert('자신이 생성한 주문에는 매칭 배팅을 할 수 없습니다.');
+        return;
+      }
+      
+      // 주문 상태 확인
+      if (targetOrder.status !== 'open') {
+        alert('이미 체결되었거나 취소된 주문입니다.');
+        return;
+      }
+      
+      // 매칭 배팅 모달 표시 (간단한 입력 폼)
+      const amount = prompt('매칭 배팅할 금액을 입력하세요 (원):');
+      if (!amount) return;
+      
+      const betAmount = parseInt(amount);
+      if (isNaN(betAmount) || betAmount < 1000) {
+        alert('최소 베팅 금액은 1,000원입니다.');
+        return;
+      }
+      
+      // TODO: 실제 매치 배팅 API 호출
+      console.log('매치 배팅 시도:', { 
+        orderId, 
+        targetOrder: targetOrder.id,
+        betAmount,
+        targetOrderType: targetOrder.type,
+        targetOrderOdds: targetOrder.odds
+      });
+      
+      alert('매치 배팅이 성공적으로 처리되었습니다!');
       
       // 주문 목록 새로고침
       const allOrders = await fetchAllOpenOrders();
@@ -401,14 +414,18 @@ const OrderbookPage: React.FC = () => {
               <div className="mt-3 flex gap-2">
                 <button 
                   onClick={() => handleMatchBet(order.id)}
-                  disabled={order.status !== 'open'}
+                  disabled={order.status !== 'open' || order.userId === userId}
                   className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
-                    order.status === 'open'
+                    order.status === 'open' && order.userId !== userId
                       ? 'bg-green-600 text-white hover:bg-green-700'
                       : 'bg-gray-400 text-gray-600 cursor-not-allowed'
                   }`}
                 >
-                  {order.status === 'open' ? '매칭 배팅' : '매칭 불가'}
+                  {order.status === 'open' && order.userId !== userId 
+                    ? '매칭 배팅' 
+                    : order.userId === userId 
+                      ? '내 주문' 
+                      : '매칭 불가'}
                 </button>
                 <button 
                   onClick={() => setSelectedOrderDetail(order)}
