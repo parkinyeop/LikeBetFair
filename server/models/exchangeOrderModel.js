@@ -22,6 +22,11 @@ const ExchangeOrder = sequelize.define('ExchangeOrder', {
   selection: { type: DataTypes.STRING, allowNull: true }, // 선택한 팀/선수명 (기존 호환성)
   status: { type: DataTypes.ENUM('open', 'matched', 'settled', 'cancelled'), defaultValue: 'open' },
   matchedOrderId: { type: DataTypes.INTEGER, allowNull: true },
+  // 매칭 배팅 관련 필드
+  matchedBy: { type: DataTypes.UUID, allowNull: true }, // 매칭한 사용자 ID
+  matchedAt: { type: DataTypes.DATE, allowNull: true }, // 매칭 시간
+  matchedAmount: { type: DataTypes.INTEGER, allowNull: true }, // 매칭된 금액
+  matchedType: { type: DataTypes.ENUM('back', 'lay'), allowNull: true }, // 매칭된 타입
   // 거래 내역 추적
   stakeAmount: { type: DataTypes.INTEGER, allowNull: false }, // 베팅 금액
   potentialProfit: { type: DataTypes.INTEGER, allowNull: false }, // 잠재적 수익

@@ -51,37 +51,16 @@ router.post('/match-order', verifyToken, async (req, res) => {
     user.balance = parseInt(user.balance) - required;
     await user.save();
     
-    // 매칭 주문 생성 (매칭 결과 기록용)
-    const matchOrder = await ExchangeOrder.create({
-      userId,
-      gameId: targetOrder.gameId,
-      market: targetOrder.market,
-      line: targetOrder.line,
-      side: matchType,
-      price: targetOrder.price,
-      amount: matchAmount,
-      selection: targetOrder.selection,
-      stakeAmount: required,
-      potentialProfit: matchType === 'back' ? Math.floor((targetOrder.price - 1) * matchAmount) : matchAmount,
-      homeTeam: targetOrder.homeTeam,
-      awayTeam: targetOrder.awayTeam,
-      commenceTime: targetOrder.commenceTime,
-      sportKey: targetOrder.sportKey,
-      gameResultId: targetOrder.gameResultId,
-      selectionDetails: targetOrder.selectionDetails,
-      autoSettlement: true,
-      backOdds: targetOrder.backOdds,
-      layOdds: targetOrder.layOdds,
-      oddsSource: targetOrder.oddsSource,
-      oddsUpdatedAt: targetOrder.oddsUpdatedAt,
-      status: 'matched', // 즉시 매칭됨
-      matchedOrderId: targetOrder.id, // 매칭된 주문 ID
-
-    });
+        // 매칭 배팅 시 새 주문 생성하지 않음
+    // 기존 주문의 status만 'matched'로 변경하고 매칭 정보 기록
     
-    // 대상 주문 상태 변경
+    // 대상 주문에 매칭 정보 추가
     targetOrder.status = 'matched';
-    targetOrder.matchedOrderId = matchOrder.id;
+    targetOrder.matchedOrderId = null; // 매칭 배팅임을 표시
+    targetOrder.matchedBy = userId; // 매칭한 사용자 ID
+    targetOrder.matchedAt = new Date(); // 매칭 시간
+    targetOrder.matchedAmount = matchAmount; // 매칭된 금액
+    targetOrder.matchedType = matchType; // 매칭된 타입
     await targetOrder.save();
     
     // 거래 내역 기록
@@ -93,9 +72,9 @@ router.post('/match-order', verifyToken, async (req, res) => {
       status: 'completed',
       referenceId: targetOrder.id,
       metadata: {
-        matchOrderId: matchOrder.id,
         matchType: matchType,
-        matchAmount: matchAmount
+        matchAmount: matchAmount,
+        matchedBy: userId
       }
     });
     
@@ -105,7 +84,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
       amount: matchAmount,
       description: `매칭 배팅 체결: ${targetOrder.homeTeam} vs ${targetOrder.awayTeam}`,
       status: 'completed',
-      referenceId: matchOrder.id,
+      referenceId: targetOrder.id,
       metadata: {
         targetOrderId: targetOrder.id,
         matchType: matchType,
@@ -117,12 +96,16 @@ router.post('/match-order', verifyToken, async (req, res) => {
     exchangeWebSocketService.broadcastOrderUpdate({
       type: 'order_matched',
       targetOrder: targetOrder,
-      matchOrder: matchOrder
+      matchInfo: {
+        matchedBy: userId,
+        matchedAmount: matchAmount,
+        matchedType: matchType
+      }
     });
     
     console.log('✅ 매칭 배팅 성공:', { 
       targetOrderId, 
-      matchOrderId: matchOrder.id, 
+      matchedBy: userId,
       matchAmount, 
       matchType 
     });
@@ -130,7 +113,6 @@ router.post('/match-order', verifyToken, async (req, res) => {
     res.json({ 
       success: true, 
       message: '매칭 배팅이 성공적으로 처리되었습니다.',
-      matchOrderId: matchOrder.id,
       targetOrderId: targetOrder.id
     });
     

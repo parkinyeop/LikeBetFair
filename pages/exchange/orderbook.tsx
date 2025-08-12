@@ -145,7 +145,7 @@ const OrderbookPage: React.FC = () => {
       if (matchResult.success) {
         alert('매칭 배팅이 성공적으로 처리되었습니다!');
         
-        // 주문 목록 새로고침
+        // 주문 목록 새로고침 (매칭된 주문은 더 이상 표시되지 않음)
         const allOrders = await fetchAllOpenOrders();
         const convertedOrders: Order[] = allOrders.map(order => ({
           id: order.id.toString(),
