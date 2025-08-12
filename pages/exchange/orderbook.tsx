@@ -376,21 +376,26 @@ const OrderbookPage: React.FC = () => {
               {/* 간소화된 정보 표시 */}
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <div className="font-medium text-gray-900">
+                  <div className="font-medium text-gray-900 text-sm">
                     {order.homeTeam || '홈팀'} vs {order.awayTeam || '원정팀'}
                   </div>
-                  <div className="text-sm text-gray-600">
-                    {order.selection || '선택 없음'} • {order.commenceTime ? formatGameTime(order.commenceTime) : '시간 미정'}
-                  </div>
-                  {/* Back/Lay 타입 표시 */}
-                  <div className="mt-1">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      order.type === 'back' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-pink-100 text-pink-800'
-                    }`}>
-                      {order.type === 'back' ? '🎯 Back (이길 것)' : '📉 Lay (질 것)'}
-                    </span>
+                  {/* 배팅 정보 강조 표시 */}
+                  <div className="mt-2">
+                    <div className="text-lg font-bold text-gray-900">
+                      {order.selection || '선택 없음'}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${
+                        order.type === 'back' 
+                          ? 'bg-green-500 text-white' 
+                          : 'bg-pink-500 text-white'
+                      }`}>
+                        {order.type === 'back' ? '🎯 Back' : '📉 Lay'}
+                      </span>
+                      <span className="text-sm text-gray-600">
+                        {order.commenceTime ? formatGameTime(order.commenceTime) : '시간 미정'}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 
@@ -417,12 +422,12 @@ const OrderbookPage: React.FC = () => {
                   disabled={order.status !== 'open' || order.userId === userId}
                   className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
                     order.status === 'open' && order.userId !== userId
-                      ? 'bg-green-600 text-white hover:bg-green-700'
+                      ? order.type === 'back' ? 'bg-pink-600 hover:bg-pink-700' : 'bg-green-600 hover:bg-green-700'
                       : 'bg-gray-400 text-gray-600 cursor-not-allowed'
                   }`}
                 >
                   {order.status === 'open' && order.userId !== userId 
-                    ? '매칭 배팅' 
+                    ? (order.type === 'back' ? '📉 Lay로 매칭' : '🎯 Back으로 매칭')
                     : order.userId === userId 
                       ? '내 주문' 
                       : '매칭 불가'}
