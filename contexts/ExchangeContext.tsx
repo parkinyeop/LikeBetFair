@@ -12,9 +12,27 @@ export interface SelectedBet {
   commenceTime?: string;
 }
 
+export interface MatchTargetOrder {
+  id: string;
+  type: 'back' | 'lay';
+  odds: number;
+  selection: string;
+  homeTeam: string;
+  awayTeam: string;
+  gameId: string;
+  commenceTime: string;
+  sportKey: string;
+}
+
 interface ExchangeContextType {
   selectedBet: SelectedBet | null;
   setSelectedBet: (bet: SelectedBet | null) => void;
+  isMatchMode: boolean;
+  setIsMatchMode: (mode: boolean) => void;
+  matchTargetOrder: MatchTargetOrder | null;
+  setMatchTargetOrder: (order: MatchTargetOrder | null) => void;
+  activateMatchMode: (targetOrder: MatchTargetOrder) => void;
+  deactivateMatchMode: () => void;
 }
 
 const ExchangeContext = createContext<ExchangeContextType | undefined>(undefined);
@@ -33,6 +51,8 @@ interface ExchangeProviderProps {
 
 export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) => {
   const [selectedBet, setSelectedBet] = useState<SelectedBet | null>(null);
+  const [isMatchMode, setIsMatchMode] = useState(false);
+  const [matchTargetOrder, setMatchTargetOrder] = useState<MatchTargetOrder | null>(null);
 
   // selectedBet 상태 변경 로그
   React.useEffect(() => {
@@ -44,9 +64,44 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
     setSelectedBet(bet);
   };
 
+  // 매칭 모드 활성화
+  const activateMatchMode = (targetOrder: MatchTargetOrder) => {
+    setIsMatchMode(true);
+    setMatchTargetOrder(targetOrder);
+    
+    // 매칭 정보로 selectedBet 자동 설정
+    const matchType = targetOrder.type === 'back' ? 'lay' : 'back';
+    const matchOdds = targetOrder.odds;
+    
+    setSelectedBet({
+      team: targetOrder.selection,
+      price: matchOdds,
+      type: matchType,
+      gameId: targetOrder.gameId,
+      market: 'h2h',
+      line: 0,
+      homeTeam: targetOrder.homeTeam,
+      awayTeam: targetOrder.awayTeam,
+      commenceTime: targetOrder.commenceTime
+    });
+  };
+
+  // 매칭 모드 비활성화
+  const deactivateMatchMode = () => {
+    setIsMatchMode(false);
+    setMatchTargetOrder(null);
+    setSelectedBet(null);
+  };
+
   const value = {
     selectedBet,
     setSelectedBet: setSelectedBetWithLog,
+    isMatchMode,
+    setIsMatchMode,
+    matchTargetOrder,
+    setMatchTargetOrder,
+    activateMatchMode,
+    deactivateMatchMode,
   };
 
   return (

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../contexts/AuthContext';
 import { useExchange } from '../../hooks/useExchange';
+import { useExchangeContext } from '../../contexts/ExchangeContext';
 import { API_CONFIG, buildApiUrl } from '../../config/apiConfig';
 
 interface Order {
@@ -30,6 +31,7 @@ const OrderbookPage: React.FC = () => {
   const router = useRouter();
   const { userId } = useAuth();
   const { fetchAllOpenOrders } = useExchange();
+  const { activateMatchMode } = useExchangeContext();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'back' | 'lay'>('all');
@@ -89,7 +91,7 @@ const OrderbookPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [fetchAllOpenOrders]);
 
-  // 매치 배팅 처리 함수
+  // 매치 배팅 처리 함수 - 오른쪽 사이드바 매칭 모드 활성화
   const handleMatchBet = async (orderId: string) => {
     try {
       // 해당 주문 찾기
@@ -111,53 +113,26 @@ const OrderbookPage: React.FC = () => {
         return;
       }
       
-      // 매칭 배팅 모달 표시 (간단한 입력 폼)
-      const amount = prompt('매칭 배팅할 금액을 입력하세요 (원):');
-      if (!amount) return;
+      // ExchangeContext를 통해 매칭 모드 활성화
+      const matchTargetOrder = {
+        id: targetOrder.id,
+        type: targetOrder.type,
+        odds: targetOrder.odds,
+        selection: targetOrder.selection || '',
+        homeTeam: targetOrder.homeTeam || '',
+        awayTeam: targetOrder.awayTeam || '',
+        gameId: targetOrder.gameId || '',
+        commenceTime: targetOrder.commenceTime || '',
+        sportKey: targetOrder.sportKey || ''
+      };
       
-      const betAmount = parseInt(amount);
-      if (isNaN(betAmount) || betAmount < 1000) {
-        alert('최소 베팅 금액은 1,000원입니다.');
-        return;
-      }
+      activateMatchMode(matchTargetOrder);
       
-      // TODO: 실제 매치 배팅 API 호출
-      console.log('매치 배팅 시도:', { 
-        orderId, 
-        targetOrder: targetOrder.id,
-        betAmount,
-        targetOrderType: targetOrder.type,
-        targetOrderOdds: targetOrder.odds
-      });
-      
-      alert('매치 배팅이 성공적으로 처리되었습니다!');
-      
-      // 주문 목록 새로고침
-      const allOrders = await fetchAllOpenOrders();
-      setOrders(allOrders.map(order => ({
-        id: order.id.toString(),
-        gameId: order.gameId,
-        userId: order.userId.toString(),
-        type: order.side,
-        odds: order.price,
-        amount: order.amount,
-        status: order.status,
-        createdAt: order.createdAt,
-        selection: order.selection,
-        homeTeam: order.homeTeam,
-        awayTeam: order.awayTeam,
-        commenceTime: order.commenceTime,
-        sportKey: order.sportKey,
-        stakeAmount: order.stakeAmount,
-        potentialProfit: order.potentialProfit,
-        backOdds: order.backOdds,
-        layOdds: order.layOdds,
-        oddsSource: order.oddsSource,
-        oddsUpdatedAt: order.oddsUpdatedAt
-      })));
+      // 사용자에게 안내
+      alert('오른쪽 사이드바에서 매칭 배팅을 완료하세요!');
       
     } catch (error) {
-      console.error('매치 배팅 실패:', error);
+      console.error('매치 배팅 처리 실패:', error);
       alert('매치 배팅 처리 중 오류가 발생했습니다.');
     }
   };

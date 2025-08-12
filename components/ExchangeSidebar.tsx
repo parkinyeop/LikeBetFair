@@ -39,7 +39,13 @@ function OrderPanel() {
     orders: userOrders,
     fetchOrders
   } = useExchange();
-  const { selectedBet, setSelectedBet } = useExchangeContext();
+  const { 
+    selectedBet, 
+    setSelectedBet, 
+    isMatchMode, 
+    matchTargetOrder, 
+    deactivateMatchMode 
+  } = useExchangeContext();
   const { balance, username } = useAuth();
   
   const [form, setForm] = useState<OrderForm>({ side: 'back', price: 0, amount: 0 });
@@ -51,6 +57,8 @@ function OrderPanel() {
       setForm(prev => ({ ...prev, price: selectedBet.price }));
     }
   }, [selectedBet]);
+
+
 
   // 실시간 업데이트 (30초마다)
   React.useEffect(() => {
@@ -153,8 +161,49 @@ function OrderPanel() {
 
       {/* 선택된 배팅 정보 */}
       <div className="bg-gray-50 p-3 rounded mb-3 border border-gray-200">
-        <h3 className="font-semibold mb-2 text-sm text-gray-700">선택된 배팅</h3>
-        {selectedBet ? (
+        <h3 className="font-semibold mb-2 text-sm text-gray-700">
+          {isMatchMode ? '매칭 배팅 정보' : '선택된 배팅'}
+          {isMatchMode && (
+            <button 
+              onClick={deactivateMatchMode}
+              className="ml-2 text-xs text-red-600 hover:text-red-800 underline"
+            >
+              매칭 모드 해제
+            </button>
+          )}
+        </h3>
+        
+        {isMatchMode && matchTargetOrder ? (
+          <div className="space-y-2 text-sm">
+            <div className="bg-blue-50 p-2 rounded border border-blue-200 mb-2">
+              <div className="text-xs text-blue-700 mb-1">매칭 대상 주문</div>
+              <div className="font-medium text-blue-800">
+                {matchTargetOrder.homeTeam} vs {matchTargetOrder.awayTeam}
+              </div>
+              <div className="text-xs text-blue-600">
+                {matchTargetOrder.selection} • {matchTargetOrder.type === 'back' ? '🎯 Back(Win)' : '📉 Lay(Loss)'}
+              </div>
+            </div>
+            
+            <div className="text-center">
+              <div className="font-bold text-lg text-gray-800 mb-1">{selectedBet?.team}</div>
+              <div className="text-xs text-gray-500">매칭 배팅</div>
+            </div>
+            
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-gray-600">매칭 타입:</span>
+                <span className={`font-medium ${selectedBet?.type === 'back' ? 'text-blue-600' : 'text-pink-600'}`}>
+                  {selectedBet?.type === 'back' ? '🎯 Back(Win)' : '📉 Lay(Loss)'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">매칭 배당:</span>
+                <span className="font-medium">{selectedBet?.price.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        ) : selectedBet ? (
           <div className="space-y-2 text-sm">
             <div className="text-center">
               <div className="font-bold text-lg text-gray-800 mb-1">{selectedBet.team}</div>
@@ -188,10 +237,14 @@ function OrderPanel() {
 
       {/* Exchange 주문 폼 */}
       <div className="bg-gray-50 p-3 rounded mb-3">
-        <h3 className="font-semibold mb-2 text-sm text-gray-700">Exchange 주문</h3>
+        <h3 className="font-semibold mb-2 text-sm text-gray-700">
+          {isMatchMode ? '매칭 배팅 주문' : 'Exchange 주문'}
+        </h3>
         <div className="space-y-2">
           <div>
-                            <label className="block text-sm font-medium mb-1">Odds</label>
+            <label className="block text-sm font-medium mb-1">
+              {isMatchMode ? '매칭 배당' : 'Odds'}
+            </label>
             <input 
               type="number" 
               step="0.01"
@@ -204,10 +257,11 @@ function OrderPanel() {
                 }
               }} 
               className="w-full p-1 border rounded text-sm"
+              readOnly={isMatchMode}
             />
           </div>
           <div>
-                            <label className="block text-sm font-medium mb-1">Amount (KRW)</label>
+            <label className="block text-sm font-medium mb-1">Amount (KRW)</label>
             <input 
               type="text" 
               value={form.amount.toLocaleString()} 
@@ -223,9 +277,13 @@ function OrderPanel() {
           <button 
             onClick={handleOrder}
             disabled={loading || !selectedBet}
-            className="w-full bg-blue-600 text-white py-1 px-2 rounded hover:bg-blue-700 disabled:bg-gray-400 text-sm font-medium"
+            className={`w-full py-1 px-2 rounded text-sm font-medium ${
+              isMatchMode 
+                ? 'bg-green-600 hover:bg-green-700 text-white' 
+                : 'bg-blue-600 hover:bg-blue-700 text-white'
+            } disabled:bg-gray-400`}
           >
-            {loading ? '처리중...' : '주문'}
+            {loading ? '처리중...' : isMatchMode ? '매칭 배팅' : '주문'}
           </button>
         </div>
       </div>
