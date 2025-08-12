@@ -40,6 +40,9 @@ const OrderbookPage: React.FC = () => {
   const [matchBetAmount, setMatchBetAmount] = useState<{ [key: string]: number }>({});
   const [matchBetOdds, setMatchBetOdds] = useState<{ [key: string]: number }>({});
   const [matchingOrder, setMatchingOrder] = useState<string | null>(null);
+  
+  // 상세보기 상태
+  const [selectedOrderDetail, setSelectedOrderDetail] = useState<Order | null>(null);
 
   useEffect(() => {
     const loadOrders = async () => {
@@ -366,6 +369,16 @@ const OrderbookPage: React.FC = () => {
                   <div className="text-sm text-gray-600">
                     {order.selection || '선택 없음'} • {order.commenceTime ? formatGameTime(order.commenceTime) : '시간 미정'}
                   </div>
+                  {/* Back/Lay 타입 표시 */}
+                  <div className="mt-1">
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                      order.type === 'back' 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-pink-100 text-pink-800'
+                    }`}>
+                      {order.type === 'back' ? '🎯 Back (이길 것)' : '📉 Lay (질 것)'}
+                    </span>
+                  </div>
                 </div>
                 
                 <div className="text-right">
@@ -375,20 +388,171 @@ const OrderbookPage: React.FC = () => {
                   <div className="text-sm text-gray-500">
                     {formatCurrency(order.amount)}원
                   </div>
+                  {/* 상태 표시 */}
+                  <div className="text-xs text-gray-400 mt-1">
+                    {order.status === 'open' ? '🔄 대기중' : 
+                     order.status === 'matched' ? '✅ 체결됨' : 
+                     order.status === 'cancelled' ? '❌ 취소됨' : '📋 정산됨'}
+                  </div>
                 </div>
               </div>
               
               {/* 간단한 매칭 배팅 버튼 */}
               <div className="mt-3 flex gap-2">
-                <button className="flex-1 bg-green-600 text-white py-2 px-3 rounded text-sm font-medium hover:bg-green-700">
-                  매칭 배팅
+                <button 
+                  onClick={() => handleMatchBet(order.id)}
+                  disabled={order.status !== 'open'}
+                  className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
+                    order.status === 'open'
+                      ? 'bg-green-600 text-white hover:bg-green-700'
+                      : 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                  }`}
+                >
+                  {order.status === 'open' ? '매칭 배팅' : '매칭 불가'}
                 </button>
-                <button className="px-3 py-2 text-gray-600 hover:text-gray-800 text-sm">
+                <button 
+                  onClick={() => setSelectedOrderDetail(order)}
+                  className="px-3 py-2 text-gray-600 hover:text-gray-800 text-sm border border-gray-300 rounded hover:bg-gray-50">
                   상세보기
                 </button>
               </div>
             </div>
           ))}
+        </div>
+      )}
+      
+      {/* 상세보기 모달 */}
+      {selectedOrderDetail && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-gray-900">주문 상세 정보</h3>
+              <button 
+                onClick={() => setSelectedOrderDetail(null)}
+                className="text-gray-400 hover:text-gray-600 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {/* 경기 정보 */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-semibold text-gray-800 mb-2">🏈 경기 정보</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">홈팀:</span>
+                    <span className="ml-2 font-medium">{selectedOrderDetail.homeTeam || '홈팀'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">원정팀:</span>
+                    <span className="ml-2 font-medium">{selectedOrderDetail.awayTeam || '원정팀'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">선택:</span>
+                    <span className="ml-2 font-medium">{selectedOrderDetail.selection || '선택 없음'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">경기시간:</span>
+                    <span className="ml-2 font-medium">
+                      {selectedOrderDetail.commenceTime ? formatGameTime(selectedOrderDetail.commenceTime) : '시간 미정'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* 주문 정보 */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-semibold text-gray-800 mb-2">📋 주문 정보</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">타입:</span>
+                    <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
+                      selectedOrderDetail.type === 'back' 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-pink-100 text-pink-800'
+                    }`}>
+                      {selectedOrderDetail.type === 'back' ? 'Back (이길 것)' : 'Lay (질 것)'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">배당률:</span>
+                    <span className="ml-2 font-medium text-blue-600">
+                      {selectedOrderDetail.odds ? selectedOrderDetail.odds.toFixed(2) : 'N/A'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">금액:</span>
+                    <span className="ml-2 font-medium">{formatCurrency(selectedOrderDetail.amount)}원</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">상태:</span>
+                    <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
+                      selectedOrderDetail.status === 'open' ? 'bg-yellow-100 text-yellow-800' :
+                      selectedOrderDetail.status === 'matched' ? 'bg-green-100 text-green-800' :
+                      selectedOrderDetail.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {selectedOrderDetail.status === 'open' ? '대기중' :
+                       selectedOrderDetail.status === 'matched' ? '체결됨' :
+                       selectedOrderDetail.status === 'cancelled' ? '취소됨' :
+                       '정산됨'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* 추가 정보 */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-semibold text-gray-800 mb-2">ℹ️ 추가 정보</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">주문 ID:</span>
+                    <span className="ml-2 font-mono text-xs">{selectedOrderDetail.id}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">생성시간:</span>
+                    <span className="ml-2 font-medium">
+                      {formatDateTime(selectedOrderDetail.createdAt)}
+                    </span>
+                  </div>
+                  {selectedOrderDetail.sportKey && (
+                    <div>
+                      <span className="text-gray-600">스포츠:</span>
+                      <span className="ml-2 font-medium">
+                        {getSportDisplayName(selectedOrderDetail.sportKey)}
+                      </span>
+                    </div>
+                  )}
+                  {selectedOrderDetail.backOdds && (
+                    <div>
+                      <span className="text-gray-600">참고 Back:</span>
+                      <span className="ml-2 font-medium text-green-600">
+                        {selectedOrderDetail.backOdds.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  {selectedOrderDetail.layOdds && (
+                    <div>
+                      <span className="text-gray-600">참고 Lay:</span>
+                      <span className="ml-2 font-medium text-pink-600">
+                        {selectedOrderDetail.layOdds.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-6 flex justify-end">
+              <button 
+                onClick={() => setSelectedOrderDetail(null)}
+                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
