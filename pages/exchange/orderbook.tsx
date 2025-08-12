@@ -283,6 +283,9 @@ const OrderbookPage: React.FC = () => {
   // 필터링 및 정렬
   const filteredOrders = orders
     .filter(order => {
+      // status가 'open'이 아닌 주문은 제외 (매칭된 주문, 정산된 주문 등)
+      if (order.status !== 'open') return false;
+      
       if (filter !== 'all' && order.type !== filter) return false;
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
@@ -308,10 +311,10 @@ const OrderbookPage: React.FC = () => {
     });
 
   const stats = {
-    total: orders.length,
-    back: orders.filter(o => o.type === 'back').length,
-    lay: orders.filter(o => o.type === 'lay').length,
-    totalAmount: orders.reduce((sum, o) => sum + o.amount, 0)
+    total: orders.filter(o => o.status === 'open').length,
+    back: orders.filter(o => o.status === 'open' && o.type === 'back').length,
+    lay: orders.filter(o => o.status === 'open' && o.type === 'lay').length,
+    totalAmount: orders.filter(o => o.status === 'open').reduce((sum, o) => sum + o.amount, 0)
   };
 
   if (loading) {
