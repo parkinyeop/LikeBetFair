@@ -225,6 +225,29 @@ const OrderbookPage: React.FC = () => {
     }
   };
 
+  // 남은 경기 시간 계산 (일/시간/분)
+  const formatRemainingTime = (commenceTime: string) => {
+    const now = new Date();
+    const gameTime = new Date(commenceTime);
+    const timeDiff = gameTime.getTime() - now.getTime();
+    
+    if (timeDiff <= 0) {
+      return '경기 시작됨';
+    }
+    
+    const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (days > 0) {
+      return `${days}일 ${hours}시간 ${minutes}분 후`;
+    } else if (hours > 0) {
+      return `${hours}시간 ${minutes}분 후`;
+    } else {
+      return `${minutes}분 후`;
+    }
+  };
+
   const formatAmount = (amount: number) => {
     if (!amount || isNaN(amount)) return '0';
     if (amount >= 1000000) {
@@ -390,10 +413,15 @@ const OrderbookPage: React.FC = () => {
                           ? 'bg-green-500 text-white' 
                           : 'bg-pink-500 text-white'
                       }`}>
-                        {order.type === 'back' ? '🎯 Back' : '📉 Lay'}
+                        {order.type === 'back' ? '🎯 Back(Win)' : '📉 Lay(Loss)'}
                       </span>
                       <span className="text-sm text-gray-600">
                         {order.commenceTime ? formatGameTime(order.commenceTime) : '시간 미정'}
+                        {order.commenceTime && (
+                          <span className="ml-2 text-blue-600 font-medium">
+                            {formatRemainingTime(order.commenceTime)}
+                          </span>
+                        )}
                       </span>
                     </div>
                   </div>
@@ -427,7 +455,7 @@ const OrderbookPage: React.FC = () => {
                   }`}
                 >
                   {order.status === 'open' && order.userId !== userId 
-                    ? (order.type === 'back' ? '📉 Lay로 매칭' : '🎯 Back으로 매칭')
+                    ? (order.type === 'back' ? '📉 Lay(Loss)로 매칭' : '🎯 Back(Win)으로 매칭')
                     : order.userId === userId 
                       ? '내 주문' 
                       : '매칭 불가'}

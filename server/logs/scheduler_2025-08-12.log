@@ -107,3 +107,9 @@
 {"timestamp":"2025-08-12T05:00:04.404Z","type":"epl","status":"success","message":"EPL 프리미어리그 데이터 업데이트 완료"}
 {"timestamp":"2025-08-12T05:00:05.199Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
 {"timestamp":"2025-08-12T05:00:05.208Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":13},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-08-12T05:10:00.161Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-08-12T05:10:05.551Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-08-12T05:10:05.563Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":13},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-08-12T05:20:00.770Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-08-12T05:20:05.824Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-08-12T05:20:05.839Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":13},"betResultsUpdated":0,"categoryCount":14}
