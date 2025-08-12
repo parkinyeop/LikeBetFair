@@ -499,4 +499,4 @@ class ExchangeSettlementService {
   }
 }
 
-export default new ExchangeSettlementService(); 
+export default ExchangeSettlementService; 

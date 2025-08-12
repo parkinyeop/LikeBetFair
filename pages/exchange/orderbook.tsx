@@ -35,6 +35,11 @@ const OrderbookPage: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'back' | 'lay'>('all');
   const [sortBy, setSortBy] = useState<'time' | 'odds' | 'amount'>('time');
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // 매치 배팅 상태
+  const [matchBetAmount, setMatchBetAmount] = useState<{ [key: string]: number }>({});
+  const [matchBetOdds, setMatchBetOdds] = useState<{ [key: string]: number }>({});
+  const [matchingOrder, setMatchingOrder] = useState<string | null>(null);
 
   useEffect(() => {
     const loadOrders = async () => {
@@ -80,6 +85,66 @@ const OrderbookPage: React.FC = () => {
     const interval = setInterval(loadOrders, 30000);
     return () => clearInterval(interval);
   }, [fetchAllOpenOrders]);
+
+  // 매치 배팅 처리 함수
+  const handleMatchBet = async (orderId: string) => {
+    const amount = matchBetAmount[orderId];
+    const odds = matchBetOdds[orderId];
+    
+    if (!amount || !odds) {
+      alert('베팅 금액과 배당률을 모두 입력해주세요.');
+      return;
+    }
+    
+    if (amount < 1000) {
+      alert('최소 베팅 금액은 1,000원입니다.');
+      return;
+    }
+    
+    if (odds < 1.01) {
+      alert('배당률은 1.01 이상이어야 합니다.');
+      return;
+    }
+    
+    try {
+      // TODO: 실제 매치 배팅 API 호출
+      console.log('매치 배팅 시도:', { orderId, amount, odds });
+      alert('매치 배팅이 성공적으로 처리되었습니다!');
+      
+      // 입력 필드 초기화
+      setMatchBetAmount(prev => ({ ...prev, [orderId]: 0 }));
+      setMatchBetOdds(prev => ({ ...prev, [orderId]: 0 }));
+      setMatchingOrder(null);
+      
+      // 주문 목록 새로고침
+      const allOrders = await fetchAllOpenOrders();
+      setOrders(allOrders.map(order => ({
+        id: order.id.toString(),
+        gameId: order.gameId,
+        userId: order.userId.toString(),
+        type: order.side,
+        odds: order.price,
+        amount: order.amount,
+        status: order.status,
+        createdAt: order.createdAt,
+        selection: order.selection,
+        homeTeam: order.homeTeam,
+        awayTeam: order.awayTeam,
+        commenceTime: order.commenceTime,
+        sportKey: order.sportKey,
+        stakeAmount: order.stakeAmount,
+        potentialProfit: order.potentialProfit,
+        backOdds: order.backOdds,
+        layOdds: order.layOdds,
+        oddsSource: order.oddsSource,
+        oddsUpdatedAt: order.oddsUpdatedAt
+      })));
+      
+    } catch (error) {
+      console.error('매치 배팅 실패:', error);
+      alert('매치 배팅 처리 중 오류가 발생했습니다.');
+    }
+  };
 
   const getSportDisplayName = (sportKey: string) => {
     const sportMap: { [key: string]: string } = {
@@ -409,6 +474,102 @@ const OrderbookPage: React.FC = () => {
                    '📋 정산됨'}
                 </div>
               </div>
+
+              {/* 매치 배팅 UI - 오픈 상태의 주문에만 표시 */}
+              {order.status === 'open' && (
+                <div className="mt-4 bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200">
+                  <div className="text-center mb-3">
+                    <h4 className="text-lg font-bold text-gray-800 mb-2">
+                      🎯 이 주문과 매치하시겠습니까?
+                    </h4>
+                    <p className="text-sm text-gray-600">
+                      {order.type === 'back' ? 'Lay' : 'Back'} 주문으로 상대방의 호가를 받아주세요
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* 매치 배팅 폼 */}
+                    <div className="bg-white p-4 rounded-lg border border-gray-200">
+                      <div className="mb-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          💰 베팅 금액
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="베팅할 금액을 입력하세요"
+                          value={matchBetAmount[order.id] || ''}
+                          onChange={(e) => setMatchBetAmount(prev => ({ 
+                            ...prev, 
+                            [order.id]: Number(e.target.value) || 0 
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          min="1000"
+                          step="1000"
+                        />
+                      </div>
+                      
+                      <div className="mb-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          🎯 배당률
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="원하는 배당률"
+                          value={matchBetOdds[order.id] || ''}
+                          onChange={(e) => setMatchBetOdds(prev => ({ 
+                            ...prev, 
+                            [order.id]: Number(e.target.value) || 0 
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          step="0.01"
+                          min="1.01"
+                        />
+                      </div>
+                      
+                      <button
+                        onClick={() => handleMatchBet(order.id)}
+                        className={`w-full py-3 px-4 rounded-lg font-bold text-white transition-colors ${
+                          order.type === 'back' 
+                            ? 'bg-pink-600 hover:bg-pink-700' 
+                            : 'bg-green-600 hover:bg-green-700'
+                        }`}
+                      >
+                        {order.type === 'back' ? '📉 Lay 주문' : '🎯 Back 주문'}
+                      </button>
+                    </div>
+                    
+                    {/* 매치 정보 요약 */}
+                    <div className="bg-white p-4 rounded-lg border border-gray-200">
+                      <h5 className="font-bold text-gray-800 mb-3 text-center">📊 매치 정보</h5>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">상대방 호가:</span>
+                          <span className="font-medium">{order.odds.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">상대방 금액:</span>
+                          <span className="font-medium">{formatCurrency(order.amount)}원</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">상대방 타입:</span>
+                          <span className={`font-medium px-2 py-1 rounded text-xs ${
+                            order.type === 'back' ? 'bg-green-100 text-green-800' : 'bg-pink-100 text-pink-800'
+                          }`}>
+                            {order.type === 'back' ? 'Back' : 'Lay'}
+                          </span>
+                        </div>
+                        <hr className="my-2" />
+                        <div className="text-center">
+                          <div className="text-xs text-gray-500 mb-1">매치 시 즉시 체결됩니다</div>
+                          <div className="text-xs text-blue-600 font-medium">
+                            💡 수수료는 거래 금액의 2%입니다
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
