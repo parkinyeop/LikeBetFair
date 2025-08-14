@@ -380,7 +380,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       >
                         <div className="text-center truncate max-w-full">{game.homeTeam}</div>
                         <div className="text-xs mt-1 opacity-90">
-                          배당: {(game.homeTeamOdds || 2.5).toFixed(2)}
+                          배당: {game.homeTeamOdds ? game.homeTeamOdds.toFixed(2) : 'N/A'}
                         </div>
                       </button>
                     </div>
@@ -400,7 +400,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       >
                         <div className="text-center">무승부</div>
                         <div className="text-xs mt-1 opacity-90">
-                          배당: {(game.drawOdds || 3.5).toFixed(2)}
+                          배당: {game.drawOdds ? game.drawOdds.toFixed(2) : 'N/A'}
                         </div>
                       </button>
                     </div>
@@ -420,7 +420,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       >
                         <div className="text-center truncate max-w-full">{game.awayTeam}</div>
                         <div className="text-xs mt-1 opacity-90">
-                          배당: {(game.awayTeamOdds || 2.5).toFixed(2)}
+                          배당: {game.awayTeamOdds ? game.awayTeamOdds.toFixed(2) : 'N/A'}
                         </div>
                       </button>
                     </div>
@@ -434,7 +434,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                   <div className="flex space-x-4">
                     <div className="flex-1">
                       <button
-                        onClick={() => handleBetClick(game, 'Over 2.5', 1.9, 'back')}
+                        onClick={() => handleBetClick(game, 'Over 2.5', game.officialOdds?.totals?.over_2_5?.averagePrice || 1.9, 'back')}
                         disabled={!isOpen}
                         className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
@@ -446,13 +446,13 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       >
                         <div className="text-center">Over 2.5</div>
                         <div className="text-xs mt-1 opacity-90">
-                          배당: 1.90
+                          배당: {game.officialOdds?.totals?.over_2_5?.averagePrice ? game.officialOdds.totals.over_2_5.averagePrice.toFixed(2) : '1.90'}
                         </div>
                       </button>
                     </div>
                     <div className="flex-1">
                       <button
-                        onClick={() => handleBetClick(game, 'Under 2.5', 1.9, 'back')}
+                        onClick={() => handleBetClick(game, 'Under 2.5', game.officialOdds?.totals?.under_2_5?.averagePrice || 1.9, 'back')}
                         disabled={!isOpen}
                         className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
@@ -464,7 +464,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       >
                         <div className="text-center">Under 2.5</div>
                         <div className="text-xs mt-1 opacity-90">
-                          배당: 1.90
+                          배당: {game.officialOdds?.totals?.under_2_5?.averagePrice ? game.officialOdds.totals.under_2_5.averagePrice.toFixed(2) : '1.90'}
                         </div>
                       </button>
                     </div>
@@ -478,37 +478,37 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                   <div className="flex space-x-4">
                     <div className="flex-1">
                       <button
-                        onClick={() => handleBetClick(game, `${game.homeTeam} -1.5`, 2.0, 'back')}
+                        onClick={() => handleBetClick(game, '홈팀 -1.5', game.officialOdds?.spreads?.home_minus_1_5?.averagePrice || 1.9, 'back')}
                         disabled={!isOpen}
                         className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
-                            : isBetSelected(game.id, currentMarket, `${game.homeTeam} -1.5`)
+                            : isBetSelected(game.id, currentMarket, '홈팀 -1.5')
                             ? 'bg-yellow-400 hover:bg-yellow-500'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                       >
-                        <div className="text-center truncate max-w-full">{game.homeTeam} -1.5</div>
+                        <div className="text-center">홈팀 -1.5</div>
                         <div className="text-xs mt-1 opacity-90">
-                          배당: 2.00
+                          배당: {game.officialOdds?.spreads?.home_minus_1_5?.averagePrice ? game.officialOdds.spreads.home_minus_1_5.averagePrice.toFixed(2) : '1.90'}
                         </div>
                       </button>
                     </div>
                     <div className="flex-1">
                       <button
-                        onClick={() => handleBetClick(game, `${game.awayTeam} +1.5`, 1.8, 'back')}
+                        onClick={() => handleBetClick(game, '원정팀 +1.5', game.officialOdds?.spreads?.away_plus_1_5?.averagePrice || 1.9, 'back')}
                         disabled={!isOpen}
                         className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
-                            : isBetSelected(game.id, currentMarket, `${game.awayTeam} +1.5`)
+                            : isBetSelected(game.id, currentMarket, '원정팀 +1.5')
                             ? 'bg-yellow-400 hover:bg-yellow-500'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                       >
-                        <div className="text-center truncate max-w-full">{game.awayTeam} +1.5</div>
+                        <div className="text-center">원정팀 +1.5</div>
                         <div className="text-xs mt-1 opacity-90">
-                          배당: 1.80
+                          배당: {game.officialOdds?.spreads?.away_plus_1_5?.averagePrice ? game.officialOdds.spreads.away_plus_1_5.averagePrice.toFixed(2) : '1.90'}
                         </div>
                       </button>
                     </div>
