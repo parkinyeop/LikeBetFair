@@ -364,7 +364,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
               {/* 승패 마켓 */}
               {currentMarket === '승패' && (
                 <div className="p-4">
-                  <div className="flex space-x-4">
+                  <div className={`flex space-x-4 ${game.sportKey?.includes('baseball') ? 'justify-between' : ''}`}>
                     {/* 홈팀 승리 */}
                     <div className="flex-1">
                       <button
@@ -385,25 +385,27 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
                       </button>
                     </div>
 
-                    {/* 무승부 */}
-                    <div className="flex-1">
-                      <button
-                        onClick={() => handleBetClick(game, '무승부', game.drawOdds || 3.5, 'back')}
-                        disabled={!isOpen}
-                        className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
-                          !isOpen
-                            ? 'opacity-50 cursor-not-allowed bg-gray-400'
-                            : isBetSelected(game.id, currentMarket, '무승부')
-                            ? 'bg-yellow-400 hover:bg-yellow-500'
-                            : 'bg-blue-600 hover:bg-blue-700'
-                        }`}
-                      >
-                        <div className="text-center">무승부</div>
-                        <div className="text-xs mt-1 opacity-90">
-                          배당: {game.drawOdds ? game.drawOdds.toFixed(2) : 'N/A'}
-                        </div>
-                      </button>
-                    </div>
+                    {/* 무승부 - 야구가 아닐 때만 표시 */}
+                    {!game.sportKey?.includes('baseball') && (
+                      <div className="flex-1">
+                        <button
+                          onClick={() => handleBetClick(game, '무승부', game.drawOdds || 3.5, 'back')}
+                          disabled={!isOpen}
+                          className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
+                            !isOpen
+                              ? 'opacity-50 cursor-not-allowed bg-gray-400'
+                              : isBetSelected(game.id, currentMarket, '무승부')
+                              ? 'bg-yellow-400 hover:bg-yellow-500'
+                              : 'bg-blue-600 hover:bg-blue-700'
+                          }`}
+                        >
+                          <div className="text-center">무승부</div>
+                          <div className="text-xs mt-1 opacity-90">
+                            배당: {game.drawOdds ? game.drawOdds.toFixed(2) : 'N/A'}
+                          </div>
+                        </button>
+                      </div>
+                    )}
 
                     {/* 원정팀 승리 */}
                     <div className="flex-1">
