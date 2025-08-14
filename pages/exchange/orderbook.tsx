@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../contexts/AuthContext';
 import { useExchange } from '../../hooks/useExchange';
-import { useExchangeContext } from '../../contexts/ExchangeContext';
+import { useExchangeContext, MatchTargetOrder } from '../../contexts/ExchangeContext';
 import { API_CONFIG, buildApiUrl } from '../../config/apiConfig';
 
 interface Order {
@@ -91,8 +91,8 @@ const OrderbookPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [fetchAllOpenOrders]);
 
-  // 매치 배팅 처리 함수 - 즉시 매칭 방식
-  const handleMatchBet = async (orderId: string) => {
+  // 매치 배팅 처리 함수 - 오른쪽 사이드 주문하기 UI 사용
+  const handleMatchBet = (orderId: string) => {
     try {
       // 해당 주문 찾기
       const targetOrder = orders.find(order => order.id === orderId);
@@ -113,69 +113,27 @@ const OrderbookPage: React.FC = () => {
         return;
       }
       
-      // 매칭 배팅 금액 입력
-      const amount = prompt('매칭 배팅할 금액을 입력하세요 (원):');
-      if (!amount) return;
+      // 매칭 모드 활성화하여 오른쪽 사이드 주문하기 UI 사용
+      const matchTargetOrder: MatchTargetOrder = {
+        id: targetOrder.id.toString(),
+        type: targetOrder.type as 'back' | 'lay',
+        odds: targetOrder.odds,
+        selection: targetOrder.selection || '',
+        homeTeam: targetOrder.homeTeam || '',
+        awayTeam: targetOrder.awayTeam || '',
+        gameId: targetOrder.gameId,
+        commenceTime: targetOrder.commenceTime || '',
+        sportKey: targetOrder.sportKey || ''
+      };
       
-      const betAmount = parseInt(amount);
-      if (isNaN(betAmount) || betAmount < 1000) {
-        alert('최소 베팅 금액은 1,000원입니다.');
-        return;
-      }
+      activateMatchMode(matchTargetOrder);
       
-      // 즉시 매칭 API 호출
-      const matchResponse = await fetch('/api/exchange/match-order', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          targetOrderId: orderId,
-          matchAmount: betAmount,
-          matchType: targetOrder.type === 'back' ? 'lay' : 'back'
-        })
-      });
-      
-      if (!matchResponse.ok) {
-        throw new Error('매칭 배팅 API 호출 실패');
-      }
-      
-      const matchResult = await matchResponse.json();
-      
-      if (matchResult.success) {
-        alert('매칭 배팅이 성공적으로 처리되었습니다!');
-        
-        // 주문 목록 새로고침 (매칭된 주문은 더 이상 표시되지 않음)
-        const allOrders = await fetchAllOpenOrders();
-        const convertedOrders: Order[] = allOrders.map(order => ({
-          id: order.id.toString(),
-          gameId: order.gameId,
-          userId: order.userId.toString(),
-          type: order.side,
-          odds: order.price,
-          amount: order.amount,
-          status: order.status,
-          createdAt: order.createdAt,
-          selection: order.selection,
-          homeTeam: order.homeTeam,
-          awayTeam: order.awayTeam,
-          commenceTime: order.commenceTime,
-          sportKey: order.sportKey,
-          stakeAmount: order.stakeAmount,
-          potentialProfit: order.potentialProfit,
-          backOdds: order.backOdds,
-          layOdds: order.layOdds,
-          oddsSource: order.oddsSource,
-          oddsUpdatedAt: order.oddsUpdatedAt
-        }));
-        setOrders(convertedOrders);
-      } else {
-        alert('매칭 배팅 실패: ' + (matchResult.message || '알 수 없는 오류'));
-      }
+      // 사용자에게 안내 메시지
+      alert('오른쪽 사이드에서 매칭 배팅 정보를 확인하고 주문을 완료하세요!');
       
     } catch (error) {
-      console.error('매치 배팅 실패:', error);
-      alert('매치 배팅 처리 중 오류가 발생했습니다.');
+      console.error('매치 배팅 모드 활성화 실패:', error);
+      alert('매치 배팅 모드 활성화 중 오류가 발생했습니다.');
     }
   };
 
@@ -452,7 +410,20 @@ const OrderbookPage: React.FC = () => {
                     {order.odds ? order.odds.toFixed(2) : 'N/A'}
                   </div>
                   <div className="text-sm text-gray-500">
-                    {formatCurrency(order.amount)}원
+                    베팅: {formatCurrency(order.amount)}원
+                  </div>
+                  {/* 매칭 배팅자가 베팅해야 할 금액 표시 */}
+                  <div className="text-sm text-orange-600 font-medium">
+                    매칭 금액: {formatCurrency(order.stakeAmount || 0)}원
+                  </div>
+                  {/* 승리/패배 시나리오 표시 */}
+                  <div className="text-xs">
+                    <div className="text-green-600">
+                      승리 시: +{formatCurrency(order.potentialProfit || 0)}원
+                    </div>
+                    <div className="text-red-600">
+                      패배 시: -{formatCurrency(order.stakeAmount || 0)}원
+                    </div>
                   </div>
                   {/* 상태 표시 */}
                   <div className="text-xs text-gray-400 mt-1">
@@ -475,7 +446,7 @@ const OrderbookPage: React.FC = () => {
                   }`}
                 >
                   {order.status === 'open' && order.userId !== userId 
-                    ? (order.type === 'back' ? '📉 Lay(Loss)로 매칭배팅' : '🎯 Back(Win)으로 매칭배팅')
+                    ? (order.type === 'back' ? `📉 Lay로 매칭 (${formatCurrency(order.stakeAmount || 0)}원)` : `🎯 Back으로 매칭 (${formatCurrency(order.stakeAmount || 0)}원)`)
                     : order.userId === userId 
                       ? '내 주문' 
                       : '매칭 불가'}
@@ -552,8 +523,26 @@ const OrderbookPage: React.FC = () => {
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-600">금액:</span>
+                    <span className="text-gray-600">베팅 금액:</span>
                     <span className="ml-2 font-medium">{formatCurrency(selectedOrderDetail.amount)}원</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">매칭 금액:</span>
+                    <span className="ml-2 font-medium text-orange-600">
+                      {formatCurrency(selectedOrderDetail.stakeAmount || 0)}원
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">승리 시 수익:</span>
+                    <span className="ml-2 font-medium text-green-600">
+                      +{formatCurrency(selectedOrderDetail.potentialProfit || 0)}원
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">패배 시 손실:</span>
+                    <span className="ml-2 font-medium text-red-600">
+                      -{formatCurrency(selectedOrderDetail.stakeAmount || 0)}원
+                    </span>
                   </div>
                   <div>
                     <span className="text-gray-600">상태:</span>
