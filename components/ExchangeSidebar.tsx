@@ -747,9 +747,27 @@ function OrderHistoryPanel() {
   );
 }
 
-export default function ExchangeSidebar() {
-  const [activeTab, setActiveTab] = useState<'order' | 'history'>('order');
+export default function ExchangeSidebar({ 
+  activeTab: externalActiveTab, 
+  onTabChange 
+}: { 
+  activeTab?: 'order' | 'history';
+  onTabChange?: (tab: 'order' | 'history') => void;
+}) {
+  const [internalActiveTab, setInternalActiveTab] = useState<'order' | 'history'>('order');
   const { isLoggedIn, balance } = useAuth();
+
+  // 외부에서 제어하는 경우와 내부에서 제어하는 경우를 구분
+  const activeTab = externalActiveTab !== undefined ? externalActiveTab : internalActiveTab;
+  const setActiveTab = (tab: 'order' | 'history') => {
+    if (externalActiveTab !== undefined) {
+      // 외부 제어인 경우
+      onTabChange?.(tab);
+    } else {
+      // 내부 제어인 경우
+      setInternalActiveTab(tab);
+    }
+  };
 
   if (!isLoggedIn) {
     return (

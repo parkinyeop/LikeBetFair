@@ -3,13 +3,82 @@ import { useExchange, ExchangeOrder } from '../hooks/useExchange';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from 'next/router';
 import { getGameInfo, getSeasonInfo, getSeasonStatusStyle, getSeasonStatusBadge } from '../config/sportsMapping';
+import ExchangeSidebar from '../components/ExchangeSidebar';
+
+// 알림 설정 관리 유틸리티
+const NotificationUtils = {
+  // 특정 알림 숨김 설정
+  hideNotification: (key: string, message?: string) => {
+    const hiddenNotifications = JSON.parse(localStorage.getItem('hiddenNotifications') || '{}');
+    hiddenNotifications[key] = {
+      hidden: true,
+      timestamp: Date.now(),
+      message: message || '사용자가 숨김 설정'
+    };
+    localStorage.setItem('hiddenNotifications', JSON.stringify(hiddenNotifications));
+  },
+
+  // 특정 알림 표시 설정 복원
+  showNotification: (key: string) => {
+    const hiddenNotifications = JSON.parse(localStorage.getItem('hiddenNotifications') || '{}');
+    delete hiddenNotifications[key];
+    localStorage.setItem('hiddenNotifications', JSON.stringify(hiddenNotifications));
+  },
+
+  // 모든 알림 설정 초기화
+  resetAllNotifications: () => {
+    localStorage.removeItem('hiddenNotifications');
+  },
+
+  // 숨겨진 알림 목록 조회
+  getHiddenNotifications: () => {
+    return JSON.parse(localStorage.getItem('hiddenNotifications') || '{}');
+  },
+
+  // 특정 알림이 숨겨져 있는지 확인
+  isNotificationHidden: (key: string) => {
+    const hiddenNotifications = JSON.parse(localStorage.getItem('hiddenNotifications') || '{}');
+    return !!hiddenNotifications[key];
+  }
+};
 
 // 간단한 Toast 알림 컴포넌트
-const Toast = ({ message, type = 'info', onClose }: { message: string; type?: 'info' | 'warning' | 'success'; onClose: () => void }) => {
+const Toast = ({ message, type = 'info', onClose, notificationKey }: { 
+  message: string; 
+  type?: 'info' | 'warning' | 'success'; 
+  onClose: () => void;
+  notificationKey?: string; // 알림 식별자 추가
+}) => {
+  const [dontShowAgain, setDontShowAgain] = useState(false);
+
   useEffect(() => {
+    // 이미 "다시 보지 않기"로 설정된 알림인지 확인
+    if (notificationKey) {
+      const hiddenNotifications = JSON.parse(localStorage.getItem('hiddenNotifications') || '{}');
+      if (hiddenNotifications[notificationKey]) {
+        onClose(); // 즉시 닫기
+        return;
+      }
+    }
+
     const timer = setTimeout(onClose, 5000);
     return () => clearTimeout(timer);
-  }, [onClose]);
+  }, [onClose, notificationKey]);
+
+  const handleClose = () => {
+    // "다시 보지 않기" 체크된 경우 localStorage에 저장
+    if (dontShowAgain && notificationKey) {
+      const hiddenNotifications = JSON.parse(localStorage.getItem('hiddenNotifications') || '{}');
+      hiddenNotifications[notificationKey] = {
+        hidden: true,
+        timestamp: Date.now(),
+        message: message
+      };
+      localStorage.setItem('hiddenNotifications', JSON.stringify(hiddenNotifications));
+      console.log(`[Toast] 알림 "${notificationKey}"을(를) 다시 보지 않기로 설정했습니다.`);
+    }
+    onClose();
+  };
 
   const bgColor = type === 'warning' ? 'bg-yellow-100 border-yellow-400' : 
                   type === 'success' ? 'bg-green-100 border-green-400' : 
@@ -20,11 +89,116 @@ const Toast = ({ message, type = 'info', onClose }: { message: string; type?: 'i
 
   return (
     <div className={`fixed top-4 right-4 z-50 p-4 border rounded-lg shadow-lg ${bgColor} ${textColor} max-w-sm`}>
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">{message}</span>
-        <button onClick={onClose} className="ml-2 text-gray-500 hover:text-gray-700">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <span className="text-sm font-medium">{message}</span>
+          
+          {/* "다시 보지 않기" 체크박스 */}
+          {notificationKey && (
+            <div className="mt-2 flex items-center">
+              <input
+                type="checkbox"
+                id={`dontShow_${notificationKey}`}
+                checked={dontShowAgain}
+                onChange={(e) => setDontShowAgain(e.target.checked)}
+                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+              />
+              <label htmlFor={`dontShow_${notificationKey}`} className="ml-2 text-xs text-gray-600">
+                다시 보지 않기
+              </label>
+            </div>
+          )}
+        </div>
+        <button onClick={handleClose} className="ml-2 text-gray-500 hover:text-gray-700 mt-1">
           ×
         </button>
+      </div>
+    </div>
+  );
+};
+
+// 알림 설정 관리 컴포넌트
+const NotificationSettings = ({ onClose }: { onClose: () => void }) => {
+  const [hiddenNotifications, setHiddenNotifications] = useState(NotificationUtils.getHiddenNotifications());
+
+  const handleResetAll = () => {
+    if (confirm('모든 알림 설정을 초기화하시겠습니까?')) {
+      NotificationUtils.resetAllNotifications();
+      setHiddenNotifications({});
+      alert('모든 알림 설정이 초기화되었습니다.');
+    }
+  };
+
+  const handleShowNotification = (key: string) => {
+    NotificationUtils.showNotification(key);
+    setHiddenNotifications(NotificationUtils.getHiddenNotifications());
+  };
+
+  const hiddenCount = Object.keys(hiddenNotifications).length;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-bold">알림 설정 관리</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            ×
+          </button>
+        </div>
+
+        {hiddenCount === 0 ? (
+          <div className="text-center py-8">
+            <div className="text-gray-400 text-4xl mb-2">🔔</div>
+            <p className="text-gray-600">숨겨진 알림이 없습니다.</p>
+            <p className="text-sm text-gray-400 mt-1">모든 알림이 정상적으로 표시됩니다.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="text-sm text-gray-600 mb-3">
+              숨겨진 알림: {hiddenCount}개
+            </div>
+            
+            {Object.entries(hiddenNotifications).map(([key, data]: [string, any]) => (
+              <div key={key} className="p-3 bg-gray-50 rounded-lg border">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-gray-800">
+                      {key === 'order_cancellation_warning' ? '주문 취소 알림' : key}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {data.message}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      숨김 설정: {new Date(data.timestamp).toLocaleString('ko-KR')}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleShowNotification(key)}
+                    className="ml-2 px-3 py-1 bg-blue-100 text-blue-700 text-xs rounded hover:bg-blue-200 transition-colors"
+                  >
+                    복원
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex justify-between items-center mt-6 pt-4 border-t">
+          <button
+            onClick={handleResetAll}
+            disabled={hiddenCount === 0}
+            className="px-4 py-2 bg-red-100 text-red-700 text-sm rounded hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            모든 설정 초기화
+          </button>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded hover:bg-gray-200 transition-colors"
+          >
+            닫기
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -39,6 +213,8 @@ export default function ExchangePage() {
   const [sportGameCounts, setSportGameCounts] = useState<{[key: string]: number}>({});
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'warning' | 'success' } | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<{[key: string]: boolean}>({});
+  const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+  const [sidebarActiveTab, setSidebarActiveTab] = useState<'order' | 'history'>('order');
 
   // 취소된 주문 확인 및 알림
   const checkCancelledOrders = async () => {
@@ -58,7 +234,7 @@ export default function ExchangePage() {
           if (order.settlementNote?.includes('매칭되지 않아')) {
             setToast({
               type: 'warning',
-              message: `${order.homeTeam} vs ${order.awayTeam} 주문이 매칭되지 않아 취소되었습니다.`
+              message: `⚠️ ${order.homeTeam} vs ${order.awayTeam} 주문이 매칭되지 않아 자동 취소되었습니다.`
             });
           }
         });
@@ -276,13 +452,13 @@ export default function ExchangePage() {
   // 매치 주문 핸들러
   const handleMatchOrder = async (existingOrder: ExchangeOrder) => {
     if (!isLoggedIn || !token) {
-      alert('로그인이 필요합니다.');
+      // 로그인 필요 시 사이드바의 주문하기 탭으로 안내
+      console.log('🔐 로그인 필요 - 주문하기 UI로 안내');
       return;
     }
 
     // 프론트엔드에서도 자기 주문인지 한 번 더 확인
     if (String(userId) === String(existingOrder.userId)) {
-      alert('자신의 주문과는 매칭할 수 없습니다.');
       console.log('🚫 프론트엔드 방어: 자기 주문 매칭 시도 차단');
       return;
     }
@@ -307,7 +483,16 @@ export default function ExchangePage() {
       const result = await placeMatchOrder(orderData);
       
       if (result.success) {
-        alert(`✅ 매치 성공!\n매치된 금액: ${result.totalMatched.toLocaleString()}원\n매치 개수: ${result.matches}개`);
+        console.log(`✅ 매치 성공! 매치된 금액: ${result.totalMatched.toLocaleString()}원, 매치 개수: ${result.matches}개`);
+        
+        // 매칭 성공 시 사이드바를 주문하기 탭으로 자동 이동
+        setSidebarActiveTab('order');
+        
+        // 성공 메시지를 Toast로 표시
+        setToast({
+          type: 'success',
+          message: `🎯 매칭 성공! ${result.totalMatched.toLocaleString()}원이 매칭되었습니다.`
+        });
         
         // 호가창 데이터 새로고침 (동적으로 활성 게임 ID 가져오기)
         try {
@@ -328,11 +513,15 @@ export default function ExchangePage() {
           console.error('호가창 새로고침 실패:', error);
         }
       } else {
-        alert('매치 실패: ' + (result.error || '알 수 없는 오류'));
+        console.error('매치 실패:', result.error || '알 수 없는 오류');
+        // 실패 메시지를 Toast로 표시
+        setToast({
+          type: 'warning',
+          message: `❌ 매칭 실패: ${result.error || '알 수 없는 오류'}`
+        });
       }
     } catch (error) {
       console.error('❌ 홈에서 매치 주문 오류:', error);
-      alert('매치 주문 중 오류가 발생했습니다: ' + (error as Error).message);
     }
   };
 
@@ -351,252 +540,276 @@ export default function ExchangePage() {
   }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Toast 알림 */}
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
-      
-      {/* 실시간 호가 현황 - 상단 */}
-      <div className="bg-white rounded shadow p-6 mb-4">
-        <h3 className="text-lg font-bold mb-4">🔥 실시간 호가 현황</h3>
-        {!isLoggedIn ? (
-          <div className="text-center py-8">
-            <p className="text-gray-600">로그인 후 실시간 호가 정보를 확인할 수 있습니다.</p>
+    <div className="h-full flex">
+      {/* 메인 콘텐츠 영역 */}
+      <div className="flex-1 flex flex-col">
+        {/* Toast 알림 */}
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+            notificationKey={toast.type === 'warning' ? 'order_cancellation_warning' : undefined}
+          />
+        )}
+        
+        {/* 실시간 호가 현황 - 상단 */}
+        <div className="bg-white rounded shadow p-6 mb-4">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold">🔥 실시간 호가 현황</h3>
+            <button
+              onClick={() => setShowNotificationSettings(true)}
+              className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded hover:bg-blue-200 transition-colors flex items-center space-x-1"
+            >
+              <span>🔔</span>
+              <span>알림 설정</span>
+            </button>
           </div>
-        ) : orderbook.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-gray-500">현재 등록된 호가가 없습니다.</p>
-            <p className="text-sm text-gray-400">아래 스포츠를 선택해서 새로운 호가를 등록해보세요!</p>
+          {!isLoggedIn ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600">로그인 후 실시간 호가 정보를 확인할 수 있습니다.</p>
+            </div>
+          ) : orderbook.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">현재 등록된 호가가 없습니다.</p>
+              <p className="text-sm text-gray-400">아래 스포츠를 선택해서 새로운 호가를 등록해보세요!</p>
+            </div>
+          ) : (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="text-sm text-gray-600 mb-3">
+                {orderbook.length > 0 ? (() => {
+                  const backOrder = orderbook.find(o => o.side === 'back' && o.status === 'open');
+                  const layOrder = orderbook.find(o => o.side === 'lay' && o.status === 'open');
+                  // 경기 정보(팀명, 시간 등)는 Back/Lay 중 하나에서 가져옴
+                  const gameInfo = backOrder || layOrder;
+                  if (!backOrder && !layOrder) {
+                    return <div className="text-center text-gray-400 py-8">현재 오픈된 호가가 없습니다.</div>;
+                  }
+                  return (
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gray-50 border border-gray-200 rounded p-4 shadow mt-4">
+                      {/* 경기 정보 */}
+                      <div className="flex-1 min-w-[180px]">
+                        {gameInfo ? (
+                          <>
+                            <div className="font-semibold text-base text-gray-800">{gameInfo.homeTeam} vs {gameInfo.awayTeam}</div>
+                            <div className="text-xs text-gray-500">{gameInfo.commenceTime ? new Date(gameInfo.commenceTime).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '시간 미정'}</div>
+                          </>
+                        ) : (
+                          <div className="text-gray-400">경기 정보 없음</div>
+                        )}
+                      </div>
+                      {/* Back 정보 */}
+                      <div className="flex flex-col items-center min-w-[120px]">
+                        <div className="text-xs text-blue-600 font-semibold mb-1">Back</div>
+                        {backOrder ? (
+                          <>
+                            <div className="font-bold text-blue-700 text-lg">{(backOrder.backOdds || backOrder.price).toFixed(2)}</div>
+                            <div className="text-blue-600">{backOrder.amount.toLocaleString()}원</div>
+                          </>
+                        ) : layOrder ? (
+                          <>
+                            <div className="font-bold text-blue-700 text-lg">{(layOrder.backOdds || 'N/A')}</div>
+                            <div className="text-blue-600">매칭 대기</div>
+                          </>
+                        ) : (
+                          <div className="text-gray-400">-</div>
+                        )}
+                      </div>
+                      {/* Lay 정보 */}
+                      <div className="flex flex-col items-center min-w-[120px]">
+                        <div className="text-xs text-pink-600 font-semibold mb-1">Lay</div>
+                        {layOrder ? (
+                          <>
+                            <div className="font-bold text-pink-700 text-lg">{(layOrder.layOdds || layOrder.price).toFixed(2)}</div>
+                            <div className="text-pink-600">{layOrder.amount.toLocaleString()}원</div>
+                          </>
+                        ) : (
+                          <div className="text-gray-400">-</div>
+                        )}
+                      </div>
+                      {/* 매칭 버튼 */}
+                      <div className="flex flex-col items-center min-w-[120px]">
+                        {/* Back만 있을 때 → Lay로 배팅 */}
+                        {backOrder && !layOrder && (
+                          (() => {
+                            console.log('매칭 버튼 상태 (Lay로 배팅):', {
+                              userId,
+                              orderUserId: backOrder.userId,
+                              disabled: !userId || String(userId) === String(backOrder.userId)
+                            });
+                            return (
+                              <button
+                                onClick={() => {
+                                  if (!userId || String(userId) === String(backOrder.userId)) {
+                                    console.log('🚫 자신의 주문과는 매칭할 수 없습니다.');
+                                    return;
+                                  }
+                                  handleMatchOrder(backOrder);
+                                }}
+                                className={`px-4 py-2 text-white text-xs rounded transition-colors ${
+                                  !userId || String(userId) === String(backOrder.userId)
+                                    ? 'bg-gray-300 cursor-not-allowed'
+                                    : 'bg-pink-500 hover:bg-pink-600'
+                                }`}
+                                disabled={!userId || String(userId) === String(backOrder.userId)}
+                              >
+                                Lay로 배팅{String(userId) === String(backOrder.userId) ? ' (내 주문)' : ''}
+                              </button>
+                            );
+                          })()
+                        )}
+                        {/* Lay만 있을 때 → Back으로 배팅 */}
+                        {layOrder && !backOrder && (
+                          (() => {
+                            console.log('매칭 버튼 상태 (Back으로 배팅):', {
+                              userId,
+                              orderUserId: layOrder.userId,
+                              disabled: !userId || String(userId) === String(layOrder.userId)
+                            });
+                            return (
+                              <button
+                                onClick={() => {
+                                  if (!userId || String(userId) === String(layOrder.userId)) {
+                                    console.log('🚫 자신의 주문과는 매칭할 수 없습니다.');
+                                    return;
+                                  }
+                                  handleMatchOrder(layOrder);
+                                }}
+                                className={`px-4 py-2 text-white text-xs rounded transition-colors ${
+                                  !userId || String(userId) === String(layOrder.userId)
+                                    ? 'bg-gray-300 cursor-not-allowed'
+                                    : 'bg-blue-500 hover:bg-blue-600'
+                                }`}
+                                disabled={!userId || String(userId) === String(layOrder.userId)}
+                              >
+                                Back으로 배팅{String(userId) === String(layOrder.userId) ? ' (내 주문)' : ''}
+                              </button>
+                            );
+                          })()
+                        )}
+                        {/* 둘 다 있을 때는 매칭 버튼 없음 (이미 매칭됨) */}
+                        {backOrder && layOrder && (
+                          <div className="text-xs text-gray-400">매칭 대기 없음</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })() : (
+                  <strong>🏀 Loading game information...</strong>
+                )}
+              </div>
+              <div className="mt-3 text-center">
+                <button
+                  onClick={() => router.push('/exchange/orderbook')}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                >
+                  전체 호가 보기 →
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 경기 선택 - 하단 */}
+        <div className="bg-white rounded shadow p-4 flex-1">
+          <h3 className="text-lg font-bold mb-3">스포츠 선택 (Exchange 거래)</h3>
+          <div className="text-center mb-4">
+            <p className="text-gray-600 text-sm">원하는 스포츠를 선택하여 호가 거래를 시작하세요.</p>
           </div>
-        ) : (
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="text-sm text-gray-600 mb-3">
-              {orderbook.length > 0 ? (() => {
-                const backOrder = orderbook.find(o => o.side === 'back' && o.status === 'open');
-                const layOrder = orderbook.find(o => o.side === 'lay' && o.status === 'open');
-                // 경기 정보(팀명, 시간 등)는 Back/Lay 중 하나에서 가져옴
-                const gameInfo = backOrder || layOrder;
-                if (!backOrder && !layOrder) {
-                  return <div className="text-center text-gray-400 py-8">현재 오픈된 호가가 없습니다.</div>;
-                }
-                return (
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gray-50 border border-gray-200 rounded p-4 shadow mt-4">
-                    {/* 경기 정보 */}
-                    <div className="flex-1 min-w-[180px]">
-                      {gameInfo ? (
-                        <>
-                          <div className="font-semibold text-base text-gray-800">{gameInfo.homeTeam} vs {gameInfo.awayTeam}</div>
-                          <div className="text-xs text-gray-500">{gameInfo.commenceTime ? new Date(gameInfo.commenceTime).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '시간 미정'}</div>
-                        </>
-                      ) : (
-                        <div className="text-gray-400">경기 정보 없음</div>
-                      )}
+          <div className="space-y-4">
+            {/* 카테고리별로 스포츠북 스타일의 접는/펼치는 레이아웃 */}
+            {Object.entries({
+              '축구': [
+                { id: 'kleague', name: 'K League 1', sport: 'soccer_korea_kleague1' },
+                { id: 'jleague', name: 'J League', sport: 'soccer_japan_j_league' },
+                { id: 'seriea', name: 'Serie A', sport: 'soccer_italy_serie_a' },
+                { id: 'brasileirao', name: 'Brasileirao', sport: 'soccer_brazil_campeonato' },
+                { id: 'mls', name: 'MLS', sport: 'soccer_usa_mls' },
+                { id: 'argentina', name: 'Primera Division', sport: 'soccer_argentina_primera_division' },
+                { id: 'csl', name: 'Chinese Super League', sport: 'soccer_china_superleague' },
+                { id: 'laliga', name: 'La Liga', sport: 'soccer_spain_primera_division' },
+                { id: 'bundesliga', name: 'Bundesliga', sport: 'soccer_germany_bundesliga' }
+              ],
+              '농구': [
+                { id: 'nba', name: 'NBA', sport: 'basketball_nba' },
+                { id: 'kbl', name: 'KBL', sport: 'basketball_kbl' }
+              ],
+              '야구': [
+                { id: 'mlb', name: 'MLB', sport: 'baseball_mlb' },
+                { id: 'kbo', name: 'KBO', sport: 'baseball_kbo' }
+              ],
+              '미식축구': [
+                { id: 'nfl', name: 'NFL', sport: 'americanfootball_nfl' }
+              ]
+            }).map(([categoryName, sports]) => {
+              const isExpanded = expandedCategories[categoryName] || false;
+              
+              return (
+                <div key={categoryName} className="bg-white rounded-lg shadow-md border border-gray-200">
+                  {/* 카테고리 헤더 */}
+                  <button
+                    onClick={() => setExpandedCategories(prev => ({ ...prev, [categoryName]: !isExpanded }))}
+                    className="w-full p-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors rounded-lg"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <span className="text-xl font-semibold text-gray-900">{categoryName}</span>
+                      <span className="text-sm text-gray-500">({sports.length}개 리그)</span>
                     </div>
-                    {/* Back 정보 */}
-                    <div className="flex flex-col items-center min-w-[120px]">
-                      <div className="text-xs text-blue-600 font-semibold mb-1">Back</div>
-                      {backOrder ? (
-                        <>
-                          <div className="font-bold text-blue-700 text-lg">{(backOrder.backOdds || backOrder.price).toFixed(2)}</div>
-                          <div className="text-blue-600">{backOrder.amount.toLocaleString()}원</div>
-                        </>
-                      ) : layOrder ? (
-                        <>
-                          <div className="font-bold text-blue-700 text-lg">{(layOrder.backOdds || 'N/A')}</div>
-                          <div className="text-blue-600">매칭 대기</div>
-                        </>
-                      ) : (
-                        <div className="text-gray-400">-</div>
-                      )}
+                    <div className="flex items-center space-x-2">
+                      <svg
+                        className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
                     </div>
-                    {/* Lay 정보 */}
-                    <div className="flex flex-col items-center min-w-[120px]">
-                      <div className="text-xs text-pink-600 font-semibold mb-1">Lay</div>
-                      {layOrder ? (
-                        <>
-                          <div className="font-bold text-pink-700 text-lg">{(layOrder.layOdds || layOrder.price).toFixed(2)}</div>
-                          <div className="text-pink-600">{layOrder.amount.toLocaleString()}원</div>
-                        </>
-                      ) : (
-                        <div className="text-gray-400">-</div>
-                      )}
-                    </div>
-                    {/* 매칭 버튼 */}
-                    <div className="flex flex-col items-center min-w-[120px]">
-                      {/* Back만 있을 때 → Lay로 배팅 */}
-                      {backOrder && !layOrder && (
-                        (() => {
-                          console.log('매칭 버튼 상태 (Lay로 배팅):', {
-                            userId,
-                            orderUserId: backOrder.userId,
-                            disabled: !userId || String(userId) === String(backOrder.userId)
-                          });
+                  </button>
+
+                  {/* 리그 목록 - 간소화된 그리드 형태 */}
+                  {isExpanded && (
+                    <div className="border-t border-gray-200 p-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {sports.map((sport) => {
+                          const count = sportGameCounts[sport.id] ?? 0;
+                          const hasGames = count > 0;
+
                           return (
                             <button
-                              onClick={() => {
-                                if (!userId || String(userId) === String(backOrder.userId)) {
-                                  alert('자신의 주문과는 매칭할 수 없습니다.');
-                                  return;
-                                }
-                                handleMatchOrder(backOrder);
-                              }}
-                              className={`px-4 py-2 text-white text-xs rounded transition-colors ${
-                                !userId || String(userId) === String(backOrder.userId)
-                                  ? 'bg-gray-300 cursor-not-allowed'
-                                  : 'bg-pink-500 hover:bg-pink-600'
-                              }`}
-                              disabled={!userId || String(userId) === String(backOrder.userId)}
+                              key={sport.id}
+                              onClick={() => router.push(`/exchange/${sport.sport}`)}
+                              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-blue-50 hover:border-blue-200 border border-gray-200 transition-colors text-left"
                             >
-                              Lay로 배팅{String(userId) === String(backOrder.userId) ? ' (내 주문)' : ''}
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-900">{sport.name}</div>
+                                <div className="text-sm text-gray-500">
+                                  {hasGames ? `${count}경기` : '경기없음'}
+                                </div>
+                              </div>
                             </button>
                           );
-                        })()
-                      )}
-                      {/* Lay만 있을 때 → Back으로 배팅 */}
-                      {layOrder && !backOrder && (
-                        (() => {
-                          console.log('매칭 버튼 상태 (Back으로 배팅):', {
-                            userId,
-                            orderUserId: layOrder.userId,
-                            disabled: !userId || String(userId) === String(layOrder.userId)
-                          });
-                          return (
-                            <button
-                              onClick={() => {
-                                if (!userId || String(userId) === String(layOrder.userId)) {
-                                  alert('자신의 주문과는 매칭할 수 없습니다.');
-                                  return;
-                                }
-                                handleMatchOrder(layOrder);
-                              }}
-                              className={`px-4 py-2 text-white text-xs rounded transition-colors ${
-                                !userId || String(userId) === String(layOrder.userId)
-                                  ? 'bg-gray-300 cursor-not-allowed'
-                                  : 'bg-blue-500 hover:bg-blue-600'
-                              }`}
-                              disabled={!userId || String(userId) === String(layOrder.userId)}
-                            >
-                              Back으로 배팅{String(userId) === String(layOrder.userId) ? ' (내 주문)' : ''}
-                            </button>
-                          );
-                        })()
-                      )}
-                      {/* 둘 다 있을 때는 매칭 버튼 없음 (이미 매칭됨) */}
-                      {backOrder && layOrder && (
-                        <div className="text-xs text-gray-400">매칭 대기 없음</div>
-                      )}
+                        })}
+                      </div>
                     </div>
-                  </div>
-                );
-              })() : (
-                <strong>🏀 Loading game information...</strong>
-              )}
-            </div>
-            <div className="mt-3 text-center">
-              <button
-                onClick={() => router.push('/exchange/orderbook')}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-              >
-                전체 호가 보기 →
-              </button>
-            </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
+        </div>
+
+        {/* 알림 설정 모달 */}
+        {showNotificationSettings && (
+          <NotificationSettings onClose={() => setShowNotificationSettings(false)} />
         )}
       </div>
 
-      {/* 경기 선택 - 하단 */}
-      <div className="bg-white rounded shadow p-4 flex-1">
-        <h3 className="text-lg font-bold mb-3">스포츠 선택 (Exchange 거래)</h3>
-        <div className="text-center mb-4">
-          <p className="text-gray-600 text-sm">원하는 스포츠를 선택하여 호가 거래를 시작하세요.</p>
-        </div>
-        <div className="space-y-4">
-          {/* 카테고리별로 스포츠북 스타일의 접는/펼치는 레이아웃 */}
-          {Object.entries({
-            '축구': [
-              { id: 'kleague', name: 'K League 1', sport: 'soccer_korea_kleague1' },
-              { id: 'jleague', name: 'J League', sport: 'soccer_japan_j_league' },
-              { id: 'seriea', name: 'Serie A', sport: 'soccer_italy_serie_a' },
-              { id: 'brasileirao', name: 'Brasileirao', sport: 'soccer_brazil_campeonato' },
-              { id: 'mls', name: 'MLS', sport: 'soccer_usa_mls' },
-              { id: 'argentina', name: 'Primera Division', sport: 'soccer_argentina_primera_division' },
-              { id: 'csl', name: 'Chinese Super League', sport: 'soccer_china_superleague' },
-              { id: 'laliga', name: 'La Liga', sport: 'soccer_spain_primera_division' },
-              { id: 'bundesliga', name: 'Bundesliga', sport: 'soccer_germany_bundesliga' }
-            ],
-            '농구': [
-              { id: 'nba', name: 'NBA', sport: 'basketball_nba' },
-              { id: 'kbl', name: 'KBL', sport: 'basketball_kbl' }
-            ],
-            '야구': [
-              { id: 'mlb', name: 'MLB', sport: 'baseball_mlb' },
-              { id: 'kbo', name: 'KBO', sport: 'baseball_kbo' }
-            ],
-            '미식축구': [
-              { id: 'nfl', name: 'NFL', sport: 'americanfootball_nfl' }
-            ]
-          }).map(([categoryName, sports]) => {
-            const isExpanded = expandedCategories[categoryName] || false;
-            
-            return (
-              <div key={categoryName} className="bg-white rounded-lg shadow-md border border-gray-200">
-                {/* 카테고리 헤더 */}
-                <button
-                  onClick={() => setExpandedCategories(prev => ({ ...prev, [categoryName]: !isExpanded }))}
-                  className="w-full p-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors rounded-lg"
-                >
-                  <div className="flex items-center space-x-3">
-                    <span className="text-xl font-semibold text-gray-900">{categoryName}</span>
-                    <span className="text-sm text-gray-500">({sports.length}개 리그)</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <svg
-                      className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                </button>
-
-                {/* 리그 목록 - 간소화된 그리드 형태 */}
-                {isExpanded && (
-                  <div className="border-t border-gray-200 p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {sports.map((sport) => {
-                        const count = sportGameCounts[sport.id] ?? 0;
-                        const hasGames = count > 0;
-
-                        return (
-                          <button
-                            key={sport.id}
-                            onClick={() => router.push(`/exchange/${sport.sport}`)}
-                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-blue-50 hover:border-blue-200 border border-gray-200 transition-colors text-left"
-                          >
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-900">{sport.name}</div>
-                              <div className="text-sm text-gray-500">
-                                {hasGames ? `${count}경기` : '경기없음'}
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      {/* 사이드바 */}
+      <ExchangeSidebar
+        activeTab={sidebarActiveTab}
+        onTabChange={setSidebarActiveTab}
+      />
     </div>
   );
 } 
