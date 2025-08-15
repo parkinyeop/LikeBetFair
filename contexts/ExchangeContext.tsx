@@ -23,6 +23,12 @@ export interface MatchTargetOrder {
   gameId: string;
   commenceTime: string;
   sportKey: string;
+  // 🆕 부분 매칭 필드들 추가
+  originalAmount?: number;
+  remainingAmount?: number;
+  filledAmount?: number;
+  partiallyFilled?: boolean;
+  displayAmount?: number; // 화면에 표시할 금액
 }
 
 interface ExchangeContextType {
@@ -37,6 +43,10 @@ interface ExchangeContextType {
   sidebarActiveTab: 'order' | 'history';
   setSidebarActiveTab: (tab: 'order' | 'history') => void;
   getRequiredMatchAmount: () => number;
+  // 🆕 부분 매칭 관련 함수들
+  getMaxMatchAmount: () => number;
+  getAvailableMatchAmount: () => number;
+  formatPartialMatchInfo: (order: MatchTargetOrder) => string;
 }
 
 const ExchangeContext = createContext<ExchangeContextType | undefined>(undefined);
@@ -101,17 +111,62 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
     setSelectedBet(null);
   };
 
-  // 매칭에 필요한 정확한 금액 계산
+  // 🆕 매칭에 필요한 정확한 금액 계산 (부분 매칭 지원)
   const getRequiredMatchAmount = () => {
     if (!matchTargetOrder) return 0;
     
+    // displayAmount 또는 remainingAmount를 우선 사용
+    const availableAmount = matchTargetOrder.displayAmount || 
+                           matchTargetOrder.remainingAmount || 
+                           matchTargetOrder.amount;
+    
     if (matchTargetOrder.type === 'back') {
       // Back 주문에 Lay로 매칭: amount × (odds - 1)
-      return matchTargetOrder.amount * (matchTargetOrder.odds - 1);
+      return availableAmount * (matchTargetOrder.odds - 1);
     } else {
       // Lay 주문에 Back으로 매칭: amount 그대로
-      return matchTargetOrder.amount;
+      return availableAmount;
     }
+  };
+
+  // 🆕 최대 매칭 가능 금액 (남은 금액 기준)
+  const getMaxMatchAmount = () => {
+    if (!matchTargetOrder) return 0;
+    return matchTargetOrder.displayAmount || 
+           matchTargetOrder.remainingAmount || 
+           matchTargetOrder.amount;
+  };
+
+  // 🆕 실제 매칭 가능한 금액 (리스크 기준)
+  const getAvailableMatchAmount = () => {
+    if (!matchTargetOrder) return 0;
+    
+    const maxAmount = getMaxMatchAmount();
+    
+    if (matchTargetOrder.type === 'back') {
+      // Back 주문에 Lay로 매칭할 때 필요한 리스크
+      return maxAmount * (matchTargetOrder.odds - 1);
+    } else {
+      // Lay 주문에 Back으로 매칭할 때 필요한 리스크
+      return maxAmount;
+    }
+  };
+
+  // 🆕 부분 매칭 정보 포맷팅
+  const formatPartialMatchInfo = (order: MatchTargetOrder) => {
+    if (!order.partiallyFilled && !order.filledAmount) {
+      return `${order.amount.toLocaleString()}원`;
+    }
+    
+    const original = order.originalAmount || order.amount;
+    const filled = order.filledAmount || 0;
+    const remaining = order.remainingAmount || order.amount;
+    
+    if (filled > 0) {
+      return `${remaining.toLocaleString()}원 (${original.toLocaleString()}원 중 ${filled.toLocaleString()}원 체결)`;
+    }
+    
+    return `${remaining.toLocaleString()}원`;
   };
 
   const value = {
@@ -126,6 +181,10 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
     sidebarActiveTab,
     setSidebarActiveTab,
     getRequiredMatchAmount,
+    // 🆕 부분 매칭 관련 함수들 추가
+    getMaxMatchAmount,
+    getAvailableMatchAmount,
+    formatPartialMatchInfo,
   };
 
   return (

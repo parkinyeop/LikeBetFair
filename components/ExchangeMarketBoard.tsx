@@ -8,9 +8,10 @@ import { useExchangeGames, ExchangeGame } from '../hooks/useExchangeGames';
 
 interface ExchangeMarketBoardProps {
   selectedCategory?: string;
+  onSidebarTabChange?: (tab: 'order' | 'history') => void;
 }
 
-export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: ExchangeMarketBoardProps) {
+export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSidebarTabChange }: ExchangeMarketBoardProps) {
   const { isLoggedIn } = useAuth();
   const { setSelectedBet } = useExchangeContext();
   const { games: exchangeGames, loading: gamesLoading, error: gamesError, refetch } = useExchangeGames(selectedCategory);
@@ -170,6 +171,11 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA" }: Exchan
         awayTeam: game.awayTeam,
         commenceTime: game.commenceTime
       });
+      
+      // 사이드바를 주문하기 탭으로 자동 변경
+      if (onSidebarTabChange) {
+        onSidebarTabChange('order');
+      }
     }
   };
 

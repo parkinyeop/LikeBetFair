@@ -805,11 +805,7 @@ export default function ExchangePage() {
         )}
       </div>
 
-      {/* 사이드바 */}
-      <ExchangeSidebar
-        activeTab={sidebarActiveTab}
-        onTabChange={setSidebarActiveTab}
-      />
+
     </div>
   );
 } 

@@ -1,5 +1,6 @@
 import express from 'express';
 import ExchangeOrder from '../models/exchangeOrderModel.js';
+import ExchangeOrderMatch from '../models/exchangeOrderMatchModel.js';
 import User from '../models/userModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
 import verifyToken from '../middleware/verifyToken.js';
@@ -9,6 +10,106 @@ import exchangeSettlementService from '../services/exchangeSettlementService.js'
 import { Op } from 'sequelize';
 
 const router = express.Router();
+
+// 🆕 부분 매칭 처리 함수
+async function processPartialMatching(orderData) {
+  const { gameId, market, line, side, price, amount, userId } = orderData;
+  const opposite = side === 'back' ? 'lay' : 'back';
+  
+  console.log('🔄 부분 매칭 처리 시작:', { gameId, market, line, side, price, amount, userId });
+  
+  // FIFO 방식으로 매칭 가능한 주문들 조회
+  let availableOrders;
+  if (side === 'back') {
+    // Back 주문은 같거나 낮은 가격의 Lay 주문과 매칭
+    availableOrders = await ExchangeOrder.findAll({
+      where: {
+        gameId,
+        market,
+        line,
+        side: 'lay',
+        price: { [Op.lte]: price },
+        status: 'open',
+        userId: { [Op.ne]: userId },
+        remainingAmount: { [Op.gt]: 0 }
+      },
+      order: [['price', 'ASC'], ['createdAt', 'ASC']] // 가격 우선, 시간 순
+    });
+  } else {
+    // Lay 주문은 같거나 높은 가격의 Back 주문과 매칭
+    availableOrders = await ExchangeOrder.findAll({
+      where: {
+        gameId,
+        market,
+        line,
+        side: 'back',
+        price: { [Op.gte]: price },
+        status: 'open',
+        userId: { [Op.ne]: userId },
+        remainingAmount: { [Op.gt]: 0 }
+      },
+      order: [['price', 'DESC'], ['createdAt', 'ASC']] // 가격 우선, 시간 순
+    });
+  }
+  
+  console.log(`📊 매칭 가능한 주문: ${availableOrders.length}개`);
+  
+  let remainingAmount = amount;
+  const matches = [];
+  
+  // 순차적으로 매칭 처리
+  for (const existingOrder of availableOrders) {
+    if (remainingAmount <= 0) break;
+    
+    const availableAmount = existingOrder.remainingAmount || existingOrder.amount;
+    const matchAmount = Math.min(remainingAmount, availableAmount);
+    const matchPrice = existingOrder.price;
+    
+    console.log(`🎯 매칭 진행: ${matchAmount}원 at ${matchPrice} (주문 ID: ${existingOrder.id})`);
+    
+    // 기존 주문 업데이트
+    const newRemainingAmount = availableAmount - matchAmount;
+    const newFilledAmount = (existingOrder.filledAmount || 0) + matchAmount;
+    const newStatus = newRemainingAmount > 0 ? 'open' : 'matched';
+    
+    await existingOrder.update({
+      remainingAmount: newRemainingAmount,
+      filledAmount: newFilledAmount,
+      partiallyFilled: newFilledAmount > 0 && newRemainingAmount > 0,
+      status: newStatus
+    });
+    
+    // 매칭 기록 생성
+    const matchRecord = await ExchangeOrderMatch.create({
+      originalOrderId: existingOrder.id,
+      matchingOrderId: null, // 나중에 새 주문 ID로 업데이트
+      matchedAmount: matchAmount,
+      matchedPrice: matchPrice,
+      originalSide: existingOrder.side,
+      matchingSide: side,
+      gameId,
+      market,
+      line,
+      status: 'active'
+    });
+    
+    matches.push({
+      matchRecord,
+      existingOrder,
+      matchAmount,
+      matchPrice,
+      newRemainingAmount
+    });
+    
+    remainingAmount -= matchAmount;
+  }
+  
+  return {
+    matches,
+    remainingAmount,
+    totalMatched: amount - remainingAmount
+  };
+}
 
 // 매칭 배팅 API - 즉시 매칭 방식
 router.post('/match-order', verifyToken, async (req, res) => {
@@ -165,26 +266,30 @@ router.post('/order', verifyToken, async (req, res) => {
     user.balance = userBalance - required;
     await user.save();
     
-    const opposite = side === 'back' ? 'lay' : 'back';
-    const match = await ExchangeOrder.findOne({
-      where: { gameId, market, line, price, amount, side: opposite, status: 'open' }
+    // 🆕 부분 매칭 처리
+    const partialMatchResult = await processPartialMatching({
+      gameId, market, line, side, price, amount, userId
+    });
+    
+    console.log('🎯 부분 매칭 결과:', {
+      totalMatched: partialMatchResult.totalMatched,
+      remainingAmount: partialMatchResult.remainingAmount,
+      matchCount: partialMatchResult.matches.length
     });
     
     // 거래 정보 계산
     const stakeAmount = side === 'back' ? amount : Math.floor((price - 1) * amount);
     const potentialProfit = side === 'back' ? Math.floor((price - 1) * amount) : amount;
     
-    let order;
     // 🆕 배당율 정보 준비
     const now = new Date();
-    const orderCreateData = {
+    const baseOrderData = {
       userId, 
       gameId, 
       market, 
       line, 
       side, 
-      price, 
-      amount, 
+      price,
       selection,
       stakeAmount, 
       potentialProfit,
@@ -200,43 +305,86 @@ router.post('/order', verifyToken, async (req, res) => {
       backOdds: orderData.backOdds,
       layOdds: orderData.layOdds,
       oddsSource: orderData.oddsSource || 'exchange',
-      oddsUpdatedAt: orderData.oddsUpdatedAt || now
+      oddsUpdatedAt: orderData.oddsUpdatedAt || now,
+      // 🆕 부분 매칭 필드 초기화
+      originalAmount: amount,
+      remainingAmount: partialMatchResult.remainingAmount,
+      filledAmount: partialMatchResult.totalMatched,
+      partiallyFilled: partialMatchResult.totalMatched > 0 && partialMatchResult.remainingAmount > 0
     };
     
-    if (match) {
-      match.status = 'matched';
-      // 🆕 매칭된 주문의 배당율 정보도 채움
-      match.backOdds = orderData.backOdds;
-      match.layOdds = orderData.layOdds;
-      match.oddsSource = orderData.oddsSource || 'exchange';
-      match.oddsUpdatedAt = orderData.oddsUpdatedAt || now;
-      await match.save();
+    let order;
+    if (partialMatchResult.remainingAmount > 0) {
+      // 미체결 주문 생성
       order = await ExchangeOrder.create({
-        ...orderCreateData,
-        status: 'matched', 
-        matchedOrderId: match.id,
-        // 🆕 매칭된 주문과 동일하게 스포츠북 배당율 사용
-        backOdds: orderData.backOdds,
-        layOdds: orderData.layOdds,
-        oddsSource: orderData.oddsSource || 'exchange',
-        oddsUpdatedAt: orderData.oddsUpdatedAt || now
+        ...baseOrderData,
+        amount: partialMatchResult.remainingAmount,
+        status: partialMatchResult.totalMatched > 0 ? 'open' : 'open'
       });
-      match.matchedOrderId = order.id;
-      await match.save();
-      console.log('✅ 즉시 매칭 완료:', { orderId: order.id, matchedWith: match.id });
-    } else {
-      order = await ExchangeOrder.create({
-        ...orderCreateData,
-        status: 'open'
+      console.log('📝 새 주문 생성:', { 
+        orderId: order.id, 
+        originalAmount: amount,
+        remainingAmount: partialMatchResult.remainingAmount,
+        status: 'open' 
       });
-      console.log('📝 새 주문 생성:', { orderId: order.id, status: 'open' });
+    }
+    
+    // 매칭된 부분에 대한 주문들 생성 및 매칭 기록 업데이트
+    const createdMatchedOrders = [];
+    for (const match of partialMatchResult.matches) {
+      // 매칭된 부분에 대한 새 주문 생성
+      const matchedOrder = await ExchangeOrder.create({
+        ...baseOrderData,
+        amount: match.matchAmount,
+        status: 'matched',
+        matchedOrderId: match.existingOrder.id,
+        stakeAmount: side === 'back' ? match.matchAmount : Math.floor((match.matchPrice - 1) * match.matchAmount),
+        potentialProfit: side === 'back' ? Math.floor((match.matchPrice - 1) * match.matchAmount) : match.matchAmount
+      });
+      
+      // 매칭 기록 업데이트 (새 주문 ID 연결)
+      await match.matchRecord.update({
+        matchingOrderId: matchedOrder.id
+      });
+      
+      // 기존 주문에도 매칭 정보 업데이트
+      if (match.existingOrder.matchedOrderId === null) {
+        await match.existingOrder.update({
+          matchedOrderId: matchedOrder.id
+        });
+      }
+      
+      createdMatchedOrders.push(matchedOrder);
+      console.log('✅ 부분 매칭 완료:', { 
+        newOrderId: matchedOrder.id, 
+        existingOrderId: match.existingOrder.id,
+        matchAmount: match.matchAmount,
+        matchPrice: match.matchPrice
+      });
     }
     
     // WebSocket으로 주문 업데이트 브로드캐스트
-    exchangeWebSocketService.broadcastOrderUpdate(gameId, { order });
+    if (order) {
+      exchangeWebSocketService.broadcastOrderUpdate(gameId, { order });
+    }
     
+    // 🆕 부분 매칭 결과 포함한 응답
     res.json({ 
-      order: order.toJSON(),
+      success: true,
+      order: order ? order.toJSON() : null,
+      matchingResult: {
+        totalMatched: partialMatchResult.totalMatched,
+        remainingAmount: partialMatchResult.remainingAmount,
+        matchCount: partialMatchResult.matches.length,
+        isPartiallyMatched: partialMatchResult.totalMatched > 0 && partialMatchResult.remainingAmount > 0,
+        isFullyMatched: partialMatchResult.totalMatched > 0 && partialMatchResult.remainingAmount === 0,
+        createdMatchedOrders: createdMatchedOrders.map(o => ({
+          id: o.id,
+          amount: o.amount,
+          price: o.price,
+          status: o.status
+        }))
+      },
       gameInfo: {
         homeTeam: orderData.homeTeam,
         awayTeam: orderData.awayTeam,
@@ -303,7 +451,16 @@ router.get('/orderbook', verifyToken, async (req, res) => {
       where: whereCondition
     });
     
-    res.json({ orders });
+    // 🆕 부분 매칭을 고려한 주문 정보 반환
+    const ordersWithRemainingAmount = orders.map(order => ({
+      ...order.toJSON(),
+      displayAmount: order.remainingAmount || order.amount, // 화면에 표시할 금액
+      originalAmount: order.originalAmount || order.amount,
+      filledAmount: order.filledAmount || 0,
+      partiallyFilled: order.partiallyFilled || false
+    }));
+    
+    res.json({ orders: ordersWithRemainingAmount });
   } catch (error) {
     console.error('호가 조회 오류:', error);
     res.status(500).json({ message: '호가 조회 중 오류가 발생했습니다.' });
@@ -377,9 +534,21 @@ router.post('/cancel/:orderId', verifyToken, async (req, res) => {
       return res.status(400).json({ message: '취소할 수 없는 주문 상태입니다.' });
     }
     
-    // 잔고 환불 (일반 잔고 사용)
+    // 🆕 부분 매칭된 주문의 경우 remainingAmount만 환불
     const user = await User.findByPk(userId);
-    const refundAmount = order.side === 'back' ? order.amount : Math.floor((order.price - 1) * order.amount);
+    const refundableAmount = order.remainingAmount || order.amount;
+    const refundAmount = order.side === 'back' ? refundableAmount : Math.floor((order.price - 1) * refundableAmount);
+    
+    console.log('💰 취소 환불 계산:', {
+      orderId: order.id,
+      originalAmount: order.originalAmount || order.amount,
+      remainingAmount: order.remainingAmount || order.amount,
+      filledAmount: order.filledAmount || 0,
+      refundableAmount,
+      refundAmount,
+      side: order.side,
+      price: order.price
+    });
     
     user.balance += refundAmount;
     await user.save();
@@ -427,6 +596,73 @@ router.get('/balance', verifyToken, async (req, res) => {
   }
 });
 
+// 🆕 주문별 매칭 상세 내역 조회
+router.get('/orders/:orderId/matches', verifyToken, async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const userId = req.user.userId;
+    
+    // 주문 소유권 확인
+    const order = await ExchangeOrder.findOne({
+      where: { id: orderId, userId }
+    });
+    
+    if (!order) {
+      return res.status(404).json({ message: '주문을 찾을 수 없습니다.' });
+    }
+    
+    // 매칭 내역 조회
+    const matches = await ExchangeOrderMatch.findAll({
+      where: {
+        [Op.or]: [
+          { originalOrderId: orderId },
+          { matchingOrderId: orderId }
+        ]
+      },
+      include: [
+        {
+          model: ExchangeOrder,
+          as: 'originalOrder',
+          required: false
+        },
+        {
+          model: ExchangeOrder,
+          as: 'matchingOrder',
+          required: false
+        }
+      ],
+      order: [['createdAt', 'ASC']]
+    });
+    
+    res.json({
+      orderId,
+      orderInfo: {
+        originalAmount: order.originalAmount || order.amount,
+        filledAmount: order.filledAmount || 0,
+        remainingAmount: order.remainingAmount || order.amount,
+        partiallyFilled: order.partiallyFilled || false
+      },
+      matches: matches.map(match => ({
+        id: match.id,
+        matchedAmount: match.matchedAmount,
+        matchedPrice: match.matchedPrice,
+        matchedAt: match.createdAt,
+        status: match.status,
+        counterparty: {
+          orderId: match.originalOrderId === parseInt(orderId) ? 
+            match.matchingOrderId : match.originalOrderId,
+          side: match.originalOrderId === parseInt(orderId) ? 
+            match.matchingSide : match.originalSide
+        }
+      }))
+    });
+    
+  } catch (error) {
+    console.error('주문 매칭 내역 조회 오류:', error);
+    res.status(500).json({ message: '매칭 내역 조회 중 오류가 발생했습니다.' });
+  }
+});
+
 // 사용자 주문 내역 조회 (상태별 필터링 지원)
 router.get('/orders', verifyToken, async (req, res) => {
   try {
@@ -442,10 +678,37 @@ router.get('/orders', verifyToken, async (req, res) => {
     const orders = await ExchangeOrder.findAll({
       where: whereCondition,
       order: [['createdAt', 'DESC']],
-      limit: 50
+      limit: 50,
+      // 🆕 매칭 정보도 함께 조회
+      include: [
+        {
+          model: ExchangeOrderMatch,
+          as: 'originalMatches',
+          required: false
+        },
+        {
+          model: ExchangeOrderMatch,
+          as: 'matchingMatches',
+          required: false
+        }
+      ]
     });
     
-    res.json(orders);
+    // 🆕 부분 매칭 정보 포함한 응답
+    const ordersWithMatchInfo = orders.map(order => ({
+      ...order.toJSON(),
+      matchInfo: {
+        originalAmount: order.originalAmount || order.amount,
+        filledAmount: order.filledAmount || 0,
+        remainingAmount: order.remainingAmount || order.amount,
+        partiallyFilled: order.partiallyFilled || false,
+        fillPercentage: order.originalAmount ? 
+          Math.round((order.filledAmount || 0) / order.originalAmount * 100) : 0,
+        matchCount: (order.originalMatches?.length || 0) + (order.matchingMatches?.length || 0)
+      }
+    }));
+    
+    res.json(ordersWithMatchInfo);
   } catch (error) {
     console.error('Exchange orders error:', error);
     res.status(500).json({ message: '주문 내역 조회 중 오류가 발생했습니다.' });

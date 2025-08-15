@@ -61,7 +61,15 @@ export default function ExchangeSportPage() {
     <div className="h-full flex flex-col">
       <h1 className="text-2xl font-bold mb-6">{typeof sport === 'string' ? sport.toUpperCase() : 'EXCHANGE'}</h1>
       <div className="flex-1 min-h-0">
-        <ExchangeMarketBoard selectedCategory={selectedCategory} />
+        <ExchangeMarketBoard 
+          selectedCategory={selectedCategory}
+          onSidebarTabChange={(tab: 'order' | 'history') => {
+            // 전역 이벤트로 사이드바 탭 변경 요청
+            window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', { 
+              detail: { tab } 
+            }));
+          }}
+        />
       </div>
     </div>
   );

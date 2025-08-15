@@ -27,6 +27,12 @@ export type ExchangeOrder = {
   potentialProfit?: number; // 예상 수익
   oddsSource?: string; // 배당율 출처
   oddsUpdatedAt?: string; // 배당율 업데이트 시간
+  // 🆕 부분 매칭 필드들 추가
+  originalAmount?: number; // 최초 주문 금액
+  remainingAmount?: number; // 남은 금액
+  filledAmount?: number; // 체결된 금액
+  partiallyFilled?: boolean; // 부분 체결 여부
+  displayAmount?: number; // 화면에 표시할 금액
 };
 
 export interface ExchangeBalance {

@@ -45,7 +45,11 @@ function OrderPanel() {
     isMatchMode, 
     matchTargetOrder, 
     deactivateMatchMode,
-    getRequiredMatchAmount
+    getRequiredMatchAmount,
+    // 🆕 부분 매칭 관련 함수들 추가
+    getMaxMatchAmount,
+    getAvailableMatchAmount,
+    formatPartialMatchInfo
   } = useExchangeContext();
   const { balance, username } = useAuth();
   
@@ -59,13 +63,13 @@ function OrderPanel() {
     }
   }, [selectedBet]);
 
-  // 매칭 모드일 때 정확한 금액 자동 설정
+  // 매칭 모드일 때 초기값 설정 (자동 설정 제거)
   useEffect(() => {
-    if (isMatchMode) {
-      const requiredAmount = getRequiredMatchAmount();
-      setForm(prev => ({ ...prev, amount: requiredAmount }));
+    if (isMatchMode && form.amount === 0) {
+      const maxAmount = getRequiredMatchAmount();
+      setForm(prev => ({ ...prev, amount: maxAmount }));
     }
-  }, [isMatchMode, getRequiredMatchAmount]);
+  }, [isMatchMode, getRequiredMatchAmount, form.amount]);
 
 
 
@@ -111,14 +115,6 @@ function OrderPanel() {
       return;
     }
 
-    // 매칭 모드일 때 정확한 금액 검증
-    if (isMatchMode) {
-      const requiredAmount = getRequiredMatchAmount();
-      if (form.amount !== requiredAmount) {
-        alert(`매칭 배팅은 정확히 ${requiredAmount.toLocaleString()}원만 가능합니다.`);
-        return;
-      }
-    }
     
     if (loading) {
       return; // 이미 처리 중이면 중복 실행 방지
@@ -142,8 +138,34 @@ function OrderPanel() {
       const result = await placeOrder(orderData);
       console.log('주문 결과:', result);
       
-      // 주문 성공 시 처리
-      alert('주문이 성공적으로 등록되었습니다!');
+      // 🆕 주문 성공 시 부분 매칭 정보 포함 알림
+      if (result.matchingResult) {
+        const { totalMatched, remainingAmount, matchCount, isPartiallyMatched, isFullyMatched } = result.matchingResult;
+        
+        if (isFullyMatched) {
+          alert(`🎉 주문이 완전히 매칭되었습니다!\n` +
+                `매칭 금액: ${totalMatched.toLocaleString()}원\n` +
+                `매칭 횟수: ${matchCount}회`);
+        } else if (isPartiallyMatched) {
+          alert(`⚡ 주문이 부분 매칭되었습니다!\n` +
+                `매칭된 금액: ${totalMatched.toLocaleString()}원\n` +
+                `남은 금액: ${remainingAmount.toLocaleString()}원 (호가창에 등록)\n` +
+                `매칭 횟수: ${matchCount}회`);
+        } else if (remainingAmount > 0) {
+          alert(`📝 주문이 호가창에 등록되었습니다!\n` +
+                `등록 금액: ${remainingAmount.toLocaleString()}원\n` +
+                `다른 사용자가 매칭하면 자동으로 체결됩니다.`);
+        } else {
+          alert('주문이 성공적으로 등록되었습니다!');
+        }
+      } else {
+        alert('주문이 성공적으로 등록되었습니다!');
+      }
+      
+      // 🆕 매칭 모드도 비활성화
+      if (isMatchMode) {
+        deactivateMatchMode();
+      }
       
       // 폼 초기화
       setForm({ side: 'back', price: 0, amount: 0 });
@@ -201,6 +223,15 @@ function OrderPanel() {
               <div className="text-xs text-blue-600">
                 {matchTargetOrder.selection} • {matchTargetOrder.type === 'back' ? '🎯 Back(Win)' : '📉 Lay(Loss)'}
               </div>
+              {/* 🆕 부분 매칭 정보 표시 */}
+              <div className="text-xs text-green-600 mt-1">
+                💰 가능 금액: {formatPartialMatchInfo(matchTargetOrder)}
+              </div>
+              {matchTargetOrder.partiallyFilled && (
+                <div className="text-xs text-orange-600 mt-1">
+                  ⚡ 부분 체결된 주문
+                </div>
+              )}
             </div>
             
             <div className="text-center">
@@ -280,33 +311,69 @@ function OrderPanel() {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">
-              {isMatchMode ? '매칭 금액 (고정)' : 'Amount (KRW)'}
+              {isMatchMode ? 
+                `배팅 금액 (1원 ~ ${getAvailableMatchAmount().toLocaleString()}원)` : 
+                'Amount (KRW)'
+              }
             </label>
+            {/* 🆕 부분 매칭 모드에서 범위 표시 */}
+            {isMatchMode && (
+              <div className="text-xs text-gray-500 mb-1">
+                💡 원하는 금액만큼 부분 매칭 가능 
+                (최대 매칭 가능: {getMaxMatchAmount().toLocaleString()}원)
+              </div>
+            )}
             <input 
               type="text" 
               value={form.amount.toLocaleString()} 
               onChange={e => {
-                if (!isMatchMode) {
-                  const value = e.target.value.replace(/,/g, '');
-                  const numValue = parseInt(value) || 0;
-                  setForm(f => ({ ...f, amount: numValue }));
+                const value = e.target.value.replace(/,/g, '');
+                let numValue = parseInt(value) || 0;
+                
+                // 🆕 매칭 모드에서 최대 리스크 금액 초과 시 제한
+                if (isMatchMode) {
+                  const maxRiskAmount = getAvailableMatchAmount();
+                  if (numValue > maxRiskAmount) {
+                    numValue = maxRiskAmount;
+                  }
                 }
+                
+                setForm(f => ({ ...f, amount: numValue }));
               }}
-              className={`w-full p-1 border rounded text-sm ${isMatchMode ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-              placeholder="0"
-              readOnly={isMatchMode}
+              className="w-full p-1 border rounded text-sm"
+              placeholder={isMatchMode ? "원하는 금액 입력" : "0"}
             />
+            {/* 🆕 매칭 모드에서 빠른 금액 선택 버튼 */}
+            {isMatchMode && (
+              <div className="flex space-x-1 mt-1">
+                {[0.25, 0.5, 0.75, 1.0].map(ratio => (
+                  <button
+                    key={ratio}
+                    onClick={() => {
+                      const maxAmount = getAvailableMatchAmount();
+                      const quickAmount = Math.floor(maxAmount * ratio);
+                      setForm(f => ({ ...f, amount: quickAmount }));
+                    }}
+                    className="flex-1 py-1 px-2 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+                  >
+                    {ratio === 1 ? '전액' : `${Math.round(ratio * 100)}%`}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <button 
             onClick={handleOrder}
-            disabled={loading || !selectedBet}
+            disabled={loading || !selectedBet || (isMatchMode && form.amount <= 0)}
             className={`w-full py-1 px-2 rounded text-sm font-medium ${
               isMatchMode 
                 ? 'bg-green-600 hover:bg-green-700 text-white' 
                 : 'bg-blue-600 hover:bg-blue-700 text-white'
             } disabled:bg-gray-400`}
           >
-            {loading ? '처리중...' : isMatchMode ? '매칭 배팅' : '주문'}
+            {loading ? '처리중...' : isMatchMode ? 
+              `🎯 부분 매칭 (${form.amount.toLocaleString()}원)` : 
+              '주문하기'}
           </button>
         </div>
       </div>
@@ -669,6 +736,12 @@ function OrderHistoryPanel() {
                     <div className="text-center">
                       <div className="text-xs text-gray-500">주문 금액</div>
                       <div className="text-lg font-bold text-gray-800">{order.amount.toLocaleString()} KRW</div>
+                      {/* 🆕 부분 매칭 정보 표시 */}
+                      {(order as any).matchInfo && (order as any).matchInfo.partiallyFilled && (
+                        <div className="text-xs text-orange-600 mt-1">
+                          📈 {(order as any).matchInfo.fillPercentage}% 체결
+                        </div>
+                      )}
                     </div>
                     <div className="text-center">
                       <div className="text-xs text-gray-500">Potential Profit</div>
@@ -733,6 +806,29 @@ function OrderHistoryPanel() {
                           <div className="flex justify-between">
                             <span className="text-gray-600">매칭 주문:</span>
                             <span className="text-green-600">#{order.matchedOrderId}</span>
+                          </div>
+                        )}
+                        {/* 🆕 부분 매칭 상세 정보 */}
+                        {(order as any).matchInfo && (
+                          <div className="border-t border-gray-200 pt-1 mt-1">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">원래 금액:</span>
+                              <span>{(order as any).matchInfo.originalAmount.toLocaleString()}원</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">체결 금액:</span>
+                              <span className="text-green-600">{(order as any).matchInfo.filledAmount.toLocaleString()}원</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">남은 금액:</span>
+                              <span className="text-orange-600">{(order as any).matchInfo.remainingAmount.toLocaleString()}원</span>
+                            </div>
+                            {(order as any).matchInfo.matchCount > 0 && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">매칭 횟수:</span>
+                                <span className="text-blue-600">{(order as any).matchInfo.matchCount}회</span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

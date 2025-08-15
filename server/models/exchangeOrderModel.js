@@ -71,6 +71,31 @@ const ExchangeOrder = sequelize.define('ExchangeOrder', {
     type: DataTypes.DATE, 
     allowNull: true,
     comment: '배당율 업데이트 시간'
+  },
+  // 🆕 부분 매칭 필드들
+  originalAmount: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    comment: '원래 주문 금액 (부분 매칭 추적용)'
+  },
+  remainingAmount: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    comment: '남은 미체결 금액'
+  },
+  filledAmount: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    comment: '체결된 금액'
+  },
+  partiallyFilled: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    comment: '부분 체결 여부'
   }
 }, { timestamps: true });
 
