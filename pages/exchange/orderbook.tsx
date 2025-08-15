@@ -31,6 +31,8 @@ interface Order {
   filledAmount?: number;
   remainingAmount?: number;
   partiallyFilled?: boolean;
+  // 🆕 매치 배팅 구분 필드
+  matchedOrderId?: number | null;
 }
 
 const OrderbookPage: React.FC = () => {
@@ -84,7 +86,9 @@ const OrderbookPage: React.FC = () => {
           originalAmount: order.originalAmount || order.amount,
           filledAmount: order.filledAmount || 0,
           remainingAmount: order.remainingAmount || order.amount,
-          partiallyFilled: order.partiallyFilled || false
+          partiallyFilled: order.partiallyFilled || false,
+          // 🆕 매치 배팅 구분 필드
+          matchedOrderId: order.matchedOrderId || null
         }));
         
         console.log('🔍 변환된 주문 데이터:', convertedOrders);
@@ -103,8 +107,8 @@ const OrderbookPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [fetchAllOpenOrders]);
 
-  // 매치 배팅 처리 함수 - 오른쪽 사이드 주문하기 UI 사용
-  const handleMatchBet = (orderId: string) => {
+  // 매치 배팅 처리 함수 - 실제 API 호출로 수정
+  const handleMatchBet = async (orderId: string) => {
     try {
       // 해당 주문 찾기
       const targetOrder = orders.find(order => order.id === orderId);
@@ -124,32 +128,72 @@ const OrderbookPage: React.FC = () => {
         alert('이미 체결되었거나 취소된 주문입니다.');
         return;
       }
+
+      // 매치 배팅 금액 입력 받기
+      const matchAmount = prompt(`매치 배팅 금액을 입력하세요 (최대: ${targetOrder.displayAmount || targetOrder.amount}원)`);
+      if (!matchAmount || isNaN(Number(matchAmount))) {
+        alert('올바른 금액을 입력해주세요.');
+        return;
+      }
+
+      const amount = parseInt(matchAmount);
+      if (amount <= 0 || amount > (targetOrder.displayAmount || targetOrder.amount)) {
+        alert('올바른 금액을 입력해주세요.');
+        return;
+      }
+
+      // 매치 타입 결정 (반대 타입)
+      const matchType = targetOrder.type === 'back' ? 'lay' : 'back';
+
+      // 🆕 매치 배팅 API 직접 호출
+      const response = await fetch('/api/exchange/match-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Auth-Token': localStorage.getItem('token') || ''
+        },
+        body: JSON.stringify({
+          targetOrderId: targetOrder.id,
+          matchAmount: amount,
+          matchType: matchType
+        })
+      });
+
+      const result = await response.json();
       
-      // 🆕 부분 매칭 정보를 포함한 매칭 모드 활성화
-      const matchTargetOrder: MatchTargetOrder = {
-        id: targetOrder.id.toString(),
-        type: targetOrder.type as 'back' | 'lay',
-        odds: targetOrder.odds,
-        amount: targetOrder.displayAmount || targetOrder.amount, // 표시할 금액 사용
-        selection: targetOrder.selection || '',
-        homeTeam: targetOrder.homeTeam || '',
-        awayTeam: targetOrder.awayTeam || '',
-        gameId: targetOrder.gameId,
-        commenceTime: targetOrder.commenceTime || '',
-        sportKey: targetOrder.sportKey || '',
-        // 🆕 부분 매칭 필드들 전달
-        originalAmount: targetOrder.originalAmount,
-        remainingAmount: targetOrder.remainingAmount,
-        filledAmount: targetOrder.filledAmount,
-        partiallyFilled: targetOrder.partiallyFilled,
-        displayAmount: targetOrder.displayAmount
-      };
-      
-      activateMatchMode(matchTargetOrder);
+      if (result.success) {
+        // 🆕 매칭 모드 활성화로 사이드바 탭 변경
+        const matchTargetOrder: MatchTargetOrder = {
+          id: targetOrder.id.toString(),
+          type: targetOrder.type as 'back' | 'lay',
+          odds: targetOrder.odds,
+          amount: amount, // 매치 배팅 금액
+          selection: targetOrder.selection || '',
+          homeTeam: targetOrder.homeTeam || '',
+          awayTeam: targetOrder.awayTeam || '',
+          gameId: targetOrder.gameId,
+          commenceTime: targetOrder.commenceTime || '',
+          sportKey: targetOrder.sportKey || '',
+          // 🆕 부분 매칭 필드들 전달
+          originalAmount: targetOrder.originalAmount,
+          remainingAmount: targetOrder.remainingAmount,
+          filledAmount: targetOrder.filledAmount,
+          partiallyFilled: targetOrder.partiallyFilled,
+          displayAmount: targetOrder.displayAmount
+        };
+        
+        activateMatchMode(matchTargetOrder);
+        
+        alert('매치 배팅이 성공적으로 처리되었습니다!');
+        // 주문 목록 새로고침
+        window.location.reload();
+      } else {
+        alert(`매치 배팅 실패: ${result.message}`);
+      }
       
     } catch (error) {
-      console.error('매치 배팅 모드 활성화 실패:', error);
-      alert('매치 배팅 모드 활성화 중 오류가 발생했습니다.');
+      console.error('매치 배팅 처리 실패:', error);
+      alert('매치 배팅 처리 중 오류가 발생했습니다.');
     }
   };
 
@@ -259,6 +303,9 @@ const OrderbookPage: React.FC = () => {
     .filter(order => {
       // status가 'open'이 아닌 주문은 제외 (매칭된 주문, 정산된 주문 등)
       if (order.status !== 'open') return false;
+      
+      // 🆕 매치 배팅 주문 제외 (matchedOrderId가 있는 주문은 매치 배팅 주문)
+      if (order.matchedOrderId) return false;
       
       if (filter !== 'all' && order.type !== filter) return false;
       if (searchTerm) {

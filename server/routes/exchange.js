@@ -155,11 +155,57 @@ router.post('/match-order', verifyToken, async (req, res) => {
         // 매칭 배팅 시 새 주문 생성하지 않음
     // 기존 주문의 status만 'matched'로 변경하고 매칭 정보 기록
     
+    // 매칭 배팅 시 새 주문 생성 (매치 배팅자용)
+    const matchOrder = await ExchangeOrder.create({
+      userId: userId,
+      gameId: targetOrder.gameId,
+      market: targetOrder.market,
+      line: targetOrder.line,
+      side: matchType,
+      price: targetOrder.price,
+      amount: matchAmount,
+      status: 'matched',
+      matchedOrderId: targetOrder.id,
+      homeTeam: targetOrder.homeTeam,
+      awayTeam: targetOrder.awayTeam,
+      commenceTime: targetOrder.commenceTime,
+      sportKey: targetOrder.sportKey,
+      gameResultId: targetOrder.gameResultId,
+      selection: targetOrder.selection,
+      selectionDetails: targetOrder.selectionDetails,
+      stakeAmount: matchType === 'back' ? matchAmount : Math.floor((targetOrder.price - 1) * matchAmount),
+      potentialProfit: matchType === 'back' ? Math.floor((targetOrder.price - 1) * matchAmount) : matchAmount,
+      autoSettlement: true,
+      backOdds: targetOrder.backOdds,
+      layOdds: targetOrder.layOdds,
+      oddsSource: targetOrder.oddsSource || 'exchange',
+      oddsUpdatedAt: targetOrder.oddsUpdatedAt || new Date(),
+      // 🆕 부분 매칭 필드들
+      originalAmount: matchAmount,
+      remainingAmount: 0, // 즉시 매칭되므로 0
+      filledAmount: matchAmount,
+      partiallyFilled: false
+    });
+
     // 대상 주문에 매칭 정보 추가
     targetOrder.status = 'matched';
-    targetOrder.matchedOrderId = null; // 매칭 배팅임을 표시
+    targetOrder.matchedOrderId = matchOrder.id;
     await targetOrder.save();
-    
+
+    // 🆕 ExchangeOrderMatch 레코드 생성
+    await ExchangeOrderMatch.create({
+      originalOrderId: targetOrder.id,
+      matchingOrderId: matchOrder.id,
+      matchedAmount: matchAmount,
+      matchedPrice: targetOrder.price,
+      originalSide: targetOrder.side,
+      matchingSide: matchType,
+      gameId: targetOrder.gameId,
+      market: targetOrder.market,
+      line: targetOrder.line,
+      status: 'active'
+    });
+
     // 거래 내역 기록
     await PaymentHistory.create({
       userId: targetOrder.userId,
@@ -411,8 +457,13 @@ router.get('/orderbook-test', async (req, res) => {
       whereCondition.line = line;
     }
     
+    // 🆕 매치 배팅 주문 제외하고 원본 주문만 조회 (테스트용)
     const orders = await ExchangeOrder.findAll({
-      where: whereCondition
+      where: {
+        ...whereCondition,
+        // matchedOrderId가 null인 주문만 조회 (원본 주문)
+        matchedOrderId: null
+      }
     });
     
     console.log('찾은 주문 수:', orders.length);
@@ -447,8 +498,13 @@ router.get('/orderbook', verifyToken, async (req, res) => {
       whereCondition.line = line;
     }
     
+    // 🆕 매치 배팅 주문 제외하고 원본 주문만 조회
     const orders = await ExchangeOrder.findAll({
-      where: whereCondition
+      where: {
+        ...whereCondition,
+        // matchedOrderId가 null인 주문만 조회 (원본 주문)
+        matchedOrderId: null
+      }
     });
     
     // 🆕 부분 매칭을 고려한 주문 정보 반환

@@ -141,3 +141,29 @@
 {"timestamp":"2025-08-15T07:20:00.884Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
 {"timestamp":"2025-08-15T07:20:07.328Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
 {"timestamp":"2025-08-15T07:20:07.345Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":13},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-08-15T07:30:00.513Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-08-15T07:30:00.519Z","type":"odds","status":"start","message":"Starting high-priority leagues odds update (30min interval)","priority":"high","leagues":["NBA","MLB","KBO","NFL","프리미어리그"]}
+{"timestamp":"2025-08-15T07:30:00.524Z","type":"epl","status":"start","message":"EPL 프리미어리그 데이터 강제 업데이트"}
+{"timestamp":"2025-08-15T07:30:03.181Z","type":"odds","status":"success","message":"High-priority odds update completed (30min interval)","priority":"medium","leagues":["NBA","MLB","KBO","NFL","프리미어리그"],"dynamicPriority":"low","oddsUpdated":20,"oddsDetail":{"totalUpdated":20,"newOdds":0,"existingOddsUpdated":20,"skippedOdds":1,"apiCalls":5,"categoriesProcessed":5}}
+{"timestamp":"2025-08-15T07:30:04.639Z","type":"epl","status":"success","message":"EPL 프리미어리그 데이터 업데이트 완료"}
+{"timestamp":"2025-08-15T07:30:08.218Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-08-15T07:30:08.237Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":13},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-08-15T07:40:00.242Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-08-15T07:40:08.163Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-08-15T07:40:08.189Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":13},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-08-15T07:41:19.240Z","type":"init","status":"start","message":"Starting initial data caching for active categories","categoryCount":14}
+{"timestamp":"2025-08-15T07:41:25.765Z","type":"init","status":"success","message":"Initial data cached successfully for active categories","oddsUpdated":166,"resultsUpdated":"N/A","betsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-08-15T07:49:13.427Z","type":"init","status":"start","message":"Starting initial data caching for active categories","categoryCount":14}
+{"timestamp":"2025-08-15T07:49:20.456Z","type":"init","status":"success","message":"Initial data cached successfully for active categories","oddsUpdated":166,"resultsUpdated":"N/A","betsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-08-15T07:50:00.474Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-08-15T07:50:05.507Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-08-15T07:50:05.535Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":13},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-08-15T07:52:27.197Z","type":"init","status":"start","message":"Starting initial data caching for active categories","categoryCount":14}
+{"timestamp":"2025-08-15T07:52:43.429Z","type":"init","status":"success","message":"Initial data cached successfully for active categories","oddsUpdated":166,"resultsUpdated":"N/A","betsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-08-15T08:00:00.676Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-08-15T08:00:00.679Z","type":"odds","status":"start","message":"Starting high-priority leagues odds update (30min interval)","priority":"high","leagues":["NBA","MLB","KBO","NFL","프리미어리그"]}
+{"timestamp":"2025-08-15T08:00:00.682Z","type":"epl","status":"start","message":"EPL 프리미어리그 데이터 강제 업데이트"}
+{"timestamp":"2025-08-15T08:00:02.349Z","type":"epl","status":"success","message":"EPL 프리미어리그 데이터 업데이트 완료"}
+{"timestamp":"2025-08-15T08:00:03.719Z","type":"odds","status":"success","message":"High-priority odds update completed (30min interval)","priority":"medium","leagues":["NBA","MLB","KBO","NFL","프리미어리그"],"dynamicPriority":"low","oddsUpdated":20,"oddsDetail":{"totalUpdated":20,"newOdds":0,"existingOddsUpdated":20,"skippedOdds":1,"apiCalls":5,"categoriesProcessed":5}}
+{"timestamp":"2025-08-15T08:00:07.721Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-08-15T08:00:07.736Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":13},"betResultsUpdated":0,"categoryCount":14}
