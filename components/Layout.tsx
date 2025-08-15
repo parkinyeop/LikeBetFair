@@ -7,7 +7,6 @@ import ExchangeSidebar from "./ExchangeSidebar";
 import ResizableMainLayout from "./ResizableMainLayout";
 import { SPORTS_TREE, getSportKey, getDisplayNameFromSportKey, getAllCategories } from "../config/sportsMapping";
 import { useBetStore } from '../stores/useBetStore';
-import { useExchangeContext } from '../contexts/ExchangeContext';
 
 interface LayoutProps {
   children: ReactNode;
@@ -17,13 +16,9 @@ const Layout = memo(({ children }: LayoutProps) => {
   const router = useRouter();
   const [selected, setSelected] = useState("NBA");
   const [betslipTab, setBetslipTab] = useState<'betslip' | 'mybets'>('betslip'); // 배팅슬립 탭 상태 추가
+  const [exchangeActiveTab, setExchangeActiveTab] = useState<'order' | 'history'>('order'); // Exchange 사이드바 탭 상태 추가
   const [resetToHome, setResetToHome] = useState(false); // 홈 리셋 상태
   const { setTabChangeCallback } = useBetStore();
-  const { sidebarActiveTab, setSidebarActiveTab } = useExchangeContext();
-  
-  // 🆕 디버깅 로그 추가
-  console.log('Layout - sidebarActiveTab:', sidebarActiveTab);
-  console.log('Layout - setSidebarActiveTab:', setSidebarActiveTab);
   
   // 페이지 체크 메모화
   const isExchange = useMemo(() => router.pathname.startsWith("/exchange"), [router.pathname]);
@@ -117,7 +112,7 @@ const Layout = memo(({ children }: LayoutProps) => {
 
     const handleExchangeSidebarTabChange = (event: CustomEvent) => {
       // Exchange 사이드바 탭 변경 요청 처리
-      setSidebarActiveTab(event.detail.tab);
+      setExchangeActiveTab(event.detail.tab);
     };
 
     window.addEventListener('bettingAreaSelected', handleBettingAreaSelected);
@@ -160,8 +155,8 @@ const Layout = memo(({ children }: LayoutProps) => {
           right={
             isExchange ? (
               <ExchangeSidebar 
-                activeTab={sidebarActiveTab}
-                onTabChange={setSidebarActiveTab}
+                activeTab={exchangeActiveTab}
+                onTabChange={setExchangeActiveTab}
               />
             ) : (
               <div className="h-full flex flex-col">
