@@ -81,10 +81,12 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
 
   // 매칭 모드 활성화
   const activateMatchMode = (targetOrder: MatchTargetOrder) => {
+    console.log('🆕 activateMatchMode 호출됨:', targetOrder);
     setIsMatchMode(true);
     setMatchTargetOrder(targetOrder);
     
     // 사이드바 탭을 주문하기로 전환
+    console.log('🆕 setSidebarActiveTab("order") 호출');
     setSidebarActiveTab('order');
     
     // 매칭 정보로 selectedBet 자동 설정

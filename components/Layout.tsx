@@ -21,6 +21,10 @@ const Layout = memo(({ children }: LayoutProps) => {
   const { setTabChangeCallback } = useBetStore();
   const { sidebarActiveTab, setSidebarActiveTab } = useExchangeContext();
   
+  // 🆕 디버깅 로그 추가
+  console.log('Layout - sidebarActiveTab:', sidebarActiveTab);
+  console.log('Layout - setSidebarActiveTab:', setSidebarActiveTab);
+  
   // 페이지 체크 메모화
   const isExchange = useMemo(() => router.pathname.startsWith("/exchange"), [router.pathname]);
 
