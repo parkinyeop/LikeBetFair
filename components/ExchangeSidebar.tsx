@@ -44,7 +44,8 @@ function OrderPanel() {
     setSelectedBet, 
     isMatchMode, 
     matchTargetOrder, 
-    deactivateMatchMode 
+    deactivateMatchMode,
+    getRequiredMatchAmount
   } = useExchangeContext();
   const { balance, username } = useAuth();
   
@@ -57,6 +58,14 @@ function OrderPanel() {
       setForm(prev => ({ ...prev, price: selectedBet.price }));
     }
   }, [selectedBet]);
+
+  // 매칭 모드일 때 정확한 금액 자동 설정
+  useEffect(() => {
+    if (isMatchMode) {
+      const requiredAmount = getRequiredMatchAmount();
+      setForm(prev => ({ ...prev, amount: requiredAmount }));
+    }
+  }, [isMatchMode, getRequiredMatchAmount]);
 
 
 
@@ -100,6 +109,15 @@ function OrderPanel() {
     if (form.amount <= 0) {
       alert('배팅 금액을 입력해주세요.');
       return;
+    }
+
+    // 매칭 모드일 때 정확한 금액 검증
+    if (isMatchMode) {
+      const requiredAmount = getRequiredMatchAmount();
+      if (form.amount !== requiredAmount) {
+        alert(`매칭 배팅은 정확히 ${requiredAmount.toLocaleString()}원만 가능합니다.`);
+        return;
+      }
     }
     
     if (loading) {
@@ -261,17 +279,22 @@ function OrderPanel() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Amount (KRW)</label>
+            <label className="block text-sm font-medium mb-1">
+              {isMatchMode ? '매칭 금액 (고정)' : 'Amount (KRW)'}
+            </label>
             <input 
               type="text" 
               value={form.amount.toLocaleString()} 
               onChange={e => {
-                const value = e.target.value.replace(/,/g, '');
-                const numValue = parseInt(value) || 0;
-                setForm(f => ({ ...f, amount: numValue }));
+                if (!isMatchMode) {
+                  const value = e.target.value.replace(/,/g, '');
+                  const numValue = parseInt(value) || 0;
+                  setForm(f => ({ ...f, amount: numValue }));
+                }
               }}
-              className="w-full p-1 border rounded text-sm"
+              className={`w-full p-1 border rounded text-sm ${isMatchMode ? 'bg-gray-100 cursor-not-allowed' : ''}`}
               placeholder="0"
+              readOnly={isMatchMode}
             />
           </div>
           <button 
@@ -754,18 +777,18 @@ export default function ExchangeSidebar({
   activeTab?: 'order' | 'history';
   onTabChange?: (tab: 'order' | 'history') => void;
 }) {
-  const [internalActiveTab, setInternalActiveTab] = useState<'order' | 'history'>('order');
   const { isLoggedIn, balance } = useAuth();
+  const { sidebarActiveTab, setSidebarActiveTab } = useExchangeContext();
 
-  // 외부에서 제어하는 경우와 내부에서 제어하는 경우를 구분
-  const activeTab = externalActiveTab !== undefined ? externalActiveTab : internalActiveTab;
+  // 외부에서 제어하는 경우와 Context에서 제어하는 경우를 구분
+  const activeTab = externalActiveTab !== undefined ? externalActiveTab : sidebarActiveTab;
   const setActiveTab = (tab: 'order' | 'history') => {
     if (externalActiveTab !== undefined) {
       // 외부 제어인 경우
       onTabChange?.(tab);
     } else {
-      // 내부 제어인 경우
-      setInternalActiveTab(tab);
+      // Context 제어인 경우
+      setSidebarActiveTab(tab);
     }
   };
 

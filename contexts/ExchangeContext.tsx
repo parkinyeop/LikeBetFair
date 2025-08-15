@@ -16,6 +16,7 @@ export interface MatchTargetOrder {
   id: string;
   type: 'back' | 'lay';
   odds: number;
+  amount: number;
   selection: string;
   homeTeam: string;
   awayTeam: string;
@@ -33,6 +34,9 @@ interface ExchangeContextType {
   setMatchTargetOrder: (order: MatchTargetOrder | null) => void;
   activateMatchMode: (targetOrder: MatchTargetOrder) => void;
   deactivateMatchMode: () => void;
+  sidebarActiveTab: 'order' | 'history';
+  setSidebarActiveTab: (tab: 'order' | 'history') => void;
+  getRequiredMatchAmount: () => number;
 }
 
 const ExchangeContext = createContext<ExchangeContextType | undefined>(undefined);
@@ -53,6 +57,7 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
   const [selectedBet, setSelectedBet] = useState<SelectedBet | null>(null);
   const [isMatchMode, setIsMatchMode] = useState(false);
   const [matchTargetOrder, setMatchTargetOrder] = useState<MatchTargetOrder | null>(null);
+  const [sidebarActiveTab, setSidebarActiveTab] = useState<'order' | 'history'>('order');
 
   // selectedBet 상태 변경 로그
   React.useEffect(() => {
@@ -68,6 +73,9 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
   const activateMatchMode = (targetOrder: MatchTargetOrder) => {
     setIsMatchMode(true);
     setMatchTargetOrder(targetOrder);
+    
+    // 사이드바 탭을 주문하기로 전환
+    setSidebarActiveTab('order');
     
     // 매칭 정보로 selectedBet 자동 설정
     const matchType = targetOrder.type === 'back' ? 'lay' : 'back';
@@ -93,6 +101,19 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
     setSelectedBet(null);
   };
 
+  // 매칭에 필요한 정확한 금액 계산
+  const getRequiredMatchAmount = () => {
+    if (!matchTargetOrder) return 0;
+    
+    if (matchTargetOrder.type === 'back') {
+      // Back 주문에 Lay로 매칭: amount × (odds - 1)
+      return matchTargetOrder.amount * (matchTargetOrder.odds - 1);
+    } else {
+      // Lay 주문에 Back으로 매칭: amount 그대로
+      return matchTargetOrder.amount;
+    }
+  };
+
   const value = {
     selectedBet,
     setSelectedBet: setSelectedBetWithLog,
@@ -102,6 +123,9 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
     setMatchTargetOrder,
     activateMatchMode,
     deactivateMatchMode,
+    sidebarActiveTab,
+    setSidebarActiveTab,
+    getRequiredMatchAmount,
   };
 
   return (

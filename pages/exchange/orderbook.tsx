@@ -118,6 +118,7 @@ const OrderbookPage: React.FC = () => {
         id: targetOrder.id.toString(),
         type: targetOrder.type as 'back' | 'lay',
         odds: targetOrder.odds,
+        amount: targetOrder.amount,
         selection: targetOrder.selection || '',
         homeTeam: targetOrder.homeTeam || '',
         awayTeam: targetOrder.awayTeam || '',
@@ -127,9 +128,6 @@ const OrderbookPage: React.FC = () => {
       };
       
       activateMatchMode(matchTargetOrder);
-      
-      // 사용자에게 안내 메시지
-      alert('오른쪽 사이드에서 매칭 배팅 정보를 확인하고 주문을 완료하세요!');
       
     } catch (error) {
       console.error('매치 배팅 모드 활성화 실패:', error);
@@ -394,12 +392,16 @@ const OrderbookPage: React.FC = () => {
                         {order.type === 'back' ? '🎯 Back(Win)' : '📉 Lay(Loss)'}
                       </span>
                       <span className="text-sm text-gray-600">
-                        {order.commenceTime ? formatGameTime(order.commenceTime) : '시간 미정'}
-                        {order.commenceTime && (
-                          <span className="ml-2 text-blue-600 font-medium">
-                            {formatRemainingTime(order.commenceTime)}
-                          </span>
-                        )}
+                        {order.commenceTime ? (
+                          <>
+                            {formatRemainingTime(order.commenceTime)} • {new Date(order.commenceTime).toLocaleString('ko-KR', {
+                              month: '2-digit',
+                              day: '2-digit', 
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </>
+                        ) : '시간 미정'}
                       </span>
                     </div>
                   </div>
@@ -414,16 +416,7 @@ const OrderbookPage: React.FC = () => {
                   </div>
                   {/* 매칭 배팅자가 베팅해야 할 금액 표시 */}
                   <div className="text-sm text-orange-600 font-medium">
-                    매칭 금액: {formatCurrency(order.stakeAmount || 0)}원
-                  </div>
-                  {/* 승리/패배 시나리오 표시 */}
-                  <div className="text-xs">
-                    <div className="text-green-600">
-                      승리 시: +{formatCurrency(order.potentialProfit || 0)}원
-                    </div>
-                    <div className="text-red-600">
-                      패배 시: -{formatCurrency(order.stakeAmount || 0)}원
-                    </div>
+                    매칭 금액: {formatCurrency(order.type === 'back' ? order.amount * (order.odds - 1) : order.amount)}원
                   </div>
                   {/* 상태 표시 */}
                   <div className="text-xs text-gray-400 mt-1">
@@ -446,7 +439,7 @@ const OrderbookPage: React.FC = () => {
                   }`}
                 >
                   {order.status === 'open' && order.userId !== userId 
-                    ? (order.type === 'back' ? `📉 Lay로 매칭 (${formatCurrency(order.stakeAmount || 0)}원)` : `🎯 Back으로 매칭 (${formatCurrency(order.stakeAmount || 0)}원)`)
+                    ? (order.type === 'back' ? `📉 Lay로 매칭 (${formatCurrency(order.amount * (order.odds - 1))}원)` : `🎯 Back으로 매칭 (${formatCurrency(order.amount)}원)`)
                     : order.userId === userId 
                       ? '내 주문' 
                       : '매칭 불가'}
@@ -529,19 +522,19 @@ const OrderbookPage: React.FC = () => {
                   <div>
                     <span className="text-gray-600">매칭 금액:</span>
                     <span className="ml-2 font-medium text-orange-600">
-                      {formatCurrency(selectedOrderDetail.stakeAmount || 0)}원
+                      {formatCurrency(selectedOrderDetail.type === 'back' ? selectedOrderDetail.amount * (selectedOrderDetail.odds - 1) : selectedOrderDetail.amount)}원
                     </span>
                   </div>
                   <div>
                     <span className="text-gray-600">승리 시 수익:</span>
                     <span className="ml-2 font-medium text-green-600">
-                      +{formatCurrency(selectedOrderDetail.potentialProfit || 0)}원
+                      +{formatCurrency(selectedOrderDetail.type === 'back' ? selectedOrderDetail.amount : selectedOrderDetail.amount * (selectedOrderDetail.odds - 1))}원
                     </span>
                   </div>
                   <div>
                     <span className="text-gray-600">패배 시 손실:</span>
                     <span className="ml-2 font-medium text-red-600">
-                      -{formatCurrency(selectedOrderDetail.stakeAmount || 0)}원
+                      -{formatCurrency(selectedOrderDetail.type === 'back' ? selectedOrderDetail.amount * (selectedOrderDetail.odds - 1) : selectedOrderDetail.amount)}원
                     </span>
                   </div>
                   <div>
