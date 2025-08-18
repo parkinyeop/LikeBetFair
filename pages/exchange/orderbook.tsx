@@ -468,8 +468,8 @@ const OrderbookPage: React.FC = () => {
                 >
                   {order.status === 'open' && order.userId !== userId 
                     ? (order.type === 'back' ? 
-                        `📉 Lay로 매칭 (${formatCurrency((order.displayAmount || order.amount) * (order.odds - 1))}원)` : 
-                        `🎯 Back으로 매칭 (${formatCurrency(order.displayAmount || order.amount)}원)`)
+                        `📉 Lay로 매칭 (${formatCurrency(Math.floor((order.displayAmount || order.amount) * (order.odds - 1)))}원)` : 
+                        `🎯 Back으로 매칭 (${formatCurrency(Math.floor(order.displayAmount || order.amount))}원)`)
                     : order.userId === userId 
                       ? '내 주문' 
                       : '매칭 불가'}

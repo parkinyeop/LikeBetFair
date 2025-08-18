@@ -51,7 +51,7 @@ function OrderPanel() {
     getAvailableMatchAmount,
     formatPartialMatchInfo
   } = useExchangeContext();
-  const { balance, username } = useAuth();
+  const { balance, username, token } = useAuth(); // 🆕 token 추가
   
   const [form, setForm] = useState<OrderForm>({ side: 'back', price: 0, amount: 0 });
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -115,19 +115,75 @@ function OrderPanel() {
       return;
     }
 
-    
     if (loading) {
       return; // 이미 처리 중이면 중복 실행 방지
     }
     
     try {
+      // 🆕 매칭 모드일 때는 매칭 배팅 API 호출
+      if (isMatchMode && matchTargetOrder) {
+        console.log('🎯 매칭 배팅 처리 시작:', { matchTargetOrder, form });
+        
+        // 🆕 토큰 상태 확인 및 디버깅
+        console.log('🔑 토큰 상태:', { 
+          hasToken: !!token, 
+          tokenLength: token ? token.length : 0,
+          tokenPreview: token ? token.substring(0, 20) + '...' : '없음',
+          source: 'AuthContext'
+        });
+        
+        // 🆕 API URL 결정 (개발환경에서는 localhost:5050 사용)
+        const apiUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+                       ? 'http://localhost:5050' 
+                       : window.location.origin;
+        
+        console.log('🌐 API URL:', apiUrl);
+        
+        const response = await fetch(`${apiUrl}/api/exchange/match-order`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-auth-token': token || ''
+          },
+          body: JSON.stringify({
+            targetOrderId: matchTargetOrder.id,
+            matchAmount: Math.floor(form.amount), // 🆕 정수로 변환
+            matchType: selectedBet.type
+          })
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('🎉 매칭 배팅이 성공적으로 처리되었습니다!');
+          
+          // 매칭 모드 비활성화
+          deactivateMatchMode();
+          
+          // 폼 초기화
+          setForm({ side: 'back', price: 0, amount: 0 });
+          setSelectedBet(null);
+          
+          // 주문 내역 새로고침
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('exchangeOrderPlaced'));
+          }
+          
+          return; // 매칭 배팅 완료 후 함수 종료
+        } else {
+          alert(`매칭 배팅 실패: ${result.message}`);
+          return;
+        }
+      }
+      
+      // 일반 주문 처리 (기존 로직)
       const orderData = {
         gameId: selectedBet.gameId || '',
         market: selectedBet.market || 'h2h',
         line: selectedBet.line || 0,
         side: selectedBet.type,
         price: selectedBet.price,
-        amount: form.amount,
+        amount: Math.floor(form.amount), // 🆕 정수로 변환
         selection: selectedBet.team,
         homeTeam: selectedBet.homeTeam, // 추가
         awayTeam: selectedBet.awayTeam, // 추가
@@ -312,7 +368,7 @@ function OrderPanel() {
           <div>
             <label className="block text-sm font-medium mb-1">
               {isMatchMode ? 
-                `배팅 금액 (1원 ~ ${getAvailableMatchAmount().toLocaleString()}원)` : 
+                `배팅 금액 (1원 ~ ${Math.floor(getAvailableMatchAmount()).toLocaleString()}원)` : 
                 'Amount (KRW)'
               }
             </label>
@@ -320,15 +376,16 @@ function OrderPanel() {
             {isMatchMode && (
               <div className="text-xs text-gray-500 mb-1">
                 💡 원하는 금액만큼 부분 매칭 가능 
-                (최대 매칭 가능: {getMaxMatchAmount().toLocaleString()}원)
+                (최대 매칭 가능: {Math.floor(getMaxMatchAmount()).toLocaleString()}원)
               </div>
             )}
             <input 
-              type="text" 
-              value={form.amount.toLocaleString()} 
+              type="number" 
+              min="1"
+              step="1"
+              value={form.amount} 
               onChange={e => {
-                const value = e.target.value.replace(/,/g, '');
-                let numValue = parseInt(value) || 0;
+                let numValue = parseInt(e.target.value) || 0;
                 
                 // 🆕 매칭 모드에서 최대 리스크 금액 초과 시 제한
                 if (isMatchMode) {
@@ -372,7 +429,7 @@ function OrderPanel() {
             } disabled:bg-gray-400`}
           >
             {loading ? '처리중...' : isMatchMode ? 
-              `🎯 부분 매칭 (${form.amount.toLocaleString()}원)` : 
+              `🎯 부분 매칭 (${Math.floor(form.amount).toLocaleString()}원)` : 
               '주문하기'}
           </button>
         </div>
