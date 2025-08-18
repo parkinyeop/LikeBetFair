@@ -12,7 +12,7 @@ interface Order {
   type: 'back' | 'lay';
   odds: number;
   amount: number;
-  status: 'open' | 'matched' | 'cancelled' | 'settled';
+  status: 'open' | 'partially_matched' | 'matched' | 'cancelled' | 'settled';
   createdAt: string;
   selection?: string;
   homeTeam?: string;
@@ -61,35 +61,47 @@ const OrderbookPage: React.FC = () => {
         console.log('🔍 원본 주문 데이터:', allOrders);
         
         // 🆕 부분 매칭 정보를 포함한 변환
-        const convertedOrders: Order[] = allOrders.map(order => ({
-          id: order.id.toString(),
-          gameId: order.gameId,
-          userId: order.userId.toString(),
-          type: order.side,
-          odds: order.price,
-          amount: order.amount,
-          status: order.status,
-          createdAt: order.createdAt,
-          selection: order.selection,
-          homeTeam: order.homeTeam,
-          awayTeam: order.awayTeam,
-          commenceTime: order.commenceTime,
-          sportKey: order.sportKey,
-          stakeAmount: order.stakeAmount,
-          potentialProfit: order.potentialProfit,
-          backOdds: order.backOdds,
-          layOdds: order.layOdds,
-          oddsSource: order.oddsSource,
-          oddsUpdatedAt: order.oddsUpdatedAt,
-          // 🆕 부분 매칭 필드들 추가
-          displayAmount: order.displayAmount || order.amount,
-          originalAmount: order.originalAmount || order.amount,
-          filledAmount: order.filledAmount || 0,
-          remainingAmount: order.remainingAmount || order.amount,
-          partiallyFilled: order.partiallyFilled || false,
-          // 🆕 매치 배팅 구분 필드
-          matchedOrderId: order.matchedOrderId || null
-        }));
+        const convertedOrders: Order[] = allOrders.map(order => {
+          console.log('🔍 개별 주문 변환:', {
+            id: order.id,
+            side: order.side,
+            amount: order.amount,
+            status: order.status,
+            partiallyFilled: order.partiallyFilled,
+            remainingAmount: order.remainingAmount,
+            displayAmount: order.displayAmount
+          });
+          
+          return {
+            id: order.id.toString(),
+            gameId: order.gameId,
+            userId: order.userId.toString(),
+            type: order.side,
+            odds: order.price,
+            amount: order.displayAmount || order.amount, // 🆕 displayAmount 우선 사용
+            status: order.status,
+            createdAt: order.createdAt,
+            selection: order.selection,
+            homeTeam: order.homeTeam,
+            awayTeam: order.awayTeam,
+            commenceTime: order.commenceTime,
+            sportKey: order.sportKey,
+            stakeAmount: order.stakeAmount,
+            potentialProfit: order.potentialProfit,
+            backOdds: order.backOdds,
+            layOdds: order.layOdds,
+            oddsSource: order.oddsSource,
+            oddsUpdatedAt: order.oddsUpdatedAt,
+            // 🆕 부분 매칭 필드들 추가
+            displayAmount: order.displayAmount || order.amount,
+            originalAmount: order.originalAmount || order.amount,
+            filledAmount: order.filledAmount || 0,
+            remainingAmount: order.remainingAmount || order.amount,
+            partiallyFilled: order.partiallyFilled || false,
+            // 🆕 매치 배팅 구분 필드
+            matchedOrderId: order.matchedOrderId || null
+          };
+        });
         
         console.log('🔍 변환된 주문 데이터:', convertedOrders);
         setOrders(convertedOrders);
@@ -123,9 +135,15 @@ const OrderbookPage: React.FC = () => {
         return;
       }
       
-      // 주문 상태 확인
-      if (targetOrder.status !== 'open') {
-        alert('이미 체결되었거나 취소된 주문입니다.');
+      // 주문 상태 확인 - 🆕 부분 매칭된 주문도 매칭 가능
+      if (targetOrder.status !== 'open' && targetOrder.status !== 'partially_matched') {
+        alert('이미 완전히 체결되었거나 취소된 주문입니다.');
+        return;
+      }
+      
+      // 🆕 부분 매칭된 주문의 경우 남은 금액이 있어야 함
+      if (targetOrder.status === 'partially_matched' && (!targetOrder.remainingAmount || targetOrder.remainingAmount <= 0)) {
+        alert('매칭 가능한 금액이 없습니다.');
         return;
       }
       
@@ -255,11 +273,14 @@ const OrderbookPage: React.FC = () => {
   // 필터링 및 정렬
   const filteredOrders = orders
     .filter(order => {
-      // status가 'open'이 아닌 주문은 제외 (매칭된 주문, 정산된 주문 등)
-      if (order.status !== 'open') return false;
+      // 🆕 'open' 또는 'partially_matched' 상태의 주문만 포함
+      if (order.status !== 'open' && order.status !== 'partially_matched') return false;
       
       // 🆕 매치 배팅 주문 제외 (matchedOrderId가 있는 주문은 매치 배팅 주문)
       if (order.matchedOrderId) return false;
+      
+      // 🆕 부분 매칭된 주문의 경우 남은 금액이 있어야 함
+      if (order.status === 'partially_matched' && (!order.remainingAmount || order.remainingAmount <= 0)) return false;
       
       if (filter !== 'all' && order.type !== filter) return false;
       if (searchTerm) {
@@ -286,10 +307,10 @@ const OrderbookPage: React.FC = () => {
     });
 
   const stats = {
-    total: orders.filter(o => o.status === 'open').length,
-    back: orders.filter(o => o.status === 'open' && o.type === 'back').length,
-    lay: orders.filter(o => o.status === 'open' && o.type === 'lay').length,
-    totalAmount: orders.filter(o => o.status === 'open').reduce((sum, o) => sum + o.amount, 0)
+    total: orders.filter(o => o.status === 'open' || o.status === 'partially_matched').length,
+    back: orders.filter(o => (o.status === 'open' || o.status === 'partially_matched') && o.type === 'back').length,
+    lay: orders.filter(o => (o.status === 'open' || o.status === 'partially_matched') && o.type === 'lay').length,
+    totalAmount: orders.filter(o => o.status === 'open' || o.status === 'partially_matched').reduce((sum, o) => sum + (o.displayAmount || o.amount), 0)
   };
 
   if (loading) {
@@ -320,7 +341,7 @@ const OrderbookPage: React.FC = () => {
       </div>
 
       {/* 통계 카드 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-lg">
           <div className="text-lg font-bold">{stats.total}</div>
           <div className="text-xs">전체 주문</div>
@@ -332,6 +353,10 @@ const OrderbookPage: React.FC = () => {
         <div className="bg-pink-50 border border-pink-200 text-pink-800 p-3 rounded-lg">
           <div className="text-lg font-bold">{stats.lay}</div>
           <div className="text-xs">Lay 주문</div>
+        </div>
+        <div className="bg-orange-50 border border-orange-200 text-orange-800 p-3 rounded-lg">
+          <div className="text-lg font-bold">{orders.filter(o => o.partiallyFilled).length}</div>
+          <div className="text-xs">부분 매칭</div>
         </div>
         <div className="bg-purple-50 border border-purple-200 text-purple-800 p-3 rounded-lg">
           <div className="text-lg font-bold">{formatAmount(stats.totalAmount)}</div>
@@ -436,19 +461,27 @@ const OrderbookPage: React.FC = () => {
                   {/* 🆕 부분 매칭 정보 표시 */}
                   {order.partiallyFilled && (
                     <div className="text-xs text-orange-600 mt-1">
-                      🔄 부분 체결 (원래: {formatCurrency(order.originalAmount || order.amount)}원)
+                      🔄 부분 체결됨
+                      <br />
+                      원래: {formatCurrency(order.originalAmount || order.amount)}원
+                      <br />
+                      체결: {formatCurrency(order.filledAmount || 0)}원
+                      <br />
+                      남음: {formatCurrency(order.remainingAmount || 0)}원
                     </div>
                   )}
                   {/* 매칭 배팅자가 베팅해야 할 금액 표시 */}
                   <div className="text-sm text-orange-600 font-medium">
                     매칭 금액: {formatCurrency(order.type === 'back' ? 
-                      (order.displayAmount || order.amount) * (order.odds - 1) : 
-                      (order.displayAmount || order.amount)
+                      Math.floor((order.displayAmount || order.amount) * (order.odds - 1)) : 
+                      Math.floor(order.displayAmount || order.amount)
                     )}원
                   </div>
                   {/* 상태 표시 */}
                   <div className="text-xs text-gray-400 mt-1">
-                    {order.status === 'open' ? '🔄 대기중' : 
+                    {order.status === 'open' ? 
+                      (order.partiallyFilled ? '🔄 부분 체결 대기중' : '🔄 대기중') : 
+                     order.status === 'partially_matched' ? '🔄 부분 체결 대기중' :
                      order.status === 'matched' ? '✅ 체결됨' : 
                      order.status === 'cancelled' ? '❌ 취소됨' : '📋 정산됨'}
                   </div>
@@ -459,14 +492,14 @@ const OrderbookPage: React.FC = () => {
               <div className="mt-3 flex gap-2">
                 <button 
                   onClick={() => handleMatchBet(order.id)}
-                  disabled={order.status !== 'open' || order.userId === userId}
+                  disabled={(order.status !== 'open' && order.status !== 'partially_matched') || order.userId === userId}
                   className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors text-white ${
-                    order.status === 'open' && order.userId !== userId
+                    (order.status === 'open' || order.status === 'partially_matched') && order.userId !== userId
                       ? order.type === 'back' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
                       : 'bg-gray-400 text-gray-600 cursor-not-allowed'
                   }`}
                 >
-                  {order.status === 'open' && order.userId !== userId 
+                  {(order.status === 'open' || order.status === 'partially_matched') && order.userId !== userId 
                     ? (order.type === 'back' ? 
                         `📉 Lay로 매칭 (${formatCurrency(Math.floor((order.displayAmount || order.amount) * (order.odds - 1)))}원)` : 
                         `🎯 Back으로 매칭 (${formatCurrency(Math.floor(order.displayAmount || order.amount))}원)`)
@@ -560,14 +593,18 @@ const OrderbookPage: React.FC = () => {
                         <span className="text-gray-600">체결된 금액:</span>
                         <span className="ml-2 font-medium text-green-600">{formatCurrency(selectedOrderDetail.filledAmount || 0)}원</span>
                       </div>
+                      <div>
+                        <span className="text-gray-600">남은 금액:</span>
+                        <span className="ml-2 font-medium text-orange-600">{formatCurrency(selectedOrderDetail.remainingAmount || 0)}원</span>
+                      </div>
                     </>
                   )}
                   <div>
                     <span className="text-gray-600">매칭 금액:</span>
                     <span className="ml-2 font-medium text-orange-600">
                       {formatCurrency(selectedOrderDetail.type === 'back' ? 
-                        (selectedOrderDetail.displayAmount || selectedOrderDetail.amount) * (selectedOrderDetail.odds - 1) : 
-                        (selectedOrderDetail.displayAmount || selectedOrderDetail.amount)
+                        Math.floor((selectedOrderDetail.displayAmount || selectedOrderDetail.amount) * (selectedOrderDetail.odds - 1)) : 
+                        Math.floor(selectedOrderDetail.displayAmount || selectedOrderDetail.amount)
                       )}원
                     </span>
                   </div>

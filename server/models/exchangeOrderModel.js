@@ -20,7 +20,10 @@ const ExchangeOrder = sequelize.define('ExchangeOrder', {
   price: { type: DataTypes.FLOAT, allowNull: false },
   amount: { type: DataTypes.INTEGER, allowNull: false },
   selection: { type: DataTypes.STRING, allowNull: true }, // 선택한 팀/선수명 (기존 호환성)
-  status: { type: DataTypes.ENUM('open', 'matched', 'settled', 'cancelled'), defaultValue: 'open' },
+  status: { 
+    type: DataTypes.ENUM('open', 'partially_matched', 'matched', 'settled', 'cancelled'), 
+    defaultValue: 'open' 
+  },
   matchedOrderId: { type: DataTypes.INTEGER, allowNull: true },
   // 거래 내역 추적
   stakeAmount: { type: DataTypes.INTEGER, allowNull: false }, // 베팅 금액

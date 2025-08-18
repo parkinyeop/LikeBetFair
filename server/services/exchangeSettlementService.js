@@ -33,11 +33,11 @@ class ExchangeSettlementService {
       console.log(`🏟️ 경기 정보: ${gameResult.homeTeam} vs ${gameResult.awayTeam}`);
       console.log(`📊 경기 결과: ${gameResult.result}, 스코어:`, gameResult.score);
       
-      // 정산 대상 주문들 조회 (매칭된 상태의 주문들 + 연결된 주문들)
+      // 🆕 정산 대상 주문들 조회 (매칭된 상태 + 부분 매칭된 상태의 주문들)
       const orders = await ExchangeOrder.findAll({
         where: {
           gameResultId: gameResultId,
-          status: 'matched',
+          status: { [Op.in]: ['matched', 'partially_matched'] },  // 🆕 부분 매칭 포함
           settledAt: null  // 아직 정산되지 않은 주문들
         },
         transaction
@@ -45,11 +45,11 @@ class ExchangeSettlementService {
       
       console.log(`📋 정산 대상 주문 수: ${orders.length}`);
       
-      // 연결된 주문들도 함께 조회 (matchedOrderId가 있는 주문들)
+      // 🆕 연결된 주문들도 함께 조회 (matchedOrderId가 있는 주문들 + 부분 매칭된 주문들)
       const connectedOrders = await ExchangeOrder.findAll({
         where: {
           gameResultId: gameResultId,
-          status: 'matched',
+          status: { [Op.in]: ['matched', 'partially_matched'] },  // 🆕 부분 매칭 포함
           settledAt: null
         },
         transaction
@@ -99,10 +99,32 @@ class ExchangeSettlementService {
         gameId: gameResultId,
         settledOrders: settledCount,
         totalWinnings,
-        results: settlementResults
+        results: settlementResults,
+        // 🆕 부분 매칭 통계 추가
+        partialMatchStats: {
+          totalPartialMatches: settlementResults.filter(r => r.isPartialMatch).length,
+          partialMatchOrders: settlementResults.filter(r => r.isPartialMatch).length * 2
+        }
       };
       
-      console.log('🎉 정산 완료 요약:', summary);
+      // 🆕 개선된 정산 완료 요약 로그
+      console.log('\n🎉 정산 완료 요약:');
+      console.log(`   🏟️ 경기: ${gameResult.homeTeam} vs ${gameResult.awayTeam}`);
+      console.log(`   📊 정산된 주문: ${settledCount}개`);
+      console.log(`   💰 총 수익: ${totalWinnings}원`);
+      console.log(`   🔄 부분 매칭: ${summary.partialMatchStats.totalPartialMatches}개 쌍`);
+      
+      if (summary.partialMatchStats.totalPartialMatches > 0) {
+        console.log('\n   📋 부분 매칭 정산 상세:');
+        settlementResults.forEach((result, index) => {
+          if (result.isPartialMatch) {
+            console.log(`     ${index + 1}. Back: ${result.backResult.userId} (${result.backResult.isPartial ? '부분' : '완전'})`);
+            console.log(`        Lay: ${result.layResult.userId} (${result.layResult.isPartial ? '부분' : '완전'})`);
+            console.log(`        결과: ${result.winnerSide} 승리, 수익: ${result.totalWinnings}원`);
+          }
+        });
+      }
+      
       return summary;
       
     } catch (error) {
@@ -186,7 +208,7 @@ class ExchangeSettlementService {
   }
 
   /**
-   * 매칭된 주문 쌍 정산
+   * 🆕 매칭된 주문 쌍 정산 (부분 매칭 포함)
    * @param {Array} pair - [backOrder, layOrder] 쌍
    * @param {Object} gameResult - 경기 결과
    * @param {Object} transaction - DB 트랜잭션
@@ -203,46 +225,101 @@ class ExchangeSettlementService {
     console.log(`  Back 주문: ID ${backOrder.id}, ${backOrder.selection}, 배당 ${backOrder.price}`);
     console.log(`  Lay 주문: ID ${layOrder.id}, ${layOrder.selection}, 배당 ${layOrder.price}`);
     
+    // 🆕 부분 매칭 정보 로깅
+    if (backOrder.partiallyFilled || layOrder.partiallyFilled) {
+      console.log(`  🔄 부분 매칭 정보:`);
+      if (backOrder.partiallyFilled) {
+        console.log(`    Back: 원래 ${backOrder.originalAmount}원, 체결 ${backOrder.filledAmount}원, 남음 ${backOrder.remainingAmount}원`);
+      }
+      if (layOrder.partiallyFilled) {
+        console.log(`    Lay: 원래 ${layOrder.originalAmount}원, 체결 ${layOrder.filledAmount}원, 남음 ${layOrder.remainingAmount}원`);
+      }
+    }
+    
     // 승부 판정
     const isBackWin = this.determineWinner(backOrder, gameResult);
     
     console.log(`  🎲 승부 판정: Back ${isBackWin ? '승리' : '패배'}`);
     
-    // 수익 계산
-    const backWinAmount = isBackWin ? backOrder.potentialProfit : -backOrder.stakeAmount;
-    const layWinAmount = isBackWin ? -layOrder.potentialProfit : layOrder.stakeAmount;
+    // 🆕 부분 매칭된 주문의 경우 실제 체결된 금액으로 수익 계산
+    const backStakeAmount = backOrder.partiallyFilled ? (backOrder.filledAmount || 0) : backOrder.stakeAmount;
+    const layStakeAmount = layOrder.partiallyFilled ? (layOrder.filledAmount || 0) : layOrder.stakeAmount;
     
-    console.log(`  💰 수익 계산:`);
-    console.log(`    Back 주문: ${backWinAmount > 0 ? '+' : ''}${backWinAmount}`);
-    console.log(`    Lay 주문: ${layWinAmount > 0 ? '+' : ''}${layWinAmount}`);
+    // 수익 계산 (부분 매칭 고려)
+    const backWinAmount = isBackWin ? 
+      (backStakeAmount * (backOrder.price - 1)) : -backStakeAmount;
+    const layWinAmount = isBackWin ? 
+      -(layStakeAmount * (layOrder.price - 1)) : layStakeAmount;
+    
+    console.log(`  💰 수익 계산 (부분 매칭 고려):`);
+    console.log(`    Back 주문: ${backWinAmount > 0 ? '+' : ''}${backWinAmount} (체결: ${backStakeAmount}원)`);
+    console.log(`    Lay 주문: ${layWinAmount > 0 ? '+' : ''}${layWinAmount} (체결: ${layStakeAmount}원)`);
     
     // 사용자 잔고 업데이트
-    await this.updateUserBalance(backOrder.userId, backWinAmount, backOrder.id, transaction);
-    await this.updateUserBalance(layOrder.userId, layWinAmount, layOrder.id, transaction);
+    await this.updateUserBalance(backOrder, backWinAmount, gameResult, isBackWin, transaction);
+    await this.updateUserBalance(layOrder, layWinAmount, gameResult, isBackWin, transaction);
     
-    // 주문 상태 업데이트
+    // 🆕 주문 상태 업데이트 (부분 매칭 고려)
     const settledAt = new Date();
-    await backOrder.update({
-      status: 'settled',
-      actualProfit: backWinAmount,
-      settledAt,
-      settlementNote: this.generateSettlementNote(backOrder, gameResult, isBackWin)
-    }, { transaction });
     
-    await layOrder.update({
-      status: 'settled',
-      actualProfit: layWinAmount,
-      settledAt,
-      settlementNote: this.generateSettlementNote(layOrder, gameResult, !isBackWin)
-    }, { transaction });
+    // Back 주문 정산
+    if (backOrder.partiallyFilled) {
+      // 부분 매칭된 주문: 체결된 부분만 정산하고 남은 부분은 cancelled로 변경
+      await backOrder.update({
+        status: 'settled',
+        actualProfit: backWinAmount,
+        settledAt,
+        settlementNote: this.generateSettlementNote(backOrder, gameResult, isBackWin) + 
+          ` (부분 매칭: ${backStakeAmount}원 정산, ${backOrder.remainingAmount}원 취소)`
+      }, { transaction });
+      
+      // 🆕 남은 금액이 있다면 취소 처리
+      if (backOrder.remainingAmount > 0) {
+        await this.cancelRemainingAmount(backOrder, transaction);
+      }
+    } else {
+      // 완전 매칭된 주문: 기존 로직
+      await backOrder.update({
+        status: 'settled',
+        actualProfit: backWinAmount,
+        settledAt,
+        settlementNote: this.generateSettlementNote(backOrder, gameResult, isBackWin)
+      }, { transaction });
+    }
+    
+    // Lay 주문 정산
+    if (layOrder.partiallyFilled) {
+      // 부분 매칭된 주문: 체결된 부분만 정산하고 남은 부분은 cancelled로 변경
+      await layOrder.update({
+        status: 'settled',
+        actualProfit: layWinAmount,
+        settledAt,
+        settlementNote: this.generateSettlementNote(layOrder, gameResult, isBackWin) + 
+          ` (부분 매칭: ${layStakeAmount}원 정산, ${layOrder.remainingAmount}원 취소)`
+      }, { transaction });
+      
+      // 🆕 남은 금액이 있다면 취소 처리
+      if (layOrder.remainingAmount > 0) {
+        await this.cancelRemainingAmount(layOrder, transaction);
+      }
+    } else {
+      // 완전 매칭된 주문: 기존 로직
+      await layOrder.update({
+        status: 'settled',
+        actualProfit: layWinAmount,
+        settledAt,
+        settlementNote: this.generateSettlementNote(layOrder, gameResult, isBackWin)
+      }, { transaction });
+    }
     
     return {
       backOrderId: backOrder.id,
       layOrderId: layOrder.id,
       winnerSide: isBackWin ? 'back' : 'lay',
-      backResult: { userId: backOrder.userId, profit: backWinAmount },
-      layResult: { userId: layOrder.userId, profit: layWinAmount },
-      totalWinnings: Math.abs(backWinAmount) + Math.abs(layWinAmount)
+      backResult: { userId: backOrder.userId, profit: backWinAmount, isPartial: backOrder.partiallyFilled },
+      layResult: { userId: layOrder.userId, profit: layWinAmount, isPartial: layOrder.partiallyFilled },
+      totalWinnings: Math.abs(backWinAmount) + Math.abs(layWinAmount),
+      isPartialMatch: backOrder.partiallyFilled || layOrder.partiallyFilled
     };
   }
 
@@ -364,9 +441,15 @@ class ExchangeSettlementService {
   }
 
   /**
-   * 사용자 잔고 업데이트 및 결제 내역 생성
+   * 🆕 사용자 잔고 업데이트 및 결제 내역 생성 (개선된 기록)
+   * @param {Object} order - 주문 정보
+   * @param {number} amount - 수익/손실 금액
+   * @param {Object} gameResult - 경기 결과
+   * @param {boolean} isWin - 승리 여부
+   * @param {Object} transaction - DB 트랜잭션
    */
-  async updateUserBalance(userId, amount, orderId, transaction) {
+  async updateUserBalance(order, amount, gameResult, isWin, transaction) {
+    const userId = order.userId;
     const user = await User.findByPk(userId, { transaction });
     if (!user) throw new Error(`사용자를 찾을 수 없습니다: ${userId}`);
     
@@ -375,43 +458,121 @@ class ExchangeSettlementService {
     
     await user.update({ balance: newBalance }, { transaction });
     
-    // 결제 내역 생성 (Exchange 주문의 경우 betId는 null)
+    // 🆕 개선된 결제 내역 메모 생성
+    const isPartialMatch = order.partiallyFilled;
+    const matchType = isPartialMatch ? '부분 매칭' : '완전 매칭';
+    const matchAmount = isPartialMatch ? `(체결: ${order.filledAmount}원)` : '';
+    
+    let memo = '';
+    if (amount > 0) {
+      memo = `Exchange ${matchType} 베팅 승리 수익 ${matchAmount}`;
+    } else {
+      memo = `Exchange ${matchType} 베팅 손실 ${matchAmount}`;
+    }
+    
+    memo += ` - ${order.side.toUpperCase()}: ${order.selection}, ` +
+            `경기: ${gameResult.homeTeam} vs ${gameResult.awayTeam}, ` +
+            `배당: ${order.price}배, ` +
+            `결과: ${gameResult.result}`;
+    
+    // 결제 내역 생성
     await PaymentHistory.create({
       userId,
       betId: null, // Exchange 주문은 Bet 테이블과 연결되지 않음
       amount,
-      memo: amount > 0 ? 'Exchange 베팅 승리 수익' : 'Exchange 베팅 손실',
+      memo,
       paidAt: new Date(),
       balanceAfter: newBalance
     }, { transaction });
     
     console.log(`      💳 ${userId}: ${previousBalance} → ${newBalance} (${amount > 0 ? '+' : ''}${amount})`);
+    console.log(`      📝 메모: ${memo}`);
   }
 
   /**
-   * 정산 메모 생성
+   * 🆕 정산 메모 생성 (부분 매칭 정보 포함)
+   * @param {Object} order - 주문 정보
+   * @param {Object} gameResult - 경기 결과
+   * @param {boolean} isWin - 승리 여부
+   * @returns {string} 정산 메모
    */
   generateSettlementNote(order, gameResult, isWin) {
     const result = isWin ? '승리' : '패배';
-    const market = order.market;
-    const selection = order.selection;
+    const market = order.market || '승패';
+    const selection = order.selection || '선택 없음';
     
-    return `${market} 베팅 ${result} - 선택: ${selection}, ` +
+    // 🆕 부분 매칭 정보 추가
+    let partialMatchInfo = '';
+    if (order.partiallyFilled) {
+      partialMatchInfo = ` [부분 매칭: 원래 ${order.originalAmount}원, 체결 ${order.filledAmount}원, 남음 ${order.remainingAmount}원]`;
+    }
+    
+    return `${market} 베팅 ${result}${partialMatchInfo} - 선택: ${selection}, ` +
            `경기: ${gameResult.homeTeam} vs ${gameResult.awayTeam}, ` +
            `결과: ${gameResult.result}`;
   }
 
   /**
-   * 특정 경기의 정산 가능한 주문 조회
+   * 🆕 특정 경기의 정산 가능한 주문 조회 (부분 매칭 포함)
    */
-    async getSettlableOrders(gameResultId) {
+  async getSettlableOrders(gameResultId) {
     return await ExchangeOrder.findAll({
       where: {
         gameResultId,
-        status: 'matched',
+        status: { [Op.in]: ['matched', 'partially_matched'] },  // 🆕 부분 매칭 포함
         settledAt: null
       }
     });
+  }
+
+  /**
+   * 🆕 부분 매칭된 주문의 남은 금액 취소 처리
+   * @param {Object} order - 부분 매칭된 주문
+   * @param {Object} transaction - DB 트랜잭션
+   */
+  async cancelRemainingAmount(order, transaction) {
+    try {
+      console.log(`  🔄 남은 금액 취소 처리: 주문 ID ${order.id}, 남은 금액 ${order.remainingAmount}원`);
+      
+      // 남은 금액이 0 이하면 취소 처리 불필요
+      if (!order.remainingAmount || order.remainingAmount <= 0) {
+        return;
+      }
+      
+      // 1. 주문 상태를 cancelled로 변경
+      await order.update({
+        status: 'cancelled',
+        settlementNote: `부분 매칭 후 남은 금액 ${order.remainingAmount}원 자동 취소`,
+        settledAt: new Date()
+      }, { transaction });
+      
+      // 2. 사용자 잔액에 남은 금액 환불
+      await User.increment('balance', {
+        by: order.remainingAmount,
+        where: { id: order.userId }
+      }, { transaction });
+      
+      // 3. 환불 후 잔액 조회
+      const user = await User.findByPk(order.userId, { transaction });
+      
+      // 4. 환불 내역 기록
+      await PaymentHistory.create({
+        userId: order.userId,
+        betId: null,
+        amount: order.remainingAmount,
+        type: 'refund',
+        memo: `부분 매칭 후 남은 금액 자동 환불 (경기: ${order.homeTeam} vs ${order.awayTeam})`,
+        status: 'completed',
+        balanceAfter: user.balance,
+        paidAt: new Date()
+      }, { transaction });
+      
+      console.log(`    ✅ 남은 금액 취소 완료 - 환불: ${order.remainingAmount}원, 새 잔액: ${user.balance}원`);
+      
+    } catch (error) {
+      console.error(`    ❌ 남은 금액 취소 처리 실패:`, error);
+      throw error;
+    }
   }
 
   /**
