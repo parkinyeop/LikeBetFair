@@ -113,11 +113,22 @@ async function processPartialMatching(orderData) {
 
 // 매칭 배팅 API - 즉시 매칭 방식
 router.post('/match-order', verifyToken, async (req, res) => {
+  // 🆕 catch 블록에서 사용할 변수들을 미리 선언
+  let targetOrder, matchOrder, exchangeOrderMatch;
+  let matchAmount, matchType, userId;
+  
   try {
-    const { targetOrderId, matchAmount, matchType } = req.body;
-    const userId = req.user.userId;
+    const { targetOrderId, matchAmount: reqMatchAmount, matchType: reqMatchType } = req.body;
+    matchAmount = reqMatchAmount;
+    matchType = reqMatchType;
+    userId = req.user.userId;
     
     console.log('🎯 매칭 배팅 요청:', { targetOrderId, matchAmount, matchType, userId });
+    console.log('🆕 ExchangeOrderMatch 모델 상태:', {
+      modelExists: !!ExchangeOrderMatch,
+      tableName: ExchangeOrderMatch?.tableName,
+      sequelize: !!ExchangeOrderMatch?.sequelize
+    });
     
     // 대상 주문 찾기
     const targetOrder = await ExchangeOrder.findByPk(targetOrderId);
@@ -193,7 +204,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
     await targetOrder.save();
 
     // 🆕 ExchangeOrderMatch 레코드 생성
-    await ExchangeOrderMatch.create({
+    console.log('🆕 ExchangeOrderMatch 생성 시작:', {
       originalOrderId: targetOrder.id,
       matchingOrderId: matchOrder.id,
       matchedAmount: matchAmount,
@@ -205,33 +216,40 @@ router.post('/match-order', verifyToken, async (req, res) => {
       line: targetOrder.line,
       status: 'active'
     });
+    
+    const exchangeOrderMatch = await ExchangeOrderMatch.create({
+      originalOrderId: parseInt(targetOrder.id), // 🆕 정수로 변환
+      matchingOrderId: parseInt(matchOrder.id), // 🆕 정수로 변환
+      matchedAmount: matchAmount,
+      matchedPrice: targetOrder.price,
+      originalSide: targetOrder.side,
+      matchingSide: matchType,
+      gameId: targetOrder.gameId,
+      market: targetOrder.market,
+      line: targetOrder.line,
+      status: 'active'
+    });
+    
+    console.log('✅ ExchangeOrderMatch 생성 완료:', exchangeOrderMatch.id);
 
     // 거래 내역 기록
+    // targetOrder 사용자 잔고 조회
+    const targetUser = await User.findByPk(targetOrder.userId);
+    
     await PaymentHistory.create({
       userId: targetOrder.userId,
-      type: 'exchange_match',
       amount: targetOrder.amount,
-      description: `매칭 배팅 체결: ${targetOrder.homeTeam} vs ${targetOrder.awayTeam}`,
-      status: 'completed',
-      referenceId: targetOrder.id,
-      metadata: {
-        matchType: matchType,
-        matchAmount: matchAmount
-      }
+      balanceAfter: targetUser.balance, // 🆕 잔고 후 금액
+      memo: `매칭 배팅 체결: ${targetOrder.homeTeam} vs ${targetOrder.awayTeam}`,
+      paidAt: new Date() // 🆕 지급 시간
     });
     
     await PaymentHistory.create({
       userId: userId,
-      type: 'exchange_match',
       amount: matchAmount,
-      description: `매칭 배팅 체결: ${targetOrder.homeTeam} vs ${targetOrder.awayTeam}`,
-      status: 'completed',
-      referenceId: targetOrder.id,
-      metadata: {
-        targetOrderId: targetOrder.id,
-        matchType: matchType,
-        matchAmount: matchAmount
-      }
+      balanceAfter: user.balance, // 🆕 잔고 후 금액
+      memo: `매칭 배팅 체결: ${targetOrder.homeTeam} vs ${targetOrder.awayTeam}`,
+      paidAt: new Date() // 🆕 지급 시간
     });
     
     // WebSocket으로 실시간 업데이트
@@ -258,10 +276,17 @@ router.post('/match-order', verifyToken, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ 매칭 배팅 실패:', error);
+    console.error('❌ 매칭 배팅 실패:', {
+      error: error.message,
+      stack: error.stack,
+      targetOrderId: targetOrder?.id || 'unknown',
+      matchAmount: matchAmount || 'unknown',
+      matchType: matchType || 'unknown',
+      userId: userId || 'unknown'
+    });
     res.status(500).json({ 
       success: false, 
-      message: '매칭 배팅 처리 중 오류가 발생했습니다.' 
+      message: `매칭 배팅 처리 중 오류가 발생했습니다: ${error.message}` 
     });
   }
 });
