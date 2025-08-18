@@ -13,7 +13,7 @@ export type ExchangeOrder = {
   price: number;
   amount: number;
   selection?: string; // 선택한 팀/선수명
-  status: 'open' | 'matched' | 'settled' | 'cancelled';
+  status: 'open' | 'partially_matched' | 'matched' | 'settled' | 'cancelled';
   matchedOrderId?: number;
   createdAt: string;
   updatedAt: string;

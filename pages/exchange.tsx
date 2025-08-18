@@ -206,7 +206,7 @@ const NotificationSettings = ({ onClose }: { onClose: () => void }) => {
 
 export default function ExchangePage() {
   const { isLoggedIn, token, userId } = useAuth(); // userId 포함
-  const { fetchOrderbook, placeMatchOrder, orders } = useExchange();
+  const { fetchOrderbook, placeMatchOrder, orders, fetchAllOpenOrders } = useExchange();
   const router = useRouter();
   const [orderbook, setOrderbook] = useState<ExchangeOrder[]>([]);
   const [gameInfo, setGameInfo] = useState<any>(null);
@@ -215,6 +215,40 @@ export default function ExchangePage() {
   const [expandedCategories, setExpandedCategories] = useState<{[key: string]: boolean}>({});
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
   const [sidebarActiveTab, setSidebarActiveTab] = useState<'order' | 'history'>('order');
+  
+  // 🆕 실시간 호가 현황 상태 추가
+  const [recentOrders, setRecentOrders] = useState<ExchangeOrder[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  
+  // 🆕 실시간 호가 현황 로드
+  useEffect(() => {
+    const loadRecentOrders = async () => {
+      try {
+        setOrdersLoading(true);
+        const orders = await fetchAllOpenOrders();
+        
+        // 🆕 부분 매칭된 주문도 포함하여 최근 5개만 표시
+        const recentOrders = orders
+          .filter(order => 
+            order.status === 'open' || 
+            (order.status === 'partially_matched' && (order.remainingAmount || 0) > 0)
+          )
+          .slice(0, 5);
+        
+        setRecentOrders(recentOrders);
+      } catch (error) {
+        console.error('실시간 호가 현황 로드 실패:', error);
+      } finally {
+        setOrdersLoading(false);
+      }
+    };
+
+    loadRecentOrders();
+    
+    // 🆕 30초마다 자동 새로고침
+    const interval = setInterval(loadRecentOrders, 30000);
+    return () => clearInterval(interval);
+  }, [fetchAllOpenOrders]);
 
   // 취소된 주문 확인 및 알림
   const checkCancelledOrders = async () => {
@@ -557,155 +591,130 @@ export default function ExchangePage() {
         <div className="bg-white rounded shadow p-6 mb-4">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-bold">🔥 실시간 호가 현황</h3>
-            <button
-              onClick={() => setShowNotificationSettings(true)}
-              className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded hover:bg-blue-200 transition-colors flex items-center space-x-1"
-            >
-              <span>🔔</span>
-              <span>알림 설정</span>
-            </button>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => router.push('/exchange/orderbook')}
+                className="px-3 py-1 bg-green-100 text-green-700 text-sm rounded hover:bg-green-200 transition-colors flex items-center space-x-1"
+              >
+                <span>📊</span>
+                <span>전체 호가보기</span>
+              </button>
+              <button
+                onClick={() => setShowNotificationSettings(true)}
+                className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded hover:bg-blue-200 transition-colors flex items-center space-x-1"
+              >
+                <span>🔔</span>
+                <span>알림 설정</span>
+              </button>
+            </div>
           </div>
+          
           {!isLoggedIn ? (
             <div className="text-center py-8">
               <p className="text-gray-600">로그인 후 실시간 호가 정보를 확인할 수 있습니다.</p>
             </div>
-          ) : orderbook.length === 0 ? (
+          ) : ordersLoading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-500">호가 정보를 불러오는 중...</p>
+            </div>
+          ) : recentOrders.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-gray-500">현재 등록된 호가가 없습니다.</p>
               <p className="text-sm text-gray-400">아래 스포츠를 선택해서 새로운 호가를 등록해보세요!</p>
             </div>
           ) : (
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="space-y-3">
               <div className="text-sm text-gray-600 mb-3">
-                {orderbook.length > 0 ? (() => {
-                  const backOrder = orderbook.find(o => o.side === 'back' && o.status === 'open');
-                  const layOrder = orderbook.find(o => o.side === 'lay' && o.status === 'open');
-                  // 경기 정보(팀명, 시간 등)는 Back/Lay 중 하나에서 가져옴
-                  const gameInfo = backOrder || layOrder;
-                  if (!backOrder && !layOrder) {
-                    return <div className="text-center text-gray-400 py-8">현재 오픈된 호가가 없습니다.</div>;
-                  }
-                  return (
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gray-50 border border-gray-200 rounded p-4 shadow mt-4">
-                      {/* 경기 정보 */}
-                      <div className="flex-1 min-w-[180px]">
-                        {gameInfo ? (
-                          <>
-                            <div className="font-semibold text-base text-gray-800">{gameInfo.homeTeam} vs {gameInfo.awayTeam}</div>
-                            <div className="text-xs text-gray-500">{gameInfo.commenceTime ? new Date(gameInfo.commenceTime).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '시간 미정'}</div>
-                          </>
-                        ) : (
-                          <div className="text-gray-400">경기 정보 없음</div>
-                        )}
+                최근 {recentOrders.length}개 호가 (30초마다 자동 새로고침)
+              </div>
+              {recentOrders.map((order) => (
+                <div key={order.id} className="bg-gray-50 border border-gray-200 rounded p-4 shadow">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    {/* 경기 정보 */}
+                    <div className="flex-1 min-w-[180px]">
+                      <div className="font-semibold text-base text-gray-800">
+                        {order.homeTeam} vs {order.awayTeam}
                       </div>
-                      {/* Back 정보 */}
-                      <div className="flex flex-col items-center min-w-[120px]">
-                        <div className="text-xs text-blue-600 font-semibold mb-1">Back</div>
-                        {backOrder ? (
-                          <>
-                            <div className="font-bold text-blue-700 text-lg">{(backOrder.backOdds || backOrder.price).toFixed(2)}</div>
-                            <div className="text-blue-600">{backOrder.amount.toLocaleString()}원</div>
-                          </>
-                        ) : layOrder ? (
-                          <>
-                            <div className="font-bold text-blue-700 text-lg">{(layOrder.backOdds || 'N/A')}</div>
-                            <div className="text-blue-600">매칭 대기</div>
-                          </>
-                        ) : (
-                          <div className="text-gray-400">-</div>
-                        )}
+                      <div className="text-xs text-gray-500">
+                        {order.commenceTime ? 
+                          new Date(order.commenceTime).toLocaleString('ko-KR', { 
+                            month: '2-digit', 
+                            day: '2-digit', 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          }) : '시간 미정'
+                        }
                       </div>
-                      {/* Lay 정보 */}
-                      <div className="flex flex-col items-center min-w-[120px]">
-                        <div className="text-xs text-pink-600 font-semibold mb-1">Lay</div>
-                        {layOrder ? (
-                          <>
-                            <div className="font-bold text-pink-700 text-lg">{(layOrder.layOdds || layOrder.price).toFixed(2)}</div>
-                            <div className="text-pink-600">{layOrder.amount.toLocaleString()}원</div>
-                          </>
-                        ) : (
-                          <div className="text-gray-400">-</div>
-                        )}
-                      </div>
-                      {/* 매칭 버튼 */}
-                      <div className="flex flex-col items-center min-w-[120px]">
-                        {/* Back만 있을 때 → Lay로 배팅 */}
-                        {backOrder && !layOrder && (
-                          (() => {
-                            console.log('매칭 버튼 상태 (Lay로 배팅):', {
-                              userId,
-                              orderUserId: backOrder.userId,
-                              disabled: !userId || String(userId) === String(backOrder.userId)
-                            });
-                            return (
-                              <button
-                                onClick={() => {
-                                  if (!userId || String(userId) === String(backOrder.userId)) {
-                                    console.log('🚫 자신의 주문과는 매칭할 수 없습니다.');
-                                    return;
-                                  }
-                                  handleMatchOrder(backOrder);
-                                }}
-                                className={`px-4 py-2 text-white text-xs rounded transition-colors ${
-                                  !userId || String(userId) === String(backOrder.userId)
-                                    ? 'bg-gray-300 cursor-not-allowed'
-                                    : 'bg-pink-500 hover:bg-pink-600'
-                                }`}
-                                disabled={!userId || String(userId) === String(backOrder.userId)}
-                              >
-                                Lay로 배팅{String(userId) === String(backOrder.userId) ? ' (내 주문)' : ''}
-                              </button>
-                            );
-                          })()
-                        )}
-                        {/* Lay만 있을 때 → Back으로 배팅 */}
-                        {layOrder && !backOrder && (
-                          (() => {
-                            console.log('매칭 버튼 상태 (Back으로 배팅):', {
-                              userId,
-                              orderUserId: layOrder.userId,
-                              disabled: !userId || String(userId) === String(layOrder.userId)
-                            });
-                            return (
-                              <button
-                                onClick={() => {
-                                  if (!userId || String(userId) === String(layOrder.userId)) {
-                                    console.log('🚫 자신의 주문과는 매칭할 수 없습니다.');
-                                    return;
-                                  }
-                                  handleMatchOrder(layOrder);
-                                }}
-                                className={`px-4 py-2 text-white text-xs rounded transition-colors ${
-                                  !userId || String(userId) === String(layOrder.userId)
-                                    ? 'bg-gray-300 cursor-not-allowed'
-                                    : 'bg-blue-500 hover:bg-blue-600'
-                                }`}
-                                disabled={!userId || String(userId) === String(layOrder.userId)}
-                              >
-                                Back으로 배팅{String(userId) === String(layOrder.userId) ? ' (내 주문)' : ''}
-                              </button>
-                            );
-                          })()
-                        )}
-                        {/* 둘 다 있을 때는 매칭 버튼 없음 (이미 매칭됨) */}
-                        {backOrder && layOrder && (
-                          <div className="text-xs text-gray-400">매칭 대기 없음</div>
-                        )}
+                      <div className="text-xs text-gray-500">
+                        {order.selection} - {order.sportKey}
                       </div>
                     </div>
-                  );
-                })() : (
-                  <strong>🏀 Loading game information...</strong>
-                )}
-              </div>
-              <div className="mt-3 text-center">
-                <button
-                  onClick={() => router.push('/exchange/orderbook')}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-                >
-                  전체 호가 보기 →
-                </button>
-              </div>
+                    
+                    {/* 주문 정보 */}
+                    <div className="flex flex-col items-center min-w-[120px]">
+                      <div className={`text-xs font-semibold mb-1 ${
+                        order.side === 'back' ? 'text-blue-600' : 'text-pink-600'
+                      }`}>
+                        {order.side.toUpperCase()}
+                      </div>
+                      <div className={`font-bold text-lg ${
+                        order.side === 'back' ? 'text-blue-700' : 'text-pink-700'
+                      }`}>
+                        {order.price.toFixed(2)}
+                      </div>
+                      <div className={`text-sm ${
+                        order.side === 'back' ? 'text-blue-600' : 'text-pink-600'
+                      }`}>
+                        {order.displayAmount ? order.displayAmount.toLocaleString() : order.amount.toLocaleString()}원
+                      </div>
+                      
+                      {/* 🆕 부분 매칭 정보 표시 */}
+                      {order.partiallyFilled && (
+                        <div className="text-xs text-orange-600 mt-1 text-center">
+                          🔄 부분 체결됨
+                          <br />
+                          남은 금액: {(order.remainingAmount || 0).toLocaleString()}원
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* 상태 및 매칭 버튼 */}
+                    <div className="flex flex-col items-center min-w-[120px]">
+                      <div className="text-xs text-gray-500 mb-2">
+                        {order.status === 'open' ? '🔄 대기중' : 
+                         order.status === 'partially_matched' ? '🔄 부분 체결' : 
+                         order.status === 'matched' ? '✅ 체결됨' : 
+                         order.status === 'cancelled' ? '❌ 취소됨' : '📋 정산됨'}
+                      </div>
+                      
+                      {/* 매칭 버튼 */}
+                      {order.status === 'open' || order.status === 'partially_matched' ? (
+                        <button
+                          onClick={() => {
+                            if (!userId || String(userId) === String(order.userId)) {
+                              console.log('🚫 자신의 주문과는 매칭할 수 없습니다.');
+                              return;
+                            }
+                            // 🆕 매칭 모드로 이동
+                            router.push('/exchange/orderbook');
+                          }}
+                          className={`px-4 py-2 text-white text-xs rounded transition-colors ${
+                            !userId || String(userId) === String(order.userId)
+                              ? 'bg-gray-400 cursor-not-allowed'
+                              : order.side === 'back' ? 'bg-pink-600 hover:bg-pink-700' : 'bg-blue-600 hover:bg-blue-700'
+                          }`}
+                          disabled={!userId || String(userId) === String(order.userId)}
+                        >
+                          {order.side === 'back' ? '📉 Lay로 매칭' : '🎯 Back으로 매칭'}
+                        </button>
+                      ) : (
+                        <div className="text-gray-400 text-xs">매칭 불가</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
