@@ -257,7 +257,7 @@ class OddsApiService {
           const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
           const fourteenDaysLater = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
           const filteredGames = oddsResponse.data.filter(game => {
-            const commence = new Date(game.commence_time);
+            const commence = new Date(game.commence_time + 'Z'); // UTC 명시
             return commence >= threeDaysAgo && commence <= fourteenDaysLater;
           });
           console.log(`[DEBUG] ${clientCategory}: ${filteredGames.length}개 경기 처리 시작 (과거 3일 ~ 미래 14일)`);
@@ -289,7 +289,7 @@ class OddsApiService {
                 sportTitle: this.getSportTitleFromSportKey(sportKey),
                 homeTeam: game.home_team,
                 awayTeam: game.away_team,
-                commenceTime: new Date(game.commence_time),
+                commenceTime: new Date(game.commence_time + 'Z'), // UTC 명시
                 odds: game.bookmakers, // odds 필드 추가
                 bookmakers: game.bookmakers,
                 market: 'h2h', // 기본값 추가
@@ -306,7 +306,7 @@ class OddsApiService {
                   subCategory,
                   homeTeam: game.home_team,  
                   awayTeam: game.away_team,
-                  commenceTime: new Date(game.commence_time)
+                  commenceTime: new Date(game.commence_time + 'Z') // UTC 명시
                 },
                 defaults: upsertData
               });
@@ -541,7 +541,7 @@ class OddsApiService {
           const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
           const fourteenDaysLater = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
           const filteredGames = oddsResponse.data.filter(game => {
-            const commence = new Date(game.commence_time);
+            const commence = new Date(game.commence_time + 'Z'); // UTC 명시
             return commence >= threeDaysAgo && commence <= fourteenDaysLater;
           });
           // === 끝 ===
@@ -570,7 +570,7 @@ class OddsApiService {
                 sportTitle: this.getSportTitleFromSportKey(sportKey),
                 homeTeam: game.home_team,
                 awayTeam: game.away_team,
-                commenceTime: new Date(game.commence_time),
+                commenceTime: new Date(game.commence_time + 'Z'), // UTC 명시
                 odds: game.bookmakers,
                 bookmakers: game.bookmakers,
                 market: 'h2h',
@@ -584,7 +584,7 @@ class OddsApiService {
                   subCategory,
                   homeTeam: game.home_team,
                   awayTeam: game.away_team,
-                  commenceTime: new Date(game.commence_time)
+                  commenceTime: new Date(game.commence_time + 'Z') // UTC 명시
                 },
                 defaults: upsertData
               });

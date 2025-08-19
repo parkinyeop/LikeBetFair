@@ -3,6 +3,7 @@ import { useExchange, ExchangeOrder } from '../hooks/useExchange';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from 'next/router';
 import { getGameInfo, getSeasonInfo, getSeasonStatusStyle, getSeasonStatusBadge } from '../config/sportsMapping';
+import { convertUTCToKST } from '../utils/timeUtils';
 import ExchangeSidebar from '../components/ExchangeSidebar';
 
 // 알림 설정 관리 유틸리티
@@ -636,16 +637,11 @@ export default function ExchangePage() {
                       <div className="font-semibold text-base text-gray-800">
                         {order.homeTeam} vs {order.awayTeam}
                       </div>
-                      <div className="text-xs text-gray-500">
-                        {order.commenceTime ? 
-                          new Date(order.commenceTime).toLocaleString('ko-KR', { 
-                            month: '2-digit', 
-                            day: '2-digit', 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
-                          }) : '시간 미정'
-                        }
-                      </div>
+                                                    <div className="text-xs text-gray-500">
+                                {order.commenceTime ? 
+                                  convertUTCToKST(order.commenceTime) : '시간 미정'
+                                }
+                              </div>
                       <div className="text-xs text-gray-500">
                         {order.selection} - {order.sportKey}
                       </div>

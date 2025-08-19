@@ -498,7 +498,7 @@ class GameResultService {
           subCategory,
           homeTeam: event.home_team,
           awayTeam: event.away_team,
-          commenceTime: new Date(event.commence_time),
+          commenceTime: new Date(event.commence_time + 'Z'), // UTC 명시
           status: this.determineGameStatus(event),
           score: event.scores,
           result: this.determineGameResult(event),
@@ -507,7 +507,7 @@ class GameResultService {
           where: {
             homeTeam: event.home_team,
             awayTeam: event.away_team,
-            commenceTime: new Date(event.commence_time)
+            commenceTime: new Date(event.commence_time + 'Z') // UTC 명시
           }
         });
             savedCount++;
@@ -567,7 +567,7 @@ class GameResultService {
         return isMatch;
       });
       if (matchingGame) {
-        const commenceTime = new Date(matchingGame.commence_time);
+        const commenceTime = new Date(matchingGame.commence_time + 'Z'); // UTC 명시
         if (commenceTime > new Date()) {
           // 미래 경기는 저장하지 않음
           return false;
@@ -753,7 +753,7 @@ class GameResultService {
                   sportTitle: this.getSportTitleFromSportKey(sportKey),
                   homeTeam: event.home_team,
                   awayTeam: event.away_team,
-                  commenceTime: new Date(event.commence_time),
+                  commenceTime: new Date(event.commence_time + 'Z'), // UTC 명시
                   status: this.determineGameStatus(event),
                   score: validatedScore,
                   result: this.determineGameResult(event),
@@ -925,7 +925,7 @@ class GameResultService {
                 subCategory,
                 homeTeam: game.home_team,
                 awayTeam: game.away_team,
-                commenceTime: new Date(game.commence_time),
+                commenceTime: new Date(game.commence_time + 'Z'), // UTC 명시
                 status: this.determineGameStatus(game),
                 score: validatedScore,
                 result: this.determineGameResult(game),
@@ -934,7 +934,7 @@ class GameResultService {
                 where: {
                   homeTeam: game.home_team,
                   awayTeam: game.away_team,
-                  commenceTime: new Date(game.commence_time)
+                  commenceTime: new Date(game.commence_time + 'Z') // UTC 명시
                 }
               });
             }
