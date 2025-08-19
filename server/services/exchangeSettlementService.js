@@ -264,13 +264,13 @@ class ExchangeSettlementService {
     
     // Back 주문 정산
     if (backOrder.partiallyFilled) {
-      // 부분 매칭된 주문: 체결된 부분만 정산하고 남은 부분은 cancelled로 변경
+      // 부분 매칭된 주문: 체결된 부분만 정산하고 남은 부분은 취소 처리
+      const backSettlementNote = this.generateDetailedPartialMatchingSettlementNote(backOrder, gameResult, isBackWin, backStakeAmount);
       await backOrder.update({
         status: 'settled',
         actualProfit: backWinAmount,
         settledAt,
-        settlementNote: this.generateSettlementNote(backOrder, gameResult, isBackWin) + 
-          ` (부분 매칭: ${backStakeAmount}원 정산, ${backOrder.remainingAmount}원 취소)`
+        settlementNote: backSettlementNote
       }, { transaction });
       
       // 🆕 남은 금액이 있다면 취소 처리
@@ -289,13 +289,13 @@ class ExchangeSettlementService {
     
     // Lay 주문 정산
     if (layOrder.partiallyFilled) {
-      // 부분 매칭된 주문: 체결된 부분만 정산하고 남은 부분은 cancelled로 변경
+      // 부분 매칭된 주문: 체결된 부분만 정산하고 남은 부분은 취소 처리
+      const laySettlementNote = this.generateDetailedPartialMatchingSettlementNote(layOrder, gameResult, isBackWin, layStakeAmount);
       await layOrder.update({
         status: 'settled',
         actualProfit: layWinAmount,
         settledAt,
-        settlementNote: this.generateSettlementNote(layOrder, gameResult, isBackWin) + 
-          ` (부분 매칭: ${layStakeAmount}원 정산, ${layOrder.remainingAmount}원 취소)`
+        settlementNote: laySettlementNote
       }, { transaction });
       
       // 🆕 남은 금액이 있다면 취소 처리
@@ -526,7 +526,7 @@ class ExchangeSettlementService {
   }
 
   /**
-   * 🆕 부분 매칭된 주문의 남은 금액 취소 처리
+   * 🆕 부분 매칭된 주문의 남은 금액 취소 처리 (개선됨)
    * @param {Object} order - 부분 매칭된 주문
    * @param {Object} transaction - DB 트랜잭션
    */
@@ -539,40 +539,76 @@ class ExchangeSettlementService {
         return;
       }
       
-      // 1. 주문 상태를 cancelled로 변경
+      // 1. 남은 금액을 0으로 설정하고 상세한 정산 메모 생성
+      const detailedNote = this.generateDetailedPartialMatchingNote(order);
       await order.update({
-        status: 'cancelled',
-        settlementNote: `부분 매칭 후 남은 금액 ${order.remainingAmount}원 자동 취소`,
-        settledAt: new Date()
+        remainingAmount: 0,
+        settlementNote: detailedNote
       }, { transaction });
       
       // 2. 사용자 잔액에 남은 금액 환불
-      await User.increment('balance', {
-        by: order.remainingAmount,
-        where: { id: order.userId }
-      }, { transaction });
-      
-      // 3. 환불 후 잔액 조회
       const user = await User.findByPk(order.userId, { transaction });
+      const currentBalance = parseFloat(user.balance);
+      const newBalance = currentBalance + order.remainingAmount;
       
-      // 4. 환불 내역 기록
+      await user.update({ balance: newBalance }, { transaction });
+      
+      // 3. 환불 내역 기록 (상세한 메모 포함)
+      const refundMemo = this.generateDetailedRefundMemo(order);
       await PaymentHistory.create({
         userId: order.userId,
         betId: null,
         amount: order.remainingAmount,
         type: 'refund',
-        memo: `부분 매칭 후 남은 금액 자동 환불 (경기: ${order.homeTeam} vs ${order.awayTeam})`,
+        memo: refundMemo,
         status: 'completed',
-        balanceAfter: user.balance,
+        balanceAfter: newBalance,
         paidAt: new Date()
       }, { transaction });
       
-      console.log(`    ✅ 남은 금액 취소 완료 - 환불: ${order.remainingAmount}원, 새 잔액: ${user.balance}원`);
+      console.log(`    ✅ 남은 금액 취소 완료 - 환불: ${order.remainingAmount}원, 새 잔액: ${newBalance}원`);
+      console.log(`    📝 정산 메모: ${detailedNote}`);
       
     } catch (error) {
       console.error(`    ❌ 남은 금액 취소 처리 실패:`, error);
       throw error;
     }
+  }
+
+  /**
+   * 🆕 부분 매칭 상세 정산 메모 생성
+   * @param {Object} order - 부분 매칭된 주문
+   * @returns {string} 상세한 정산 메모
+   */
+  generateDetailedPartialMatchingNote(order) {
+    const baseNote = order.settlementNote || '정산 완료';
+    const partialInfo = `[부분 매칭] 원래 ${(order.originalAmount || order.amount).toLocaleString()}원 중 ${(order.filledAmount || 0).toLocaleString()}원 체결, ${(order.remainingAmount || 0).toLocaleString()}원 취소`;
+    
+    return `${baseNote} - ${partialInfo}`;
+  }
+
+  /**
+   * 🆕 부분 매칭 상세 환불 메모 생성
+   * @param {Object} order - 부분 매칭된 주문
+   * @returns {string} 상세한 환불 메모
+   */
+  generateDetailedRefundMemo(order) {
+    return `부분 매칭 후 남은 금액 자동 환불 - ${order.homeTeam} vs ${order.awayTeam} (${order.side} ${order.selection}) - 체결: ${(order.filledAmount || 0).toLocaleString()}원, 환불: ${(order.remainingAmount || 0).toLocaleString()}원`;
+  }
+
+  /**
+   * 🆕 부분 매칭 상세 정산 메모 생성 (정산 시)
+   * @param {Object} order - 부분 매칭된 주문
+   * @param {Object} gameResult - 경기 결과
+   * @param {boolean} isBackWin - Back 주문 승리 여부
+   * @param {number} stakeAmount - 실제 체결된 금액
+   * @returns {string} 상세한 정산 메모
+   */
+  generateDetailedPartialMatchingSettlementNote(order, gameResult, isBackWin, stakeAmount) {
+    const baseResult = isBackWin ? '승리' : '패배';
+    const partialInfo = `[부분 매칭] 원래 ${(order.originalAmount || order.amount).toLocaleString()}원 중 ${stakeAmount.toLocaleString()}원 체결, ${(order.remainingAmount || 0).toLocaleString()}원 취소`;
+    
+    return `정산 완료 - ${baseResult} - ${partialInfo}`;
   }
 
   /**
