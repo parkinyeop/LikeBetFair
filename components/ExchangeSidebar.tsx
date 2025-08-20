@@ -63,6 +63,70 @@ function OrderPanel() {
     }
   }, [selectedBet]);
 
+  // 🆕 홈에서 선택된 경기 정보를 읽어와서 주문 폼에 자동으로 채우기
+  useEffect(() => {
+    const checkAndLoadSelectedGame = () => {
+      const selectedGameInfo = localStorage.getItem('selectedGameForOrder');
+      if (selectedGameInfo) {
+        try {
+          const gameInfo = JSON.parse(selectedGameInfo);
+          
+          console.log('🎯 홈에서 선택된 경기 정보 발견:', gameInfo);
+          
+          // 주문 폼에 자동으로 정보 채우기
+          setForm(prev => ({
+            ...prev,
+            price: gameInfo.odds || prev.price,
+            amount: prev.amount, // 금액은 사용자가 입력하도록 유지
+            side: 'back' as const
+          }));
+          
+          // selectedBet 업데이트 (더 확실하게)
+          const newSelectedBet = {
+            team: gameInfo.selection,
+            price: gameInfo.odds,
+            type: 'back' as const, // 기본값으로 back 설정
+            gameId: gameInfo.gameId,
+            market: gameInfo.market,
+            homeTeam: gameInfo.homeTeam,
+            awayTeam: gameInfo.awayTeam,
+            commenceTime: gameInfo.commenceTime
+          };
+          
+          console.log('🎯 새로운 selectedBet 설정:', newSelectedBet);
+          setSelectedBet(newSelectedBet);
+          
+          // 사용 후 localStorage에서 제거
+          localStorage.removeItem('selectedGameForOrder');
+          
+          console.log('🎯 홈에서 선택된 경기 정보로 주문 폼 자동 채움 완료');
+        } catch (error) {
+          console.error('선택된 경기 정보 파싱 오류:', error);
+          localStorage.removeItem('selectedGameForOrder');
+        }
+      }
+    };
+
+    // 초기 체크
+    checkAndLoadSelectedGame();
+    
+    // 주기적으로 체크 (500ms마다 - 더 빠르게)
+    const interval = setInterval(checkAndLoadSelectedGame, 500);
+    
+    // 🆕 추가로 탭 변경 시에도 체크
+    const handleTabChange = () => {
+      setTimeout(checkAndLoadSelectedGame, 100);
+    };
+    
+    // 탭 변경 이벤트 리스너 추가
+    window.addEventListener('exchangeSidebarTabChange', handleTabChange);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('exchangeSidebarTabChange', handleTabChange);
+    };
+  }, []); // 의존성 제거하여 매번 체크
+
   // 매칭 모드일 때 초기값 설정 (자동 설정 제거)
   useEffect(() => {
     if (isMatchMode && form.amount === 0) {
