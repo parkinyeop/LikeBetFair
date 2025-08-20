@@ -42,7 +42,19 @@ export default function LiveOddsPage() {
     
     // 30초마다 자동 새로고침
     const interval = setInterval(loadRecentOrders, 30000);
-    return () => clearInterval(interval);
+    
+    // 🆕 주문 완료 이벤트 감지하여 즉시 새로고침
+    const handleOrderPlaced = () => {
+      console.log('🔄 주문 완료 이벤트 감지, 실시간 호가 현황 새로고침');
+      loadRecentOrders();
+    };
+    
+    window.addEventListener('exchangeOrderPlaced', handleOrderPlaced);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('exchangeOrderPlaced', handleOrderPlaced);
+    };
   }, [fetchAllOpenOrders]);
 
   // 필터링 로직
@@ -123,14 +135,14 @@ export default function LiveOddsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-black p-6">
       {/* 헤더 */}
       <div className="max-w-7xl mx-auto">
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <div className="bg-black rounded-lg shadow p-6 mb-6">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">🔥 실시간 호가 현황</h1>
-              <p className="text-gray-600 mt-2">현재 등록된 모든 호가를 실시간으로 확인하고 매칭할 수 있습니다.</p>
+              <h1 className="text-3xl font-bold text-white">🔥 실시간 호가 현황</h1>
+              <p className="text-gray-300 mt-2">현재 등록된 모든 호가를 실시간으로 확인하고 매칭할 수 있습니다.</p>
             </div>
             <div className="flex items-center space-x-3">
               <button

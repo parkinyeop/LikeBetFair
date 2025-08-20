@@ -199,21 +199,23 @@ router.post('/match-order', verifyToken, async (req, res) => {
       oddsSource: targetOrder.oddsSource || 'exchange',
       oddsUpdatedAt: targetOrder.oddsUpdatedAt || new Date(),
       // 🆕 부분 매칭 필드들
-      originalAmount: actualMatchAmount,
+      originalAmount: actualMatchAmount, // 🆕 매칭 주문의 원래 금액
       remainingAmount: 0, // 즉시 매칭되므로 0
-      filledAmount: actualMatchAmount,
-      partiallyFilled: false
+      filledAmount: actualMatchAmount, // 🆕 매칭 주문의 체결된 금액
+      partiallyFilled: false // 🆕 매칭 주문은 즉시 체결되므로 false
     });
 
     // 🆕 대상 주문 상태 업데이트 (부분 매칭 처리)
     if (actualMatchAmount >= (targetOrder.remainingAmount || targetOrder.amount)) {
       // 완전 매칭
       targetOrder.status = 'matched';
-      targetOrder.filledAmount = targetOrder.originalAmount || targetOrder.amount;
+      targetOrder.originalAmount = targetOrder.originalAmount || targetOrder.amount; // 🆕 originalAmount 설정
+      targetOrder.filledAmount = targetOrder.originalAmount;
       targetOrder.remainingAmount = 0;
       targetOrder.partiallyFilled = false;
     } else {
       // 부분 매칭
+      targetOrder.originalAmount = targetOrder.originalAmount || targetOrder.amount; // 🆕 originalAmount 설정
       targetOrder.partiallyFilled = true;
       targetOrder.filledAmount = (targetOrder.filledAmount || 0) + actualMatchAmount;
       targetOrder.remainingAmount = (targetOrder.remainingAmount || targetOrder.amount) - actualMatchAmount;

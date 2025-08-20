@@ -116,7 +116,19 @@ const OrderbookPage: React.FC = () => {
     
     // 30초마다 자동 새로고침
     const interval = setInterval(loadOrders, 30000);
-    return () => clearInterval(interval);
+    
+    // 🆕 주문 완료 이벤트 감지하여 즉시 새로고침
+    const handleOrderPlaced = () => {
+      console.log('🔄 주문 완료 이벤트 감지, 전체 호가보기 새로고침');
+      loadOrders();
+    };
+    
+    window.addEventListener('exchangeOrderPlaced', handleOrderPlaced);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('exchangeOrderPlaced', handleOrderPlaced);
+    };
   }, [fetchAllOpenOrders]);
 
   // 매치 배팅 처리 함수 - 오른쪽 사이드 주문하기 UI 사용
@@ -325,12 +337,12 @@ const OrderbookPage: React.FC = () => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
+    <div className="bg-black rounded-lg shadow-sm p-6">
       {/* 헤더 */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-1">전체 호가 현황</h1>
-          <p className="text-gray-600 text-sm">실시간 거래소 주문 현황을 확인하세요</p>
+          <h1 className="text-2xl font-bold text-white mb-1">전체 호가 현황</h1>
+          <p className="text-gray-300 text-sm">실시간 거래소 주문 현황을 확인하세요</p>
         </div>
         <button
           onClick={() => router.back()}

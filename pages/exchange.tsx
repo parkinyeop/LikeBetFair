@@ -356,14 +356,29 @@ export default function ExchangePage() {
 
     fetchTodayGames();
     
+    // 🆕 주문 완료 이벤트 감지하여 투데이 베팅 데이터 새로고침
+    const handleOrderPlaced = () => {
+      console.log('🔄 주문 완료 이벤트 감지, 익스체인지 홈 투데이 베팅 데이터 새로고침');
+      fetchTodayGames();
+    };
+    
+    window.addEventListener('exchangeOrderPlaced', handleOrderPlaced);
+    
     if (typeof document !== 'undefined') {
       const interval = setInterval(() => {
         console.log('[Exchange Today] 주기적 경기 데이터 갱신 시도');
         fetchTodayGames();
       }, 5 * 60 * 1000);
       
-      return () => clearInterval(interval);
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('exchangeOrderPlaced', handleOrderPlaced);
+      };
     }
+    
+    return () => {
+      window.removeEventListener('exchangeOrderPlaced', handleOrderPlaced);
+    };
   }, []);
 
   // 🆕 todayGames를 평탄화하여 전체 경기 리스트로 변환
@@ -1098,9 +1113,9 @@ export default function ExchangePage() {
         )}
         
         {/* 🆕 투데이 베팅 스타일로 변경된 헤더 */}
-        <div className="bg-orange-100 rounded shadow p-6 mb-4">
+        <div className="bg-black rounded shadow p-6 mb-4">
           <div className="flex justify-between items-center mb-4">
-            <h1 className="text-2xl font-bold">Sports Exchange</h1>
+            <h1 className="text-2xl font-bold text-white">Sports Exchange</h1>
             <div className="flex items-center space-x-3">
               <button
                 onClick={() => router.push('/exchange/live-odds')}
