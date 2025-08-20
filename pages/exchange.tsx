@@ -1105,13 +1105,13 @@ export default function ExchangePage() {
             <h1 className="text-2xl font-bold">Sports Exchange</h1>
             <div className="flex items-center space-x-3">
               <button
-                onClick={() => setShowNotificationSettings(true)}
+                onClick={() => router.push('/exchange/live-odds')}
                 className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded hover:bg-blue-200 transition-colors flex items-center space-x-1"
               >
-                <span>🔔</span>
-                <span>알림 설정</span>
+                <span>📊</span>
+                <span>실시간 호가 현황</span>
               </button>
-          </div>
+            </div>
           </div>
           
           {/* 🆕 사용자 안내 메시지 */}
@@ -1132,18 +1132,27 @@ export default function ExchangePage() {
           <TodayBettingView />
         </div>
 
-        {/* 🆕 실시간 호가 현황 - 간소화된 버전 */}
-        <div className="bg-white rounded shadow p-4 mb-4">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold">🔥 실시간 호가 현황</h3>
-            <button
-              onClick={() => router.push('/exchange/orderbook')}
-              className="px-3 py-1 bg-green-100 text-green-700 text-sm rounded hover:bg-green-200 transition-colors flex items-center space-x-1"
-            >
-              <span>📊</span>
-              <span>전체 호가보기</span>
-            </button>
-          </div>
+                  {/* 🆕 실시간 호가 현황 - 간소화된 버전 */}
+          <div className="bg-white rounded shadow p-4 mb-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">🔥 실시간 호가 현황</h3>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => router.push('/exchange/live-odds')}
+                  className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded hover:bg-blue-200 transition-colors flex items-center space-x-1"
+                >
+                  <span>📊</span>
+                  <span>실시간 호가 현황</span>
+                </button>
+                <button
+                  onClick={() => router.push('/exchange/orderbook')}
+                  className="px-3 py-1 bg-green-100 text-green-700 text-sm rounded hover:bg-green-200 transition-colors flex items-center space-x-1"
+                >
+                  <span>📋</span>
+                  <span>전체 호가보기</span>
+                </button>
+              </div>
+            </div>
           
           {!isLoggedIn ? (
             <div className="text-center py-8">
