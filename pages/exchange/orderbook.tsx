@@ -344,12 +344,22 @@ const OrderbookPage: React.FC = () => {
           <h1 className="text-2xl font-bold text-white mb-1">전체 호가 현황</h1>
           <p className="text-gray-300 text-sm">실시간 거래소 주문 현황을 확인하세요</p>
         </div>
-        <button
-          onClick={() => router.back()}
-          className="px-4 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition-colors"
-        >
-          ← 뒤로가기
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => router.push('/exchange')}
+            className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded hover:bg-blue-200 transition-colors flex items-center space-x-1"
+          >
+            <span>←</span>
+            <span>홈으로 돌아가기</span>
+          </button>
+          <button
+            onClick={() => router.push('/exchange/live-odds')}
+            className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded hover:bg-blue-200 transition-colors flex items-center space-x-1"
+          >
+            <span>📊</span>
+            <span>실시간 호가 현황</span>
+          </button>
+        </div>
       </div>
 
       {/* 통계 카드 */}
