@@ -264,16 +264,16 @@ function OrderPanel() {
         
         if (isFullyMatched) {
           alert(`🎉 주문이 완전히 매칭되었습니다!\n` +
-                `매칭 금액: ${totalMatched.toLocaleString()}원\n` +
+                `매칭 금액: ${totalMatched.toLocaleString()} KRW\n` +
                 `매칭 횟수: ${matchCount}회`);
         } else if (isPartiallyMatched) {
           alert(`⚡ 주문이 부분 매칭되었습니다!\n` +
-                `매칭된 금액: ${totalMatched.toLocaleString()}원\n` +
-                `남은 금액: ${remainingAmount.toLocaleString()}원 (호가창에 등록)\n` +
+                `매칭된 금액: ${totalMatched.toLocaleString()} KRW\n` +
+                `남은 금액: ${remainingAmount.toLocaleString()} KRW (호가창에 등록)\n` +
                 `매칭 횟수: ${matchCount}회`);
         } else if (remainingAmount > 0) {
           alert(`📝 주문이 호가창에 등록되었습니다!\n` +
-                `등록 금액: ${remainingAmount.toLocaleString()}원\n` +
+                `등록 금액: ${remainingAmount.toLocaleString()} KRW\n` +
                 `다른 사용자가 매칭하면 자동으로 체결됩니다.`);
         } else {
           alert('주문이 성공적으로 등록되었습니다!');
@@ -431,25 +431,25 @@ function OrderPanel() {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">
-              {isMatchMode ? 
-                `배팅 금액 (1원 ~ ${Math.floor(getAvailableMatchAmount()).toLocaleString()}원)` : 
-                'Amount (KRW)'
-              }
+                          {isMatchMode ? 
+              `배팅 금액 (1 ~ ${Math.floor(getAvailableMatchAmount()).toLocaleString()} KRW)` : 
+              'Amount (KRW)'
+            }
             </label>
             {/* 🆕 부분 매칭 모드에서 범위 표시 */}
             {isMatchMode && (
               <div className="text-xs text-gray-500 mb-1">
-                💡 원하는 금액만큼 부분 매칭 가능 
-                (최대 매칭 가능: {Math.floor(getMaxMatchAmount()).toLocaleString()}원)
+                              💡 원하는 금액만큼 부분 매칭 가능 
+              (최대 매칭 가능: {Math.floor(getMaxMatchAmount()).toLocaleString()} KRW)
               </div>
             )}
             <input 
-              type="number" 
-              min="1"
-              step="1"
-              value={form.amount} 
+              type="text" 
+              value={form.amount > 0 ? form.amount.toLocaleString() : ''} 
               onChange={e => {
-                let numValue = parseInt(e.target.value) || 0;
+                // 쉼표와 공백 제거 후 숫자만 추출
+                const cleanValue = e.target.value.replace(/[,\s]/g, '');
+                let numValue = parseInt(cleanValue) || 0;
                 
                 // 🆕 매칭 모드에서 최대 리스크 금액 초과 시 제한
                 if (isMatchMode) {
@@ -460,6 +460,12 @@ function OrderPanel() {
                 }
                 
                 setForm(f => ({ ...f, amount: numValue }));
+              }}
+              onBlur={() => {
+                // 포커스를 잃을 때 000,000 형식으로 포맷팅
+                if (form.amount > 0) {
+                  setForm(f => ({ ...f, amount: form.amount }));
+                }
               }}
               className="w-full p-1 border rounded text-sm"
               placeholder={isMatchMode ? "원하는 금액 입력" : "0"}
@@ -493,7 +499,7 @@ function OrderPanel() {
             } disabled:bg-gray-400`}
           >
             {loading ? '처리중...' : isMatchMode ? 
-              `🎯 부분 매칭 (${Math.floor(form.amount).toLocaleString()}원)` : 
+              `🎯 부분 매칭 (${Math.floor(form.amount).toLocaleString()} KRW)` : 
               '주문하기'}
           </button>
         </div>
@@ -699,7 +705,7 @@ function OrderHistoryPanel() {
             </div>
             <div className="text-center">
               <div className="text-gray-500">총 금액</div>
-              <div className="font-bold text-gray-800">{stats.totalAmount.toLocaleString()}원</div>
+              <div className="font-bold text-gray-800">{stats.totalAmount.toLocaleString()} KRW</div>
             </div>
             <div className="text-center">
               <div className="text-gray-500">미체결</div>
@@ -934,15 +940,15 @@ function OrderHistoryPanel() {
                           <div className="border-t border-gray-200 pt-1 mt-1">
                             <div className="flex justify-between">
                               <span className="text-gray-600">원래 금액:</span>
-                              <span>{(order as any).matchInfo.originalAmount.toLocaleString()}원</span>
+                              <span>{(order as any).matchInfo.originalAmount.toLocaleString()} KRW</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-gray-600">체결 금액:</span>
-                              <span className="text-green-600">{(order as any).matchInfo.filledAmount.toLocaleString()}원</span>
+                              <span className="text-green-600">{(order as any).matchInfo.filledAmount.toLocaleString()} KRW</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-gray-600">남은 금액:</span>
-                              <span className="text-orange-600">{(order as any).matchInfo.remainingAmount.toLocaleString()}원</span>
+                              <span className="text-orange-600">{(order as any).matchInfo.remainingAmount.toLocaleString()} KRW</span>
                             </div>
                             {(order as any).matchInfo.matchCount > 0 && (
                               <div className="flex justify-between">

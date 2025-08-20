@@ -1063,9 +1063,7 @@ export default function ExchangePage() {
                                   <div className="font-bold">{label}</div>
                                   <div className="text-sm">{outcome.price ? outcome.price.toFixed(2) : 'N/A'}</div>
                                   {!isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
-                                  {isBettable && outcome.price && (
-                                    <div className="text-xs text-blue-100 mt-1">클릭하여 주문하기</div>
-                                  )}
+                                  
                                 </button>
                             );
                           });
@@ -1100,7 +1098,7 @@ export default function ExchangePage() {
         )}
         
         {/* 🆕 투데이 베팅 스타일로 변경된 헤더 */}
-        <div className="bg-white rounded shadow p-6 mb-4">
+        <div className="bg-orange-100 rounded shadow p-6 mb-4">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-2xl font-bold">Sports Exchange</h1>
             <div className="flex items-center space-x-3">
@@ -1110,6 +1108,13 @@ export default function ExchangePage() {
               >
                 <span>📊</span>
                 <span>실시간 호가 현황</span>
+              </button>
+              <button
+                onClick={() => router.push('/exchange/orderbook')}
+                className="px-3 py-1 bg-green-100 text-green-700 text-sm rounded hover:bg-green-200 transition-colors flex items-center space-x-1"
+              >
+                <span>📋</span>
+                <span>전체 호가보기</span>
               </button>
             </div>
           </div>
@@ -1132,117 +1137,7 @@ export default function ExchangePage() {
           <TodayBettingView />
         </div>
 
-                  {/* 🆕 실시간 호가 현황 - 간소화된 버전 */}
-          <div className="bg-white rounded shadow p-4 mb-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold">🔥 실시간 호가 현황</h3>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => router.push('/exchange/live-odds')}
-                  className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded hover:bg-blue-200 transition-colors flex items-center space-x-1"
-                >
-                  <span>📊</span>
-                  <span>실시간 호가 현황</span>
-                </button>
-                <button
-                  onClick={() => router.push('/exchange/orderbook')}
-                  className="px-3 py-1 bg-green-100 text-green-700 text-sm rounded hover:bg-green-200 transition-colors flex items-center space-x-1"
-                >
-                  <span>📋</span>
-                  <span>전체 호가보기</span>
-                </button>
-              </div>
-            </div>
-          
-          {!isLoggedIn ? (
-            <div className="text-center py-8">
-              <p className="text-gray-600">로그인 후 실시간 호가 정보를 확인할 수 있습니다.</p>
-            </div>
-          ) : ordersLoading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-500">호가 정보를 불러오는 중...</p>
-            </div>
-          ) : recentOrders.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500">현재 등록된 호가가 없습니다.</p>
-              <p className="text-sm text-gray-400">위의 경기를 선택해서 새로운 호가를 등록해보세요!</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="text-sm text-gray-600 mb-3">
-                최근 {recentOrders.length}개 호가 (30초마다 자동 새로고침)
-              </div>
-              {recentOrders.slice(0, 3).map((order) => (
-                <div key={order.id} className="bg-gray-50 border border-gray-200 rounded p-4 shadow">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div className="flex-1 min-w-[180px]">
-                      <div className="font-semibold text-base text-gray-800">
-                        {order.homeTeam} vs {order.awayTeam}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {order.commenceTime ? 
-                          convertUTCToKST(order.commenceTime) : '시간 미정'
-                        }
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {order.selection} - {order.sportKey}
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-col items-center min-w-[120px]">
-                      <div className={`text-xs font-semibold mb-1 ${
-                        order.side === 'back' ? 'text-blue-600' : 'text-pink-600'
-                      }`}>
-                        {order.side.toUpperCase()}
-                      </div>
-                      <div className={`font-bold text-lg ${
-                        order.side === 'back' ? 'text-blue-700' : 'text-pink-700'
-                      }`}>
-                        {order.price.toFixed(2)}
-                      </div>
-                      <div className={`text-sm ${
-                        order.side === 'back' ? 'text-blue-600' : 'text-pink-600'
-                      }`}>
-                        {order.displayAmount ? order.displayAmount.toLocaleString() : order.amount.toLocaleString()}원
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-col items-center min-w-[120px]">
-                      <div className="text-xs text-gray-500 mb-2">
-                        {order.status === 'open' ? '🔄 대기중' : 
-                         order.status === 'partially_matched' ? '🔄 부분 체결' : 
-                         order.status === 'matched' ? '✅ 체결됨' : 
-                         order.status === 'cancelled' ? '❌ 취소됨' : '📋 정산됨'}
-                      </div>
-                      
-                      {order.status === 'open' || order.status === 'partially_matched' ? (
-                        <button
-                          onClick={() => {
-                            if (!userId || String(userId) === String(order.userId)) {
-                              return;
-                            }
-                            router.push('/exchange/orderbook');
-                          }}
-                          className={`px-4 py-2 text-white text-xs rounded transition-colors ${
-                            !userId || String(userId) === String(order.userId)
-                              ? 'bg-gray-400 cursor-not-allowed'
-                              : order.side === 'back' ? 'bg-pink-600 hover:bg-pink-700' : 'bg-blue-600 hover:bg-blue-700'
-                          }`}
-                          disabled={!userId || String(userId) === String(order.userId)}
-                        >
-                          {order.side === 'back' ? '📉 Lay로 매칭' : '🎯 Back으로 매칭'}
-                        </button>
-                      ) : (
-                        <div className="text-gray-400 text-xs">매칭 불가</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                  
 
         {/* 알림 설정 모달 */}
         {showNotificationSettings && (
