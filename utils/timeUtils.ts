@@ -48,20 +48,19 @@ export function getClientTimezoneInfo() {
 export function convertUtcToLocal(utcTime: string | Date): Date {
   let utcDate: Date;
   if (typeof utcTime === 'string') {
-    // 데이터베이스의 시간은 UTC이므로 명시적으로 UTC로 해석
-    // Z가 없으면 UTC로 간주하고 추가
+    // UTC 시간을 명시적으로 UTC로 해석
     if (utcTime.endsWith('Z')) {
       utcDate = new Date(utcTime);
     } else {
-      // 이미 UTC 시간이므로 Z를 추가하여 명시적으로 UTC로 표시
+      // UTC로 간주하고 Z 추가
       utcDate = new Date(utcTime + 'Z');
     }
   } else {
     utcDate = new Date(utcTime.getTime());
   }
   
-  // JavaScript Date는 자동으로 클라이언트 시간대로 표시됨
-  // UTC 09:30 → KST 18:30 (9시간 차이)
+  // 브라우저 지역설정 기반 자동 변환
+  // 한국 사용자면 자동으로 KST로 표시, 다른 지역 사용자면 해당 지역 시간으로 변환
   return utcDate;
 }
 
