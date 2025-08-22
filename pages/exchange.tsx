@@ -45,6 +45,18 @@ export default function Exchange() {
             const filteredGames = data.filter((game: any) => {
               const localGameTime = convertUtcToLocal(game.commence_time);
               const isValid = localGameTime >= oneDayAgo && localGameTime <= sevenDaysLater;
+              
+              // 🆕 KBO 경기 시간 추가 검증
+              if (game.sport_key === 'baseball_kbo' || game.sport_key === 'KBO' || config.sportKey === 'baseball_kbo') {
+                const hour = localGameTime.getHours();
+                const isKBOValidTime = hour >= 18 && hour <= 21; // KBO는 18:00~21:00에 진행
+                
+                if (!isKBOValidTime) {
+                  console.log(`[KBO 시간 검증] 부정확한 경기 시간 제외: ${game.home_team} vs ${game.away_team} - ${localGameTime.toLocaleString()} (${hour}시)`);
+                  return false;
+                }
+              }
+              
               return isValid;
             });
             
@@ -341,6 +353,7 @@ export default function Exchange() {
         
         {todayFlatGames?.map((game: any) => {
           const gameTime = new Date(game.commence_time);
+          const localGameTime = convertUtcToLocal(game.commence_time);
           const isBettable = game.isBettable !== undefined ? game.isBettable : true;
           
           const officialOdds = game.officialOdds || {};
@@ -402,7 +415,7 @@ export default function Exchange() {
                 </div>
                 <div className="text-right">
                   <div className="text-sm text-gray-300">
-                    📅 {gameTime.toLocaleDateString()} {gameTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    📅 {localGameTime.toLocaleDateString()} {localGameTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </div>
                   {!isBettable && (
                     <div className="text-xs text-red-400 mt-1">
@@ -636,6 +649,7 @@ export default function Exchange() {
           ) : (
             <div className="space-y-4">
               {games?.map((game, index) => {
+                const localGameTime = convertUtcToLocal(game.commence_time);
                 const h2hOdds = game.officialOdds?.h2h || {};
                 
                                  let outcomes: any[] = [];
@@ -672,7 +686,7 @@ export default function Exchange() {
                       <span className="text-lg font-bold text-white">🏟️ {game.home_team} vs {game.away_team}</span>
                       <div className="text-right">
                         <span className="text-sm text-gray-300">
-                          📅 {new Date(game.commence_time).toLocaleDateString()} {new Date(game.commence_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          📅 {localGameTime.toLocaleDateString()} {localGameTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                         {!game.isBettable && (
                           <div className="text-xs text-red-400 mt-1">

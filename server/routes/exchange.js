@@ -158,11 +158,24 @@ router.post('/match-order', verifyToken, async (req, res) => {
     if (targetOrder.side === 'back') {
       // Back 주문에 Lay로 매칭: matchAmount는 리스크 금액
       // 실제 매칭되는 주문 금액 = matchAmount / (odds - 1)
-      const maxMatchableAmount = Math.floor(matchAmount / (targetOrder.price - 1));
+      if (targetOrder.price <= 1.0) {
+        return res.status(400).json({ 
+          success: false, 
+          message: '유효하지 않은 배당율입니다. (1.0 이하)' 
+        });
+      }
+      // 🆕 소수점 문제 해결: Math.floor → Math.round 사용
+      const maxMatchableAmount = Math.round(matchAmount / (targetOrder.price - 1));
       actualMatchAmount = Math.min(maxMatchableAmount, targetOrder.remainingAmount || targetOrder.amount);
       stakeAmount = matchAmount; // 리스크 금액
     } else {
       // Lay 주문에 Back으로 매칭: matchAmount는 주문 금액
+      if (targetOrder.price <= 1.0) {
+        return res.status(400).json({ 
+          success: false, 
+          message: '유효하지 않은 배당율입니다. (1.0 이하)' 
+        });
+      }
       actualMatchAmount = Math.min(matchAmount, targetOrder.remainingAmount || targetOrder.amount);
       stakeAmount = Math.floor((targetOrder.price - 1) * actualMatchAmount); // 리스크 금액
     }
@@ -173,6 +186,22 @@ router.post('/match-order', verifyToken, async (req, res) => {
         message: '매칭 가능한 금액이 없습니다.' 
       });
     }
+    
+    // 🆕 매칭 금액 계산 디버깅 로그
+    console.log('🎯 매칭 금액 계산 결과:', {
+      targetOrderSide: targetOrder.side,
+      targetOrderPrice: targetOrder.price,
+      targetOrderAmount: targetOrder.amount,
+      targetOrderRemainingAmount: targetOrder.remainingAmount,
+      matchAmount: matchAmount,
+      actualMatchAmount: actualMatchAmount,
+      stakeAmount: stakeAmount,
+      matchType: matchType,
+      // 🆕 소수점 계산 디버깅 추가
+      calculation: targetOrder.side === 'back' ? 
+        `${matchAmount} / (${targetOrder.price} - 1) = ${matchAmount / (targetOrder.price - 1)}` : 
+        `${matchAmount} * (${targetOrder.price} - 1) = ${matchAmount * (targetOrder.price - 1)}`
+    });
     
     // 사용자 잔고 확인
     const user = await User.findByPk(userId);
@@ -233,9 +262,27 @@ router.post('/match-order', verifyToken, async (req, res) => {
       targetOrder.filledAmount = (targetOrder.filledAmount || 0) + actualMatchAmount;
       targetOrder.remainingAmount = (targetOrder.remainingAmount || targetOrder.amount) - actualMatchAmount;
       targetOrder.status = 'partially_matched'; // 🆕 새로운 상태 사용
+      
+      // 🆕 소수점 문제 해결: 잔액이 100원 미만이면 0으로 처리
+      if (targetOrder.remainingAmount < 100) {
+        console.log('🧹 잔액 정리: remainingAmount가 100원 미만이므로 0으로 처리');
+        targetOrder.remainingAmount = 0;
+        targetOrder.status = 'matched';
+        targetOrder.partiallyFilled = false;
+      }
     }
     
     await targetOrder.save();
+
+    // 🆕 대상 주문 업데이트 후 디버깅 로그
+    console.log('🎯 대상 주문 업데이트 완료:', {
+      orderId: targetOrder.id,
+      originalAmount: targetOrder.originalAmount,
+      filledAmount: targetOrder.filledAmount,
+      remainingAmount: targetOrder.remainingAmount,
+      status: targetOrder.status,
+      partiallyFilled: targetOrder.partiallyFilled
+    });
 
     // 🆕 ExchangeOrderMatch 레코드 생성
     console.log('🆕 ExchangeOrderMatch 생성 시작:', {

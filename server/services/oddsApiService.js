@@ -98,6 +98,8 @@ class OddsApiService {
     }
   }
 
+
+
   // 성능 모니터링
   updatePerformanceMetrics(processingTime) {
     this.performanceMetrics.totalProcessingTime += processingTime;
@@ -196,13 +198,20 @@ class OddsApiService {
 
   // 배당률 데이터 검증
   validateOddsData(game) {
-    return game && 
+    // 기본 데이터 검증
+    const basicValidation = game && 
            game.home_team && 
            game.away_team && 
            game.commence_time && 
            game.bookmakers && 
            Array.isArray(game.bookmakers) && 
            game.bookmakers.length > 0;
+    
+    if (!basicValidation) return false;
+    
+
+    
+    return true;
   }
 
   // 전체 카테고리 업데이트
