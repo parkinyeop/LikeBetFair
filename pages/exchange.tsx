@@ -241,10 +241,14 @@ export default function ExchangePage() {
           let apiUrl = '';
           try {
             apiUrl = buildApiUrl(`${API_CONFIG.ENDPOINTS.ODDS}/${config.sportKey}`);
+            console.log(`🔍 ${displayName} 데이터 요청:`, apiUrl);
+            
             const response = await fetch(apiUrl);
+            console.log(`📊 ${displayName} 응답 상태:`, response.status, response.statusText);
             
             if (response.ok) {
               const data = await response.json();
+              console.log(`✅ ${displayName} 데이터 로드 성공:`, data.length, '개 경기');
               
               const now = getCurrentLocalTime();
               const oneDayAgo = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
@@ -342,7 +346,8 @@ export default function ExchangePage() {
               }
             }
           } catch (err) {
-            console.error(`Error fetching ${displayName}:`, err);
+            console.error(`❌ ${displayName} 데이터 로드 실패:`, err);
+            console.error(`🔍 ${displayName} API URL:`, apiUrl);
           }
         }
         
