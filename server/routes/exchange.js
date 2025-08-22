@@ -151,8 +151,21 @@ router.post('/match-order', verifyToken, async (req, res) => {
       return res.status(400).json({ success: false, message: '매칭 배팅은 반대 타입으로만 가능합니다.' });
     }
     
-    // 🆕 부분 매칭 처리 로직
-    const actualMatchAmount = Math.min(matchAmount, targetOrder.remainingAmount || targetOrder.amount);
+    // 🆕 올바른 매칭 금액 계산 로직
+    let actualMatchAmount;
+    let stakeAmount;
+    
+    if (targetOrder.side === 'back') {
+      // Back 주문에 Lay로 매칭: matchAmount는 리스크 금액
+      // 실제 매칭되는 주문 금액 = matchAmount / (odds - 1)
+      const maxMatchableAmount = Math.floor(matchAmount / (targetOrder.price - 1));
+      actualMatchAmount = Math.min(maxMatchableAmount, targetOrder.remainingAmount || targetOrder.amount);
+      stakeAmount = matchAmount; // 리스크 금액
+    } else {
+      // Lay 주문에 Back으로 매칭: matchAmount는 주문 금액
+      actualMatchAmount = Math.min(matchAmount, targetOrder.remainingAmount || targetOrder.amount);
+      stakeAmount = Math.floor((targetOrder.price - 1) * actualMatchAmount); // 리스크 금액
+    }
     
     if (actualMatchAmount <= 0) {
       return res.status(400).json({ 
@@ -163,7 +176,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
     
     // 사용자 잔고 확인
     const user = await User.findByPk(userId);
-    const required = matchType === 'back' ? actualMatchAmount : Math.floor((targetOrder.price - 1) * actualMatchAmount);
+    const required = stakeAmount;
     
     if (!user || parseInt(user.balance) < required) {
       return res.status(400).json({ success: false, message: '잔고 부족' });
@@ -191,7 +204,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
       gameResultId: targetOrder.gameResultId,
       selection: targetOrder.selection,
       selectionDetails: targetOrder.selectionDetails,
-      stakeAmount: matchType === 'back' ? actualMatchAmount : Math.floor((targetOrder.price - 1) * actualMatchAmount),
+      stakeAmount: stakeAmount, // 🆕 올바른 리스크 금액 사용
       potentialProfit: matchType === 'back' ? Math.floor((targetOrder.price - 1) * actualMatchAmount) : actualMatchAmount,
       autoSettlement: true,
       backOdds: targetOrder.backOdds,

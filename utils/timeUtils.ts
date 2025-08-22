@@ -46,23 +46,22 @@ export function getClientTimezoneInfo() {
  * UTC 시간을 클라이언트 로컬 시간으로 변환
  */
 export function convertUtcToLocal(utcTime: string | Date): Date {
-  // UTC 시간을 Date 객체로 변환 (UTC로 해석)
   let utcDate: Date;
   if (typeof utcTime === 'string') {
-    // UTC 문자열을 명시적으로 UTC로 파싱
+    // 데이터베이스의 시간은 UTC이므로 명시적으로 UTC로 해석
+    // Z가 없으면 UTC로 간주하고 추가
     if (utcTime.endsWith('Z')) {
       utcDate = new Date(utcTime);
     } else {
-      // Z가 없으면 UTC로 간주하고 추가
+      // 이미 UTC 시간이므로 Z를 추가하여 명시적으로 UTC로 표시
       utcDate = new Date(utcTime + 'Z');
     }
   } else {
     utcDate = new Date(utcTime.getTime());
   }
   
-
-  
   // JavaScript Date는 자동으로 클라이언트 시간대로 표시됨
+  // UTC 09:30 → KST 18:30 (9시간 차이)
   return utcDate;
 }
 
