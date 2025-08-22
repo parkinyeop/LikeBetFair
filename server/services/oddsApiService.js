@@ -266,16 +266,11 @@ class OddsApiService {
           const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
           const fourteenDaysLater = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
           const filteredGames = oddsResponse.data.filter(game => {
-            // 🆕 안전한 시간 변환 로직 추가
+            // 🆕 올바른 UTC 시간 처리 로직
             let commence;
             try {
-              if (game.commence_time && game.commence_time.endsWith('Z')) {
-                commence = new Date(game.commence_time);
-              } else if (game.commence_time) {
-                commence = new Date(game.commence_time + 'Z');
-              } else {
-                return false;
-              }
+              // OddsAPI에서 받은 시간은 이미 UTC이므로 그대로 사용
+              commence = new Date(game.commence_time);
               
               if (isNaN(commence.getTime())) {
                 return false;
@@ -308,22 +303,21 @@ class OddsApiService {
               const calculatedOdds = this.calculateAverageOdds(game.bookmakers);
               console.log(`[DEBUG] calculateAverageOdds 결과:`, JSON.stringify(calculatedOdds, null, 2));
               
-              // 🆕 안전한 시간 변환 로직 추가
+              // 🆕 올바른 UTC 시간 처리 로직
               let commenceTime;
               try {
-                if (game.commence_time && game.commence_time.endsWith('Z')) {
-                  commenceTime = new Date(game.commence_time);
-                } else if (game.commence_time) {
-                  commenceTime = new Date(game.commence_time + 'Z');
-                } else {
-                  console.error(`[DEBUG] commence_time이 null/undefined: ${game.commence_time}`);
-                  continue;
-                }
+                // OddsAPI에서 받은 시간은 이미 UTC이므로 그대로 사용
+                // new Date()는 UTC 시간을 UTC로 정확하게 해석
+                commenceTime = new Date(game.commence_time);
                 
                 if (isNaN(commenceTime.getTime())) {
                   console.error(`[DEBUG] 유효하지 않은 시간: ${game.commence_time}`);
                   continue;
                 }
+                
+                // 🆕 디버깅: 시간 변환 결과 확인
+                console.log(`[DEBUG] 시간 변환: ${game.commence_time} → ${commenceTime.toISOString()}`);
+                
               } catch (timeError) {
                 console.error(`[DEBUG] 시간 변환 오류: ${timeError.message}`);
                 continue;
