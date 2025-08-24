@@ -15,7 +15,8 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
   const { isLoggedIn } = useAuth();
   const { setSelectedBet } = useExchangeContext();
   const { games: exchangeGames, loading: gamesLoading, error: gamesError, refetch } = useExchangeGames(selectedCategory);
-  const [gameMarkets, setGameMarkets] = useState<{[gameId: string]: '승패' | '총점' | '핸디캡'}>({});
+  // 체크박스 방식으로 변경: 여러 마켓을 동시에 선택 가능
+  const [gameMarkets, setGameMarkets] = useState<{[gameId: string]: Set<string>}>({});
   const [selectedBets, setSelectedBets] = useState<{[key: string]: boolean}>({});
 
   // 선택된 카테고리에서 스포츠 키 추출
@@ -129,14 +130,30 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
   console.log('✅ 필터링 후 경기 수:', sortedGames.length);
   const filteredGames = sortedGames;
 
-  // 경기별 마켓 선택 핸들러
-  const setGameMarket = (gameId: string, market: '승패' | '총점' | '핸디캡') => {
-    setGameMarkets(prev => ({ ...prev, [gameId]: market }));
+  // 체크박스 방식 마켓 토글 핸들러
+  const toggleGameMarket = (gameId: string, market: string) => {
+    setGameMarkets(prev => {
+      const current = prev[gameId] || new Set();
+      const newSet = new Set(current);
+      
+      if (newSet.has(market)) {
+        newSet.delete(market);
+      } else {
+        newSet.add(market);
+      }
+      
+      // 최소 하나는 선택되도록 보장
+      if (newSet.size === 0) {
+        newSet.add('승패');
+      }
+      
+      return { ...prev, [gameId]: newSet };
+    });
   };
 
-  // 경기의 현재 선택된 마켓 가져오기
-  const getGameMarket = (gameId: string) => {
-    return gameMarkets[gameId] || '승패';
+  // 경기의 선택된 마켓들 가져오기
+  const getSelectedMarkets = (gameId: string) => {
+    return gameMarkets[gameId] || new Set(['승패']);
   };
 
   // 주문 클릭 핸들러
@@ -151,8 +168,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
       return;
     }
 
-    const currentMarket = getGameMarket(game.id);
-    const betKey = `${game.id}-${currentMarket}-${team}`;
+    const betKey = `${game.id}-승패-${team}`; // Exchange는 주로 승패 마켓 사용
     
     // 같은 베팅을 다시 클릭하면 선택 해제, 다른 베팅을 클릭하면 선택
     if (selectedBets[betKey]) {
@@ -166,7 +182,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
         price,
         type,
         gameId: game.id,
-        market: currentMarket,
+        market: '승패', // Exchange는 주로 승패 마켓 사용
         homeTeam: game.homeTeam,
         awayTeam: game.awayTeam,
         commenceTime: game.commenceTime
@@ -259,7 +275,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
       <div className="flex-1 overflow-auto p-4 space-y-4">
                 {filteredGames.map((game) => {
           const isOpen = isBettingOpen(game.commenceTime);
-          const currentMarket = getGameMarket(game.id);
+          const selectedMarkets = getSelectedMarkets(game.id);
           
           return (
             <div key={game.id} className="bg-white rounded-lg shadow border border-gray-200">
@@ -331,45 +347,36 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                 </div>
               </div>
 
-              {/* 경기별 마켓 탭 선택 - 스포츠북 스타일 */}
-              <div className="bg-gray-50 border-b border-gray-200">
-                <div className="flex bg-gray-100 rounded-lg m-3 p-1">
-                  <button
-                    onClick={() => setGameMarket(game.id, '승패')}
-                    className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                      currentMarket === '승패'
-                        ? 'bg-blue-500 text-white'
-                        : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    Win/Loss
-                  </button>
-                  <button
-                    onClick={() => setGameMarket(game.id, '총점')}
-                    className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                      currentMarket === '총점'
-                        ? 'bg-blue-500 text-white'
-                        : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    Over/Under
-                  </button>
-                  <button
-                    onClick={() => setGameMarket(game.id, '핸디캡')}
-                    className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                      currentMarket === '핸디캡'
-                        ? 'bg-blue-500 text-white'
-                        : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    Handicap
-                  </button>
+              {/* 마켓 체크박스 - 여러 마켓을 동시에 선택 가능 */}
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="text-sm font-medium text-gray-700 mb-2">📊 베팅 마켓 선택:</div>
+                <div className="flex flex-wrap gap-4">
+                  {['승패', '총점', '핸디캡'].map(market => {
+                    const isSelected = selectedMarkets.has(market);
+                    return (
+                      <label key={market} className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleGameMarket(game.id, market)}
+                          className="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                        />
+                        <span className={`text-sm font-medium ${
+                          isSelected ? 'text-blue-700' : 'text-gray-600'
+                        }`}>
+                          {market === '승패' ? '승/패' : 
+                           market === '총점' ? '언더/오버' : '핸디캡'}
+                        </span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
 
               {/* 승패 마켓 */}
-              {currentMarket === '승패' && (
-                <div className="p-4">
+              {selectedMarkets.has('승패') && (
+                <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="text-sm font-medium text-blue-800 mb-2">🏆 승/패 (Win/Loss)</div>
                   <div className={`flex space-x-4 ${game.sportKey?.includes('baseball') ? 'justify-between' : ''}`}>
                     {/* 홈팀 승리 */}
                     <div className="flex-1">
@@ -379,7 +386,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                         className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
-                            : isBetSelected(game.id, currentMarket, game.homeTeam)
+                            : isBetSelected(game.id, '승패', game.homeTeam)
                             ? 'bg-yellow-400 hover:bg-yellow-500'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
@@ -400,7 +407,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                           className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                             !isOpen
                               ? 'opacity-50 cursor-not-allowed bg-gray-400'
-                              : isBetSelected(game.id, currentMarket, '무승부')
+                              : isBetSelected(game.id, '승패', '무승부')
                               ? 'bg-yellow-400 hover:bg-yellow-500'
                               : 'bg-blue-600 hover:bg-blue-700'
                           }`}
@@ -421,7 +428,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                         className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
-                            : isBetSelected(game.id, currentMarket, game.awayTeam)
+                            : isBetSelected(game.id, '승패', game.awayTeam)
                             ? 'bg-yellow-400 hover:bg-yellow-500'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
@@ -437,8 +444,9 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
               )}
 
               {/* 총점 마켓 */}
-              {currentMarket === '총점' && (
-                <div className="p-4">
+              {selectedMarkets.has('총점') && (
+                <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="text-sm font-medium text-blue-800 mb-2">📈 언더/오버 (Over/Under)</div>
                   <div className="flex space-x-4">
                     <div className="flex-1">
                       <button
@@ -447,7 +455,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                         className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
-                            : isBetSelected(game.id, currentMarket, 'Over 2.5')
+                            : isBetSelected(game.id, '총점', 'Over 2.5')
                             ? 'bg-yellow-400 hover:bg-yellow-500'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
@@ -465,7 +473,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                         className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
-                            : isBetSelected(game.id, currentMarket, 'Under 2.5')
+                            : isBetSelected(game.id, '총점', 'Under 2.5')
                             ? 'bg-yellow-400 hover:bg-yellow-500'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
@@ -481,8 +489,9 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
               )}
 
               {/* 핸디캡 마켓 */}
-              {currentMarket === '핸디캡' && (
-                <div className="p-4">
+              {selectedMarkets.has('핸디캡') && (
+                <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="text-sm font-medium text-blue-800 mb-2">🎯 핸디캡 (Handicap)</div>
                   <div className="flex space-x-4">
                     <div className="flex-1">
                       <button
@@ -491,7 +500,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                         className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
-                            : isBetSelected(game.id, currentMarket, '홈팀 -1.5')
+                            : isBetSelected(game.id, '핸디캡', '홈팀 -1.5')
                             ? 'bg-yellow-400 hover:bg-yellow-500'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
@@ -509,7 +518,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                         className={`w-full h-16 px-4 py-2 rounded text-white font-bold transition-colors border-2 border-gray-400 flex flex-col justify-center items-center ${
                           !isOpen
                             ? 'opacity-50 cursor-not-allowed bg-gray-400'
-                            : isBetSelected(game.id, currentMarket, '원정팀 +1.5')
+                            : isBetSelected(game.id, '핸디캡', '원정팀 +1.5')
                             ? 'bg-yellow-400 hover:bg-yellow-500'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
