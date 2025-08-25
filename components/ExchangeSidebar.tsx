@@ -481,7 +481,7 @@ function OrderPanel() {
                       const quickAmount = Math.floor(maxAmount * ratio);
                       setForm(f => ({ ...f, amount: quickAmount }));
                     }}
-                    className="flex-1 py-1 px-2 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+                    className="flex-1 py-1 px-2 text-xs bg-blue-100 hover:bg-blue-200 rounded text-blue-700"
                   >
                     {ratio === 1 ? '전액' : `${Math.round(ratio * 100)}%`}
                   </button>

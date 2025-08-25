@@ -347,14 +347,14 @@ const OrderbookPage: React.FC = () => {
         <div className="flex items-center space-x-3">
           <button
             onClick={() => router.push('/exchange')}
-            className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded hover:bg-blue-200 transition-colors flex items-center space-x-1"
+            className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors flex items-center space-x-1"
           >
             <span>←</span>
             <span>홈으로 돌아가기</span>
           </button>
           <button
             onClick={() => router.push('/exchange/live-odds')}
-            className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded hover:bg-blue-200 transition-colors flex items-center space-x-1"
+            className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors flex items-center space-x-1"
           >
             <span>📊</span>
             <span>실시간 호가 현황</span>
@@ -517,7 +517,7 @@ const OrderbookPage: React.FC = () => {
                   disabled={(order.status !== 'open' && order.status !== 'partially_matched') || order.userId === userId}
                   className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors text-white ${
                     (order.status === 'open' || order.status === 'partially_matched') && order.userId !== userId
-                      ? order.type === 'back' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
+                      ? order.type === 'back' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'
                       : 'bg-gray-400 text-gray-600 cursor-not-allowed'
                   }`}
                 >
@@ -704,7 +704,7 @@ const OrderbookPage: React.FC = () => {
             <div className="mt-6 flex justify-end">
               <button 
                 onClick={() => setSelectedOrderDetail(null)}
-                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
               >
                 닫기
               </button>
