@@ -262,7 +262,11 @@ function MyBetsPanel() {
               const times = bet.selections
                 .map((sel: any) => sel.commence_time)
                 .filter((t: any) => !!t)
-                .map((t: string) => new Date(t))
+                .map((t: string) => {
+                  // UTC 시간을 KST로 변환 (UTC+9)
+                  const utcDate = new Date(t);
+                  return new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
+                })
                 .filter((d: Date) => !isNaN(d.getTime()));
               if (times.length > 0) {
                 const maxDate = new Date(Math.max(...times.map(d => d.getTime())));

@@ -48,20 +48,17 @@ export function getClientTimezoneInfo() {
 export function convertUtcToLocal(utcTime: string | Date): Date {
   let utcDate: Date;
   if (typeof utcTime === 'string') {
-    // UTC 시간을 명시적으로 UTC로 해석
-    if (utcTime.endsWith('Z')) {
-      utcDate = new Date(utcTime);
-    } else {
-      // UTC로 간주하고 Z 추가
-      utcDate = new Date(utcTime + 'Z');
-    }
+    // OddsAPI에서 받은 시간은 이미 UTC이므로 그대로 사용
+    // new Date()는 UTC 시간을 UTC로 정확하게 해석
+    utcDate = new Date(utcTime);
   } else {
     utcDate = new Date(utcTime.getTime());
   }
   
-  // 브라우저 지역설정 기반 자동 변환
-  // 한국 사용자면 자동으로 KST로 표시, 다른 지역 사용자면 해당 지역 시간으로 변환
-  return utcDate;
+  // UTC 시간을 KST로 변환 (UTC+9)
+  const kstDate = new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
+  
+  return kstDate;
 }
 
 /**

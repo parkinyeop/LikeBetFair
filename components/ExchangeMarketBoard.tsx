@@ -59,7 +59,9 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
   // 베팅 마감 시간 체크 함수 (스포츠북 규칙) - 먼저 선언
   const isBettingOpen = (commenceTime: string): boolean => {
     const now = new Date();
-    const gameTime = new Date(commenceTime);
+    // UTC 시간을 KST로 변환 (UTC+9)
+    const utcDate = new Date(commenceTime);
+    const gameTime = new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
     const cutoffTime = new Date(gameTime.getTime() - 5 * 60 * 1000); // 5분 전 마감
     return now < cutoffTime;
   };
@@ -67,7 +69,9 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
   // 경기 표시 여부 체크 함수 (스포츠북 규칙)
   const shouldDisplayGame = (commenceTime: string): boolean => {
     const now = new Date();
-    const gameTime = new Date(commenceTime);
+    // UTC 시간을 KST로 변환 (UTC+9)
+    const utcDate = new Date(commenceTime);
+    const gameTime = new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
     const timeDiff = gameTime.getTime() - now.getTime();
     
     // 스포츠북 규칙: 과거 경기도 표시하되 배당율만 다르게 처리
@@ -86,7 +90,9 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
   
   const sortedGames = Array.from(uniqueGamesMap.values())
     .filter(game => {
-      const gameTime = new Date(game.commenceTime);
+      // UTC 시간을 KST로 변환 (UTC+9)
+      const utcDate = new Date(game.commenceTime);
+      const gameTime = new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
       const timeDiff = gameTime.getTime() - now.getTime();
       const shouldDisplay = shouldDisplayGame(game.commenceTime);
       
@@ -103,8 +109,11 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
       return shouldDisplay;
     })
     .sort((a, b) => {
-      const timeA = new Date(a.commenceTime);
-      const timeB = new Date(b.commenceTime);
+      // UTC 시간을 KST로 변환 (UTC+9)
+      const utcDateA = new Date(a.commenceTime);
+      const utcDateB = new Date(b.commenceTime);
+      const timeA = new Date(utcDateA.getTime() + 9 * 60 * 60 * 1000);
+      const timeB = new Date(utcDateB.getTime() + 9 * 60 * 60 * 1000);
       const now = new Date();
       
       // 1. 미래 경기 우선 (가까운 순)
@@ -247,7 +256,9 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
             {(() => {
               if (filteredGames.length === 0) return '';
               const nextGame = filteredGames[0];
-              const nextGameTime = new Date(nextGame.commenceTime);
+              // UTC 시간을 KST로 변환 (UTC+9)
+              const utcDate = new Date(nextGame.commenceTime);
+              const nextGameTime = new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
               const now = new Date();
               const timeDiff = nextGameTime.getTime() - now.getTime();
               if (timeDiff > 0) {
@@ -289,11 +300,12 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                     <div className="flex flex-col items-end">
                       <div className="text-xs text-gray-400">
                         {(() => {
-                          // UTC 시간을 올바르게 처리
-                          const gameTime = new Date(game.commenceTime);
+                          // UTC 시간을 KST로 변환 (UTC+9)
+                          const utcDate = new Date(game.commenceTime);
+                          const gameTime = new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
                           const now = new Date();
                           
-                          // UTC 기준으로 시간 차이 계산
+                          // KST 기준으로 시간 차이 계산
                           const timeDiff = gameTime.getTime() - now.getTime();
                           const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
                           const hoursDiff = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
