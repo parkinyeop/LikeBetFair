@@ -7,7 +7,15 @@ import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import next from 'next';
 
+// 환경변수 로드 (여러 파일 시도)
+dotenv.config({ path: '.env.local' });
+dotenv.config({ path: '.env' });
 dotenv.config();
+
+// 🚨 임시 해결책: API 키 강제 설정 (dotenv 문제 해결 후 제거)
+process.env.ODDS_API_KEY = 'e13d9605e7004b8a6f3d2aae57b2e8b4';
+process.env.THE_ODDS_API_KEY = 'e13d9605e7004b8a6f3d2aae57b2e8b4';
+console.log('[환경변수] 임시 API 키 강제 설정됨:', process.env.ODDS_API_KEY.substring(0, 8) + '...');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
