@@ -32,6 +32,12 @@ class OddsApiService {
     this.apiKey = process.env.ODDS_API_KEY || process.env.THE_ODDS_API_KEY;
     this.baseUrl = 'https://api.the-odds-api.com/v4/sports';
     
+    // 🚨 디버깅: API 키 상태 확인
+    console.log('[OddsApiService] 생성자에서 API 키 확인:');
+    console.log('[OddsApiService] ODDS_API_KEY:', process.env.ODDS_API_KEY ? `${process.env.ODDS_API_KEY.substring(0, 8)}...` : '설정되지 않음');
+    console.log('[OddsApiService] THE_ODDS_API_KEY:', process.env.THE_ODDS_API_KEY ? `${process.env.THE_ODDS_API_KEY.substring(0, 8)}...` : '설정되지 않음');
+    console.log('[OddsApiService] this.apiKey:', this.apiKey ? `${this.apiKey.substring(0, 8)}...` : '설정되지 않음');
+    
     // API 사용량 추적 (디버깅을 위해 완전히 비활성화)
     this.apiCallTracker = {
       dailyCalls: 0,
@@ -738,22 +744,21 @@ class OddsApiService {
                 continue;
               }
               
-              // 🆕 안전한 시간 변환 로직 추가
+              // 🆕 올바른 UTC 시간 처리 로직 (통일)
               let commenceTime;
               try {
-                if (game.commence_time && game.commence_time.endsWith('Z')) {
-                  commenceTime = new Date(game.commence_time);
-                } else if (game.commence_time) {
-                  commenceTime = new Date(game.commence_time + 'Z');
-                } else {
-                  console.error(`[야구 디버깅] ❌ commence_time이 null/undefined: ${game.commence_time}`);
-                  continue;
-                }
+                // OddsAPI에서 받은 시간은 이미 UTC이므로 그대로 사용
+                // new Date()는 UTC 시간을 UTC로 정확하게 해석
+                commenceTime = new Date(game.commence_time);
                 
                 if (isNaN(commenceTime.getTime())) {
                   console.error(`[야구 디버깅] ❌ 유효하지 않은 시간: ${game.commence_time}`);
                   continue;
                 }
+                
+                // 🆕 디버깅: 시간 변환 결과 확인
+                console.log(`[야구 디버깅] 시간 변환: ${game.commence_time} → ${commenceTime.toISOString()}`);
+                
               } catch (timeError) {
                 console.error(`[야구 디버깅] ❌ 시간 변환 오류: ${timeError.message}`);
                 continue;
