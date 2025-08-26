@@ -285,6 +285,14 @@ class ExchangeGameMappingService {
       // 1. OddsCache에서 경기 정보 및 배당율 조회 (GameResult 의존성 제거)
       const mappedData = { ...orderData };
       
+      console.log('🔍 mapGameDataToOrder 시작:', {
+        gameId: orderData.gameId,
+        selection: orderData.selection,
+        side: orderData.side,
+        originalCommenceTime: orderData.commenceTime,
+        originalCommenceTimeType: typeof orderData.commenceTime
+      });
+      
       if (orderData.gameId && orderData.selection) {
         const oddsCacheData = await this.getOddsCacheData(orderData.gameId, orderData.selection, orderData.side);
         
@@ -298,6 +306,16 @@ class ExchangeGameMappingService {
             oddsCacheData.mainCategory, 
             oddsCacheData.subCategory
           );
+          
+          // 🆕 디버깅: commenceTime 매핑 결과 확인
+          console.log('🔍 commenceTime 매핑 결과:', {
+            gameId: orderData.gameId,
+            originalCommenceTime: orderData.commenceTime,
+            oddsCacheCommenceTime: oddsCacheData.commenceTime,
+            mappedCommenceTime: mappedData.commenceTime,
+            mappedCommenceTimeType: typeof mappedData.commenceTime,
+            mappedCommenceTimeISO: mappedData.commenceTime?.toISOString()
+          });
           
           // 배당율 설정
           mappedData.backOdds = oddsCacheData.backOdds;
@@ -314,7 +332,8 @@ class ExchangeGameMappingService {
             side: orderData.side,
             backOdds: mappedData.backOdds,
             layOdds: mappedData.layOdds,
-            oddsSource: mappedData.oddsSource
+            oddsSource: mappedData.oddsSource,
+            commenceTime: mappedData.commenceTime
           });
         } else {
           console.log('⚠️ OddsCache에서 경기 정보를 찾을 수 없음:', orderData.gameId);
@@ -323,6 +342,16 @@ class ExchangeGameMappingService {
 
       // 2. selectionDetails 구조화
       mappedData.selectionDetails = this.createSelectionDetails(mappedData);
+
+      // 🆕 디버깅: 최종 매핑 결과 확인
+      console.log('🔍 최종 매핑 결과:', {
+        gameId: orderData.gameId,
+        homeTeam: mappedData.homeTeam,
+        awayTeam: mappedData.awayTeam,
+        commenceTime: mappedData.commenceTime,
+        commenceTimeType: typeof mappedData.commenceTime,
+        commenceTimeISO: mappedData.commenceTime?.toISOString()
+      });
 
       return mappedData;
 
