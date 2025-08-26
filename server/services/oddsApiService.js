@@ -215,9 +215,9 @@ class OddsApiService {
   }
 
   // 전체 카테고리 업데이트
-  async fetchAndCacheOdds() {
+  async fetchAndCacheOdds(forceUpdate = false) {
     try {
-      console.log('[DEBUG] Starting odds update for all categories...');
+      console.log(`[DEBUG] Starting odds update for all categories... Force Update: ${forceUpdate}`);
       
       // API 키 확인
       if (!this.apiKey) {
@@ -340,21 +340,57 @@ class OddsApiService {
               
               console.log(`[DEBUG] Upsert 데이터:`, JSON.stringify(upsertData, null, 2));
               
-              // findOrCreate 사용으로 unique constraint 의존성 완전 제거
-              const [oddsRecord, created] = await OddsCache.findOrCreate({
-                where: {
-                  mainCategory,
-                  subCategory,
-                  homeTeam: game.home_team,  
-                  awayTeam: game.away_team,
-                  commenceTime: commenceTime // 🆕 안전하게 변환된 시간 사용
-                },
-                defaults: upsertData
-              });
-              
-              // 기존 레코드 업데이트
-              if (!created) {
-                await oddsRecord.update(upsertData);
+              // 강제 업데이트 모드: 기존 데이터와 관계없이 항상 업데이트
+              if (forceUpdate) {
+                console.log(`[DEBUG] 🔄 강제 업데이트 모드: ${game.home_team} vs ${game.away_team}`);
+                
+                // 기존 레코드 찾기
+                const existingRecord = await OddsCache.findOne({
+                  where: {
+                    mainCategory,
+                    subCategory,
+                    homeTeam: game.home_team,  
+                    awayTeam: game.away_team,
+                    commenceTime: commenceTime
+                  }
+                });
+                
+                if (existingRecord) {
+                  // 기존 레코드 업데이트
+                  await existingRecord.update(upsertData);
+                  totalUpdatedCount++;
+                  console.log(`[DEBUG] ✅ 강제 업데이트 완료: ${game.home_team} vs ${game.away_team}`);
+                } else {
+                  // 새 레코드 생성
+                  await OddsCache.create(upsertData);
+                  totalNewCount++;
+                  console.log(`[DEBUG] ✅ 강제 새로 생성: ${game.home_team} vs ${game.away_team}`);
+                }
+              } else {
+                // 기존 로직: findOrCreate 사용
+                const [oddsRecord, created] = await OddsCache.findOrCreate({
+                  where: {
+                    mainCategory,
+                    subCategory,
+                    homeTeam: game.home_team,  
+                    awayTeam: game.away_team,
+                    commenceTime: commenceTime
+                  },
+                  defaults: upsertData
+                });
+                
+                // 기존 레코드 업데이트
+                if (!created) {
+                  await oddsRecord.update(upsertData);
+                }
+
+                if (created) {
+                  totalNewCount++;
+                  console.log(`[DEBUG] ✅ 새 배당률 저장: ${game.home_team} vs ${game.away_team}`);
+                } else {
+                  totalUpdatedCount++;
+                  console.log(`[DEBUG] 🔄 기존 배당률 업데이트: ${game.home_team} vs ${game.away_team}`);
+                }
               }
 
               if (created) {
@@ -365,8 +401,8 @@ class OddsApiService {
                 console.log(`[DEBUG] 🔄 기존 배당률 업데이트: ${game.home_team} vs ${game.away_team}`);
               }
 
-              // 배당률 히스토리 저장
-              if (oddsRecord) {
+              // 배당률 히스토리 저장 (강제 업데이트 모드에서는 건너뛰기)
+              if (!forceUpdate && oddsRecord) {
                 console.log('[DEBUG] saveOddsSnapshot 호출 직전:', {
                   id: oddsRecord.id,
                   homeTeam: oddsRecord.homeTeam,
@@ -529,7 +565,7 @@ class OddsApiService {
   }
 
   // 활성 카테고리만 업데이트 (스케줄러용)
-  async fetchAndCacheOddsForCategories(activeCategories, priorityLevel = 'medium') {
+  async fetchAndCacheOddsForCategories(activeCategories, priorityLevel = 'medium', forceUpdate = false) {
     let totalUpdatedCount = 0;
     let totalNewCount = 0;
     let totalSkippedCount = 0;
@@ -749,16 +785,58 @@ class OddsApiService {
                 console.log(`[야구 디버깅]   commenceTime: ${commenceTime.toISOString()}`); // 🆕 안전하게 변환된 시간 사용
               }
               
-              const [oddsRecord, created] = await OddsCache.findOrCreate({
-                where: {
-                  mainCategory,
-                  subCategory,
-                  homeTeam: game.home_team,
-                  awayTeam: game.away_team,
-                  commenceTime: commenceTime // 🆕 안전하게 변환된 시간 사용
-                },
-                defaults: upsertData
-              });
+              // 강제 업데이트 모드: 기존 데이터와 관계없이 항상 업데이트
+              if (forceUpdate) {
+                console.log(`[DEBUG] 🔄 강제 업데이트 모드: ${game.home_team} vs ${game.away_team}`);
+                
+                // 기존 레코드 찾기
+                const existingRecord = await OddsCache.findOne({
+                  where: {
+                    mainCategory,
+                    subCategory,
+                    homeTeam: game.home_team,
+                    awayTeam: game.away_team,
+                    commenceTime: commenceTime
+                  }
+                });
+                
+                if (existingRecord) {
+                  // 기존 레코드 업데이트
+                  await existingRecord.update(upsertData);
+                  totalUpdatedCount++;
+                  console.log(`[DEBUG] ✅ 강제 업데이트 완료: ${game.home_team} vs ${game.away_team}`);
+                } else {
+                  // 새 레코드 생성
+                  await OddsCache.create(upsertData);
+                  totalNewCount++;
+                  console.log(`[DEBUG] ✅ 강제 새로 생성: ${game.home_team} vs ${game.away_team}`);
+                }
+              } else {
+                // 기존 로직: findOrCreate 사용
+                const [oddsRecord, created] = await OddsCache.findOrCreate({
+                  where: {
+                    mainCategory,
+                    subCategory,
+                    homeTeam: game.home_team,
+                    awayTeam: game.away_team,
+                    commenceTime: commenceTime
+                  },
+                  defaults: upsertData
+                });
+                
+                // 기존 레코드 업데이트
+                if (!created) {
+                  await oddsRecord.update(upsertData);
+                }
+
+                if (created) {
+                  totalNewCount++;
+                  console.log(`[DEBUG] ✅ 새 배당률 저장: ${game.home_team} vs ${game.away_team}`);
+                } else {
+                  totalUpdatedCount++;
+                  console.log(`[DEBUG] 🔄 기존 배당률 업데이트: ${game.home_team} vs ${game.away_team}`);
+                }
+              }
               
               // 🆕 야구 전용 디버깅 로그 추가
               if (clientCategory.includes('KBO') || clientCategory.includes('MLB')) {

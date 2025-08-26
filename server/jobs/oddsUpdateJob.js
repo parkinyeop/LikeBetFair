@@ -286,9 +286,9 @@ cron.schedule('0 */2 * * *', async () => {
   });
   
   try {
-    // 10분 타임아웃 설정 (임시)
+    // 10분 타임아웃 설정 (임시) + 강제 업데이트 모드
     const oddsUpdateResult = await withTimeout(
-      oddsApiService.fetchAndCacheOddsForCategories(Array.from(highPriorityCategories), 'medium'),
+      oddsApiService.fetchAndCacheOddsForCategories(Array.from(highPriorityCategories), 'medium', true), // 강제 업데이트 모드 활성화
       10 * 60 * 1000, // 10분
       'Temporary high-priority odds update'
     );
