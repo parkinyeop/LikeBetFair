@@ -819,12 +819,17 @@ function OrderHistoryPanel() {
                     </div>
                     <div className="text-xs text-gray-500">
                       {order.market} • {commenceTime 
-                        ? new Date(commenceTime).toLocaleString('ko-KR', { 
-                            month: 'short', 
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })
+                        ? (() => {
+                            // commenceTime이 UTC 시간이므로, 9시간을 더해서 KST로 표시
+                            const utcDate = new Date(commenceTime);
+                            const kstDate = new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
+                            return kstDate.toLocaleString('ko-KR', { 
+                              month: 'short', 
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            });
+                          })()
                         : '시간 미정'
                       }
                     </div>
