@@ -432,60 +432,60 @@ cron.schedule('0 */2 * * *', async () => {
 //   // ... 기존 코드 전체 주석 처리 ...
 // });
 
-// 🆕 TEMPORARY SCHEDULER - 500K API LIMIT COMPLIANCE
-// 저우선순위 리그 - 72시간마다 업데이트 (임시)
-cron.schedule('0 0 */3 * * *', async () => {
-  saveUpdateLog('odds_temp', 'start', { 
-    message: 'Starting TEMPORARY low-priority leagues odds update (72hour interval - 500K limit)',
-    priority: 'low_temp',
-    leagues: Array.from(lowPriorityCategories),
-    note: 'Temporary scheduler due to 500K API limit'
-  });
-  
-  try {
-    // 12분 타임아웃 설정 (임시)
-    const oddsUpdateResult = await withTimeout(
-      oddsApiService.fetchAndCacheOddsForCategories(Array.from(lowPriorityCategories), 'low'),
-      12 * 60 * 1000, // 12분
-      'Temporary low-priority odds update'
-    );
-    
-    const oddsSummary = {
-      totalUpdated: oddsUpdateResult?.updatedCount || 0,
-      newOdds: oddsUpdateResult?.newCount || 0,
-      existingOddsUpdated: oddsUpdateResult?.updatedExistingCount || 0,
-      skippedOdds: oddsUpdateResult?.skippedCount || 0,
-      apiCalls: oddsUpdateResult?.apiCalls || 0,
-      categoriesProcessed: oddsUpdateResult?.categories?.length || 0
-    };
-    
-    console.log('[SCHEDULER_ODDS_TEMP] 📊 Temporary Low-priority Update Summary:');
-    console.log('[SCHEDULER_ODDS_TEMP]   - Total Updated:', oddsSummary.totalUpdated);
-    console.log('[SCHEDULER_ODDS_TEMP]   - New Odds:', oddsSummary.newOdds);
-    console.log('[SCHEDULER_ODDS_TEMP]   - Existing Updated:', oddsSummary.existingOddsUpdated);
-    console.log('[SCHEDULER_ODDS_TEMP]   - Skipped:', oddsSummary.skippedOdds);
-    console.log('[SCHEDULER_ODDS_TEMP]   - API Calls:', oddsSummary.apiCalls);
-    console.log('[SCHEDULER_ODDS_TEMP]   - Categories Processed:', oddsSummary.categoriesProcessed);
-    
-    saveUpdateLog('odds_temp', 'success', { 
-      message: 'Temporary low-priority odds update completed (72hour interval)',
-      priority: 'low_temp',
-      leagues: Array.from(lowPriorityCategories),
-      oddsUpdated: oddsSummary.totalUpdated,
-      oddsDetail: oddsSummary,
-      note: 'Temporary scheduler due to 500K API limit'
-    });
-    
-  } catch (error) {
-    saveUpdateLog('odds_temp', 'error', { 
-      message: 'Temporary low-priority odds update failed',
-      priority: 'low_temp',
-      leagues: Array.from(lowPriorityCategories),
-      error: error.message,
-      note: 'Temporary scheduler due to 500K API limit'
-    });
-  }
-});
+// 🚫 TEMPORARILY DISABLED - ORIGINAL SCHEDULER RESTORED
+// 저우선순위 리그 - 24시간마다 업데이트 (원래 코드)
+// cron.schedule('0 0 */3 * * *', async () => {
+//   saveUpdateLog('odds_temp', 'start', { 
+//     message: 'Starting TEMPORARY low-priority leagues odds update (72hour interval - 500K limit)',
+//     priority: 'low_temp',
+//     leagues: Array.from(lowPriorityCategories),
+//     note: 'Temporary scheduler due to 500K API limit'
+//   });
+//   
+//   try {
+//     // 12분 타임아웃 설정 (임시)
+//     const oddsUpdateResult = await withTimeout(
+//       oddsApiService.fetchAndCacheOddsForCategories(Array.from(lowPriorityCategories), 'low'),
+//       12 * 60 * 1000, // 12분
+//       'Temporary low-priority odds update'
+//     );
+//     
+//     const oddsSummary = {
+//       totalUpdated: oddsUpdateResult?.updatedCount || 0,
+//       newOdds: oddsUpdateResult?.newCount || 0,
+//       existingOddsUpdated: oddsUpdateResult?.updatedExistingCount || 0,
+//       skippedOdds: oddsUpdateResult?.skippedCount || 0,
+//       apiCalls: oddsUpdateResult?.apiCalls || 0,
+//       categoriesProcessed: oddsUpdateResult?.categories?.length || 0
+//     };
+//     
+//     console.log('[SCHEDULER_ODDS_TEMP] 📊 Temporary Low-priority Update Summary:');
+//     console.log('[SCHEDULER_ODDS_TEMP]   - Total Updated:', oddsSummary.totalUpdated);
+//     console.log('[SCHEDULER_ODDS_TEMP]   - New Odds:', oddsSummary.newOdds);
+//     console.log('[SCHEDULER_ODDS_TEMP]   - Existing Updated:', oddsSummary.existingOddsUpdated);
+//     console.log('[SCHEDULER_ODDS_TEMP]   - Skipped:', oddsSummary.skippedOdds);
+//     console.log('[SCHEDULER_ODDS_TEMP]   - API Calls:', oddsSummary.apiCalls);
+//     console.log('[SCHEDULER_ODDS_TEMP]   - Categories Processed:', oddsSummary.categoriesProcessed);
+//     
+//     saveUpdateLog('odds_temp', 'success', { 
+//       message: 'Temporary low-priority odds update completed (72hour interval)',
+//       priority: 'low_temp',
+//       leagues: Array.from(lowPriorityCategories),
+//       oddsUpdated: oddsSummary.totalUpdated,
+//       oddsDetail: oddsSummary,
+//       note: 'Temporary scheduler due to 500K API limit'
+//     });
+//     
+//   } catch (error) {
+//     saveUpdateLog('odds_temp', 'error', { 
+//       message: 'Temporary low-priority odds update failed',
+//       priority: 'low_temp',
+//       leagues: Array.from(lowPriorityCategories),
+//       error: error.message,
+//       note: 'Temporary scheduler due to 500K API limit'
+//     });
+//   }
+// });
 
 // 🚫 TEMPORARILY DISABLED - 500K API LIMIT RESPONSE
 // 전체 데이터 업데이트 - 하루에 한 번만 (비용 절약) (원래 코드)
@@ -493,51 +493,51 @@ cron.schedule('0 0 */3 * * *', async () => {
 //   // ... 기존 코드 전체 주석 처리 ...
 // });
 
-// 🆕 TEMPORARY SCHEDULER - 500K API LIMIT COMPLIANCE
-// 전체 데이터 업데이트 - 3일에 한 번만 (임시)
-cron.schedule('0 6 */3 * *', async () => {
-  saveUpdateLog('full_temp', 'start', { 
-    message: 'Starting TEMPORARY full data update (3day interval - 500K limit)',
-    includesOdds: true,
-    includesResults: true,
-    includesBets: true,
-    note: 'Temporary scheduler due to 500K API limit'
-  });
-  
-  try {
-    // 모든 카테고리에 대해 한 번에 업데이트 (20분 타임아웃 - 임시)
-    const [oddsResult, resultsResult] = await withTimeout(
-      Promise.all([
-        oddsApiService.fetchAndCacheOdds(),
-        gameResultService.fetchAndUpdateResults()
-      ]),
-      20 * 60 * 1000, // 20분
-      'Temporary daily full update'
-    );
-    
-    // 배팅 결과 업데이트 (3분 타임아웃 - 임시)
-    const betResult = await withTimeout(
-      betResultService.updateBetResults(),
-      3 * 60 * 1000, // 3분
-      'Temporary daily bet results update'
-    );
-    
-    lastUpdateTime = new Date();
-    saveUpdateLog('full_temp', 'success', { 
-      message: 'Temporary full data update completed (3day interval)',
-      oddsUpdated: 'All categories',
-      resultsUpdated: resultsResult?.updatedCount || 'N/A',
-      betsUpdated: betResult?.updatedCount || 0,
-      note: 'Temporary scheduler due to 500K API limit'
-    });
-  } catch (error) {
-    saveUpdateLog('full_temp', 'error', { 
-      message: 'Temporary full data update failed',
-      error: error.message,
-      note: 'Temporary scheduler due to 500K API limit'
-    });
-  }
-});
+// 🚫 TEMPORARILY DISABLED - ORIGINAL SCHEDULER RESTORED
+// 전체 데이터 업데이트 - 하루에 한 번만 (원래 코드)
+// cron.schedule('0 6 */3 * *', async () => {
+//   saveUpdateLog('full_temp', 'start', { 
+//     message: 'Starting TEMPORARY full data update (3day interval - 500K limit)',
+//     includesOdds: true,
+//     includesResults: true,
+//     includesBets: true,
+//       note: 'Temporary scheduler due to 500K API limit'
+//   });
+//   
+//   try {
+//     // 모든 카테고리에 대해 한 번에 업데이트 (20분 타임아웃 - 임시)
+//     const [oddsResult, resultsResult] = await withTimeout(
+//       Promise.all([
+//         oddsApiService.fetchAndCacheOdds(),
+//         gameResultCount: Array.from(activeCategories).length
+//       ]),
+//       20 * 60 * 1000, // 20분
+//       'Temporary daily full update'
+//     );
+//     
+//     // 배팅 결과 업데이트 (3분 타임아웃 - 임시)
+//     const betResult = await withTimeout(
+//       betResultService.updateBetResults(),
+//       3 * 60 * 1000, // 3분
+//       'Temporary daily bet results update'
+//     );
+//     
+//     lastUpdateTime = new Date();
+//     saveUpdateLog('full_temp', 'success', { 
+//       message: 'Temporary full data update completed (3day interval)',
+//       oddsUpdated: 'All categories',
+//       resultsUpdated: resultsResult?.updatedCount || 'N/A',
+//       betsUpdated: betResult?.updatedCount || 0,
+//       note: 'Temporary scheduler due to 500K API limit'
+//     });
+//   } catch (error) {
+//     saveUpdateLog('full_temp', 'error', { 
+//       message: 'Temporary full data update failed',
+//       error: error.message,
+//       note: 'Temporary scheduler due to 500K API limit'
+//     });
+//   }
+// });
 
 // 데이터베이스 통계 - 매일 자정에 실행
 cron.schedule('0 0 * * *', async () => {

@@ -38,15 +38,21 @@ class OddsApiService {
     console.log('[OddsApiService] THE_ODDS_API_KEY:', process.env.THE_ODDS_API_KEY ? `${process.env.THE_ODDS_API_KEY.substring(0, 8)}...` : '설정되지 않음');
     console.log('[OddsApiService] this.apiKey:', this.apiKey ? `${this.apiKey.substring(0, 8)}...` : '설정되지 않음');
     
-    // API 사용량 추적 (디버깅을 위해 완전히 비활성화)
+    // API 사용량 추적
     this.apiCallTracker = {
       dailyCalls: 0,
       monthlyCalls: 0,
       lastResetDate: new Date().toDateString(),
-      dailyLimit: 999999,
-      monthlyLimit: 999999,
+      // 🚨 임시 설정 (디버깅용) - 나중에 원래 값으로 복구 필요
+      dailyLimit: 999999,    // 원래: 500 (무료 플랜)
+      monthlyLimit: 10000,   // 원래: 10000 (무료 플랜)
       currentHourCalls: 0,
-      hourlyLimit: 999999
+      hourlyLimit: 999999    // 원래: 100 (무료 플랜)
+      
+      // 🔧 원래 설정 (복구 시 주석 해제)
+      // dailyLimit: 500,      // 일일 500회
+      // monthlyLimit: 10000,  // 월간 10,000회
+      // hourlyLimit: 100      // 시간당 100회
     };
     
     // 성능 모니터링
@@ -75,11 +81,26 @@ class OddsApiService {
     console.log(`[DEBUG] API Call Tracker: Daily ${this.apiCallTracker.dailyCalls}, Monthly ${this.apiCallTracker.monthlyCalls}`);
   }
 
-  // API 호출 가능 여부 확인 (디버깅을 위해 완전히 비활성화)
+  // API 호출 가능 여부 확인
   canMakeApiCall() {
-    // 디버깅 모드: 모든 API 호출 허용
+    // 🚨 임시 설정 (디버깅용) - 모든 API 호출 허용
     console.log(`[DEBUG] API 호출 허용 - Daily: ${this.apiCallTracker.dailyCalls}, Monthly: ${this.apiCallTracker.monthlyCalls}`);
     return true;
+    
+    // 🔧 원래 설정 (복구 시 주석 해제)
+    /*
+    const canMakeDaily = this.apiCallTracker.dailyCalls < this.apiCallTracker.dailyLimit;
+    const canMakeMonthly = this.apiCallTracker.monthlyCalls < this.apiCallTracker.monthlyLimit;
+    const canMakeHourly = this.apiCallTracker.currentHourCalls < this.apiCallTracker.hourlyLimit;
+    
+    const canMake = canMakeDaily && canMakeMonthly && canMakeHourly;
+    
+    if (!canMake) {
+      console.log(`[DEBUG] API 호출 제한 - Daily: ${this.apiCallTracker.dailyCalls}/${this.apiCallTracker.dailyLimit}, Monthly: ${this.apiCallTracker.monthlyCalls}/${this.apiCallTracker.monthlyLimit}, Hourly: ${this.apiCallTracker.currentHourCalls}/${this.apiCallTracker.hourlyLimit}`);
+    }
+    
+    return canMake;
+    */
   }
 
   // 구조화된 로깅
@@ -309,20 +330,29 @@ class OddsApiService {
               const calculatedOdds = this.calculateAverageOdds(game.bookmakers);
               console.log(`[DEBUG] calculateAverageOdds 결과:`, JSON.stringify(calculatedOdds, null, 2));
               
-              // 🆕 올바른 UTC 시간 처리 로직
+              // 🆕 강제 UTC 시간 처리 로직
               let commenceTime;
               try {
-                // OddsAPI에서 받은 시간은 이미 UTC이므로 그대로 사용
-                // new Date()는 UTC 시간을 UTC로 정확하게 해석
-                commenceTime = new Date(game.commence_time);
+                // OddsAPI에서 받은 시간은 이미 UTC이므로 강제로 UTC로 저장
+                const utcDate = new Date(game.commence_time);
                 
-                if (isNaN(commenceTime.getTime())) {
+                if (isNaN(utcDate.getTime())) {
                   console.error(`[DEBUG] 유효하지 않은 시간: ${game.commence_time}`);
                   continue;
                 }
                 
+                // 🆕 강제로 UTC 시간으로 설정 (KST 변환 방지)
+                commenceTime = new Date(Date.UTC(
+                  utcDate.getUTCFullYear(),
+                  utcDate.getUTCMonth(),
+                  utcDate.getUTCDate(),
+                  utcDate.getUTCHours(),
+                  utcDate.getUTCMinutes(),
+                  utcDate.getUTCSeconds()
+                ));
+                
                 // 🆕 디버깅: 시간 변환 결과 확인
-                console.log(`[DEBUG] 시간 변환: ${game.commence_time} → ${commenceTime.toISOString()}`);
+                console.log(`[DEBUG] 강제 UTC 변환: ${game.commence_time} → ${commenceTime.toISOString()}`);
                 
               } catch (timeError) {
                 console.error(`[DEBUG] 시간 변환 오류: ${timeError.message}`);
@@ -744,20 +774,29 @@ class OddsApiService {
                 continue;
               }
               
-              // 🆕 올바른 UTC 시간 처리 로직 (통일)
+              // 🆕 강제 UTC 시간 처리 로직 (통일)
               let commenceTime;
               try {
-                // OddsAPI에서 받은 시간은 이미 UTC이므로 그대로 사용
-                // new Date()는 UTC 시간을 UTC로 정확하게 해석
-                commenceTime = new Date(game.commence_time);
+                // OddsAPI에서 받은 시간은 이미 UTC이므로 강제로 UTC로 저장
+                const utcDate = new Date(game.commence_time);
                 
-                if (isNaN(commenceTime.getTime())) {
+                if (isNaN(utcDate.getTime())) {
                   console.error(`[야구 디버깅] ❌ 유효하지 않은 시간: ${game.commence_time}`);
                   continue;
                 }
                 
+                // 🆕 강제로 UTC 시간으로 설정 (KST 변환 방지)
+                commenceTime = new Date(Date.UTC(
+                  utcDate.getUTCFullYear(),
+                  utcDate.getUTCMonth(),
+                  utcDate.getUTCDate(),
+                  utcDate.getUTCHours(),
+                  utcDate.getUTCMinutes(),
+                  utcDate.getUTCSeconds()
+                ));
+                
                 // 🆕 디버깅: 시간 변환 결과 확인
-                console.log(`[야구 디버깅] 시간 변환: ${game.commence_time} → ${commenceTime.toISOString()}`);
+                console.log(`[야구 디버깅] 강제 UTC 변환: ${game.commence_time} → ${commenceTime.toISOString()}`);
                 
               } catch (timeError) {
                 console.error(`[야구 디버깅] ❌ 시간 변환 오류: ${timeError.message}`);

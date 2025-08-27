@@ -13,9 +13,9 @@ dotenv.config({ path: '.env' });
 dotenv.config();
 
 // 🚨 임시 해결책: API 키 강제 설정 (dotenv 문제 해결 후 제거)
-process.env.ODDS_API_KEY = 'e13d9605e7004b8a6f3d2aae57b2e8b4';
-process.env.THE_ODDS_API_KEY = 'e13d9605e7004b8a6f3d2aae57b2e8b4';
-console.log('[환경변수] 임시 API 키 강제 설정됨:', process.env.ODDS_API_KEY.substring(0, 8) + '...');
+process.env.ODDS_API_KEY = 'b1a67915235b9dd963dcb5be603853ea';
+process.env.THE_ODDS_API_KEY = 'b1a67915235b9dd963dcb5be603853ea';
+console.log('[환경변수] 새로운 API 키 설정됨:', process.env.ODDS_API_KEY.substring(0, 8) + '...');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -148,15 +148,7 @@ app.all('*', (req, res) => {
   return handle(req, res);
 });
 
-// 스케줄러 초기화
-// 빌드 환경에서는 스케줄러 비활성화 (타임아웃 방지)
-if (process.env.NODE_ENV !== 'production' || process.env.DISABLE_SCHEDULER !== 'true') {
-  import('./jobs/oddsUpdateJob.js').catch(err => {
-    console.log('[스케줄러] 빌드 환경에서 스케줄러 로드 실패 (정상):', err.message);
-  });
-} else {
-  console.log('[스케줄러] 빌드 환경에서 스케줄러 비활성화됨');
-}
+// 스케줄러 초기화는 startServer 함수 내부에서 처리
 
 // 배팅 결과 업데이트는 oddsUpdateJob.js에서만 처리 (중복 방지)
 
@@ -284,6 +276,20 @@ async function startServer() {
     console.log('[시작] Next.js 앱 준비 중...');
     await nextApp.prepare();
     console.log('✅ Next.js 앱 준비 완료');
+    
+    // 스케줄러 초기화
+    console.log('[시작] 스케줄러 초기화 중...');
+    if (process.env.NODE_ENV !== 'production' || process.env.DISABLE_SCHEDULER !== 'true') {
+      try {
+        await import('./jobs/oddsUpdateJob.js');
+        console.log('[스케줄러] ✅ 스케줄러 로드 성공');
+      } catch (err) {
+        console.error('[스케줄러] ❌ 스케줄러 로드 실패:', err.message);
+        console.error('[스케줄러] 스택 트레이스:', err.stack);
+      }
+    } else {
+      console.log('[스케줄러] 빌드 환경에서 스케줄러 비활성화됨');
+    }
     
     // 서버 시작
     console.log(`[시작] Express 서버 시작 중... (포트: ${PORT})`);
