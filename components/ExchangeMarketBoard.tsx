@@ -59,9 +59,10 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
   // 베팅 마감 시간 체크 함수 (스포츠북 규칙) - 먼저 선언
   const isBettingOpen = (commenceTime: string): boolean => {
     const now = new Date();
-    // UTC 시간을 KST로 변환 (UTC+9)
+    // 🚨 수정: 하드코딩된 KST 변환 제거
+    // 브라우저의 로컬 시간대 설정을 사용하여 자동 변환
     const utcDate = new Date(commenceTime);
-    const gameTime = new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
+    const gameTime = utcDate;
     const cutoffTime = new Date(gameTime.getTime() - 5 * 60 * 1000); // 5분 전 마감
     return now < cutoffTime;
   };
@@ -69,9 +70,10 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
   // 경기 표시 여부 체크 함수 (스포츠북 규칙)
   const shouldDisplayGame = (commenceTime: string): boolean => {
     const now = new Date();
-    // UTC 시간을 KST로 변환 (UTC+9)
+    // 🚨 수정: 하드코딩된 KST 변환 제거
+    // 브라우저의 로컬 시간대 설정을 사용하여 자동 변환
     const utcDate = new Date(commenceTime);
-    const gameTime = new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
+    const gameTime = utcDate;
     const timeDiff = gameTime.getTime() - now.getTime();
     
     // 스포츠북 규칙: 과거 경기도 표시하되 배당율만 다르게 처리
@@ -90,9 +92,10 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
   
   const sortedGames = Array.from(uniqueGamesMap.values())
     .filter(game => {
-      // UTC 시간을 KST로 변환 (UTC+9)
+      // 🚨 수정: 하드코딩된 KST 변환 제거
+      // 브라우저의 로컬 시간대 설정을 사용하여 자동 변환
       const utcDate = new Date(game.commenceTime);
-      const gameTime = new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
+      const gameTime = utcDate;
       const timeDiff = gameTime.getTime() - now.getTime();
       const shouldDisplay = shouldDisplayGame(game.commenceTime);
       
@@ -109,11 +112,12 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
       return shouldDisplay;
     })
     .sort((a, b) => {
-      // UTC 시간을 KST로 변환 (UTC+9)
+      // 🚨 수정: 하드코딩된 KST 변환 제거
+      // 브라우저의 로컬 시간대 설정을 사용하여 자동 변환
       const utcDateA = new Date(a.commenceTime);
       const utcDateB = new Date(b.commenceTime);
-      const timeA = new Date(utcDateA.getTime() + 9 * 60 * 60 * 1000);
-      const timeB = new Date(utcDateB.getTime() + 9 * 60 * 60 * 1000);
+      const timeA = utcDateA;
+      const timeB = utcDateB;
       const now = new Date();
       
       // 1. 미래 경기 우선 (가까운 순)
@@ -256,9 +260,10 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
             {(() => {
               if (filteredGames.length === 0) return '';
               const nextGame = filteredGames[0];
-              // UTC 시간을 KST로 변환 (UTC+9)
+              // 🚨 수정: 하드코딩된 KST 변환 제거
+              // 브라우저의 로컬 시간대 설정을 사용하여 자동 변환
               const utcDate = new Date(nextGame.commenceTime);
-              const nextGameTime = new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
+              const nextGameTime = utcDate;
               const now = new Date();
               const timeDiff = nextGameTime.getTime() - now.getTime();
               if (timeDiff > 0) {
@@ -300,9 +305,10 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                     <div className="flex flex-col items-end">
                       <div className="text-xs text-gray-400">
                         {(() => {
-                          // UTC 시간을 KST로 변환 (UTC+9)
+                          // 🚨 수정: 하드코딩된 KST 변환 제거
+                          // 브라우저의 로컬 시간대 설정을 사용하여 자동 변환
                           const utcDate = new Date(game.commenceTime);
-                          const gameTime = new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
+                          const gameTime = utcDate;
                           const now = new Date();
                           
                           // KST 기준으로 시간 차이 계산
@@ -336,12 +342,11 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                         })()}
                       </div>
                       <div className="text-xs text-gray-400">
-                        {/* UTC 시간을 한국 시간으로 변환하여 표시 */}
+                        {/* 🚨 수정: 하드코딩된 KST 변환 제거 */}
+                        {/* 브라우저의 로컬 시간대 설정을 사용하여 자동 변환 */}
                         {(() => {
                           const gameTime = new Date(game.commenceTime);
-                          // UTC를 한국 시간(KST)으로 변환 (UTC+9)
-                          const kstTime = new Date(gameTime.getTime() + 9 * 60 * 60 * 1000);
-                          return kstTime.toLocaleString('ko-KR', {
+                          return gameTime.toLocaleString('ko-KR', {
                             month: '2-digit',
                             day: '2-digit',
                             hour: '2-digit',

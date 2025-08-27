@@ -263,9 +263,10 @@ function MyBetsPanel() {
                 .map((sel: any) => sel.commence_time)
                 .filter((t: any) => !!t)
                 .map((t: string) => {
-                  // UTC 시간을 KST로 변환 (UTC+9)
+                  // 🚨 수정: 하드코딩된 KST 변환 제거
+                  // 브라우저의 로컬 시간대 설정을 사용하여 자동 변환
                   const utcDate = new Date(t);
-                  return new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
+                  return utcDate;
                 })
                 .filter((d: Date) => !isNaN(d.getTime()));
               if (times.length > 0) {

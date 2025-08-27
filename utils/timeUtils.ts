@@ -55,10 +55,12 @@ export function convertUtcToLocal(utcTime: string | Date): Date {
     utcDate = new Date(utcTime.getTime());
   }
   
-  // UTC 시간을 KST로 변환 (UTC+9)
-  const kstDate = new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
+  // 🚨 수정: 하드코딩된 KST 변환 제거
+  // 브라우저의 로컬 시간대 설정을 사용하여 자동 변환
+  // const kstDate = new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
   
-  return kstDate;
+  // UTC 시간을 브라우저 로컬 시간대로 자동 변환
+  return utcDate;
 }
 
 /**

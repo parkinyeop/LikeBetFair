@@ -820,10 +820,10 @@ function OrderHistoryPanel() {
                     <div className="text-xs text-gray-500">
                       {order.market} • {commenceTime 
                         ? (() => {
-                            // commenceTime이 UTC 시간이므로, 9시간을 더해서 KST로 표시
+                            // 🚨 수정: 하드코딩된 KST 변환 제거
+                            // 브라우저의 로컬 시간대 설정을 사용하여 자동 변환
                             const utcDate = new Date(commenceTime);
-                            const kstDate = new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
-                            return kstDate.toLocaleString('ko-KR', { 
+                            return utcDate.toLocaleString('ko-KR', { 
                               month: 'short', 
                               day: 'numeric',
                               hour: '2-digit',
