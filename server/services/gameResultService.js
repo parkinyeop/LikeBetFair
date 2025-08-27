@@ -30,6 +30,9 @@ const clientSportKeyMap = {
   'KBO': 'baseball_kbo',
   'NFL': 'americanfootball_nfl',
   
+  // 한글 카테고리명
+  '프리미어리그': 'soccer_england_premier_league',
+  
   // 기타 영문 변형
   'LaLiga': 'soccer_spain_la_liga',
   'SerieA': 'soccer_italy_serie_a',

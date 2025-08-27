@@ -829,12 +829,16 @@ class OddsApiService {
                 console.log(`[야구 디버깅]   commenceTime: ${commenceTime.toISOString()}`); // 🆕 안전하게 변환된 시간 사용
               }
               
+              // 변수를 상위 스코프에서 선언
+              let oddsRecord = null;
+              let created = false;
+              
               // 강제 업데이트 모드: 기존 데이터와 관계없이 항상 업데이트
               if (forceUpdate) {
                 console.log(`[DEBUG] 🔄 강제 업데이트 모드: ${game.home_team} vs ${game.away_team}`);
                 
                 // 기존 레코드 찾기
-                const existingRecord = await OddsCache.findOne({
+                oddsRecord = await OddsCache.findOne({
                   where: {
                     mainCategory,
                     subCategory,
@@ -844,20 +848,21 @@ class OddsApiService {
                   }
                 });
                 
-                if (existingRecord) {
+                if (oddsRecord) {
                   // 기존 레코드 업데이트
-                  await existingRecord.update(upsertData);
+                  await oddsRecord.update(upsertData);
                   totalUpdatedCount++;
                   console.log(`[DEBUG] ✅ 강제 업데이트 완료: ${game.home_team} vs ${game.away_team}`);
                 } else {
                   // 새 레코드 생성
-                  await OddsCache.create(upsertData);
+                  oddsRecord = await OddsCache.create(upsertData);
+                  created = true;
                   totalNewCount++;
                   console.log(`[DEBUG] ✅ 강제 새로 생성: ${game.home_team} vs ${game.away_team}`);
                 }
               } else {
                 // 기존 로직: findOrCreate 사용
-                const [oddsRecord, created] = await OddsCache.findOrCreate({
+                const [record, isCreated] = await OddsCache.findOrCreate({
                   where: {
                     mainCategory,
                     subCategory,
@@ -867,6 +872,9 @@ class OddsApiService {
                   },
                   defaults: upsertData
                 });
+                
+                oddsRecord = record;
+                created = isCreated;
                 
                 // 기존 레코드 업데이트
                 if (!created) {
@@ -887,17 +895,6 @@ class OddsApiService {
                 console.log(`[야구 디버깅] 💾 데이터베이스 저장 결과:`);
                 console.log(`[야구 디버깅]   새로 생성: ${created ? '예' : '아니오'}`);
                 console.log(`[야구 디버깅]   레코드 ID: ${oddsRecord?.id || 'N/A'}`);
-              }
-              
-              // 기존 레코드 업데이트
-              if (!created) {
-                await oddsRecord.update(upsertData);
-              }
-
-              if (created) {
-                totalNewCount++;
-              } else {
-                totalUpdatedCount++;
               }
 
               // OddsHistory 저장 추가
