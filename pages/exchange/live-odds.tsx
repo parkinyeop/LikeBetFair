@@ -291,11 +291,17 @@ export default function LiveOddsPage() {
                       {/* 🆕 Back 주문이 있는 선택지 (비활성화) */}
                       <button 
                         disabled={true}
-                        className="flex-1 px-4 py-2 rounded bg-gray-600 border-gray-500 cursor-not-allowed opacity-50 text-white font-bold border-2"
+                        className="flex-1 px-4 py-2 rounded bg-gray-600 border-gray-500 cursor-not-allowed text-white font-bold border-2"
                       >
-                        <div>{order.selection}</div>
+                        <div className="text-white">{order.selection}</div>
                         <div className="text-xs mt-1 opacity-90">
                           🎯 Back
+                        </div>
+                        <div className="text-xs mt-1 text-white font-medium">
+                          배당률: {order.price.toFixed(2)}
+                        </div>
+                        <div className="text-xs mt-1 text-white font-medium">
+                          금액: {order.amount.toLocaleString()}원
                         </div>
                       </button>
                       
@@ -334,6 +340,9 @@ export default function LiveOddsPage() {
                         </div>
                         <div className="text-xs mt-1 opacity-90">
                           📉 Lay 가능
+                        </div>
+                        <div className="text-xs mt-1 opacity-90">
+                          매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원
                         </div>
                       </button>
                     </div>
