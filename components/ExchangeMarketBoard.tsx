@@ -524,7 +524,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                                     : 'bg-blue-600 hover:bg-blue-700'
                                 } text-white text-sm`}
                               >
-                                <div className="font-medium">Over {point}</div>
+                                <div className="font-medium">{game.homeTeam}</div>
                                 <div className="text-xs">{overOdds ? overOdds.toFixed(2) : 'N/A'}</div>
                               </button>
                               <div className="w-12 text-sm font-medium text-blue-400 text-center">{point}</div>
@@ -539,7 +539,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                                     : 'bg-blue-600 hover:bg-blue-700'
                                 } text-white text-sm`}
                               >
-                                <div className="font-medium">Under {point}</div>
+                                <div className="font-medium">{game.awayTeam}</div>
                                 <div className="text-xs">{underOdds ? underOdds.toFixed(2) : 'N/A'}</div>
                               </button>
                             </div>
@@ -562,7 +562,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                     if (spreadEntries.length === 0) {
                       return (
                         <div className="text-center text-gray-500 py-3">
-                          핸디캡 배당 정보 없음
+                          핸디캡 배당 정보가 없습니다.
                         </div>
                       );
                     }
@@ -630,7 +630,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                                       : 'bg-blue-600 hover:bg-blue-700'
                                   } text-white text-sm`}
                                 >
-                                  <div className="font-medium">{game.homeTeam} {homeHandicap > 0 ? '+' : ''}{homeHandicap}</div>
+                                  <div className="font-medium">{game.homeTeam}</div>
                                   <div className="text-xs">{homeOdds.toFixed(2)}</div>
                                 </button>
                               )}
@@ -647,7 +647,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                                       : 'bg-blue-600 hover:bg-blue-700'
                                   } text-white text-sm`}
                                 >
-                                  <div className="font-medium">{game.awayTeam} {awayHandicap > 0 ? '+' : ''}{awayHandicap}</div>
+                                  <div className="font-medium">{game.awayTeam}</div>
                                   <div className="text-xs">{awayOdds.toFixed(2)}</div>
                                 </button>
                               )}

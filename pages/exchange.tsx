@@ -697,7 +697,7 @@ export default function Exchange() {
                                 } text-white text-sm`}
                                 disabled={!isBettable || !overOdds}
                               >
-                                <div className="font-medium">Over {point}</div>
+                                <div className="font-medium">{game.home_team}</div>
                                 <div className="text-xs">{overOdds ? overOdds.toFixed(2) : 'N/A'}</div>
                               </button>
                               <div className="w-12 text-sm font-medium text-blue-400 text-center">{point}</div>
@@ -737,7 +737,7 @@ export default function Exchange() {
                                 } text-white text-sm`}
                                 disabled={!isBettable || !underOdds}
                               >
-                                <div className="font-medium">Under {point}</div>
+                                <div className="font-medium">{game.away_team}</div>
                                 <div className="text-xs">{underOdds ? underOdds.toFixed(2) : 'N/A'}</div>
                               </button>
                             </div>
@@ -1304,7 +1304,7 @@ export default function Exchange() {
                                       } text-white text-sm`}
                                       disabled={!game.isBettable || !overOdds}
                                     >
-                                      <div className="font-medium">Over {point}</div>
+                                      <div className="font-medium">{game.home_team}</div>
                                       <div className="text-xs">{overOdds ? overOdds.toFixed(2) : 'N/A'}</div>
                                     </button>
                                     <div className="w-12 text-sm font-medium text-blue-400 text-center">{point}</div>
@@ -1344,7 +1344,7 @@ export default function Exchange() {
                                       } text-white text-sm`}
                                       disabled={!game.isBettable || !underOdds}
                                     >
-                                      <div className="font-medium">Under {point}</div>
+                                      <div className="font-medium">{game.away_team}</div>
                                       <div className="text-xs">{underOdds ? underOdds.toFixed(2) : 'N/A'}</div>
                                     </button>
                                   </div>
