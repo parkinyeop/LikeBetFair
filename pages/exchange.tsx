@@ -22,6 +22,21 @@ export default function Exchange() {
   const [todayGameMarkets, setTodayGameMarkets] = useState<{[gameId: string]: Set<string>}>({});
   const [leagueGameMarkets, setLeagueGameMarkets] = useState<{[gameId: string]: Set<string>}>({});
 
+  // 🎯 공통 버튼 스타일 함수 - 모든 마켓 버튼에서 재사용
+  const getButtonStyle = (isActive: boolean, isDisabled: boolean) => {
+    const baseStyle = "flex-1 p-2 rounded-lg text-center transition-colors text-white text-sm";
+    
+    if (isDisabled) {
+      return `${baseStyle} bg-gray-600 cursor-not-allowed`;
+    }
+    
+    if (isActive) {
+      return `${baseStyle} bg-blue-500 hover:bg-blue-600 cursor-pointer`;
+    }
+    
+    return `${baseStyle} bg-gray-600 cursor-not-allowed`;
+  };
+
   // 🆕 초기 마켓 설정 함수 - 게임이 로드될 때마다 기본값 설정
   const initializeGameMarkets = (gameId: string, isToday: boolean = true) => {
     if (isToday) {
@@ -629,16 +644,12 @@ export default function Exchange() {
                               console.log('🎯 배당율 카드 클릭됨:', gameInfo);
                             }
                           }}
-                          className={`flex-1 p-3 rounded-lg text-center transition-all duration-200 transform hover:scale-105 ${
-                            isBettable && outcome.price
-                              ? 'bg-blue-500 hover:bg-blue-600 cursor-pointer shadow-lg hover:shadow-xl'
-                              : 'bg-gray-600 cursor-not-allowed'
-                          } text-white`}
+                          className={getButtonStyle(isBettable && outcome.price, !isBettable || !outcome.price)}
                           disabled={!isBettable || !outcome.price}
                           title={isBettable && outcome.price ? `클릭하여 ${outcome.name} 주문하기` : '베팅 마감됨'}
                         >
-                          <div className="font-bold">{label}</div>
-                          <div className="text-sm">{outcome.price ? outcome.price.toFixed(2) : 'N/A'}</div>
+                          <div className="font-medium">{label}</div>
+                          <div className="text-xs">{outcome.price ? outcome.price.toFixed(2) : 'N/A'}</div>
                           {!isBettable && <div className="text-xs text-red-400 mt-1">Betting Closed</div>}
                         </button>
                       );
@@ -1236,16 +1247,12 @@ export default function Exchange() {
                                     console.log('🎯 배당율 카드 클릭됨:', gameInfo);
                                   }
                                 }}
-                                className={`flex-1 p-3 rounded-lg text-center transition-all duration-200 transform hover:scale-105 ${
-                                  game.isBettable && outcome.price
-                                    ? 'bg-blue-500 hover:bg-blue-600 cursor-pointer shadow-lg hover:shadow-xl'
-                                    : 'bg-gray-600 cursor-not-allowed'
-                                } text-white`}
+                                className={getButtonStyle(game.isBettable && outcome.price, !game.isBettable || !outcome.price)}
                                 disabled={!game.isBettable || !outcome.price}
                                 title={game.isBettable && outcome.price ? `클릭하여 ${outcome.name} 주문하기` : '베팅 마감됨'}
                               >
-                                <div className="font-bold">{label}</div>
-                                <div className="text-sm">{outcome.price ? outcome.price.toFixed(2) : 'N/A'}</div>
+                                <div className="font-medium">{label}</div>
+                                <div className="text-xs">{outcome.price ? outcome.price.toFixed(2) : 'N/A'}</div>
                                 {!game.isBettable && <div className="text-xs text-red-400 mt-1">Betting Closed</div>}
                               </button>
                             );

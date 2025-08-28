@@ -134,11 +134,26 @@ export default function LiveOddsPage() {
     return marketNames[market] || market;
   };
 
+  // 🎯 공통 버튼 스타일 함수 - 모든 마켓 버튼에서 재사용
+  const getButtonStyle = (isActive: boolean, isDisabled: boolean) => {
+    const baseStyle = "flex-1 p-2 rounded-lg text-center transition-colors text-white text-sm";
+    
+    if (isDisabled) {
+      return `${baseStyle} bg-gray-600 cursor-not-allowed`;
+    }
+    
+    if (isActive) {
+      return `${baseStyle} bg-blue-500 hover:bg-blue-600 cursor-pointer`;
+    }
+    
+    return `${baseStyle} bg-gray-600 cursor-not-allowed`;
+  };
+
   return (
-    <div className="min-h-screen bg-black p-6">
-      {/* 헤더 */}
-      <div className="max-w-7xl mx-auto">
-        <div className="bg-black rounded-lg shadow p-6 mb-6">
+    <div className="p-6">
+      <div className="bg-black rounded shadow p-6 mb-4">
+        {/* 헤더 */}
+        <div className="mb-6">
           <div className="flex justify-between items-center mb-6">
             <div>
               <h1 className="text-3xl font-bold text-white">🔥 실시간 호가 현황</h1>
@@ -291,9 +306,9 @@ export default function LiveOddsPage() {
                       {/* 🆕 Back 주문이 있는 선택지 (비활성화) */}
                       <button 
                         disabled={true}
-                        className="flex-1 px-4 py-2 rounded bg-gray-600 border-gray-500 cursor-not-allowed text-white font-bold border-2"
+                        className={getButtonStyle(false, true)}
                       >
-                        <div className="text-white">{order.selection}</div>
+                        <div className="font-medium">{order.selection}</div>
                         <div className="text-xs mt-1 opacity-90">
                           🎯 Back
                         </div>
@@ -307,9 +322,9 @@ export default function LiveOddsPage() {
                       
                       {/* 🆕 Lay 주문이 가능한 반대 선택지 (활성화) */}
                       <button 
-                        className="flex-1 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 border-blue-400 text-white font-bold border-2 transition-colors"
+                        className={getButtonStyle(true, false)}
                       >
-                        <div>
+                        <div className="font-medium">
                           {(() => {
                             // 🆕 반대 선택지 찾기
                             if (order.market === 'h2h' || order.market === '승패') {
