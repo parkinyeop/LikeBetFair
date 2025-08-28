@@ -3,6 +3,7 @@ import { useExchange, ExchangeOrder } from '../../hooks/useExchange';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
 import { convertUTCToKST } from '../../utils/timeUtils';
+import { getButtonStyle } from '../../utils/buttonStyles';
 
 export default function LiveOddsPage() {
   const { isLoggedIn, token, userId } = useAuth();
@@ -15,6 +16,36 @@ export default function LiveOddsPage() {
   const [selectedSport, setSelectedSport] = useState<string>('all');
   const [selectedMarket, setSelectedMarket] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  
+  // 🎯 버튼별 선택 상태 관리
+  const [selectedButtons, setSelectedButtons] = useState<{[gameId: string]: string}>({});
+
+  // 🎯 버튼이 선택되었는지 확인하는 함수
+  const isButtonSelected = (gameId: string, buttonKey: string) => {
+    const isSelected = selectedButtons[gameId] === buttonKey;
+    console.log('🎯 live-odds isButtonSelected 확인:', { gameId, buttonKey, isSelected, selectedButtons });
+    return isSelected;
+  };
+
+  // 🎯 버튼 클릭 시 선택 상태 변경
+  const handleButtonClick = (gameId: string, buttonKey: string) => {
+    console.log('🎯 live-odds handleButtonClick 호출됨:', { gameId, buttonKey });
+    setSelectedButtons(prev => {
+      const newState = { ...prev };
+      // 같은 경기의 다른 버튼이 선택되어 있다면 해제
+      if (newState[gameId] === buttonKey) {
+        delete newState[gameId]; // 같은 버튼 재클릭 시 선택 해제
+        console.log('🎯 live-odds 버튼 선택 해제됨:', { gameId, buttonKey });
+      } else {
+        newState[gameId] = buttonKey; // 새 버튼 선택
+        console.log('🎯 live-odds 새 버튼 선택됨:', { gameId, buttonKey });
+      }
+      console.log('🎯 live-odds selectedButtons 상태 업데이트:', newState);
+      return newState;
+    });
+  };
+
+
 
   // 실시간 호가 현황 로드
   useEffect(() => {
@@ -134,20 +165,7 @@ export default function LiveOddsPage() {
     return marketNames[market] || market;
   };
 
-  // 🎯 공통 버튼 스타일 함수 - 모든 마켓 버튼에서 재사용
-  const getButtonStyle = (isActive: boolean, isDisabled: boolean) => {
-    const baseStyle = "flex-1 p-2 rounded-lg text-center transition-colors text-white text-sm";
-    
-    if (isDisabled) {
-      return `${baseStyle} bg-gray-600 cursor-not-allowed`;
-    }
-    
-    if (isActive) {
-      return `${baseStyle} bg-blue-500 hover:bg-blue-600 cursor-pointer`;
-    }
-    
-    return `${baseStyle} bg-gray-600 cursor-not-allowed`;
-  };
+
 
   return (
     <div className="p-6">
@@ -306,24 +324,30 @@ export default function LiveOddsPage() {
                       {/* 🆕 Back 주문이 있는 선택지 (비활성화) */}
                       <button 
                         disabled={true}
-                        className={getButtonStyle(false, true)}
+                        className={getButtonStyle(false, true, false, false)}
                       >
                         <div className="font-medium">{order.selection}</div>
                         <div className="text-xs mt-1 opacity-90">
                           🎯 Back
                         </div>
-                        <div className="text-xs mt-1">
+                        <div className="text-xs mt-1 text-white font-medium">
                           배당률: {order.price.toFixed(2)}
                         </div>
-                        <div className="text-xs mt-1">
+                        <div className="text-xs mt-1 text-white font-medium">
                           금액: {order.amount.toLocaleString()}원
                         </div>
                       </button>
                       
                       {/* 🆕 Lay 주문이 가능한 반대 선택지 (활성화) */}
-                      <button 
-                        className={getButtonStyle(true, false)}
-                      >
+                                              <button 
+                          onClick={() => handleButtonClick(String(order.id), `Lay_${order.market}_${order.selection}`)}
+                          className={getButtonStyle(
+                            true, 
+                            false, 
+                            isButtonSelected(String(order.id), `Lay_${order.market}_${order.selection}`),
+                            false
+                          )}
+                        >
                         <div className="font-medium">
                           {(() => {
                             // 🆕 반대 선택지 찾기
