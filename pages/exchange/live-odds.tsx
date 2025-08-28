@@ -164,27 +164,27 @@ export default function LiveOddsPage() {
 
           {/* 통계 카드 */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="text-2xl font-bold text-blue-600">{recentOrders.length}</div>
-              <div className="text-sm text-blue-700">전체 호가</div>
+            <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+              <div className="text-2xl font-bold text-white">{recentOrders.length}</div>
+              <div className="text-sm text-gray-300">전체 호가</div>
             </div>
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="text-2xl font-bold text-green-600">
+            <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+              <div className="text-2xl font-bold text-green-400">
                 {recentOrders.filter(o => o.status === 'open').length}
               </div>
-              <div className="text-sm text-green-700">대기중</div>
+              <div className="text-sm text-gray-300">대기중</div>
             </div>
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-              <div className="text-2xl font-bold text-orange-600">
+            <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+              <div className="text-2xl font-bold text-orange-400">
                 {recentOrders.filter(o => o.status === 'partially_matched').length}
               </div>
-              <div className="text-sm text-orange-700">부분 체결</div>
+              <div className="text-sm text-gray-300">부분 체결</div>
             </div>
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-              <div className="text-2xl font-bold text-purple-600">
+            <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+              <div className="text-2xl font-bold text-purple-400">
                 {Object.keys(sportStats).length}
               </div>
-              <div className="text-sm text-purple-700">활성 스포츠</div>
+              <div className="text-sm text-gray-300">활성 스포츠</div>
             </div>
           </div>
 
@@ -192,11 +192,11 @@ export default function LiveOddsPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             {/* 스포츠 필터 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">스포츠</label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">스포츠</label>
               <select
                 value={selectedSport}
                 onChange={(e) => setSelectedSport(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white"
               >
                 <option value="all">전체 스포츠</option>
                 {Object.keys(sportStats).map(sport => (
@@ -209,11 +209,11 @@ export default function LiveOddsPage() {
 
             {/* 마켓 필터 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">마켓</label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">마켓</label>
               <select
                 value={selectedMarket}
                 onChange={(e) => setSelectedMarket(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white"
               >
                 <option value="all">전체 마켓</option>
                 {Object.keys(marketStats).map(market => (
@@ -226,13 +226,13 @@ export default function LiveOddsPage() {
 
             {/* 검색 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">검색</label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">검색</label>
               <input
                 type="text"
                 placeholder="팀명 또는 선택 검색..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white placeholder-gray-400"
               />
             </div>
 
@@ -249,17 +249,17 @@ export default function LiveOddsPage() {
         </div>
 
         {/* 호가 목록 */}
-        <div className="bg-white rounded-lg shadow">
+        <div className="bg-black rounded-lg shadow">
           {ordersLoading ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-500">호가 정보를 불러오는 중...</p>
+              <p className="text-gray-400">호가 정보를 불러오는 중...</p>
             </div>
           ) : filteredOrders.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-gray-400 text-4xl mb-4">📊</div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">호가가 없습니다</h3>
-              <p className="text-gray-600">
+              <h3 className="text-lg font-semibold text-gray-300 mb-2">호가가 없습니다</h3>
+              <p className="text-gray-400">
                 {searchTerm || selectedSport !== 'all' || selectedMarket !== 'all' 
                   ? '검색 조건에 맞는 호가가 없습니다.' 
                   : '현재 등록된 호가가 없습니다.'}
@@ -272,21 +272,21 @@ export default function LiveOddsPage() {
                 {filteredOrders.map((order) => (
                   <div
                     key={order.id}
-                    className="bg-gray-900 p-4 rounded shadow border-2 border-blue-500"
+                    className="bg-gray-800 p-4 rounded shadow border-2 border-blue-400"
                   >
-                    {/* 🆕 투데이 배팅과 동일: 경기명 */}
+                    {/* 🆕 투데이 배팅과 동일: 경기명 (font-semibold) */}
                     <div className="text-white font-semibold mb-2">
                       {order.homeTeam} vs {order.awayTeam}
                     </div>
                     
-                    {/* 🆕 투데이 배팅과 동일: 시간 */}
+                    {/* 🆕 투데이 배팅과 동일: 시간 (기본 폰트) */}
                     <div className="mb-4">
-                      <div className="text-sm text-gray-300">
+                      <div className="text-white">
                         {order.commenceTime ? convertUTCToKST(order.commenceTime) : '시간 미정'}
                       </div>
                     </div>
                     
-                    {/* 🆕 투데이 배팅과 동일: 두 개의 베팅 버튼 */}
+                    {/* 🆕 투데이 배팅과 동일: 두 개의 베팅 버튼 (기본 폰트) */}
                     <div className="flex space-x-4">
                       <button 
                         onClick={() => handleMatchOrder(order)}
@@ -294,18 +294,18 @@ export default function LiveOddsPage() {
                         className={`flex-1 px-4 py-2 rounded text-white font-bold transition-colors border-2 ${
                           !isLoggedIn || String(userId) === String(order.userId)
                             ? 'bg-gray-600 border-gray-500 cursor-not-allowed'
-                            : 'bg-blue-600 hover:bg-blue-700 border-blue-500'
+                            : 'bg-blue-600 hover:bg-blue-700 border-blue-400'
                         }`}
                       >
-                        <div className="text-sm">{order.selection}</div>
+                        <div>{order.selection}</div>
                         <div className="text-xs mt-1 opacity-90">
                           {order.side === 'back' ? '🎯 Back' : '📉 Lay'}
                         </div>
                       </button>
                       
                       <button className="flex-1 px-4 py-2 rounded bg-gray-700 text-white text-center border-2 border-gray-600">
-                        <div className="text-sm">배당률</div>
-                        <div className="text-lg font-bold text-blue-400 mt-1">
+                        <div>배당률</div>
+                        <div className="text-xs mt-1 opacity-90">
                           {order.price.toFixed(2)}
                         </div>
                       </button>
