@@ -312,10 +312,10 @@ export default function LiveOddsPage() {
                         <div className="text-xs mt-1 opacity-90">
                           🎯 Back
                         </div>
-                        <div className="text-xs mt-1 text-white font-medium">
+                        <div className="text-xs mt-1">
                           배당률: {order.price.toFixed(2)}
                         </div>
-                        <div className="text-xs mt-1 text-white font-medium">
+                        <div className="text-xs mt-1">
                           금액: {order.amount.toLocaleString()}원
                         </div>
                       </button>
