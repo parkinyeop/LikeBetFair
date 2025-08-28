@@ -169,6 +169,26 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
     return gameMarkets[gameId] || new Set(['승패']);
   };
 
+  // 🆕 게임이 로드될 때 기본 마켓 설정
+  useEffect(() => {
+    if (filteredGames.length > 0) {
+      const newGameMarkets: {[gameId: string]: Set<string>} = {};
+      
+      filteredGames.forEach(game => {
+        if (!gameMarkets[game.id]) {
+          newGameMarkets[game.id] = new Set(['승패']);
+        }
+      });
+      
+      if (Object.keys(newGameMarkets).length > 0) {
+        setGameMarkets(prev => ({
+          ...prev,
+          ...newGameMarkets
+        }));
+      }
+    }
+  }, [filteredGames]);
+
   // 주문 클릭 핸들러
   const handleBetClick = (game: ExchangeGame, team: string, price: number, type: 'back' | 'lay') => {
     if (!isLoggedIn) {

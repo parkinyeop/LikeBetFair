@@ -1680,235 +1680,297 @@ export default function Home() {
                     )}
                     
                     {/* 언더/오버 배당 */}
-                    {selectedMarketsForGame.has('Over/Under') && game.officialOdds?.totals && Object.keys(game.officialOdds.totals).length > 0 && (
+                    {selectedMarketsForGame.has('Over/Under') && (
                       <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                         <div className="text-sm font-medium text-blue-800 mb-2">📈 언더/오버 (Over/Under)</div>
-                        <div className="space-y-2">
-                          {(() => {
-                            const totalsOdds = game.officialOdds.totals;
-                            const groupedTotals: { [point: string]: { over?: any, under?: any } } = {};
-                            
-                            Object.entries(totalsOdds).forEach(([outcomeName, oddsData]) => {
-                              if (outcomeName.startsWith('Over ')) {
-                                const point = outcomeName.replace('Over ', '');
-                                if (!groupedTotals[point]) groupedTotals[point] = {};
-                                groupedTotals[point].over = oddsData;
-                              } else if (outcomeName.startsWith('Under ')) {
-                                const point = outcomeName.replace('Under ', '');
-                                if (!groupedTotals[point]) groupedTotals[point] = {};
-                                groupedTotals[point].under = oddsData;
-                              }
-                            });
-                            
-                            // 0.5 단위 포인트만 필터링 (0.25, 0.75 등 제외)
-                            const filteredTotals = Object.entries(groupedTotals).filter(([point, oddsPair]) => {
-                              const pointValue = parseFloat(point);
-                              // NaN이거나 0.5 단위가 아니면 제외 (0.5, 1, 1.5, 2, 2.5... 만 허용)
-                              return !isNaN(pointValue) && (pointValue % 0.5 === 0) && (pointValue % 1 === 0 || pointValue % 1 === 0.5);
-                            });
-                            
-                            return filteredTotals.map(([point, oddsPair], idx: number) => {
-                              const overOdds = oddsPair.over?.averagePrice;
-                              const underOdds = oddsPair.under?.averagePrice;
-                              
-                              return (
-                                <div key={idx} className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => {
-                                      const isBettable = new Date(game.commence_time) > new Date(Date.now() + 10 * 60 * 1000);
-                                      if (!isBettable) {
-                                        alert('This game is closed for betting.');
-                                        return;
-                                      }
-                                      toggleSelection({
-                                        team: `Over ${point}`,
-                                        odds: overOdds,
-                                        desc: `${game.home_team} vs ${game.away_team}`,
-                                        commence_time: game.commence_time,
-                                        market: 'Over/Under',
-                                        gameId: game.id,
-                                        sport_key: game.sport_key,
-                                        point: parseFloat(point)
-                                      });
-                                    }}
-                                    className={`flex-1 p-2 rounded-lg text-center transition-colors ${
-                                      (selections || []).some(sel => sel.team === `Over ${point}` && sel.market === 'Over/Under' && sel.gameId === game.id)
-                                        ? 'bg-yellow-500 hover:bg-yellow-600'
-                                        : game.isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
-                                    } text-white text-sm`}
-                                    disabled={!game.isBettable || !overOdds}
-                                  >
-                                    <div className="font-medium">{game.home_team}</div>
-                                    <div className="text-xs">Over ({overOdds ? overOdds.toFixed(2) : 'N/A'})</div>
-                                    {!game.isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
-                                  </button>
-                                  <div className="w-16 text-base font-bold text-gray-800 text-center">
-                                    {point}
-                                  </div>
-                                  <button
-                                    onClick={() => {
-                                      const isBettable = new Date(game.commence_time) > new Date(Date.now() + 10 * 60 * 1000);
-                                      if (!isBettable) {
-                                        alert('This game is closed for betting.');
-                                        return;
-                                      }
-                                      toggleSelection({
-                                        team: `Under ${point}`,
-                                        odds: underOdds,
-                                        desc: `${game.home_team} vs ${game.away_team}`,
-                                        commence_time: game.commence_time,
-                                        market: 'Over/Under',
-                                        gameId: game.id,
-                                        sport_key: game.sport_key,
-                                        point: parseFloat(point)
-                                      });
-                                    }}
-                                    className={`flex-1 p-2 rounded-lg text-center transition-colors ${
-                                      (selections || []).some(sel => sel.team === `Under ${point}` && sel.market === 'Over/Under' && sel.gameId === game.id)
-                                        ? 'bg-yellow-500 hover:bg-yellow-600'
-                                        : game.isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
-                                    } text-white text-sm`}
-                                    disabled={!game.isBettable || !underOdds}
-                                  >
-                                    <div className="font-medium">{game.away_team}</div>
-                                    <div className="text-xs">Under ({underOdds ? underOdds.toFixed(2) : 'N/A'})</div>
-                                    {!game.isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
-                                  </button>
-                                </div>
-                              );
-                            });
-                          })()}
+                        
+                        {/* 디버깅 정보 추가 */}
+                        <div className="mb-2 p-2 bg-gray-100 rounded text-xs">
+                          <details>
+                            <summary className="cursor-pointer font-medium">🔍 디버깅 정보</summary>
+                            <div className="mt-2 space-y-1">
+                              <div>officialOdds 존재: {game.officialOdds ? '✅' : '❌'}</div>
+                              <div>totals 키: {game.officialOdds?.totals ? Object.keys(game.officialOdds.totals).join(', ') : '없음'}</div>
+                              <div>totals 데이터 길이: {game.officialOdds?.totals ? Object.keys(game.officialOdds.totals).length : 0}</div>
+                              <div>bookmakers 존재: {game.bookmakers ? '✅' : '❌'}</div>
+                              <div>sport_key: {game.sport_key}</div>
+                            </div>
+                          </details>
                         </div>
+                        
+                        {game.officialOdds?.totals && Object.keys(game.officialOdds.totals).length > 0 ? (
+                          <div className="space-y-2">
+                            {(() => {
+                              const totalsOdds = game.officialOdds.totals;
+                              const groupedTotals: { [point: string]: { over?: any, under?: any } } = {};
+                              
+                              Object.entries(totalsOdds).forEach(([outcomeName, oddsData]) => {
+                                if (outcomeName.startsWith('Over ')) {
+                                  const point = outcomeName.replace('Over ', '');
+                                  if (!groupedTotals[point]) groupedTotals[point] = {};
+                                  groupedTotals[point].over = oddsData;
+                                } else if (outcomeName.startsWith('Under ')) {
+                                  const point = outcomeName.replace('Under ', '');
+                                  if (!groupedTotals[point]) groupedTotals[point] = {};
+                                  groupedTotals[point].under = oddsData;
+                                }
+                              });
+                              
+                              // 0.5 단위 포인트만 필터링 (0.25, 0.75 등 제외)
+                              const filteredTotals = Object.entries(groupedTotals).filter(([point, oddsPair]) => {
+                                const pointValue = parseFloat(point);
+                                // NaN이거나 0.5 단위가 아니면 제외 (0.5, 1, 1.5, 2, 2.5... 만 허용)
+                                return !isNaN(pointValue) && (pointValue % 0.5 === 0) && (pointValue % 1 === 0 || pointValue % 1 === 0.5);
+                              });
+                              
+                              if (filteredTotals.length === 0) {
+                                return (
+                                  <div className="text-center text-gray-500 py-6">
+                                    <div className="mb-2">📊 필터링된 언더/오버 정보가 없습니다</div>
+                                    <div className="text-xs text-gray-400">
+                                      원본 데이터는 있지만 0.5 단위 포인트가 아닙니다.
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              
+                              return filteredTotals.map(([point, oddsPair], idx: number) => {
+                                const overOdds = oddsPair.over?.averagePrice;
+                                const underOdds = oddsPair.under?.averagePrice;
+                                
+                                return (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => {
+                                        const isBettable = new Date(game.commence_time) > new Date(Date.now() + 10 * 60 * 1000);
+                                        if (!isBettable) {
+                                          alert('This game is closed for betting.');
+                                          return;
+                                        }
+                                        toggleSelection({
+                                          team: `Over ${point}`,
+                                          odds: overOdds,
+                                          desc: `${game.home_team} vs ${game.away_team}`,
+                                          commence_time: game.commence_time,
+                                          market: 'Over/Under',
+                                          gameId: game.id,
+                                          sport_key: game.sport_key,
+                                          point: parseFloat(point)
+                                        });
+                                      }}
+                                      className={`flex-1 p-2 rounded-lg text-center transition-colors ${
+                                        (selections || []).some(sel => sel.team === `Over ${point}` && sel.market === 'Over/Under' && sel.gameId === game.id)
+                                          ? 'bg-yellow-500 hover:bg-yellow-600'
+                                          : game.isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                      } text-white text-sm`}
+                                      disabled={!game.isBettable || !overOdds}
+                                    >
+                                      <div className="font-medium">{game.home_team}</div>
+                                      <div className="text-xs">Over ({overOdds ? overOdds.toFixed(2) : 'N/A'})</div>
+                                      {!game.isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
+                                    </button>
+                                    <div className="w-16 text-base font-bold text-gray-800 text-center">
+                                      {point}
+                                    </div>
+                                    <button
+                                      onClick={() => {
+                                        const isBettable = new Date(game.commence_time) > new Date(Date.now() + 10 * 60 * 1000);
+                                        if (!isBettable) {
+                                          alert('This game is closed for betting.');
+                                          return;
+                                        }
+                                        toggleSelection({
+                                          team: `Under ${point}`,
+                                          odds: underOdds,
+                                          desc: `${game.home_team} vs ${game.away_team}`,
+                                          commence_time: game.commence_time,
+                                          market: 'Over/Under',
+                                          gameId: game.id,
+                                          sport_key: game.sport_key,
+                                          point: parseFloat(point)
+                                        });
+                                      }}
+                                      className={`flex-1 p-2 rounded-lg text-center transition-colors ${
+                                        (selections || []).some(sel => sel.team === `Under ${point}` && sel.market === 'Over/Under' && sel.gameId === game.id)
+                                          ? 'bg-yellow-500 hover:bg-yellow-600'
+                                          : game.isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                      } text-white text-sm`}
+                                      disabled={!game.isBettable || !underOdds}
+                                    >
+                                      <div className="font-medium">{game.away_team}</div>
+                                      <div className="text-xs">Under ({underOdds ? underOdds.toFixed(2) : 'N/A'})</div>
+                                      {!game.isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
+                                    </button>
+                                  </div>
+                                );
+                              });
+                            })()}
+                          </div>
+                        ) : (
+                          <div className="text-center text-gray-500 py-6">
+                            <div className="mb-2">📊 언더/오버 배당 정보가 없습니다</div>
+                            <div className="text-xs text-gray-400">
+                              이 경기에는 총점 관련 배당 정보가 제공되지 않습니다.
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                     
                     {/* 핸디캡 배당 */}
-                    {selectedMarketsForGame.has('Handicap') && game.officialOdds?.spreads && Object.keys(game.officialOdds.spreads).length > 0 && (
+                    {selectedMarketsForGame.has('Handicap') && (
                       <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                         <div className="text-sm font-medium text-blue-800 mb-2">🎯 핸디캡 (Handicap)</div>
-                        <div className="space-y-2">
-                          {(() => {
-                            const spreadsOdds = game.officialOdds.spreads;
-                            const groupedSpreads: { [point: string]: { home?: any, away?: any } } = {};
-                            
-                            Object.entries(spreadsOdds).forEach(([outcomeName, oddsData]) => {
-                              // "Team Point" 형식에서 팀명과 핸디캡 분리
-                              const parts = outcomeName.split(' ');
-                              const point = parts[parts.length - 1]; // 마지막 부분이 핸디캡
-                              const teamName = parts.slice(0, -1).join(' '); // 나머지가 팀명
-                              const handicapValue = parseFloat(point); // -1.5 또는 +1.5
-                              const absPoint = Math.abs(handicapValue).toString(); // "1.5"로 통일
-                              
-                              if (!groupedSpreads[absPoint]) groupedSpreads[absPoint] = {};
-                              
-                              // 홈팀인지 원정팀인지 판단
-                              if (teamName === game.home_team) {
-                                groupedSpreads[absPoint].home = { oddsData, handicap: handicapValue };
-                              } else if (teamName === game.away_team) {
-                                groupedSpreads[absPoint].away = { oddsData, handicap: handicapValue };
-                              }
-                            });
-                            
-                            // 0.5 단위 핸디캡만 필터링 (-1.5, -1, -0.5, 0.5, 1, 1.5 등)
-                            const filteredSpreads = Object.entries(groupedSpreads).filter(([point, oddsPair]) => {
-                              const pointValue = Math.abs(parseFloat(point));
-                              return pointValue % 0.5 === 0;
-                            });
-                            
-                            if (filteredSpreads.length === 0) {
-                              return <div className="text-center text-gray-500 py-6">No Handicap odds available</div>;
-                            }
-                            
-                            return (
-                              <div className="space-y-2">
-                                {filteredSpreads.map(([absPoint, oddsPair], idx: number) => {
-                                  const homeData = oddsPair.home;
-                                  const awayData = oddsPair.away;
-                                  
-                                  const homeOdds = homeData?.oddsData?.averagePrice;
-                                  const awayOdds = awayData?.oddsData?.averagePrice;
-                                  const homeHandicap = homeData?.handicap || 0;
-                                  const awayHandicap = awayData?.handicap || 0;
-                                  const pointValue = parseFloat(absPoint);
-                                  
-                                  return (
-                                    <div key={idx} className="flex items-center gap-2">
-                                      {homeOdds != null && (
-                                        <button
-                                          onClick={() => {
-                                            const isBettable = new Date(game.commence_time) > new Date(Date.now() + 10 * 60 * 1000);
-                                            if (!isBettable) {
-                                              alert('This game is closed for betting.');
-                                              return;
-                                            }
-                                            toggleSelection({
-                                              team: `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`,
-                                              odds: homeOdds,
-                                              desc: `${game.home_team} vs ${game.away_team}`,
-                                              commence_time: game.commence_time,
-                                              market: 'Handicap',
-                                              gameId: game.id,
-                                              sport_key: game.sport_key,
-                                              point: pointValue
-                                            });
-                                          }}
-                                          className={`flex-1 p-2 rounded-lg text-center transition-colors ${
-                                                                                          (selections || []).some(sel => sel.team === `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}` && sel.market === 'Handicap' && sel.gameId === game.id)
-                                              ? 'bg-yellow-500 hover:bg-yellow-600'
-                                              : game.isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
-                                          } text-white text-sm`}
-                                          disabled={!game.isBettable || !homeOdds}
-                                        >
-                                          <div className="font-medium">{game.home_team}</div>
-                                          <div className="text-xs">
-                                            {homeOdds.toFixed(2)} 
-                                            <span className="ml-1 text-xs">{homeHandicap > 0 ? '+' : ''}{homeHandicap}</span>
-                                          </div>
-                                          {!game.isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
-                                        </button>
-                                      )}
-                                      <div className="w-16 text-base font-bold text-gray-800 text-center">{homeHandicap > 0 ? '+' : ''}{homeHandicap}</div>
-                                      {awayOdds != null && (
-                                        <button
-                                          onClick={() => {
-                                            const isBettable = new Date(game.commence_time) > new Date(Date.now() + 10 * 60 * 1000);
-                                            if (!isBettable) {
-                                              alert('This game is closed for betting.');
-                                              return;
-                                            }
-                                            toggleSelection({
-                                              team: `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`,
-                                              odds: awayOdds,
-                                              desc: `${game.home_team} vs ${game.away_team}`,
-                                              commence_time: game.commence_time,
-                                              market: 'Handicap',
-                                              gameId: game.id,
-                                              sport_key: game.sport_key,
-                                              point: pointValue
-                                            });
-                                          }}
-                                          className={`flex-1 p-2 rounded-lg text-center transition-colors ${
-                                                                                          (selections || []).some(sel => sel.team === `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}` && sel.market === 'Handicap' && sel.gameId === game.id)
-                                              ? 'bg-yellow-500 hover:bg-yellow-600'
-                                              : game.isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
-                                          } text-white text-sm`}
-                                          disabled={!game.isBettable || !awayOdds}
-                                        >
-                                          <div className="font-medium">{game.away_team}</div>
-                                          <div className="text-xs">
-                                            {awayOdds.toFixed(2)} 
-                                            <span className="ml-1 text-xs">{awayHandicap > 0 ? '+' : ''}{awayHandicap}</span>
-                                          </div>
-                                          {!game.isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
-                                        </button>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            );
-                          })()}
+                        
+                        {/* 디버깅 정보 추가 */}
+                        <div className="mb-2 p-2 bg-gray-100 rounded text-xs">
+                          <details>
+                            <summary className="cursor-pointer font-medium">🔍 디버깅 정보</summary>
+                            <div className="mt-2 space-y-1">
+                              <div>officialOdds 존재: {game.officialOdds ? '✅' : '❌'}</div>
+                              <div>spreads 키: {game.officialOdds?.spreads ? Object.keys(game.officialOdds.spreads).join(', ') : '없음'}</div>
+                              <div>spreads 데이터 길이: {game.officialOdds?.spreads ? Object.keys(game.officialOdds.spreads).length : 0}</div>
+                              <div>bookmakers 존재: {game.bookmakers ? '✅' : '❌'}</div>
+                              <div>sport_key: {game.sport_key}</div>
+                            </div>
+                          </details>
                         </div>
+                        
+                        {game.officialOdds?.spreads && Object.keys(game.officialOdds.spreads).length > 0 ? (
+                          <div className="space-y-2">
+                            {(() => {
+                              const spreadsOdds = game.officialOdds.spreads;
+                              const groupedSpreads: { [point: string]: { home?: any, away?: any } } = {};
+                              
+                              Object.entries(spreadsOdds).forEach(([outcomeName, oddsData]) => {
+                                // "Team Point" 형식에서 팀명과 핸디캡 분리
+                                const parts = outcomeName.split(' ');
+                                const point = parts[parts.length - 1]; // 마지막 부분이 핸디캡
+                                const teamName = parts.slice(0, -1).join(' '); // 나머지가 팀명
+                                const handicapValue = parseFloat(point); // -1.5 또는 +1.5
+                                const absPoint = Math.abs(handicapValue).toString(); // "1.5"로 통일
+                                
+                                if (!groupedSpreads[absPoint]) groupedSpreads[absPoint] = {};
+                                
+                                // 홈팀인지 원정팀인지 판단
+                                if (teamName === game.home_team) {
+                                  groupedSpreads[absPoint].home = { oddsData, handicap: handicapValue };
+                                } else if (teamName === game.away_team) {
+                                  groupedSpreads[absPoint].away = { oddsData, handicap: handicapValue };
+                                }
+                              });
+                              
+                              // 0.5 단위 핸디캡만 필터링 (-1.5, -1, -0.5, 0.5, 1, 1.5 등)
+                              const filteredSpreads = Object.entries(groupedSpreads).filter(([point, oddsPair]) => {
+                                const pointValue = Math.abs(parseFloat(point));
+                                return pointValue % 0.5 === 0;
+                              });
+                              
+                              if (filteredSpreads.length === 0) {
+                                return (
+                                  <div className="text-center text-gray-500 py-6">
+                                    <div className="mb-2">🎯 필터링된 핸디캡 정보가 없습니다</div>
+                                    <div className="text-xs text-gray-400">
+                                      원본 데이터는 있지만 0.5 단위 핸디캡이 아닙니다.
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              
+                              return filteredSpreads.map(([absPoint, oddsPair], idx: number) => {
+                                const homeData = oddsPair.home;
+                                const awayData = oddsPair.away;
+                                
+                                const homeOdds = homeData?.oddsData?.averagePrice;
+                                const awayOdds = awayData?.oddsData?.averagePrice;
+                                const homeHandicap = homeData?.handicap || 0;
+                                const awayHandicap = awayData?.handicap || 0;
+                                const pointValue = parseFloat(absPoint);
+                                
+                                return (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    {homeOdds != null && (
+                                      <button
+                                        onClick={() => {
+                                          const isBettable = new Date(game.commence_time) > new Date(Date.now() + 10 * 60 * 1000);
+                                          if (!isBettable) {
+                                            alert('This game is closed for betting.');
+                                            return;
+                                          }
+                                          toggleSelection({
+                                            team: `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`,
+                                            odds: homeOdds,
+                                            desc: `${game.home_team} vs ${game.away_team}`,
+                                            commence_time: game.commence_time,
+                                            market: 'Handicap',
+                                            gameId: game.id,
+                                            sport_key: game.sport_key,
+                                            point: pointValue
+                                          });
+                                        }}
+                                        className={`flex-1 p-2 rounded-lg text-center transition-colors ${
+                                          (selections || []).some(sel => sel.team === `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}` && sel.market === 'Handicap' && sel.gameId === game.id)
+                                            ? 'bg-yellow-500 hover:bg-yellow-600'
+                                            : game.isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                        } text-white text-sm`}
+                                        disabled={!game.isBettable || !homeOdds}
+                                      >
+                                        <div className="font-medium">{game.home_team}</div>
+                                        <div className="text-xs">
+                                          {homeOdds.toFixed(2)} 
+                                          <span className="ml-1 text-xs">{homeHandicap > 0 ? '+' : ''}{homeHandicap}</span>
+                                        </div>
+                                        {!game.isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
+                                      </button>
+                                    )}
+                                    <div className="w-16 text-base font-bold text-gray-800 text-center">{homeHandicap > 0 ? '+' : ''}{homeHandicap}</div>
+                                    {awayOdds != null && (
+                                      <button
+                                        onClick={() => {
+                                          const isBettable = new Date(game.commence_time) > new Date(Date.now() + 10 * 60 * 1000);
+                                          if (!isBettable) {
+                                            alert('This game is closed for betting.');
+                                            return;
+                                          }
+                                          toggleSelection({
+                                            team: `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`,
+                                            odds: awayOdds,
+                                            desc: `${game.home_team} vs ${game.away_team}`,
+                                            commence_time: game.commence_time,
+                                            market: 'Handicap',
+                                            gameId: game.id,
+                                            sport_key: game.sport_key,
+                                            point: pointValue
+                                          });
+                                        }}
+                                        className={`flex-1 p-2 rounded-lg text-center transition-colors ${
+                                          (selections || []).some(sel => sel.team === `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}` && sel.market === 'Handicap' && sel.gameId === game.id)
+                                            ? 'bg-yellow-500 hover:bg-yellow-600'
+                                            : game.isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                        } text-white text-sm`}
+                                        disabled={!game.isBettable || !awayOdds}
+                                      >
+                                        <div className="font-medium">{game.away_team}</div>
+                                        <div className="text-xs">
+                                          {awayOdds.toFixed(2)} 
+                                          <span className="ml-1 text-xs">{awayHandicap > 0 ? '+' : ''}{awayHandicap}</span>
+                                        </div>
+                                        {!game.isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              });
+                            })()}
+                          </div>
+                        ) : (
+                          <div className="text-center text-gray-500 py-6">
+                            <div className="mb-2">🎯 핸디캡 배당 정보가 없습니다</div>
+                            <div className="text-xs text-gray-400">
+                              이 경기에는 핸디캡 관련 배당 정보가 제공되지 않습니다.
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
