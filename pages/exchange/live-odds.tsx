@@ -286,27 +286,54 @@ export default function LiveOddsPage() {
                       </div>
                     </div>
                     
-                    {/* 🆕 투데이 배팅과 동일: 두 개의 베팅 버튼 (기본 폰트) */}
+                    {/* 🆕 투데이 배팅과 동일: 선택지별 버튼 (Back/Lay 상태에 따라 활성화/비활성화) */}
                     <div className="flex space-x-4">
+                      {/* 🆕 Back 주문이 있는 선택지 (비활성화) */}
                       <button 
-                        onClick={() => handleMatchOrder(order)}
-                        disabled={!isLoggedIn || String(userId) === String(order.userId)}
-                        className={`flex-1 px-4 py-2 rounded text-white font-bold transition-colors border-2 ${
-                          !isLoggedIn || String(userId) === String(order.userId)
-                            ? 'bg-gray-600 border-gray-500 cursor-not-allowed'
-                            : 'bg-blue-600 hover:bg-blue-700 border-blue-400'
-                        }`}
+                        disabled={true}
+                        className="flex-1 px-4 py-2 rounded bg-gray-600 border-gray-500 cursor-not-allowed opacity-50 text-white font-bold border-2"
                       >
                         <div>{order.selection}</div>
                         <div className="text-xs mt-1 opacity-90">
-                          {order.side === 'back' ? '🎯 Back' : '📉 Lay'}
+                          🎯 Back
                         </div>
                       </button>
                       
-                      <button className="flex-1 px-4 py-2 rounded bg-gray-700 text-white text-center border-2 border-gray-600">
-                        <div>배당률</div>
+                      {/* 🆕 Lay 주문이 가능한 반대 선택지 (활성화) */}
+                      <button 
+                        className="flex-1 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 border-blue-400 text-white font-bold border-2 transition-colors"
+                      >
+                        <div>
+                          {(() => {
+                            // 🆕 반대 선택지 찾기
+                            if (order.market === 'h2h' || order.market === '승패') {
+                              // 승/패 경기: 현재 선택지가 홈팀이면 원정팀, 원정팀이면 홈팀
+                              if (order.selection === order.homeTeam) {
+                                return order.awayTeam;
+                              } else {
+                                return order.homeTeam;
+                              }
+                            } else if (order.market === 'totals' || order.market === '오버/언더') {
+                              // 오버/언더 경기: 현재 선택지가 오버면 언더, 언더면 오버
+                              if (order.selection === '오버') {
+                                return '언더';
+                              } else {
+                                return '오버';
+                              }
+                            } else if (order.market === 'spreads' || order.market === '핸디캡') {
+                              // 핸디캡 경기: 현재 선택지가 홈팀이면 원정팀, 원정팀이면 홈팀
+                              if (order.selection === order.homeTeam) {
+                                return order.awayTeam;
+                              } else {
+                                return order.homeTeam;
+                              }
+                            }
+                            // 기본값: 반대 선택지
+                            return order.selection === order.homeTeam ? order.awayTeam : order.homeTeam;
+                          })()}
+                        </div>
                         <div className="text-xs mt-1 opacity-90">
-                          {order.price.toFixed(2)}
+                          📉 Lay 가능
                         </div>
                       </button>
                     </div>
