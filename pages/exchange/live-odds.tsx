@@ -266,116 +266,53 @@ export default function LiveOddsPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      경기 정보
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      선택
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      배당율
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      금액
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      상태
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      등록 시간
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      액션
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredOrders.map((order) => (
-                    <tr key={order.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0">
-                            <div className="text-lg">{getSportIcon(order.sportKey || '')}</div>
-                          </div>
-                          <div className="ml-3">
-                            <div className="text-sm font-medium text-gray-900">
-                              {order.homeTeam} vs {order.awayTeam}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {order.sportKey} • {getMarketDisplayName(order.market || '')}
-                            </div>
-                            {order.commenceTime && (
-                              <div className="text-xs text-gray-400">
-                                {convertUTCToKST(order.commenceTime)}
-                              </div>
-                            )}
-                          </div>
+            <div className="p-4">
+              {/* 🆕 투데이 배팅 GameCard와 정확히 동일한 구조 */}
+              <div className="space-y-4">
+                {filteredOrders.map((order) => (
+                  <div
+                    key={order.id}
+                    className="bg-gray-900 p-4 rounded shadow border-2 border-blue-500"
+                  >
+                    {/* 🆕 투데이 배팅과 동일: 경기명 */}
+                    <div className="text-white font-semibold mb-2">
+                      {order.homeTeam} vs {order.awayTeam}
+                    </div>
+                    
+                    {/* 🆕 투데이 배팅과 동일: 시간 */}
+                    <div className="mb-4">
+                      <div className="text-sm text-gray-300">
+                        {order.commenceTime ? convertUTCToKST(order.commenceTime) : '시간 미정'}
+                      </div>
+                    </div>
+                    
+                    {/* 🆕 투데이 배팅과 동일: 두 개의 베팅 버튼 */}
+                    <div className="flex space-x-4">
+                      <button 
+                        onClick={() => handleMatchOrder(order)}
+                        disabled={!isLoggedIn || String(userId) === String(order.userId)}
+                        className={`flex-1 px-4 py-2 rounded text-white font-bold transition-colors border-2 ${
+                          !isLoggedIn || String(userId) === String(order.userId)
+                            ? 'bg-gray-600 border-gray-500 cursor-not-allowed'
+                            : 'bg-blue-600 hover:bg-blue-700 border-blue-500'
+                        }`}
+                      >
+                        <div className="text-sm">{order.selection}</div>
+                        <div className="text-xs mt-1 opacity-90">
+                          {order.side === 'back' ? '🎯 Back' : '📉 Lay'}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{order.selection}</div>
-                        <div className="text-xs text-gray-500">
-                          {order.side === 'back' ? 'Back' : 'Lay'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className={`text-lg font-bold ${
-                          order.side === 'back' ? 'text-blue-600' : 'text-pink-600'
-                        }`}>
+                      </button>
+                      
+                      <button className="flex-1 px-4 py-2 rounded bg-gray-700 text-white text-center border-2 border-gray-600">
+                        <div className="text-sm">배당률</div>
+                        <div className="text-lg font-bold text-blue-400 mt-1">
                           {order.price.toFixed(2)}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {order.displayAmount ? order.displayAmount.toLocaleString() : order.amount.toLocaleString()}원
-                        </div>
-                        {order.partiallyFilled && (
-                          <div className="text-xs text-orange-600">
-                            남은 금액: {(order.remainingAmount || 0).toLocaleString()}원
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          order.status === 'open' 
-                            ? 'bg-green-100 text-green-800'
-                            : order.status === 'partially_matched'
-                            ? 'bg-orange-100 text-orange-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {order.status === 'open' ? '🔄 대기중' : 
-                           order.status === 'partially_matched' ? '🔄 부분 체결' : 
-                           order.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {order.createdAt ? new Date(order.createdAt).toLocaleString('ko-KR') : 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        {order.status === 'open' || order.status === 'partially_matched' ? (
-                          <button
-                            onClick={() => handleMatchOrder(order)}
-                            disabled={!isLoggedIn || String(userId) === String(order.userId)}
-                            className={`px-3 py-1 text-white text-xs rounded transition-colors ${
-                              !isLoggedIn || String(userId) === String(order.userId)
-                                ? 'bg-gray-400 cursor-not-allowed'
-                                : order.side === 'back' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'
-                            }`}
-                          >
-                            {order.side === 'back' ? '📉 Lay로 매칭' : '🎯 Back으로 매칭'}
-                          </button>
-                        ) : (
-                          <span className="text-gray-400">매칭 불가</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
