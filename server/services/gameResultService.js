@@ -166,9 +166,12 @@ class GameResultService {
   }
 
   /**
-   * 게임 결과는 TheSportsDB API만 사용 (The Odds API 사용 금지)
+   * TheSportsDB API를 사용하여 경기 결과 데이터 가져오기
+   * @param {string} sportKey - 스포츠 키
+   * @param {number} daysFrom - 과거 몇 일간의 데이터를 가져올지 (기본값: 3)
+   * @param {boolean} includeFuture - 미래 1일 데이터 포함 여부 (기본값: true)
    */
-  async fetchResultsWithSportsDB(sportKey, daysFrom = 7) {
+  async fetchResultsWithSportsDB(sportKey, daysFrom = 3, includeFuture = true) {
     try {
       console.log(`[GameResult] TheSportsDB API 사용: ${sportKey}`);
       const leagueId = this.getSportsDbLeagueIdBySportKey(sportKey);
@@ -206,9 +209,12 @@ class GameResultService {
       const events = response.data?.events || [];
       console.log(`[GameResult] TheSportsDB API 성공: ${events.length}개 경기`);
       
-      // 날짜 필터링: 과거 daysFrom일간의 경기만 수집 (최적화)
+      // 🆕 시간 범위 수정: 과거 3일 + 미래 1일 (시간대 문제 고려)
       const now = new Date();
       const cutoffDate = new Date(now.getTime() - daysFrom * 24 * 60 * 60 * 1000);
+      const futureDate = includeFuture ? new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000) : now;
+      
+      console.log(`[GameResult] 시간 범위 설정: ${cutoffDate.toISOString()} ~ ${futureDate.toISOString()}`);
       
       const filteredEvents = events.filter(event => {
         if (!event.dateEvent || !event.strTime) {
@@ -218,19 +224,36 @@ class GameResultService {
         // 날짜 비교 최적화: 문자열 비교로 빠른 필터링
         const eventDateStr = event.dateEvent;
         const cutoffDateStr = cutoffDate.toISOString().slice(0, 10);
-        const nowDateStr = now.toISOString().slice(0, 10);
+        const futureDateStr = futureDate.toISOString().slice(0, 10);
         
-        // 날짜가 범위 밖이면 빠르게 제외
-        if (eventDateStr < cutoffDateStr || eventDateStr > nowDateStr) {
+        // 🆕 날짜가 범위 밖이면 빠르게 제외 (과거 3일 + 미래 1일)
+        if (eventDateStr < cutoffDateStr || eventDateStr > futureDateStr) {
           return false;
         }
         
         // 시간까지 정확히 비교가 필요한 경우만 Date 객체 생성
         const eventDateTime = new Date(eventDateStr + ' ' + event.strTime);
-        return eventDateTime >= cutoffDate && eventDateTime <= now;
+        const isInRange = eventDateTime >= cutoffDate && eventDateTime <= futureDate;
+        
+        // 🆕 디버깅 로그 추가
+        if (eventDateTime > now) {
+          console.log(`[GameResult] 미래 경기 포함: ${event.strHomeTeam} vs ${event.strAwayTeam} (${eventDateTime.toISOString()})`);
+        }
+        
+        return isInRange;
       });
       
-      console.log(`[GameResult] 날짜 필터링 결과: ${events.length}개 → ${filteredEvents.length}개 (과거 ${daysFrom}일간)`);
+      // 🆕 로그 메시지 수정: 과거 3일 + 미래 1일 표시
+      const pastCount = filteredEvents.filter(event => {
+        const eventDateTime = new Date(event.dateEvent + ' ' + event.strTime);
+        return eventDateTime <= now;
+      }).length;
+      const futureCount = filteredEvents.filter(event => {
+        const eventDateTime = new Date(event.dateEvent + ' ' + event.strTime);
+        return eventDateTime > now;
+      }).length;
+      
+      console.log(`[GameResult] 날짜 필터링 결과: ${events.length}개 → ${filteredEvents.length}개 (과거 ${pastCount}개 + 미래 ${futureCount}개)`);
       
       // TheSportsDB 형식을 표준 형식으로 변환 (UTC 시간 사용)
       const convertedData = filteredEvents.map(event => {
@@ -487,7 +510,8 @@ class GameResultService {
       if (!sportKey) continue;
       
       try {
-        const resultsResponse = await this.fetchResultsWithSportsDB(sportKey, 30);
+        // 🆕 시간 범위 수정: 과거 3일 + 미래 1일 (시간대 문제 고려)
+        const resultsResponse = await this.fetchResultsWithSportsDB(sportKey, 3, true);
         const events = resultsResponse.data || [];
         console.log(`Found ${events.length} events for ${league} from TheSportsDB API`);
 
@@ -557,7 +581,8 @@ class GameResultService {
       }
       
       console.log(`[결과수집] TheSportsDB API 요청: ${sportKey}`);
-      const resultsResponse = await this.fetchResultsWithSportsDB(sportKey, 30);
+      // 🆕 시간 범위 수정: 과거 3일 + 미래 1일 (시간대 문제 고려)
+      const resultsResponse = await this.fetchResultsWithSportsDB(sportKey, 3, true);
       console.log(`[결과수집] TheSportsDB API 응답 데이터 수: ${resultsResponse.data.length}개`);
       
       // 해당 팀들의 경기 찾기
@@ -713,7 +738,8 @@ class GameResultService {
         
         try {
           // TheSportsDB API 사용 (The Odds API 사용 금지)
-          const resultsResponse = await this.fetchResultsWithSportsDB(sportKey, 7);
+          // 🆕 시간 범위 수정: 과거 3일 + 미래 1일 (시간대 문제 고려)
+          const resultsResponse = await this.fetchResultsWithSportsDB(sportKey, 3, true);
           
           if (resultsResponse.data && Array.isArray(resultsResponse.data)) {
             console.log(`Found ${resultsResponse.data.length} events for ${clientCategory}`);
@@ -1164,15 +1190,16 @@ class GameResultService {
   }
 
   // 새로운 메서드: 특정 스포츠의 최근 경기 결과만 가져오기
-  async fetchRecentResults(clientCategory, days = 7) {
+  async fetchRecentResults(clientCategory, days = 3) {
     try {
       const sportKey = this.getSportKeyForCategory(clientCategory);
       if (!sportKey) {
         throw new Error(`Unknown category: ${clientCategory}`);
       }
 
+      // 🆕 시간 범위 수정: 과거 3일 + 미래 1일 (시간대 문제 고려)
       // TheSportsDB API 사용 (The Odds API 사용 금지)
-      const resultsResponse = await this.fetchResultsWithSportsDB(sportKey, days);
+      const resultsResponse = await this.fetchResultsWithSportsDB(sportKey, days, true);
 
       return resultsResponse.data;
     } catch (error) {
