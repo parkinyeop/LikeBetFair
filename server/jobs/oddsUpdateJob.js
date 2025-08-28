@@ -837,6 +837,36 @@ cron.schedule('*/10 * * * *', async () => {
   }
 });
 
+// 🎯 Exchange 주문 자동 정산 처리 - 매 5분마다 실행
+cron.schedule('*/5 * * * *', async () => {
+  try {
+    console.log('🎯 [Exchange] 매칭된 주문 자동 정산 시작...');
+    
+    // Exchange 주문 자동 정산 실행
+    const { stdout } = await execAsync('node -e "import ExchangeSettlementService from \'./services/exchangeSettlementService.js\'; const service = new ExchangeSettlementService(); service.settleAllConnectedOrders().then((result) => console.log(\'정산 완료:\', JSON.stringify(result))).catch(e => console.error(\'정산 실패:\', e.message));"', {
+      cwd: process.cwd()
+    });
+    
+    console.log('✅ [Exchange] 매칭된 주문 자동 정산 완료');
+    
+    // 정산 결과 로그 저장
+    saveUpdateLog('exchange_settlement', 'success', {
+      message: 'Exchange 주문 자동 정산 완료',
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ [Exchange] 매칭된 주문 자동 정산 실패:', error.message);
+    
+    // 오류 로그 저장
+    saveUpdateLog('exchange_settlement', 'error', {
+      message: 'Exchange 주문 자동 정산 실패',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // EPL 경기 결과/odds 별도 30분마다 강제 실행 (10분에서 변경)
 cron.schedule('*/30 * * * *', async () => {
   saveUpdateLog('epl', 'start', { message: 'EPL 프리미어리그 데이터 강제 업데이트' });
