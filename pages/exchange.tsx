@@ -5,9 +5,11 @@ import { API_CONFIG, buildApiUrl } from '../config/apiConfig';
 import { normalizeTeamNameForComparison } from '../utils/matchSportsbookGame';
 import { convertUtcToLocal, getCurrentLocalTime } from '../utils/timeUtils';
 import { getButtonStyle } from '../utils/buttonStyles';
+import { useExchangeContext } from '../contexts/ExchangeContext';
 
 export default function Exchange() {
   const router = useRouter();
+  const { selectedBet, setSelectedBet } = useExchangeContext();
   const [todayGames, setTodayGames] = useState<Record<string, any[]>>({});
   const [todayLoading, setTodayLoading] = useState(false);
   const [todayFlatGames, setTodayFlatGames] = useState<any[]>([]);
@@ -23,35 +25,60 @@ export default function Exchange() {
   const [todayGameMarkets, setTodayGameMarkets] = useState<{[gameId: string]: Set<string>}>({});
   const [leagueGameMarkets, setLeagueGameMarkets] = useState<{[gameId: string]: Set<string>}>({});
   
-  // 🎯 버튼별 선택 상태 관리
-  const [selectedButtons, setSelectedButtons] = useState<{[gameId: string]: string}>({});
-
-  // 🎯 버튼이 선택되었는지 확인하는 함수
+  // 🎯 버튼이 선택되었는지 확인하는 함수 - ExchangeContext만 사용 (하위 페이지와 동일)
   const isButtonSelected = (gameId: string, buttonKey: string) => {
-    const isSelected = selectedButtons[gameId] === buttonKey;
-    console.log('🎯 isButtonSelected 확인:', { gameId, buttonKey, isSelected, selectedButtons });
+    if (!selectedBet) {
+      console.log('🎯 isButtonSelected: selectedBet이 null입니다');
+      return false;
+    }
+    
+    // buttonKey에서 팀명과 마켓 추출 (예: "승패_New England Revolution" -> market: "승패", team: "New England Revolution")
+    const [market, team] = buttonKey.split('_', 2);
+    
+    const isSelected = selectedBet.gameId === gameId && 
+                      selectedBet.market === market &&
+                      selectedBet.team === team;
+    
+    console.log('🎯 isButtonSelected 확인 (ExchangeContext만 사용):', { 
+      gameId, buttonKey, market, team, selectedBet, isSelected,
+      'selectedBet.gameId === gameId': selectedBet.gameId === gameId,
+      'selectedBet.market === market': selectedBet.market === market,
+      'selectedBet.team === team': selectedBet.team === team,
+      'selectedBet.gameId 타입': typeof selectedBet.gameId,
+      'gameId 타입': typeof gameId
+    });
     return isSelected;
   };
 
-  // 🎯 버튼 클릭 시 선택 상태 변경
-  const handleButtonClick = (gameId: string, buttonKey: string) => {
-    console.log('🎯 handleButtonClick 호출됨:', { gameId, buttonKey });
-    setSelectedButtons(prev => {
-      const newState = { ...prev };
-      // 같은 경기의 다른 버튼이 선택되어 있다면 해제
-      if (newState[gameId] === buttonKey) {
-        delete newState[gameId]; // 같은 버튼 재클릭 시 선택 해제
-        console.log('🎯 버튼 선택 해제됨:', { gameId, buttonKey });
-      } else {
-        newState[gameId] = buttonKey; // 새 버튼 선택
-        console.log('🎯 새 버튼 선택됨:', { gameId, buttonKey });
-      }
-      console.log('🎯 selectedButtons 상태 업데이트:', newState);
-      return newState;
-    });
+  // 🎯 버튼 클릭 핸들러 - ExchangeContext만 사용 (하위 페이지와 동일)
+  const handleButtonClick = (game: any, team: string, price: number, market: string = '승패') => {
+    console.log('🎯 버튼 클릭됨:', { game, team, price, market });
+    console.log('🎯 현재 selectedBet 상태:', selectedBet);
+    console.log('🎯 game.id:', game.id, '타입:', typeof game.id);
+    
+    // 같은 베팅을 다시 클릭하면 선택 해제, 다른 베팅을 클릭하면 선택
+    if (selectedBet && selectedBet.gameId === game.id && selectedBet.team === team && selectedBet.market === market) {
+      console.log('🎯 동일한 베팅 재클릭 - 선택 해제');
+      setSelectedBet(null);
+      console.log('🎯 베팅 선택 해제 완료');
+    } else {
+      console.log('🎯 새로운 베팅 선택');
+      // 새로운 베팅 선택
+      const newSelectedBet = {
+        team,
+        price,
+        type: 'back' as const,
+        gameId: game.id,
+        market: market,
+        homeTeam: game.home_team,
+        awayTeam: game.away_team,
+        commenceTime: game.commence_time
+      };
+      console.log('🎯 새 베팅 선택할 객체:', newSelectedBet);
+      setSelectedBet(newSelectedBet);
+      console.log('🎯 새 베팅 선택 완료:', { team, price, market });
+    }
   };
-
-
 
   // 🆕 초기 마켓 설정 함수 - 게임이 로드될 때마다 기본값 설정
   const initializeGameMarkets = (gameId: string, isToday: boolean = true) => {
@@ -633,7 +660,12 @@ export default function Exchange() {
                         <button
                           key={idx}
                           onClick={() => {
-                            if (isBettable && outcome.price) {
+                            // 🎯 버튼 선택 상태 토글
+                            const wasSelected = isButtonSelected(game.id, `승패_${outcome.name}`);
+                            handleButtonClick(game, outcome.name, outcome.price, '승패');
+                            
+                            // 선택 해제된 경우가 아니라면 사이드바로 이동
+                            if (!wasSelected && isBettable && outcome.price) {
                               const gameInfo = {
                                 gameId: game.id,
                                 homeTeam: game.home_team,
@@ -1214,7 +1246,7 @@ export default function Exchange() {
                         })}
                       </div>
                       
-                      {/* 🆕 디버깅: 사용 가능한 마켓 정보 표시 */}
+                      {/* �� 디버깅: 사용 가능한 마켓 정보 표시 */}
                       <div className="mt-2 text-xs text-gray-400">
                         <details>
                           <summary className="cursor-pointer">🔍 사용 가능한 마켓 정보</summary>
@@ -1241,10 +1273,12 @@ export default function Exchange() {
                               <button
                                 key={idx}
                                 onClick={() => {
-                                  if (game.isBettable && outcome.price) {
-                                    // 버튼 선택 상태 토글
-                                    handleButtonClick(game.id, `승패_${outcome.name}`);
-                                    
+                                  // 🎯 버튼 선택 상태 토글
+                                  const wasSelected = isButtonSelected(game.id, `승패_${outcome.name}`);
+                                  handleButtonClick(game, outcome.name, outcome.price, '승패');
+                                  
+                                  // 선택 해제된 경우가 아니라면 사이드바로 이동
+                                  if (!wasSelected && game.isBettable && outcome.price) {
                                     const gameInfo = {
                                       gameId: game.id,
                                       homeTeam: game.home_team,
