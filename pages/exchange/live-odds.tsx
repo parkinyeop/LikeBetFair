@@ -303,46 +303,143 @@ export default function LiveOddsPage() {
                     
                     {/* 🆕 투데이 배팅과 동일: 선택지별 버튼 (Back/Lay 상태에 따라 활성화/비활성화) */}
                     <div className="flex space-x-4">
-                      {/* 🎯 Back 주문이 있는 선택지 (비활성화, 큰 사이즈) */}
-                      <button 
-                        disabled={true}
-                        className={getButtonStyle(false, true)}
-                      >
-                        <div className="font-medium truncate max-w-full">{order.selection}</div>
-                        <div className="text-xs mt-1 opacity-90">
-                          🎯 Back
-                        </div>
-                        <div className="text-xs mt-1 text-white font-medium">
-                          배당률: {order.price.toFixed(2)}
-                        </div>
-                        <div className="text-xs mt-1 text-white font-medium">
-                          금액: {order.amount.toLocaleString()}원
-                        </div>
-                      </button>
-                      
-                      {/* 🆕 Lay 주문이 가능한 반대 선택지들 (조건부 렌더링) */}
+                      {/* 🆕 모든 버튼을 조건부 렌더링으로 표시 */}
                       {(() => {
+                        // 🐛 디버깅: 실제 데이터 값 확인
+                        console.log('🔍 live-odds 디버깅:', {
+                          orderId: order.id,
+                          sportKey: order.sportKey,
+                          market: order.market,
+                          selection: order.selection,
+                          homeTeam: order.homeTeam,
+                          awayTeam: order.awayTeam
+                        });
+                        
                         if (order.market === 'h2h' || order.market === '승패') {
-                          if (order.selection === '무승부' || order.selection === 'Draw') {
-                            // 🎯 무승부 배팅: 승리, 패배 2개 Lay 버튼 표시
+                          if (order.sportKey?.startsWith('soccer')) {
+                            // 🎯 축구 경기: 항상 승/무/패 3개 버튼 표시
+                            console.log('⚽ 축구 경기로 인식됨 - 3개 버튼 표시');
+                            if (order.selection === '무승부' || order.selection === 'Draw') {
+                              // 무승부 배팅: 승리 → 무승부 → 패배 순서로 3개 버튼
+                              return (
+                                <>
+                                  <button 
+                                    className={getButtonStyle(true, false)}
+                                  >
+                                    <div className="font-medium truncate max-w-full">승리</div>
+                                    <div className="text-xs mt-1 opacity-90">
+                                      📉 Lay 가능
+                                    </div>
+                                    <div className="text-xs mt-1 opacity-90">
+                                      매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원
+                                    </div>
+                                  </button>
+                                  
+                                  {/* 🎯 Back 주문이 있는 선택지 (비활성화, 가운데 위치) */}
+                                  <button 
+                                    disabled={true}
+                                    className={getButtonStyle(false, true)}
+                                  >
+                                    <div className="font-medium truncate max-w-full">{order.selection}</div>
+                                    <div className="text-xs mt-1 opacity-90">
+                                      🎯 Back
+                                    </div>
+                                    <div className="text-xs mt-1 text-white font-medium">
+                                      배당률: {order.price.toFixed(2)}
+                                    </div>
+                                    <div className="text-xs mt-1 text-white font-medium">
+                                      금액: {order.amount.toLocaleString()}원
+                                    </div>
+                                  </button>
+                                  
+                                  <button 
+                                    className={getButtonStyle(true, false)}
+                                  >
+                                    <div className="font-medium truncate max-w-full">패배</div>
+                                    <div className="text-xs mt-1 opacity-90">
+                                      📉 Lay 가능
+                                    </div>
+                                    <div className="text-xs mt-1 opacity-90">
+                                      매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원
+                                    </div>
+                                  </button>
+                                </>
+                              );
+                            } else {
+                              // 승/패 배팅: 승/패 → 무승부 → 승/패 순서로 3개 버튼
+                              const oppositeSelection = order.selection === order.homeTeam ? order.awayTeam : order.homeTeam;
+                              return (
+                                <>
+                                  {/* 🎯 Back 주문이 있는 선택지 (비활성화, 왼쪽 위치) */}
+                                  <button 
+                                    disabled={true}
+                                    className={getButtonStyle(false, true)}
+                                  >
+                                    <div className="font-medium truncate max-w-full">{order.selection}</div>
+                                    <div className="text-xs mt-1 opacity-90">
+                                      🎯 Back
+                                    </div>
+                                    <div className="text-xs mt-1 text-white font-medium">
+                                      배당률: {order.price.toFixed(2)}
+                                    </div>
+                                    <div className="text-xs mt-1 text-white font-medium">
+                                      금액: {order.amount.toLocaleString()}원
+                                    </div>
+                                  </button>
+                                  
+                                  <button 
+                                    className={getButtonStyle(true, false)}
+                                  >
+                                    <div className="font-medium truncate max-w-full">무승부</div>
+                                    <div className="text-xs mt-1 opacity-90">
+                                      📉 Lay 가능
+                                    </div>
+                                    <div className="text-xs mt-1 opacity-90">
+                                      매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원
+                                    </div>
+                                  </button>
+                                  
+                                  <button 
+                                    className={getButtonStyle(true, false)}
+                                  >
+                                    <div className="font-medium truncate max-w-full">{oppositeSelection}</div>
+                                    <div className="text-xs mt-1 opacity-90">
+                                      📉 Lay 가능
+                                    </div>
+                                    <div className="text-xs mt-1 opacity-90">
+                                      매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원
+                                    </div>
+                                  </button>
+                                </>
+                              );
+                            }
+                          } else {
+                            // 🎯 축구가 아닌 다른 스포츠: 승/패 2개 버튼만 표시 (무승부 없음)
+                            console.log('🏀⚾ 축구가 아닌 스포츠로 인식됨 - 2개 버튼 표시');
+                            const oppositeSelection = order.selection === order.homeTeam ? order.awayTeam : order.homeTeam;
                             return (
                               <>
+                                {/* 🎯 Back 주문이 있는 선택지 (비활성화, 왼쪽 위치) */}
                                 <button 
-                                  className={getButtonStyle(true, false)}
+                                  disabled={true}
+                                  className={getButtonStyle(false, true)}
                                 >
-                                  <div className="font-medium truncate max-w-full">승리</div>
+                                  <div className="font-medium truncate max-w-full">{order.selection}</div>
                                   <div className="text-xs mt-1 opacity-90">
-                                    📉 Lay 가능
+                                    🎯 Back
                                   </div>
-                                  <div className="text-xs mt-1 opacity-90">
-                                    매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원
+                                  <div className="text-xs mt-1 text-white font-medium">
+                                    배당률: {order.price.toFixed(2)}
+                                  </div>
+                                  <div className="text-xs mt-1 text-white font-medium">
+                                    금액: {order.amount.toLocaleString()}원
                                   </div>
                                 </button>
                                 
                                 <button 
                                   className={getButtonStyle(true, false)}
                                 >
-                                  <div className="font-medium truncate max-w-full">패배</div>
+                                  <div className="font-medium truncate max-w-full">{oppositeSelection}</div>
                                   <div className="text-xs mt-1 opacity-90">
                                     📉 Lay 가능
                                   </div>
@@ -352,13 +449,34 @@ export default function LiveOddsPage() {
                                 </button>
                               </>
                             );
-                          } else {
-                            // 🎯 승/패 배팅: 무승부 1개 Lay 버튼 표시
-                            return (
+                          }
+                        } else if (order.market === 'totals' || order.market === '오버/언더') {
+                          // 🎯 오버/언더 경기: 반대 선택지 1개
+                          return (
+                            <>
+                              {/* 🎯 Back 주문이 있는 선택지 (비활성화, 왼쪽 위치) */}
+                              <button 
+                                disabled={true}
+                                className={getButtonStyle(false, true)}
+                              >
+                                <div className="font-medium truncate max-w-full">{order.selection}</div>
+                                <div className="text-xs mt-1 opacity-90">
+                                  🎯 Back
+                                </div>
+                                <div className="text-xs mt-1 text-white font-medium">
+                                  배당률: {order.price.toFixed(2)}
+                                </div>
+                                <div className="text-xs mt-1 text-white font-medium">
+                                  금액: {order.amount.toLocaleString()}원
+                                </div>
+                              </button>
+                              
                               <button 
                                 className={getButtonStyle(true, false)}
                               >
-                                <div className="font-medium truncate max-w-full">무승부</div>
+                                <div className="font-medium truncate max-w-full">
+                                  {order.selection === '오버' ? '언더' : '오버'}
+                                </div>
                                 <div className="text-xs mt-1 opacity-90">
                                   📉 Lay 가능
                                 </div>
@@ -366,58 +484,79 @@ export default function LiveOddsPage() {
                                   매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원
                                 </div>
                               </button>
-                            );
-                          }
-                        } else if (order.market === 'totals' || order.market === '오버/언더') {
-                          // 🎯 오버/언더 경기: 반대 선택지 1개
-                          return (
-                            <button 
-                              className={getButtonStyle(true, false)}
-                            >
-                              <div className="font-medium truncate max-w-full">
-                                {order.selection === '오버' ? '언더' : '오버'}
-                              </div>
-                              <div className="text-xs mt-1 opacity-90">
-                                📉 Lay 가능
-                              </div>
-                              <div className="text-xs mt-1 opacity-90">
-                                매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원
-                              </div>
-                            </button>
+                            </>
                           );
                         } else if (order.market === 'spreads' || order.market === '핸디캡') {
                           // 🎯 핸디캡 경기: 반대 선택지 1개
                           return (
-                            <button 
-                              className={getButtonStyle(true, false)}
-                            >
-                              <div className="font-medium truncate max-w-full">
-                                {order.selection === order.homeTeam ? order.awayTeam : order.homeTeam}
-                              </div>
-                              <div className="text-xs mt-1 opacity-90">
-                                📉 Lay 가능
-                              </div>
-                              <div className="text-xs mt-1 opacity-90">
-                                매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원
-                              </div>
-                            </button>
+                            <>
+                              {/* 🎯 Back 주문이 있는 선택지 (비활성화, 왼쪽 위치) */}
+                              <button 
+                                disabled={true}
+                                className={getButtonStyle(false, true)}
+                              >
+                                <div className="font-medium truncate max-w-full">{order.selection}</div>
+                                <div className="text-xs mt-1 opacity-90">
+                                  🎯 Back
+                                </div>
+                                <div className="text-xs mt-1 text-white font-medium">
+                                  배당률: {order.price.toFixed(2)}
+                                </div>
+                                <div className="text-xs mt-1 text-white font-medium">
+                                  금액: {order.amount.toLocaleString()}원
+                                </div>
+                                </button>
+                              
+                              <button 
+                                className={getButtonStyle(true, false)}
+                              >
+                                <div className="font-medium truncate max-w-full">
+                                  {order.selection === order.homeTeam ? order.awayTeam : order.homeTeam}
+                                </div>
+                                <div className="text-xs mt-1 opacity-90">
+                                  📉 Lay 가능
+                                </div>
+                                <div className="text-xs mt-1 opacity-90">
+                                  매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원
+                                </div>
+                              </button>
+                            </>
                           );
                         } else {
                           // 🎯 기본값: 반대 선택지 1개
                           return (
-                            <button 
-                              className={getButtonStyle(true, false)}
-                            >
-                              <div className="font-medium truncate max-w-full">
-                                {order.selection === order.homeTeam ? order.awayTeam : order.homeTeam}
-                              </div>
-                              <div className="text-xs mt-1 opacity-90">
-                                📉 Lay 가능
-                              </div>
-                              <div className="text-xs mt-1 opacity-90">
-                                매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원
-                              </div>
-                            </button>
+                            <>
+                              {/* 🎯 Back 주문이 있는 선택지 (비활성화, 왼쪽 위치) */}
+                              <button 
+                                disabled={true}
+                                className={getButtonStyle(false, true)}
+                              >
+                                <div className="font-medium truncate max-w-full">{order.selection}</div>
+                                <div className="text-xs mt-1 opacity-90">
+                                  🎯 Back
+                                </div>
+                                <div className="text-xs mt-1 text-white font-medium">
+                                  배당률: {order.price.toFixed(2)}
+                                </div>
+                                <div className="text-xs mt-1 text-white font-medium">
+                                  금액: {order.amount.toLocaleString()}원
+                                </div>
+                              </button>
+                              
+                              <button 
+                                className={getButtonStyle(true, false)}
+                              >
+                                <div className="font-medium truncate max-w-full">
+                                  {order.selection === order.homeTeam ? order.awayTeam : order.homeTeam}
+                                </div>
+                                <div className="text-xs mt-1 opacity-90">
+                                  📉 Lay 가능
+                                </div>
+                                <div className="text-xs mt-1 opacity-90">
+                                  매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원
+                                </div>
+                              </button>
+                            </>
                           );
                         }
                       })()}
