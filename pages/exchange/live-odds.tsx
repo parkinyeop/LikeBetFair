@@ -3,7 +3,6 @@ import { useExchange, ExchangeOrder } from '../../hooks/useExchange';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
 import { convertUTCToKST } from '../../utils/timeUtils';
-import { getButtonStyle } from '../../utils/buttonStyles';
 
 export default function LiveOddsPage() {
   const { isLoggedIn, token, userId } = useAuth();
@@ -16,36 +15,6 @@ export default function LiveOddsPage() {
   const [selectedSport, setSelectedSport] = useState<string>('all');
   const [selectedMarket, setSelectedMarket] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
-  
-  // 🎯 버튼별 선택 상태 관리
-  const [selectedButtons, setSelectedButtons] = useState<{[gameId: string]: string}>({});
-
-  // 🎯 버튼이 선택되었는지 확인하는 함수
-  const isButtonSelected = (gameId: string, buttonKey: string) => {
-    const isSelected = selectedButtons[gameId] === buttonKey;
-    console.log('🎯 live-odds isButtonSelected 확인:', { gameId, buttonKey, isSelected, selectedButtons });
-    return isSelected;
-  };
-
-  // 🎯 버튼 클릭 시 선택 상태 변경
-  const handleButtonClick = (gameId: string, buttonKey: string) => {
-    console.log('🎯 live-odds handleButtonClick 호출됨:', { gameId, buttonKey });
-    setSelectedButtons(prev => {
-      const newState = { ...prev };
-      // 같은 경기의 다른 버튼이 선택되어 있다면 해제
-      if (newState[gameId] === buttonKey) {
-        delete newState[gameId]; // 같은 버튼 재클릭 시 선택 해제
-        console.log('🎯 live-odds 버튼 선택 해제됨:', { gameId, buttonKey });
-      } else {
-        newState[gameId] = buttonKey; // 새 버튼 선택
-        console.log('🎯 live-odds 새 버튼 선택됨:', { gameId, buttonKey });
-      }
-      console.log('🎯 live-odds selectedButtons 상태 업데이트:', newState);
-      return newState;
-    });
-  };
-
-
 
   // 실시간 호가 현황 로드
   useEffect(() => {
@@ -165,7 +134,20 @@ export default function LiveOddsPage() {
     return marketNames[market] || market;
   };
 
-
+  // 🎯 공통 버튼 스타일 함수 - 모든 마켓 버튼에서 재사용
+  const getButtonStyle = (isActive: boolean, isDisabled: boolean) => {
+    const baseStyle = "flex-1 p-2 rounded-lg text-center transition-colors text-white text-sm";
+    
+    if (isDisabled) {
+      return `${baseStyle} bg-gray-600 cursor-not-allowed`;
+    }
+    
+    if (isActive) {
+      return `${baseStyle} bg-blue-500 hover:bg-blue-600 cursor-pointer`;
+    }
+    
+    return `${baseStyle} bg-gray-600 cursor-not-allowed`;
+  };
 
   return (
     <div className="p-6">
@@ -321,12 +303,12 @@ export default function LiveOddsPage() {
                     
                     {/* 🆕 투데이 배팅과 동일: 선택지별 버튼 (Back/Lay 상태에 따라 활성화/비활성화) */}
                     <div className="flex space-x-4">
-                      {/* 🆕 Back 주문이 있는 선택지 (비활성화) */}
+                      {/* 🎯 Back 주문이 있는 선택지 (비활성화, 큰 사이즈) */}
                       <button 
                         disabled={true}
-                        className={getButtonStyle(false, true, false, false)}
+                        className={getButtonStyle(false, true)}
                       >
-                        <div className="font-medium">{order.selection}</div>
+                        <div className="font-medium truncate max-w-full">{order.selection}</div>
                         <div className="text-xs mt-1 opacity-90">
                           🎯 Back
                         </div>
@@ -338,52 +320,107 @@ export default function LiveOddsPage() {
                         </div>
                       </button>
                       
-                      {/* 🆕 Lay 주문이 가능한 반대 선택지 (활성화) */}
-                                              <button 
-                          onClick={() => handleButtonClick(String(order.id), `Lay_${order.market}_${order.selection}`)}
-                          className={getButtonStyle(
-                            true, 
-                            false, 
-                            isButtonSelected(String(order.id), `Lay_${order.market}_${order.selection}`),
-                            false
-                          )}
-                        >
-                        <div className="font-medium">
-                          {(() => {
-                            // 🆕 반대 선택지 찾기
-                            if (order.market === 'h2h' || order.market === '승패') {
-                              // 승/패 경기: 현재 선택지가 홈팀이면 원정팀, 원정팀이면 홈팀
-                              if (order.selection === order.homeTeam) {
-                                return order.awayTeam;
-                              } else {
-                                return order.homeTeam;
-                              }
-                            } else if (order.market === 'totals' || order.market === '오버/언더') {
-                              // 오버/언더 경기: 현재 선택지가 오버면 언더, 언더면 오버
-                              if (order.selection === '오버') {
-                                return '언더';
-                              } else {
-                                return '오버';
-                              }
-                            } else if (order.market === 'spreads' || order.market === '핸디캡') {
-                              // 핸디캡 경기: 현재 선택지가 홈팀이면 원정팀, 원정팀이면 홈팀
-                              if (order.selection === order.homeTeam) {
-                                return order.awayTeam;
-                              } else {
-                                return order.homeTeam;
-                              }
-                            }
-                            // 기본값: 반대 선택지
-                            return order.selection === order.homeTeam ? order.awayTeam : order.homeTeam;
-                          })()}
-                        </div>
-                        <div className="text-xs mt-1 opacity-90">
-                          📉 Lay 가능
-                        </div>
-                        <div className="text-xs mt-1 opacity-90">
-                          매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원
-                        </div>
-                      </button>
+                      {/* 🆕 Lay 주문이 가능한 반대 선택지들 (조건부 렌더링) */}
+                      {(() => {
+                        if (order.market === 'h2h' || order.market === '승패') {
+                          if (order.selection === '무승부' || order.selection === 'Draw') {
+                            // 🎯 무승부 배팅: 승리, 패배 2개 Lay 버튼 표시
+                            return (
+                              <>
+                                <button 
+                                  className={getButtonStyle(true, false)}
+                                >
+                                  <div className="font-medium truncate max-w-full">승리</div>
+                                  <div className="text-xs mt-1 opacity-90">
+                                    📉 Lay 가능
+                                  </div>
+                                  <div className="text-xs mt-1 opacity-90">
+                                    매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원
+                                  </div>
+                                </button>
+                                
+                                <button 
+                                  className={getButtonStyle(true, false)}
+                                >
+                                  <div className="font-medium truncate max-w-full">패배</div>
+                                  <div className="text-xs mt-1 opacity-90">
+                                    📉 Lay 가능
+                                  </div>
+                                  <div className="text-xs mt-1 opacity-90">
+                                    매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원
+                                  </div>
+                                </button>
+                              </>
+                            );
+                          } else {
+                            // 🎯 승/패 배팅: 무승부 1개 Lay 버튼 표시
+                            return (
+                              <button 
+                                className={getButtonStyle(true, false)}
+                              >
+                                <div className="font-medium truncate max-w-full">무승부</div>
+                                <div className="text-xs mt-1 opacity-90">
+                                  📉 Lay 가능
+                                </div>
+                                <div className="text-xs mt-1 opacity-90">
+                                  매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원
+                                </div>
+                              </button>
+                            );
+                          }
+                        } else if (order.market === 'totals' || order.market === '오버/언더') {
+                          // 🎯 오버/언더 경기: 반대 선택지 1개
+                          return (
+                            <button 
+                              className={getButtonStyle(true, false)}
+                            >
+                              <div className="font-medium truncate max-w-full">
+                                {order.selection === '오버' ? '언더' : '오버'}
+                              </div>
+                              <div className="text-xs mt-1 opacity-90">
+                                📉 Lay 가능
+                              </div>
+                              <div className="text-xs mt-1 opacity-90">
+                                매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원
+                              </div>
+                            </button>
+                          );
+                        } else if (order.market === 'spreads' || order.market === '핸디캡') {
+                          // 🎯 핸디캡 경기: 반대 선택지 1개
+                          return (
+                            <button 
+                              className={getButtonStyle(true, false)}
+                            >
+                              <div className="font-medium truncate max-w-full">
+                                {order.selection === order.homeTeam ? order.awayTeam : order.homeTeam}
+                              </div>
+                              <div className="text-xs mt-1 opacity-90">
+                                📉 Lay 가능
+                              </div>
+                              <div className="text-xs mt-1 opacity-90">
+                                매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원
+                              </div>
+                            </button>
+                          );
+                        } else {
+                          // 🎯 기본값: 반대 선택지 1개
+                          return (
+                            <button 
+                              className={getButtonStyle(true, false)}
+                            >
+                              <div className="font-medium truncate max-w-full">
+                                {order.selection === order.homeTeam ? order.awayTeam : order.homeTeam}
+                              </div>
+                              <div className="text-xs mt-1 opacity-90">
+                                📉 Lay 가능
+                              </div>
+                              <div className="text-xs mt-1 opacity-90">
+                                매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원
+                              </div>
+                            </button>
+                          );
+                        }
+                      })()}
                     </div>
                   </div>
                 ))}
