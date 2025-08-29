@@ -30,6 +30,59 @@ export default function LiveOddsPage() {
   // 🎯 버튼 클릭 시 선택 상태 변경
   const handleButtonClick = (orderId: string, buttonKey: string) => {
     console.log('🎯 live-odds handleButtonClick 호출됨:', { orderId, buttonKey });
+    
+    // Lay 버튼 클릭 시 orderbook 페이지로 이동
+    if (buttonKey.startsWith('lay_')) {
+      const order = recentOrders.find(o => String(o.id) === orderId);
+      if (order) {
+        // Lay 버튼의 선택지 추출 (예: lay_승리 -> 승리, lay_핸디캡_Minnesota United FC +0.5 -> Minnesota United FC +0.5)
+        let selection = buttonKey.replace('lay_', '');
+        
+        // 🆕 마켓명도 제거 (예: 핸디캡_, totals_ 등)
+        if (selection.includes('_')) {
+          selection = selection.split('_').slice(1).join('_');
+        }
+        
+        // 🆕 팀명만 추출하여 검색어로 사용
+        let searchQuery = '';
+        
+        if (selection === '승리' || selection === 'Win') {
+          searchQuery = order.homeTeam || '';
+        } else if (selection === '패배' || selection === 'Loss') {
+          searchQuery = order.awayTeam || '';
+        } else if (selection === '무승부' || selection === 'Draw') {
+          // 무승부는 팀명으로 검색할 수 없으므로 경기 전체를 검색
+          searchQuery = `${order.homeTeam} ${order.awayTeam}`;
+        } else {
+          // 핸디캡이나 다른 마켓의 경우 팀명만 추출
+          // 예: "Minnesota United FC +0.5" -> "Minnesota United FC"
+          // 예: "Over 2.5" -> "Over"
+          // 예: "Under 2.5" -> "Under"
+          
+          // 숫자나 특수문자가 포함된 경우 마지막 부분 제거
+          const parts = selection.split(' ');
+          let teamName = '';
+          
+          if (selection.includes('+') || selection.includes('-') || selection.includes('.')) {
+            // 핸디캡이나 오버/언더: 마지막 숫자 부분 제거
+            teamName = parts.slice(0, -1).join(' ');
+          } else {
+            // 일반적인 경우: 전체 사용
+            teamName = selection;
+          }
+          
+          searchQuery = teamName;
+        }
+        
+        console.log('🔍 검색어 추출:', { selection, searchQuery });
+        
+        // orderbook 페이지로 이동하면서 검색어 설정
+        const encodedSearch = encodeURIComponent(searchQuery);
+        router.push(`/exchange/orderbook?search=${encodedSearch}`);
+        return;
+      }
+    }
+    
     setSelectedButtons(prev => {
       const newState = { ...prev };
       // 같은 주문의 다른 버튼이 선택되어 있다면 해제
@@ -347,6 +400,8 @@ export default function LiveOddsPage() {
                                   onClick={() => handleButtonClick(String(order.id), `lay_승리`)}
                                   className={getButtonStyle(
                                     true, 
+                                    false,
+                                    false,
                                     false
                                   )}
                                 >
@@ -381,6 +436,8 @@ export default function LiveOddsPage() {
                                   onClick={() => handleButtonClick(String(order.id), `lay_패배`)}
                                   className={getButtonStyle(
                                     true, 
+                                    false,
+                                    false,
                                     false
                                   )}
                                 >
@@ -421,6 +478,8 @@ export default function LiveOddsPage() {
                                   onClick={() => handleButtonClick(String(order.id), `lay_무승부`)}
                                   className={getButtonStyle(
                                     true, 
+                                    false,
+                                    false,
                                     false
                                   )}
                                 >
@@ -438,6 +497,8 @@ export default function LiveOddsPage() {
                                   onClick={() => handleButtonClick(String(order.id), `lay_${oppositeSelection}`)}
                                   className={getButtonStyle(
                                     true, 
+                                    false,
+                                    false,
                                     false
                                   )}
                                 >
@@ -474,13 +535,15 @@ export default function LiveOddsPage() {
                               </button>
                               
                               {/* Lay 주문이 가능한 반대 선택지 (활성화) */}
-                              <button 
-                                onClick={() => handleButtonClick(String(order.id), `lay_${order.market}_${order.selection}`)}
-                                className={getButtonStyle(
-                                  true, 
-                                  false
-                                )}
-                              >
+                                                              <button 
+                                  onClick={() => handleButtonClick(String(order.id), `lay_${order.market}_${order.selection}`)}
+                                  className={getButtonStyle(
+                                    true, 
+                                    false,
+                                    false,
+                                    false
+                                  )}
+                                >
                                 <div className="font-medium">
                                   {(() => {
                                     // 🆕 반대 선택지 찾기

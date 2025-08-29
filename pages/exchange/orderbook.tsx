@@ -46,6 +46,15 @@ const OrderbookPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<'time' | 'odds' | 'amount'>('time');
   const [searchTerm, setSearchTerm] = useState('');
   
+  // 🆕 URL 파라미터에서 검색어 읽어오기
+  useEffect(() => {
+    if (router.query.search) {
+      const searchFromUrl = decodeURIComponent(router.query.search as string);
+      setSearchTerm(searchFromUrl);
+      console.log('🔍 URL에서 검색어 설정:', searchFromUrl);
+    }
+  }, [router.query.search]);
+  
   // 매치 배팅 상태
   const [matchBetAmount, setMatchBetAmount] = useState<{ [key: string]: number }>({});
   const [matchBetOdds, setMatchBetOdds] = useState<{ [key: string]: number }>({});
