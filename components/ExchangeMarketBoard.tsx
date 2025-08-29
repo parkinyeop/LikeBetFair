@@ -422,62 +422,59 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
               {selectedMarkets.has('승패') && (
                               <div className="mb-4 p-3 bg-gray-800 rounded-lg border border-gray-700">
                 <div className="text-sm font-medium text-white mb-2">🏆 승/패 (Win/Loss)</div>
-                  <div className={`flex space-x-4 ${game.sportKey?.includes('baseball') ? 'justify-between' : ''}`}>
+                  <div className="flex items-center gap-2">
                     {/* 홈팀 승리 */}
-                    <div className="flex-1">
-                      <button
-                        onClick={() => handleBetClick(game, game.homeTeam, game.homeTeamOdds || 2.5, 'back')}
-                        disabled={!isOpen}
-                        className={getButtonStyle(
-                          isOpen,
-                          !isOpen,
-                          isBetSelected(game.id, '승패', game.homeTeam)
-                        )}
-                      >
-                        <div className="text-center truncate max-w-full">{game.homeTeam}</div>
-                        <div className="text-xs mt-1 opacity-90">
-                          배당: {game.homeTeamOdds ? game.homeTeamOdds.toFixed(2) : 'N/A'}
-                        </div>
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => handleBetClick(game, game.homeTeam, game.homeTeamOdds || 2.5, 'back')}
+                      disabled={!isOpen}
+                      className={getButtonStyle(
+                        isOpen,
+                        !isOpen,
+                        isBetSelected(game.id, '승패', game.homeTeam),
+                        false
+                      )}
+                    >
+                      <div className="text-center truncate max-w-full">{game.homeTeam}</div>
+                      <div className="text-xs mt-1 opacity-90">
+                        배당: {game.homeTeamOdds ? game.homeTeamOdds.toFixed(2) : 'N/A'}
+                      </div>
+                    </button>
 
                     {/* 무승부 - 야구가 아닐 때만 표시 */}
                     {!game.sportKey?.includes('baseball') && (
-                      <div className="flex-1">
-                        <button
-                          onClick={() => handleBetClick(game, '무승부', game.drawOdds || 3.5, 'back')}
-                          disabled={!isOpen}
-                          className={getButtonStyle(
-                            isOpen,
-                            !isOpen,
-                            isBetSelected(game.id, '승패', '무승부')
-                          )}
-                        >
-                          <div className="text-center">무승부</div>
-                          <div className="text-xs mt-1 opacity-90">
-                            배당: {game.drawOdds ? game.drawOdds.toFixed(2) : 'N/A'}
-                          </div>
-                        </button>
-                      </div>
-                    )}
-
-                    {/* 원정팀 승리 */}
-                    <div className="flex-1">
                       <button
-                        onClick={() => handleBetClick(game, game.awayTeam, game.awayTeamOdds || 2.5, 'back')}
+                        onClick={() => handleBetClick(game, '무승부', game.drawOdds || 3.5, 'back')}
                         disabled={!isOpen}
                         className={getButtonStyle(
                           isOpen,
                           !isOpen,
-                          isBetSelected(game.id, '승패', game.awayTeam)
+                          isBetSelected(game.id, '승패', '무승부'),
+                          false
                         )}
                       >
-                        <div className="text-center truncate max-w-full">{game.awayTeam}</div>
+                        <div className="text-center">무승부</div>
                         <div className="text-xs mt-1 opacity-90">
-                          배당: {game.awayTeamOdds ? game.awayTeamOdds.toFixed(2) : 'N/A'}
+                          배당: {game.drawOdds ? game.drawOdds.toFixed(2) : 'N/A'}
                         </div>
                       </button>
-                    </div>
+                    )}
+
+                    {/* 원정팀 승리 */}
+                    <button
+                      onClick={() => handleBetClick(game, game.awayTeam, game.awayTeamOdds || 2.5, 'back')}
+                      disabled={!isOpen}
+                      className={getButtonStyle(
+                        isOpen,
+                        !isOpen,
+                        isBetSelected(game.id, '승패', game.awayTeam),
+                        false
+                      )}
+                    >
+                      <div className="text-center truncate max-w-full">{game.awayTeam}</div>
+                      <div className="text-xs mt-1 opacity-90">
+                        배당: {game.awayTeamOdds ? game.awayTeamOdds.toFixed(2) : 'N/A'}
+                      </div>
+                    </button>
                   </div>
                 </div>
               )}

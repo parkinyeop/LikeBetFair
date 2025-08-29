@@ -1,5 +1,5 @@
 // 🎯 공통 버튼 스타일 함수 - 모든 마켓 버튼에서 재사용
-export const getButtonStyle = (isActive: boolean, isDisabled: boolean, isSelected: boolean = false, isLarge: boolean = true) => {
+export const getButtonStyle = (isActive: boolean, isDisabled: boolean, isSelected: boolean = false, isLarge: boolean = false) => {
   console.log('🎨 getButtonStyle 호출됨:', { isActive, isDisabled, isSelected, isLarge });
   
   const baseStyle = isLarge

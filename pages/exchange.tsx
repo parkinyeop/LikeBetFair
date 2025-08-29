@@ -663,7 +663,8 @@ export default function Exchange() {
                           className={getButtonStyle(
                             isBettable && outcome.price, 
                             !isBettable || !outcome.price,
-                            isButtonSelected(game.id, `승패_${outcome.name}`)
+                            isButtonSelected(game.id, `승패_${outcome.name}`),
+                            false
                           )}
                           disabled={!isBettable || !outcome.price}
                           title={isBettable && outcome.price ? `클릭하여 ${outcome.name} 주문하기` : '베팅 마감됨'}
@@ -1273,7 +1274,8 @@ export default function Exchange() {
                                 className={getButtonStyle(
                                   game.isBettable && outcome.price, 
                                   !game.isBettable || !outcome.price,
-                                  isButtonSelected(game.id, `승패_${outcome.name}`)
+                                  isButtonSelected(game.id, `승패_${outcome.name}`),
+                                  false
                                 )}
                                 disabled={!game.isBettable || !outcome.price}
                                 title={game.isBettable && outcome.price ? `클릭하여 ${outcome.name} 주문하기` : '베팅 마감됨'}
