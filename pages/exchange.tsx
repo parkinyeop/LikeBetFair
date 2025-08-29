@@ -766,7 +766,12 @@ export default function Exchange() {
                             <div key={point} className="flex items-center gap-2">
                               <button
                                 onClick={() => {
-                                  if (isBettable && overOdds) {
+                                  // 🎯 버튼 선택 상태 토글
+                                  const wasSelected = isButtonSelected(game.id, `총점_Over ${point}`);
+                                  handleButtonClick(game, `Over ${point}`, overOdds, '총점');
+                                  
+                                  // 선택 해제된 경우가 아니라면 사이드바로 이동
+                                  if (!wasSelected && isBettable && overOdds) {
                                     const gameInfo = {
                                       gameId: game.id,
                                       homeTeam: game.home_team,
@@ -793,11 +798,12 @@ export default function Exchange() {
                                     console.log('🎯 Over 배당율 카드 클릭됨:', gameInfo);
                                   }
                                 }}
-                                className={`flex-1 p-2 rounded-lg text-center transition-colors ${
-                                  !isBettable || !overOdds
-                                    ? 'opacity-50 cursor-not-allowed bg-gray-600'
-                                    : 'bg-blue-500 hover:bg-blue-600 cursor-pointer'
-                                } text-white text-sm`}
+                                className={getButtonStyle(
+                                  isBettable && overOdds,
+                                  !isBettable || !overOdds,
+                                  isButtonSelected(game.id, `총점_Over ${point}`),
+                                  false
+                                )}
                                 disabled={!isBettable || !overOdds}
                               >
                                 <div className="font-medium">{game.home_team}</div>
@@ -806,7 +812,12 @@ export default function Exchange() {
                               <div className="w-12 text-sm font-medium text-blue-400 text-center">{point}</div>
                               <button
                                 onClick={() => {
-                                  if (isBettable && underOdds) {
+                                  // 🎯 버튼 선택 상태 토글
+                                  const wasSelected = isButtonSelected(game.id, `총점_Under ${point}`);
+                                  handleButtonClick(game, `Under ${point}`, underOdds, '총점');
+                                  
+                                  // 선택 해제된 경우가 아니라면 사이드바로 이동
+                                  if (!wasSelected && isBettable && underOdds) {
                                     const gameInfo = {
                                       gameId: game.id,
                                       homeTeam: game.home_team,
@@ -833,11 +844,12 @@ export default function Exchange() {
                                     console.log('🎯 Under 배당율 카드 클릭됨:', gameInfo);
                                   }
                                 }}
-                                className={`flex-1 p-2 rounded-lg text-center transition-colors ${
-                                  !isBettable || !underOdds
-                                    ? 'opacity-50 cursor-not-allowed bg-gray-600'
-                                    : 'bg-blue-500 hover:bg-blue-600 cursor-pointer'
-                                } text-white text-sm`}
+                                className={getButtonStyle(
+                                  isBettable && underOdds,
+                                  !isBettable || !underOdds,
+                                  isButtonSelected(game.id, `총점_Under ${point}`),
+                                  false
+                                )}
                                 disabled={!isBettable || !underOdds}
                               >
                                 <div className="font-medium">{game.away_team}</div>
@@ -922,14 +934,20 @@ export default function Exchange() {
                               {homeOdds != null && (
                                 <button
                                   onClick={() => {
-                                    if (isBettable && homeOdds) {
+                                    // 🎯 버튼 선택 상태 토글
+                                    const selection = `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`;
+                                    const wasSelected = isButtonSelected(game.id, `핸디캡_${selection}`);
+                                    handleButtonClick(game, selection, homeOdds, '핸디캡');
+                                    
+                                    // 선택 해제된 경우가 아니라면 사이드바로 이동
+                                    if (!wasSelected && isBettable && homeOdds) {
                                       const gameInfo = {
                                         gameId: game.id,
                                         homeTeam: game.home_team,
                                         awayTeam: game.away_team,
                                         sportKey: game.sport_key,
                                         market: '핸디캡',
-                                        selection: `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`,
+                                        selection: selection,
                                         odds: homeOdds,
                                         commenceTime: game.commence_time
                                       };
@@ -949,11 +967,12 @@ export default function Exchange() {
                                       console.log('🎯 홈팀 핸디캡 배당율 카드 클릭됨:', gameInfo);
                                     }
                                   }}
-                                  className={`flex-1 p-2 rounded-lg text-center transition-colors ${
-                                    !isBettable || !homeOdds
-                                      ? 'opacity-50 cursor-not-allowed bg-gray-600'
-                                      : 'bg-blue-500 hover:bg-blue-600 cursor-pointer'
-                                  } text-white text-sm`}
+                                  className={getButtonStyle(
+                                    isBettable && homeOdds,
+                                    !isBettable || !homeOdds,
+                                    isButtonSelected(game.id, `핸디캡_${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`),
+                                    false
+                                  )}
                                   disabled={!isBettable || !homeOdds}
                                 >
                                   <div className="font-medium">{game.home_team} {homeHandicap > 0 ? '+' : ''}{homeHandicap}</div>
@@ -964,14 +983,20 @@ export default function Exchange() {
                               {awayOdds != null && (
                                 <button
                                   onClick={() => {
-                                    if (isBettable && awayOdds) {
+                                    // 🎯 버튼 선택 상태 토글
+                                    const selection = `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`;
+                                    const wasSelected = isButtonSelected(game.id, `핸디캡_${selection}`);
+                                    handleButtonClick(game, selection, awayOdds, '핸디캡');
+                                    
+                                    // 선택 해제된 경우가 아니라면 사이드바로 이동
+                                    if (!wasSelected && isBettable && awayOdds) {
                                       const gameInfo = {
                                         gameId: game.id,
                                         homeTeam: game.home_team,
                                         awayTeam: game.away_team,
                                         sportKey: game.sport_key,
                                         market: '핸디캡',
-                                        selection: `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`,
+                                        selection: selection,
                                         odds: awayOdds,
                                         commenceTime: game.commence_time
                                       };
@@ -991,11 +1016,12 @@ export default function Exchange() {
                                       console.log('🎯 원정팀 핸디캡 배당율 카드 클릭됨:', gameInfo);
                                     }
                                   }}
-                                  className={`flex-1 p-2 rounded-lg text-center transition-colors ${
-                                    !isBettable || !awayOdds
-                                      ? 'opacity-50 cursor-not-allowed bg-gray-600'
-                                      : 'bg-blue-500 hover:bg-blue-600 cursor-pointer'
-                                  } text-white text-sm`}
+                                  className={getButtonStyle(
+                                    isBettable && awayOdds,
+                                    !isBettable || !awayOdds,
+                                    isButtonSelected(game.id, `핸디캡_${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`),
+                                    false
+                                  )}
                                   disabled={!isBettable || !awayOdds}
                                 >
                                   <div className="font-medium">{game.away_team} {awayHandicap > 0 ? '+' : ''}{awayHandicap}</div>
@@ -1379,7 +1405,12 @@ export default function Exchange() {
                                   <div key={point} className="flex items-center gap-2">
                                     <button
                                       onClick={() => {
-                                        if (game.isBettable && overOdds) {
+                                        // 🎯 버튼 선택 상태 토글
+                                        const wasSelected = isButtonSelected(game.id, `총점_Over ${point}`);
+                                        handleButtonClick(game, `Over ${point}`, overOdds, '총점');
+                                        
+                                        // 선택 해제된 경우가 아니라면 사이드바로 이동
+                                        if (!wasSelected && game.isBettable && overOdds) {
                                           const gameInfo = {
                                             gameId: game.id,
                                             homeTeam: game.home_team,
@@ -1406,11 +1437,12 @@ export default function Exchange() {
                                           console.log('🎯 총점 마켓 배당율 카드 클릭됨:', gameInfo);
                                         }
                                       }}
-                                      className={`flex-1 p-2 rounded-lg text-center transition-colors ${
-                                        !game.isBettable || !overOdds
-                                          ? 'opacity-50 cursor-not-allowed bg-gray-600'
-                                          : 'bg-blue-500 hover:bg-blue-600 cursor-pointer'
-                                      } text-white text-sm`}
+                                      className={getButtonStyle(
+                                        game.isBettable && overOdds,
+                                        !game.isBettable || !overOdds,
+                                        isButtonSelected(game.id, `총점_Over ${point}`),
+                                        false
+                                      )}
                                       disabled={!game.isBettable || !overOdds}
                                     >
                                       <div className="font-medium">{game.home_team}</div>
@@ -1419,7 +1451,12 @@ export default function Exchange() {
                                     <div className="w-12 text-sm font-medium text-blue-400 text-center">{point}</div>
                                     <button
                                       onClick={() => {
-                                        if (game.isBettable && underOdds) {
+                                        // 🎯 버튼 선택 상태 토글
+                                        const wasSelected = isButtonSelected(game.id, `총점_Under ${point}`);
+                                        handleButtonClick(game, `Under ${point}`, underOdds, '총점');
+                                        
+                                        // 선택 해제된 경우가 아니라면 사이드바로 이동
+                                        if (!wasSelected && game.isBettable && underOdds) {
                                           const gameInfo = {
                                             gameId: game.id,
                                             homeTeam: game.home_team,
@@ -1446,11 +1483,12 @@ export default function Exchange() {
                                           console.log('🎯 Under 배당율 카드 클릭됨:', gameInfo);
                                         }
                                       }}
-                                      className={`flex-1 p-2 rounded-lg text-center transition-colors ${
-                                        !game.isBettable || !underOdds
-                                          ? 'opacity-50 cursor-not-allowed bg-gray-600'
-                                          : 'bg-blue-500 hover:bg-blue-600 cursor-pointer'
-                                      } text-white text-sm`}
+                                                                              className={getButtonStyle(
+                                          game.isBettable && underOdds,
+                                          !game.isBettable || !underOdds,
+                                          isButtonSelected(game.id, `총점_Under ${point}`),
+                                          false
+                                        )}
                                       disabled={!game.isBettable || !underOdds}
                                     >
                                       <div className="font-medium">{game.away_team}</div>
@@ -1491,7 +1529,12 @@ export default function Exchange() {
                                     <button
                                       key={idx}
                                       onClick={() => {
-                                        if (game.isBettable && odds.averagePrice) {
+                                        // 🎯 버튼 선택 상태 토글
+                                        const wasSelected = isButtonSelected(game.id, `핸디캡_${key}`);
+                                        handleButtonClick(game, key, odds.averagePrice, '핸디캡');
+                                        
+                                        // 선택 해제된 경우가 아니라면 사이드바로 이동
+                                        if (!wasSelected && game.isBettable && odds.averagePrice) {
                                           const gameInfo = {
                                             gameId: game.id,
                                             homeTeam: game.home_team,
@@ -1518,11 +1561,12 @@ export default function Exchange() {
                                           console.log('🎯 핸디캡 마켓 배당율 카드 클릭됨:', gameInfo);
                                         }
                                       }}
-                                      className={`flex-1 p-3 rounded-lg text-center transition-all duration-200 transform hover:scale-105 ${
-                                        game.isBettable && odds.averagePrice
-                                          ? 'bg-blue-500 hover:bg-blue-600 cursor-pointer shadow-lg hover:shadow-xl'
-                                          : 'bg-gray-600 cursor-not-allowed'
-                                      } text-white`}
+                                      className={getButtonStyle(
+                                        game.isBettable && odds.averagePrice,
+                                        !game.isBettable || !odds.averagePrice,
+                                        isButtonSelected(game.id, `핸디캡_${key}`),
+                                        false
+                                      )}
                                       disabled={!game.isBettable || !odds.averagePrice}
                                       title={game.isBettable && odds.averagePrice ? `클릭하여 ${key} 주문하기` : '베팅 마감됨'}
                                     >
