@@ -1,10 +1,10 @@
 // DB 기준 중앙화된 설정 파일
 // 모든 API 설정, 카테고리 매핑, 시간 설정 등을 한 곳에서 관리
 
-import db from '../models/db.js';
+const db = require('../models/db.js');
 
 // ===== API 설정 =====
-export const API_CONFIG = {
+const API_CONFIG = {
   // 서버 설정
   BACKEND_PORT: process.env.PORT || 5050,
   FRONTEND_PORT: 3000,
@@ -35,7 +35,7 @@ export const API_CONFIG = {
 };
 
 // ===== 시간 설정 =====
-export const TIME_CONFIG = {
+const TIME_CONFIG = {
   // 시간대 설정
   DEFAULT_TIMEZONE: 'Asia/Seoul',
   UTC_OFFSET: 9, // KST = UTC+9
@@ -58,7 +58,7 @@ export const TIME_CONFIG = {
 };
 
 // ===== 데이터베이스 설정 =====
-export const DB_CONFIG = {
+const DB_CONFIG = {
   // 테이블명
       TABLES: {
       ODDS_CACHE: 'OddsCaches',
@@ -197,7 +197,7 @@ export function getSportConfig(sportTitle) {
 /**
  * 카테고리별 스포츠 목록 반환
  */
-export function getSportsByCategory(category) {
+function getSportsByCategory(category) {
   if (!SPORTS_MAPPING) return [];
   return SPORTS_MAPPING.categoryGroups[category] || [];
 }
@@ -205,7 +205,7 @@ export function getSportsByCategory(category) {
 /**
  * 활성화된 모든 스포츠 목록 반환
  */
-export function getActiveSports() {
+function getActiveSports() {
   if (!SPORTS_MAPPING) return [];
   return Object.values(SPORTS_MAPPING.mapping)
     .filter(sport => sport.isActive)
@@ -213,7 +213,7 @@ export function getActiveSports() {
 }
 
 // ===== 베팅 설정 =====
-export const BETTING_CONFIG = {
+const BETTING_CONFIG = {
   // 베팅 금액 제한
   MIN_BET_AMOUNT: 1000,      // 최소 1,000원
   MAX_BET_AMOUNT: 1000000,   // 최대 100만원
@@ -237,7 +237,7 @@ export const BETTING_CONFIG = {
 };
 
 // ===== 로깅 설정 =====
-export const LOG_CONFIG = {
+const LOG_CONFIG = {
   // 로그 레벨
   LEVEL: process.env.LOG_LEVEL || 'info',
   
@@ -267,7 +267,7 @@ export const LOG_CONFIG = {
 };
 
 // ===== 환경별 설정 오버라이드 =====
-export function getEnvironmentConfig() {
+function getEnvironmentConfig() {
   const env = process.env.NODE_ENV || 'development';
   
   const envConfigs = {
@@ -292,7 +292,7 @@ export function getEnvironmentConfig() {
 }
 
 // ===== 초기화 함수 =====
-export async function initializeCentralizedConfig() {
+async function initializeCentralizedConfig() {
   console.log('[설정] 중앙화된 설정 초기화 시작...');
   
   try {
@@ -316,11 +316,25 @@ export async function initializeCentralizedConfig() {
 }
 
 // ===== 설정 새로고침 =====
-export async function refreshConfig() {
+async function refreshConfig() {
   console.log('[설정] 설정 새로고침 시작...');
   await generateSportsMappingFromDB();
   console.log('[설정] 설정 새로고침 완료');
 }
 
 // 정기적인 설정 새로고침 (1시간마다)
-setInterval(refreshConfig, 60 * 60 * 1000); 
+setInterval(refreshConfig, 60 * 60 * 1000);
+
+// ===== CommonJS Export =====
+module.exports = {
+  API_CONFIG,
+  TIME_CONFIG,
+  DB_CONFIG,
+  BETTING_CONFIG,
+  LOG_CONFIG,
+  getSportsByCategory,
+  getActiveSports,
+  getEnvironmentConfig,
+  initializeCentralizedConfig,
+  refreshConfig
+}; 
