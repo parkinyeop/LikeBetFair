@@ -49,7 +49,15 @@ function OrderPanel() {
     // 🆕 부분 매칭 관련 함수들 추가
     getMaxMatchAmount,
     getAvailableMatchAmount,
-    formatPartialMatchInfo
+    formatPartialMatchInfo,
+    // 🆕 멀티배팅 관련 상태와 함수들
+    multiBetSelections,
+    multiBetStake,
+    multiBetTotalOdds,
+    multiBetPotentialWinnings,
+    updateMultiBetStake,
+    createMultiBetOrder,
+    clearMultiBet
   } = useExchangeContext();
   const { balance, username, token } = useAuth(); // 🆕 token 추가
   
@@ -402,6 +410,86 @@ function OrderPanel() {
             <p className="text-sm text-gray-500">중앙에서 Back/Lay 버튼을 클릭하여 배팅을 선택하세요.</p>
           </div>
         )}
+
+        {/* 🆕 멀티배팅 정보 표시 */}
+        {multiBetSelections.length > 0 && (
+          <div className="bg-yellow-50 p-3 rounded mb-3 border border-yellow-200">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="font-semibold text-sm text-yellow-800">
+                🎯 멀티배팅 선택 ({multiBetSelections.length}개)
+              </h3>
+              <button 
+                onClick={clearMultiBet}
+                className="text-xs text-red-600 hover:text-red-800 underline"
+              >
+                초기화
+              </button>
+            </div>
+            
+            {/* 선택된 경기들 */}
+            <div className="space-y-2 mb-3">
+              {multiBetSelections.map((selection, index) => (
+                <div key={index} className="bg-white p-2 rounded border border-yellow-200">
+                  <div className="text-xs text-yellow-700 mb-1">
+                    {selection.homeTeam} vs {selection.awayTeam}
+                  </div>
+                  <div className="text-xs text-yellow-600">
+                    {selection.selection} • {selection.side === 'back' ? '🎯 Back' : '📉 Lay'} • {selection.odds.toFixed(2)}
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {/* 멀티배팅 베팅 폼 */}
+            <div className="space-y-2">
+              <div>
+                <label className="block text-xs text-yellow-700 mb-1">베팅 금액 (KRW)</label>
+                <input
+                  type="text"
+                  value={multiBetStake > 0 ? multiBetStake.toLocaleString() : ''}
+                  onChange={(e) => {
+                    // 🆕 스포츠북과 동일한 방식: 콤마 제거 후 숫자만 처리
+                    const value = e.target.value.replace(/,/g, ''); // 콤마 제거
+                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                      const numValue = value === '' ? 0 : parseFloat(value);
+                      updateMultiBetStake(numValue);
+                    }
+                  }}
+                  placeholder="베팅 금액 입력"
+                  className="w-full px-2 py-1 text-sm border border-yellow-300 rounded focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                />
+              </div>
+              
+              <div className="bg-white p-2 rounded border border-yellow-200">
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-yellow-700">총 배당률:</span>
+                  <span className="font-medium text-yellow-800">{multiBetTotalOdds.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-yellow-700">예상 수익:</span>
+                  <span className="font-medium text-yellow-800">
+                    {multiBetPotentialWinnings > 0 ? `+${multiBetPotentialWinnings.toLocaleString()}` : '0'} KRW
+                  </span>
+                </div>
+              </div>
+              
+              <button
+                onClick={async () => {
+                  const result = await createMultiBetOrder();
+                  if (result.success) {
+                    alert('멀티배팅 주문이 성공적으로 생성되었습니다!');
+                  } else {
+                    alert(`멀티배팅 주문 생성 실패: ${result.error}`);
+                  }
+                }}
+                disabled={multiBetStake <= 0}
+                className="w-full py-2 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+              >
+                🎯 멀티배팅 주문 생성
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Exchange 주문 폼 */}
@@ -447,24 +535,20 @@ function OrderPanel() {
               type="text" 
               value={form.amount > 0 ? form.amount.toLocaleString() : ''} 
               onChange={e => {
-                // 쉼표와 공백 제거 후 숫자만 추출
-                const cleanValue = e.target.value.replace(/[,\s]/g, '');
-                let numValue = parseInt(cleanValue) || 0;
-                
-                // 🆕 매칭 모드에서 최대 리스크 금액 초과 시 제한
-                if (isMatchMode) {
-                  const maxRiskAmount = getAvailableMatchAmount();
-                  if (numValue > maxRiskAmount) {
-                    numValue = maxRiskAmount;
+                // 🆕 스포츠북과 동일한 방식: 콤마 제거 후 숫자만 처리
+                const value = e.target.value.replace(/,/g, ''); // 콤마 제거
+                if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                  let numValue = value === '' ? 0 : parseFloat(value);
+                  
+                  // 🆕 매칭 모드에서 최대 리스크 금액 초과 시 제한
+                  if (isMatchMode) {
+                    const maxRiskAmount = getAvailableMatchAmount();
+                    if (numValue > maxRiskAmount) {
+                      numValue = maxRiskAmount;
+                    }
                   }
-                }
-                
-                setForm(f => ({ ...f, amount: numValue }));
-              }}
-              onBlur={() => {
-                // 포커스를 잃을 때 000,000 형식으로 포맷팅
-                if (form.amount > 0) {
-                  setForm(f => ({ ...f, amount: form.amount }));
+                  
+                  setForm(f => ({ ...f, amount: numValue }));
                 }
               }}
               className="w-full p-1 border rounded text-sm"

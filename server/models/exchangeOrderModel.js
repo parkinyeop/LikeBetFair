@@ -27,8 +27,8 @@ const ExchangeOrder = sequelize.define('ExchangeOrder', {
   matchedOrderId: { type: DataTypes.INTEGER, allowNull: true },
   // 거래 내역 추적
   stakeAmount: { type: DataTypes.INTEGER, allowNull: false }, // 베팅 금액
-  potentialProfit: { type: DataTypes.INTEGER, allowNull: false }, // 잠재적 수익
-  actualProfit: { type: DataTypes.INTEGER, allowNull: true }, // 실제 수익 (정산 후)
+  potentialProfit: { type: DataTypes.DECIMAL(10, 2), allowNull: false }, // 잠재적 수익 (소수점 2자리)
+  actualProfit: { type: DataTypes.DECIMAL(10, 2), allowNull: true }, // 실제 수익 (정산 후, 소수점 2자리)
   settledAt: { type: DataTypes.DATE, allowNull: true }, // 정산 시간
   // 게임 연동 필드들
   homeTeam: { type: DataTypes.STRING, allowNull: true },
@@ -113,7 +113,7 @@ const ExchangeOrder = sequelize.define('ExchangeOrder', {
     comment: '총 배당률 (멀티배팅용)'
   },
   potentialWinnings: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.DECIMAL(10, 2),
     allowNull: true,
     comment: '잠재적 수익 (멀티배팅용)'
   },

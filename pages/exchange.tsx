@@ -9,7 +9,15 @@ import { useExchangeContext } from '../contexts/ExchangeContext';
 
 export default function Exchange() {
   const router = useRouter();
-  const { selectedBet, setSelectedBet } = useExchangeContext();
+  const { 
+    selectedBet, 
+    setSelectedBet,
+    // 🆕 멀티배팅 관련 상태와 함수들
+    multiBetSelections,
+    addMultiBetSelection,
+    removeMultiBetSelection,
+    clearMultiBet
+  } = useExchangeContext();
   const [todayGames, setTodayGames] = useState<Record<string, any[]>>({});
   const [todayLoading, setTodayLoading] = useState(false);
   const [todayFlatGames, setTodayFlatGames] = useState<any[]>([]);
@@ -27,27 +35,29 @@ export default function Exchange() {
   
   // 🎯 버튼이 선택되었는지 확인하는 함수 - ExchangeContext만 사용 (하위 페이지와 동일)
   const isButtonSelected = (gameId: string, buttonKey: string) => {
-    if (!selectedBet) {
-      console.log('🎯 isButtonSelected: selectedBet이 null입니다');
-      return false;
-    }
-    
     // buttonKey에서 팀명과 마켓 추출 (예: "승패_New England Revolution" -> market: "승패", team: "New England Revolution")
     const [market, team] = buttonKey.split('_', 2);
     
-    const isSelected = selectedBet.gameId === gameId && 
-                      selectedBet.market === market &&
-                      selectedBet.team === team;
+    // 🆕 1. selectedBet 확인 (단일 베팅 선택)
+    if (selectedBet && selectedBet.gameId === gameId && 
+        selectedBet.market === market && selectedBet.team === team) {
+      console.log('🎯 isButtonSelected: selectedBet으로 선택됨');
+      return true;
+    }
     
-    console.log('🎯 isButtonSelected 확인 (ExchangeContext만 사용):', { 
-      gameId, buttonKey, market, team, selectedBet, isSelected,
-      'selectedBet.gameId === gameId': selectedBet.gameId === gameId,
-      'selectedBet.market === market': selectedBet.market === market,
-      'selectedBet.team === team': selectedBet.team === team,
-      'selectedBet.gameId 타입': typeof selectedBet.gameId,
-      'gameId 타입': typeof gameId
+    // 🆕 2. 멀티배팅 선택 상태 확인
+    const isMultiBet = isMultiBetSelected(gameId, market, team);
+    if (isMultiBet) {
+      console.log('🎯 isButtonSelected: 멀티배팅으로 선택됨');
+      return true;
+    }
+    
+    console.log('🎯 isButtonSelected: 선택되지 않음', { 
+      gameId, buttonKey, market, team, 
+      selectedBet: selectedBet ? '있음' : '없음',
+      isMultiBet
     });
-    return isSelected;
+    return false;
   };
 
   // 🎯 버튼 클릭 핸들러 - ExchangeContext만 사용 (하위 페이지와 동일)
@@ -60,6 +70,8 @@ export default function Exchange() {
     if (selectedBet && selectedBet.gameId === game.id && selectedBet.team === team && selectedBet.market === market) {
       console.log('🎯 동일한 베팅 재클릭 - 선택 해제');
       setSelectedBet(null);
+      // 🆕 멀티배팅에서도 제거
+      removeMultiBetSelection(game.id, market, team);
       console.log('🎯 베팅 선택 해제 완료');
     } else {
       console.log('🎯 새로운 베팅 선택');
@@ -76,7 +88,23 @@ export default function Exchange() {
       };
       console.log('🎯 새 베팅 선택할 객체:', newSelectedBet);
       setSelectedBet(newSelectedBet);
-      console.log('🎯 새 베팅 선택 완료:', { team, price, market });
+      
+      // 🆕 멀티배팅에도 자동 추가
+      const multiBetSelection = {
+        orderId: Date.now(), // 임시 ID
+        gameId: game.id,
+        homeTeam: game.home_team,
+        awayTeam: game.away_team,
+        market: market,
+        selection: team,
+        side: 'back' as const,
+        odds: price,
+        amount: 0, // 사용자가 입력할 금액
+        commenceTime: game.commence_time,
+        sportKey: game.sport_key || 'soccer'
+      };
+      addMultiBetSelection(multiBetSelection);
+      console.log('🎯 새 베팅 선택 완료 및 멀티배팅에 추가:', { team, price, market });
     }
   };
 
@@ -98,6 +126,15 @@ export default function Exchange() {
       });
     }
   };
+
+  // 🆕 멀티배팅 선택 상태 확인
+  const isMultiBetSelected = (gameId: string, market: string, team: string) => {
+    return multiBetSelections.some(s => 
+      s.gameId === gameId && s.market === market && s.selection === team
+    );
+  };
+
+
 
   // Today Betting 데이터 가져오기
   const fetchTodayGames = async () => {

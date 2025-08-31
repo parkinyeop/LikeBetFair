@@ -2,13 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useExchange, ExchangeOrder } from '../../hooks/useExchange';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
+import { useExchangeContext, MultiBetSelection } from '../../contexts/ExchangeContext';
 import { convertUTCToKST } from '../../utils/timeUtils';
 import { getButtonStyle } from '../../utils/buttonStyles';
 
 export default function LiveOddsPage() {
   const { isLoggedIn, token, userId } = useAuth();
   const { fetchAllOpenOrders } = useExchange();
+  const { multiBetSelections, addMultiBetSelection, removeMultiBetSelection } = useExchangeContext();
   const router = useRouter();
+
   
   const [recentOrders, setRecentOrders] = useState<ExchangeOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
@@ -25,6 +28,36 @@ export default function LiveOddsPage() {
     const isSelected = selectedButtons[orderId] === buttonKey;
     console.log('🎯 live-odds isButtonSelected 확인:', { orderId, buttonKey, isSelected, selectedButtons });
     return isSelected;
+  };
+
+  // 🆕 멀티배팅 선택 상태 확인
+  const isMultiBetSelected = (orderId: number, market: string, selection: string) => {
+    return multiBetSelections.some(s => 
+      s.orderId === orderId && s.market === market && s.selection === selection
+    );
+  };
+
+  // 🆕 멀티배팅 선택 토글
+  const toggleMultiBetSelection = (order: ExchangeOrder, side: 'back' | 'lay', selection: string) => {
+    const multiBetSelection: MultiBetSelection = {
+      orderId: order.id,
+      gameId: order.gameId || '',
+      homeTeam: order.homeTeam || '',
+      awayTeam: order.awayTeam || '',
+      market: order.market || '',
+      selection: selection,
+      side: side,
+      odds: order.price,
+      amount: order.amount,
+      commenceTime: order.commenceTime || '',
+      sportKey: order.sportKey || ''
+    };
+
+    if (isMultiBetSelected(order.id, order.market || '', selection)) {
+      removeMultiBetSelection(order.id, order.market || '', selection);
+    } else {
+      addMultiBetSelection(multiBetSelection);
+    }
   };
 
   // 🎯 버튼 클릭 시 선택 상태 변경
@@ -216,20 +249,7 @@ export default function LiveOddsPage() {
     return marketNames[market] || market;
   };
 
-  // 🎯 공통 버튼 스타일 함수 - 모든 마켓 버튼에서 재사용
-  const getButtonStyle = (isActive: boolean, isDisabled: boolean) => {
-    const baseStyle = "flex-1 p-2 rounded-lg text-center transition-colors text-white text-sm";
-    
-    if (isDisabled) {
-      return `${baseStyle} bg-gray-600 cursor-not-allowed`;
-    }
-    
-    if (isActive) {
-      return `${baseStyle} bg-blue-500 hover:bg-blue-600 cursor-pointer`;
-    }
-    
-    return `${baseStyle} bg-gray-600 cursor-not-allowed`;
-  };
+
 
   return (
     <div className="p-6">
@@ -371,6 +391,8 @@ export default function LiveOddsPage() {
                     key={order.id}
                     className="bg-gray-800 p-4 rounded shadow border-2 border-blue-400"
                   >
+
+                    
                     {/* 🆕 투데이 배팅과 동일: 경기명 (font-semibold) */}
                     <div className="text-white font-semibold mb-2">
                       {order.homeTeam} vs {order.awayTeam}
@@ -398,12 +420,7 @@ export default function LiveOddsPage() {
                                 {/* 승리 (Lay 가능) */}
                                 <button 
                                   onClick={() => handleButtonClick(String(order.id), `lay_승리`)}
-                                  className={getButtonStyle(
-                                    true, 
-                                    false,
-                                    false,
-                                    false
-                                  )}
+                                  className={getButtonStyle(true, false, false, false)}
                                 >
                                   <div className="font-medium">승리</div>
                                   <div className="text-xs mt-1 opacity-90">

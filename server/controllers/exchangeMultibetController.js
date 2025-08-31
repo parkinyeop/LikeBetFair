@@ -98,10 +98,10 @@ class ExchangeMultibetController {
         amount: stake,
         status: 'open',
         stakeAmount: stake,
-        potentialProfit: Math.round(stake * totalOdds * 100) / 100,
+        potentialProfit: parseFloat((stake * totalOdds - stake).toFixed(2)), // 🆕 소수점 처리
         isMultibet: true,
         totalOdds,
-        potentialWinnings: Math.round(stake * totalOdds * 100) / 100,
+        potentialWinnings: parseFloat((stake * totalOdds).toFixed(2)), // 🆕 소수점 처리
         selectionCount: selections.length,
         selectionDetails: {
           selections: selections.map(s => ({
@@ -117,7 +117,17 @@ class ExchangeMultibetController {
           multibetType: 'accumulator',
           description: description || '멀티배팅'
         },
-        description: description || '멀티배팅'
+        description: description || '멀티배팅',
+        // 🆕 필수 필드들 추가
+        originalAmount: stake,
+        remainingAmount: stake,
+        filledAmount: 0,
+        partiallyFilled: false,
+        autoSettlement: true,
+        homeTeam: selections[0]?.homeTeam || '멀티배팅',
+        awayTeam: selections[0]?.awayTeam || '멀티배팅',
+        commenceTime: selections[0]?.commenceTime || new Date(),
+        sportKey: selections[0]?.sportKey || 'multibet'
       }, { transaction });
 
       // 6. 사용자 잔액 차감
