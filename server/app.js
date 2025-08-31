@@ -52,6 +52,7 @@ import authRoutes from './routes/auth.js';
 import betRoutes from './routes/bet.js';
 import adminRoutes from './routes/admin.js';
 import exchangeRoutes from './routes/exchange.js';
+import exchangeMultibetRoutes from './routes/exchangeMultibetRoutes.js';
 
 
 
@@ -115,6 +116,7 @@ app.use('/api/bet', betRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/game-results', gameResultRoutes);
 app.use('/api/exchange', exchangeRoutes);
+app.use('/api/exchange/multibet', exchangeMultibetRoutes);
 app.use('/api/odds', oddsRoutes);
 
 // API 라우트 디버깅

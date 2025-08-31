@@ -2,6 +2,7 @@
   "name": "likebetfair-server",
   "version": "1.0.0",
   "description": "Server for LikeBetFair application",
+  "type": "module",
   "main": "app.js",
   "scripts": {
     "start": "NODE_OPTIONS='--max-old-space-size=2048' node app.js",

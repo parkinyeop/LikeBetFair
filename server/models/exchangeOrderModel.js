@@ -101,21 +101,29 @@ const ExchangeOrder = sequelize.define('ExchangeOrder', {
     comment: '부분 체결 여부'
   },
   // 🆕 멀티배팅 관련 필드들
-  multibetId: { 
-    type: DataTypes.INTEGER, 
-    allowNull: true,
-    references: {
-      model: 'ExchangeMultibets',
-      key: 'id'
-    },
-    comment: '멀티배팅 ID (멀티배팅의 일부인 경우)'
-  },
-  isMultibetSelection: {
+  isMultibet: {
     type: DataTypes.BOOLEAN,
     allowNull: false,
     defaultValue: false,
-    comment: '멀티배팅 선택사항 여부'
+    comment: '멀티배팅 여부'
+  },
+  totalOdds: {
+    type: DataTypes.DECIMAL(10, 4),
+    allowNull: true,
+    comment: '총 배당률 (멀티배팅용)'
+  },
+  potentialWinnings: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: '잠재적 수익 (멀티배팅용)'
+  },
+  selectionCount: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 1,
+    comment: '선택 개수 (멀티배팅용)'
   }
+
 }, { timestamps: true });
 
 // 관계 설정을 위한 import (순환 참조 방지)

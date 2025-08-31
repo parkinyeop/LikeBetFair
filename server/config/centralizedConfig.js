@@ -1,10 +1,10 @@
 // DB 기준 중앙화된 설정 파일
 // 모든 API 설정, 카테고리 매핑, 시간 설정 등을 한 곳에서 관리
 
-const db = require('../models/db.js');
+import db from '../models/db.js';
 
 // ===== API 설정 =====
-const API_CONFIG = {
+export const API_CONFIG = {
   // 서버 설정
   BACKEND_PORT: process.env.PORT || 5050,
   FRONTEND_PORT: 3000,
@@ -35,7 +35,7 @@ const API_CONFIG = {
 };
 
 // ===== 시간 설정 =====
-const TIME_CONFIG = {
+export const TIME_CONFIG = {
   // 시간대 설정
   DEFAULT_TIMEZONE: 'Asia/Seoul',
   UTC_OFFSET: 9, // KST = UTC+9
@@ -58,7 +58,7 @@ const TIME_CONFIG = {
 };
 
 // ===== 데이터베이스 설정 =====
-const DB_CONFIG = {
+export const DB_CONFIG = {
   // 테이블명
       TABLES: {
       ODDS_CACHE: 'OddsCaches',
@@ -197,7 +197,7 @@ export function getSportConfig(sportTitle) {
 /**
  * 카테고리별 스포츠 목록 반환
  */
-function getSportsByCategory(category) {
+export function getSportsByCategory(category) {
   if (!SPORTS_MAPPING) return [];
   return SPORTS_MAPPING.categoryGroups[category] || [];
 }
@@ -205,39 +205,32 @@ function getSportsByCategory(category) {
 /**
  * 활성화된 모든 스포츠 목록 반환
  */
-function getActiveSports() {
+export function getActiveSports() {
   if (!SPORTS_MAPPING) return [];
   return Object.values(SPORTS_MAPPING.mapping)
     .filter(sport => sport.isActive)
     .map(sport => sport.displayName);
 }
 
-// ===== 베팅 설정 =====
-const BETTING_CONFIG = {
+// 🎯 베팅 규칙 설정 (스포츠북과 동일)
+export const BETTING_CONFIG = {
   // 베팅 금액 제한
-  MIN_BET_AMOUNT: 1000,      // 최소 1,000원
-  MAX_BET_AMOUNT: 1000000,   // 최대 100만원
-  MAX_DAILY_BET: 5000000,    // 일일 최대 500만원
+  MIN_BET_AMOUNT: 1000,        // 최소 베팅 금액: 1,000원
+  MAX_BET_AMOUNT: null,        // 최대 베팅 금액: 제한 없음 (사용자 잔액 한도)
   
-  // 배당률 제한
-  MIN_ODDS: 1.01,
-  MAX_ODDS: 100.0,
+  // 선택 개수 제한
+  MIN_SELECTIONS: 1,           // 최소 선택 개수: 1개 (단일 베팅 허용)
+  MAX_SELECTIONS: 10,          // 최대 선택 개수: 10개
   
-  // 베팅 슬립 제한
-  MAX_SELECTIONS: 10,        // 최대 10개 선택
-  MAX_SAME_GAME_BETS: 3,     // 같은 경기 최대 3개 베팅
-  
-  // 결과 처리
-  RESULT_PROCESSING_DELAY: 30 * 60 * 1000, // 경기 종료 30분 후 결과 확정
-  AUTO_CANCEL_HOURS: 24,     // 24시간 후 자동 취소
-  
-  // 수수료
-  COMMISSION_RATE: 0.05,     // 5% 수수료
-  MINIMUM_COMMISSION: 50     // 최소 수수료 50원
+  // 기타 제한
+  MAX_SAME_GAME_BETS: 3,       // 같은 경기 최대 베팅 수: 3개
+  MAX_TOTAL_ODDS: 1000,        // 최대 총 배당율: 1000배
+  MAX_FUTURE_DAYS: 7,          // 최대 미래 경기 일수: 7일
+  MIN_BEFORE_GAME_MINUTES: 10, // 경기 시작 전 최소 베팅 시간: 10분
 };
 
 // ===== 로깅 설정 =====
-const LOG_CONFIG = {
+export const LOG_CONFIG = {
   // 로그 레벨
   LEVEL: process.env.LOG_LEVEL || 'info',
   
@@ -267,7 +260,7 @@ const LOG_CONFIG = {
 };
 
 // ===== 환경별 설정 오버라이드 =====
-function getEnvironmentConfig() {
+export function getEnvironmentConfig() {
   const env = process.env.NODE_ENV || 'development';
   
   const envConfigs = {
@@ -292,7 +285,7 @@ function getEnvironmentConfig() {
 }
 
 // ===== 초기화 함수 =====
-async function initializeCentralizedConfig() {
+export async function initializeCentralizedConfig() {
   console.log('[설정] 중앙화된 설정 초기화 시작...');
   
   try {
@@ -316,25 +309,11 @@ async function initializeCentralizedConfig() {
 }
 
 // ===== 설정 새로고침 =====
-async function refreshConfig() {
+export async function refreshConfig() {
   console.log('[설정] 설정 새로고침 시작...');
   await generateSportsMappingFromDB();
   console.log('[설정] 설정 새로고침 완료');
 }
 
 // 정기적인 설정 새로고침 (1시간마다)
-setInterval(refreshConfig, 60 * 60 * 1000);
-
-// ===== CommonJS Export =====
-module.exports = {
-  API_CONFIG,
-  TIME_CONFIG,
-  DB_CONFIG,
-  BETTING_CONFIG,
-  LOG_CONFIG,
-  getSportsByCategory,
-  getActiveSports,
-  getEnvironmentConfig,
-  initializeCentralizedConfig,
-  refreshConfig
-}; 
+setInterval(refreshConfig, 60 * 60 * 1000); 
