@@ -189,3 +189,12 @@
 {"timestamp":"2025-09-01T19:00:06.391Z","type":"odds","status":"success","message":"High-priority odds update completed (30min interval)","priority":"medium","leagues":["NBA","MLB","KBO","NFL","프리미어리그"],"dynamicPriority":"low","oddsUpdated":59,"oddsDetail":{"totalUpdated":59,"newOdds":0,"existingOddsUpdated":59,"skippedOdds":1,"apiCalls":5,"categoriesProcessed":5}}
 {"timestamp":"2025-09-01T19:00:07.193Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
 {"timestamp":"2025-09-01T19:00:07.217Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T19:05:10.420Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T19:05:40.626Z","type":"init","status":"start","message":"Starting initial data caching for active categories","categoryCount":14}
+{"timestamp":"2025-09-01T19:05:47.366Z","type":"init","status":"success","message":"Initial data cached successfully for active categories","oddsUpdated":153,"resultsUpdated":"N/A","betsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T19:07:44.786Z","type":"init","status":"start","message":"Starting initial data caching for active categories","categoryCount":14}
+{"timestamp":"2025-09-01T19:07:50.908Z","type":"init","status":"success","message":"Initial data cached successfully for active categories","oddsUpdated":152,"resultsUpdated":"N/A","betsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T19:10:00.926Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T19:10:05.723Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T19:10:05.737Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T19:10:11.113Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}

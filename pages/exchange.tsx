@@ -5,19 +5,14 @@ import { API_CONFIG, buildApiUrl } from '../config/apiConfig';
 import { normalizeTeamNameForComparison } from '../utils/matchSportsbookGame';
 import { convertUtcToLocal, getCurrentLocalTime } from '../utils/timeUtils';
 import { getButtonStyle } from '../utils/buttonStyles';
-import { useExchangeContext } from '../contexts/ExchangeContext';
+import { useExchangeStore } from '../stores/useExchangeStore';
 
 export default function Exchange() {
   const router = useRouter();
   const { 
-    selectedBet, 
-    setSelectedBet,
-    // 🆕 멀티배팅 관련 상태와 함수들
-    multiBetSelections,
-    addMultiBetSelection,
-    removeMultiBetSelection,
-    clearMultiBet
-  } = useExchangeContext();
+    selections,
+    toggleSelection
+  } = useExchangeStore();
   const [todayGames, setTodayGames] = useState<Record<string, any[]>>({});
   const [todayLoading, setTodayLoading] = useState(false);
   const [todayFlatGames, setTodayFlatGames] = useState<any[]>([]);
@@ -33,87 +28,34 @@ export default function Exchange() {
   const [todayGameMarkets, setTodayGameMarkets] = useState<{[gameId: string]: Set<string>}>({});
   const [leagueGameMarkets, setLeagueGameMarkets] = useState<{[gameId: string]: Set<string>}>({});
   
-  // 🎯 버튼이 선택되었는지 확인하는 함수 - ExchangeContext만 사용 (하위 페이지와 동일)
+  // 🎯 버튼이 선택되었는지 확인하는 함수 (스포츠북 구조로 단순화)
   const isButtonSelected = (gameId: string, buttonKey: string) => {
     // buttonKey에서 팀명과 마켓 추출 (예: "승패_New England Revolution" -> market: "승패", team: "New England Revolution")
     const [market, team] = buttonKey.split('_', 2);
     
-    // 🆕 1. selectedBet 확인 (단일 베팅 선택)
-    if (selectedBet && selectedBet.gameId === gameId && 
-        selectedBet.market === market && selectedBet.team === team) {
-      console.log('🎯 isButtonSelected: selectedBet으로 선택됨');
-      return true;
-    }
-    
-    // 🆕 2. 멀티배팅 선택 상태 확인
-    const isMultiBet = isMultiBetSelected(gameId, market, team);
-    if (isMultiBet) {
-      console.log('🎯 isButtonSelected: 멀티배팅으로 선택됨');
-      return true;
-    }
-    
-    console.log('🎯 isButtonSelected: 선택되지 않음', { 
-      gameId, buttonKey, market, team, 
-      selectedBet: selectedBet ? '있음' : '없음',
-      isMultiBet
-    });
-    return false;
+    return selections.some(selection =>
+      selection.gameId === gameId &&
+      selection.market === market &&
+      selection.team === team
+    );
   };
 
   // 🎯 버튼 클릭 핸들러 - ExchangeContext만 사용 (하위 페이지와 동일)
   const handleButtonClick = (game: any, team: string, price: number, market: string = '승패') => {
     console.log('🎯 버튼 클릭됨:', { game, team, price, market });
-    console.log('🎯 현재 selectedBet 상태:', selectedBet);
-    console.log('🎯 game.id:', game.id, '타입:', typeof game.id);
     
-    // 같은 베팅을 다시 클릭하면 선택 해제, 다른 베팅을 클릭하면 선택
-    if (selectedBet && selectedBet.gameId === game.id && selectedBet.team === team && selectedBet.market === market) {
-      console.log('🎯 동일한 베팅 재클릭 - 선택 해제');
-      setSelectedBet(null);
-      // 🆕 멀티배팅에서도 제거
-      removeMultiBetSelection(game.id, market, team);
-      console.log('🎯 베팅 선택 해제 완료');
-    } else {
-      console.log('🎯 새로운 베팅 선택');
-      // 새로운 베팅 선택
-      const newSelectedBet = {
-        team,
-        price,
-        type: 'back' as const,
-        gameId: game.id,
-        market: market,
-        homeTeam: game.home_team,
-        awayTeam: game.away_team,
-        commenceTime: game.commence_time
-      };
-      console.log('🎯 새 베팅 선택할 객체:', newSelectedBet);
-      setSelectedBet(newSelectedBet);
-      
-      // 🆕 멀티배팅에도 자동 추가
-      const multiBetSelection = {
-        orderId: Date.now(), // 임시 ID
-        gameId: game.id,
-        homeTeam: game.home_team,
-        awayTeam: game.away_team,
-        market: market,
-        selection: team,
-        team: team, // 🆕 team 필드 추가
-        side: 'back' as const,
-        odds: price,
-        amount: 0, // 사용자가 입력할 금액
-        commenceTime: game.commence_time,
-        sportKey: game.sport_key || 'soccer',
-        desc: `${game.home_team} vs ${game.away_team}`, // 🆕 desc 필드 추가
-        option: market === 'Over/Under' ? team : undefined, // 🆕 option 필드 추가
-        point: market === 'Over/Under' ? (() => {
-          // Over/Under의 경우 point 추출
-          const match = team.match(/(\d+\.?\d*)/);
-          return match ? match[1] : undefined;
-        })() : undefined // 🆕 point 필드 추가
-      };
-      addMultiBetSelection(multiBetSelection);
-      console.log('🎯 새 베팅 선택 완료 및 멀티배팅에 추가:', { team, price, market });
-    }
+    // 스포츠북처럼 단순한 토글
+    toggleSelection({
+      team,
+      odds: price,
+      type: 'back',
+      gameId: game.id,
+      market,
+      homeTeam: game.home_team,
+      awayTeam: game.away_team,
+      commenceTime: game.commence_time,
+      sportKey: game.sport_key
+    });
   };
 
   // 🆕 초기 마켓 설정 함수 - 게임이 로드될 때마다 기본값 설정
@@ -135,12 +77,7 @@ export default function Exchange() {
     }
   };
 
-  // 🆕 멀티배팅 선택 상태 확인
-  const isMultiBetSelected = (gameId: string, market: string, team: string) => {
-    return multiBetSelections.some(s => 
-      s.gameId === gameId && s.market === market && s.selection === team
-    );
-  };
+
 
 
 
