@@ -14,7 +14,7 @@ interface ExchangeMarketBoardProps {
 
 export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSidebarTabChange }: ExchangeMarketBoardProps) {
   const { isLoggedIn } = useAuth();
-  const { setSelectedBet, selectedBet } = useExchangeContext();
+  const { setSelectedBet, selectedBet, multiBetSelections, addMultiBetSelection, removeMultiBetSelection } = useExchangeContext();
   const { games: exchangeGames, loading: gamesLoading, error: gamesError, refetch } = useExchangeGames(selectedCategory);
   // 체크박스 방식으로 변경: 여러 마켓을 동시에 선택 가능
   const [gameMarkets, setGameMarkets] = useState<{[gameId: string]: Set<string>}>({});
@@ -201,12 +201,31 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
       return;
     }
 
-    // 같은 베팅을 다시 클릭하면 선택 해제, 다른 베팅을 클릭하면 선택
-    if (selectedBet && selectedBet.gameId === game.id && selectedBet.team === team && selectedBet.market === market) {
+    console.log('🎯 버튼 클릭됨:', { game, team, price, market });
+    console.log('🎯 현재 selectedBet 상태:', selectedBet);
+    
+    // 현재 선택된 것과 동일한 베팅인지 확인
+    const isSameBet = selectedBet && 
+                     selectedBet.gameId === game.id && 
+                     selectedBet.team === team && 
+                     selectedBet.market === market;
+    
+    // multiBet에 이미 있는지 확인
+    const isInMultiBet = multiBetSelections.some(selection => 
+      selection.gameId === game.id && 
+      selection.market === market && 
+      selection.team === team
+    );
+
+    if (isSameBet) {
+      console.log('🎯 동일한 베팅 재클릭 - 선택 해제');
       setSelectedBet(null);
+    } else if (isInMultiBet) {
+      console.log('🎯 멀티베팅에서 제거');
+      removeMultiBetSelection(0, market, team);
     } else {
-      // 새로운 베팅 선택
-      setSelectedBet({
+      console.log('🎯 새로운 베팅 선택');
+      const newBet = {
         team,
         price,
         type,
@@ -215,7 +234,27 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
         homeTeam: game.homeTeam,
         awayTeam: game.awayTeam,
         commenceTime: game.commenceTime
+      };
+      
+      setSelectedBet(newBet);
+      
+      // 멀티베팅에도 추가
+      addMultiBetSelection({
+        orderId: 0, // 임시값
+        gameId: game.id,
+        homeTeam: game.homeTeam,
+        awayTeam: game.awayTeam,
+        market,
+        selection: team,
+        team,
+        side: type,
+        odds: price,
+        amount: 0, // 임시값
+        commenceTime: game.commenceTime,
+        sportKey: game.sportKey || ''
       });
+      
+      console.log('🎯 새 베팅 선택 완료 및 멀티배팅에 추가:', { team, price, market });
       
       // 사이드바를 주문하기 탭으로 자동 변경
       if (onSidebarTabChange) {
@@ -228,15 +267,27 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
 
   // 베팅 선택 상태 확인 함수
   const isBetSelected = (gameId: string, market: string, team: string): boolean => {
-    if (!selectedBet) return false;
+    // selectedBet 체크
+    const isSelectedBet = selectedBet && 
+                         selectedBet.gameId === gameId && 
+                         selectedBet.market === market && 
+                         selectedBet.team === team;
     
-    const isSelected = selectedBet.gameId === gameId && 
-                      selectedBet.market === market && 
-                      selectedBet.team === team;
+    // multiBetSelections 체크
+    const isInMultiBet = multiBetSelections.some(selection => 
+      selection.gameId === gameId && 
+      selection.market === market && 
+      selection.team === team
+    );
+    
+    const isSelected = isSelectedBet || isInMultiBet;
     
     console.log('🎯 ExchangeMarketBoard isBetSelected 확인:', { 
       gameId, market, team, 
       selectedBet, 
+      multiBetSelections,
+      isSelectedBet,
+      isInMultiBet,
       isSelected 
     });
     return isSelected;

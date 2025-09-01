@@ -453,7 +453,7 @@ export default function LiveOddsPage() {
                                     {/* 승리 (Lay 가능) */}
                                     <button 
                                       onClick={() => handleButtonClick(String(multibetOrder.id), `lay_승리`)}
-                                      className={getButtonStyle(true, false, false, false)}
+                                      className={getButtonStyle(true, false, isButtonSelected(String(multibetOrder.id), `lay_승리`), false)}
                                     >
                                       <div className="font-medium">승리</div>
                                       <div className="text-xs mt-1 opacity-90">
@@ -484,7 +484,7 @@ export default function LiveOddsPage() {
                                     {/* 패배 (Lay 가능) */}
                                     <button 
                                       onClick={() => handleButtonClick(String(multibetOrder.id), `lay_패배`)}
-                                      className={getButtonStyle(true, false, false, false)}
+                                      className={getButtonStyle(true, false, isButtonSelected(String(multibetOrder.id), `lay_패배`), false)}
                                     >
                                       <div className="font-medium">패배</div>
                                       <div className="text-xs mt-1 opacity-90">
@@ -521,7 +521,7 @@ export default function LiveOddsPage() {
                                     {/* 무승부 (Lay 가능) */}
                                     <button 
                                       onClick={() => handleButtonClick(String(multibetOrder.id), `lay_무승부`)}
-                                      className={getButtonStyle(true, false, false, false)}
+                                      className={getButtonStyle(true, false, isButtonSelected(String(multibetOrder.id), `lay_무승부`), false)}
                                     >
                                       <div className="font-medium">무승부</div>
                                       <div className="text-xs mt-1 opacity-90">
@@ -535,7 +535,7 @@ export default function LiveOddsPage() {
                                     {/* 반대 승/패 (Lay 가능) */}
                                     <button 
                                       onClick={() => handleButtonClick(String(multibetOrder.id), `lay_${oppositeSelection}`)}
-                                      className={getButtonStyle(true, false, false, false)}
+                                      className={getButtonStyle(true, false, isButtonSelected(String(multibetOrder.id), `lay_${oppositeSelection}`), false)}
                                     >
                                       <div className="font-medium">{oppositeSelection}</div>
                                       <div className="text-xs mt-1 opacity-90">
@@ -572,7 +572,7 @@ export default function LiveOddsPage() {
                                   {/* Lay 주문이 가능한 반대 선택지 (활성화) */}
                                   <button 
                                     onClick={() => handleButtonClick(String(multibetOrder.id), `lay_${selection.market}_${selection.team}`)}
-                                    className={getButtonStyle(true, false, false, false)}
+                                    className={getButtonStyle(true, false, isButtonSelected(String(multibetOrder.id), `lay_${selection.market}_${selection.team}`), false)}
                                   >
                                     <div className="font-medium">
                                       {(() => {
@@ -679,7 +679,7 @@ export default function LiveOddsPage() {
                                 {/* 승리 (Lay 가능) */}
                                 <button 
                                   onClick={() => handleButtonClick(String(order.id), `lay_승리`)}
-                                  className={getButtonStyle(true, false, false, false)}
+                                  className={getButtonStyle(true, false, isButtonSelected(String(order.id), `lay_승리`), false)}
                                 >
                                   <div className="font-medium">승리</div>
                                   <div className="text-xs mt-1 opacity-90">
@@ -713,7 +713,7 @@ export default function LiveOddsPage() {
                                   className={getButtonStyle(
                                     true, 
                                     false,
-                                    false,
+                                    isButtonSelected(String(order.id), `lay_패배`),
                                     false
                                   )}
                                 >
@@ -755,7 +755,7 @@ export default function LiveOddsPage() {
                                   className={getButtonStyle(
                                     true, 
                                     false,
-                                    false,
+                                    isButtonSelected(String(order.id), `lay_무승부`),
                                     false
                                   )}
                                 >

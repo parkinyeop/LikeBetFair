@@ -13,14 +13,14 @@ export const getButtonStyle = (isActive: boolean, isDisabled: boolean, isSelecte
 
   if (isSelected) {
     console.log('🎨 getButtonStyle 결과: 선택됨 (노란색)');
-    return `${baseStyle} bg-yellow-500 hover:bg-yellow-600 cursor-pointer shadow-lg hover:shadow-xl`;
+    return `${baseStyle} bg-yellow-500 hover:bg-yellow-600 cursor-pointer shadow-lg hover:shadow-xl border-2 border-yellow-400`;
   }
 
   if (isActive) {
     console.log('🎨 getButtonStyle 결과: 활성화 (파란색)');
-    return `${baseStyle} bg-blue-600 hover:bg-blue-700 cursor-pointer shadow-lg hover:shadow-xl`;
+    return `${baseStyle} bg-blue-600 hover:bg-blue-700 cursor-pointer shadow-lg hover:shadow-xl border-2 border-blue-400`;
   }
 
   console.log('🎨 getButtonStyle 결과: 기본 (회색)');
-  return `${baseStyle} bg-gray-400 cursor-not-allowed`;
+  return `${baseStyle} bg-gray-400 cursor-not-allowed border-2 border-gray-500`;
 };
