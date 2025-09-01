@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { API_CONFIG, buildApiUrl } from '../config/apiConfig';
 import { useExchange } from '../hooks/useExchange';
 import { useAuth } from '../contexts/AuthContext';
-import { useExchangeContext } from '../contexts/ExchangeContext';
 import { getSportKey } from '../config/sportsMapping';
 import { useExchangeGames, ExchangeGame } from '../hooks/useExchangeGames';
-import { getButtonStyle } from '../utils/buttonStyles';
+import { useExchangeStore } from '../stores/useExchangeStore';
 
 interface ExchangeMarketBoardProps {
   selectedCategory?: string;
@@ -14,7 +13,7 @@ interface ExchangeMarketBoardProps {
 
 export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSidebarTabChange }: ExchangeMarketBoardProps) {
   const { isLoggedIn } = useAuth();
-  const { setSelectedBet, selectedBet, multiBetSelections, addMultiBetSelection, removeMultiBetSelection, setMultiBetSelections } = useExchangeContext();
+  const { selections, toggleSelection } = useExchangeStore();
   const { games: exchangeGames, loading: gamesLoading, error: gamesError, refetch } = useExchangeGames(selectedCategory);
   // 체크박스 방식으로 변경: 여러 마켓을 동시에 선택 가능
   const [gameMarkets, setGameMarkets] = useState<{[gameId: string]: Set<string>}>({});
@@ -189,7 +188,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
     }
   }, [filteredGames]);
 
-  // 주문 클릭 핸들러
+  // 주문 클릭 핸들러 (스포츠북 구조로 단순화)
   const handleBetClick = (game: ExchangeGame, team: string, price: number, type: 'back' | 'lay', market: string = '승패') => {
     if (!isLoggedIn) {
       alert('로그인이 필요합니다.');
@@ -202,107 +201,35 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
     }
 
     console.log('🎯 버튼 클릭됨:', { game, team, price, market });
-    console.log('🎯 현재 selectedBet 상태:', selectedBet);
     
-    // 현재 선택된 것과 동일한 베팅인지 확인
-    const isSameBet = selectedBet && 
-                     selectedBet.gameId === game.id && 
-                     selectedBet.team === team && 
-                     selectedBet.market === market;
+    // 스포츠북처럼 단순한 토글
+    toggleSelection({
+      team,
+      odds: price,
+      type,
+      gameId: game.id,
+      market,
+      homeTeam: game.homeTeam,
+      awayTeam: game.awayTeam,
+      commenceTime: game.commenceTime,
+      sportKey: game.sportKey
+    });
     
-    // multiBet에 이미 있는지 확인
-    const isInMultiBet = multiBetSelections.some(selection => 
-      selection.gameId === game.id && 
-      selection.market === market && 
-      selection.team === team
-    );
-
-    if (isSameBet || isInMultiBet) {
-      console.log('🎯 동일한 베팅 재클릭 - 선택 해제');
-      setSelectedBet(null);
-      
-      // 멀티베팅에서도 제거
-      if (isInMultiBet) {
-        setMultiBetSelections(prev => 
-          prev.filter(s => !(s.gameId === game.id && s.market === market && s.team === team))
-        );
-        console.log('🎯 멀티베팅에서도 제거됨');
-      }
-    } else {
-      console.log('🎯 새로운 베팅 선택');
-      
-      // 다른 베팅이 선택되어 있다면 해제
-      if (selectedBet) {
-        console.log('🎯 기존 선택 해제:', selectedBet);
-        setSelectedBet(null);
-      }
-      
-      const newBet = {
-        team,
-        price,
-        type,
-        gameId: game.id,
-        market: market,
-        homeTeam: game.homeTeam,
-        awayTeam: game.awayTeam,
-        commenceTime: game.commenceTime
-      };
-      
-      setSelectedBet(newBet);
-      
-      // 멀티베팅에도 추가
-      addMultiBetSelection({
-        orderId: 0, // 임시값
-        gameId: game.id,
-        homeTeam: game.homeTeam,
-        awayTeam: game.awayTeam,
-        market,
-        selection: team,
-        team,
-        side: type,
-        odds: price,
-        amount: 0, // 임시값
-        commenceTime: game.commenceTime,
-        sportKey: game.sportKey || ''
-      });
-      
-      console.log('🎯 새 베팅 선택 완료 및 멀티배팅에 추가:', { team, price, market });
-      
-      // 사이드바를 주문하기 탭으로 자동 변경
-      if (onSidebarTabChange) {
-        onSidebarTabChange('order');
-      }
+    // 사이드바를 주문하기 탭으로 자동 변경
+    if (onSidebarTabChange) {
+      onSidebarTabChange('order');
     }
   };
 
 
 
-  // 베팅 선택 상태 확인 함수
+  // 베팅 선택 상태 확인 함수 (스포츠북 구조로 단순화)
   const isBetSelected = (gameId: string, market: string, team: string): boolean => {
-    // selectedBet 체크
-    const isSelectedBet = selectedBet && 
-                         selectedBet.gameId === gameId && 
-                         selectedBet.market === market && 
-                         selectedBet.team === team;
-    
-    // multiBetSelections 체크
-    const isInMultiBet = multiBetSelections.some(selection => 
-      selection.gameId === gameId && 
-      selection.market === market && 
+    return selections.some(selection =>
+      selection.gameId === gameId &&
+      selection.market === market &&
       selection.team === team
     );
-    
-    const isSelected = isSelectedBet || isInMultiBet;
-    
-    console.log('🎯 ExchangeMarketBoard isBetSelected 확인:', { 
-      gameId, market, team, 
-      selectedBet, 
-      multiBetSelections,
-      isSelectedBet,
-      isInMultiBet,
-      isSelected 
-    });
-    return isSelected;
   };
 
   // 로딩 상태
@@ -490,12 +417,11 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                     <button
                       onClick={() => handleBetClick(game, game.homeTeam, game.homeTeamOdds || 2.5, 'back')}
                       disabled={!isOpen}
-                      className={getButtonStyle(
-                        isOpen,
-                        !isOpen,
-                        isBetSelected(game.id, '승패', game.homeTeam),
-                        false
-                      )}
+                      className={`flex-1 p-2 rounded-lg text-center text-white text-sm transition-colors ${
+                        isBetSelected(game.id, '승패', game.homeTeam)
+                          ? 'bg-yellow-500 hover:bg-yellow-600'
+                          : isOpen ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'
+                      }`}
                     >
                       <div className="text-center truncate max-w-full">{game.homeTeam}</div>
                       <div className="text-xs mt-1 opacity-90">
@@ -508,12 +434,11 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                       <button
                         onClick={() => handleBetClick(game, '무승부', game.drawOdds || 3.5, 'back')}
                         disabled={!isOpen}
-                        className={getButtonStyle(
-                          isOpen,
-                          !isOpen,
-                          isBetSelected(game.id, '승패', '무승부'),
-                          false
-                        )}
+                        className={`flex-1 p-2 rounded-lg text-center text-white text-sm transition-colors ${
+                          isBetSelected(game.id, '승패', '무승부')
+                            ? 'bg-yellow-500 hover:bg-yellow-600'
+                            : isOpen ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'
+                        }`}
                       >
                         <div className="text-center">무승부</div>
                         <div className="text-xs mt-1 opacity-90">
@@ -526,12 +451,11 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                     <button
                       onClick={() => handleBetClick(game, game.awayTeam, game.awayTeamOdds || 2.5, 'back')}
                       disabled={!isOpen}
-                      className={getButtonStyle(
-                        isOpen,
-                        !isOpen,
-                        isBetSelected(game.id, '승패', game.awayTeam),
-                        false
-                      )}
+                      className={`flex-1 p-2 rounded-lg text-center text-white text-sm transition-colors ${
+                        isBetSelected(game.id, '승패', game.awayTeam)
+                          ? 'bg-yellow-500 hover:bg-yellow-600'
+                          : isOpen ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'
+                      }`}
                     >
                       <div className="text-center truncate max-w-full">{game.awayTeam}</div>
                       <div className="text-xs mt-1 opacity-90">
@@ -598,12 +522,11 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                               <button
                                 onClick={() => handleBetClick(game, `Over ${point}`, overOdds || 1.9, 'back', '총점')}
                                 disabled={!isOpen}
-                                className={getButtonStyle(
-                                  isOpen,
-                                  !isOpen,
-                                  isBetSelected(game.id, '총점', `Over ${point}`),
-                                  false
-                                )}
+                                className={`flex-1 p-2 rounded-lg text-center text-white text-sm transition-colors ${
+                                  isBetSelected(game.id, '총점', `Over ${point}`)
+                                    ? 'bg-yellow-500 hover:bg-yellow-600'
+                                    : isOpen ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'
+                                }`}
                               >
                                 <div className="font-medium">{game.homeTeam}</div>
                                 <div className="text-xs">{overOdds ? overOdds.toFixed(2) : 'N/A'}</div>
@@ -612,12 +535,11 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                               <button
                                 onClick={() => handleBetClick(game, `Under ${point}`, underOdds || 1.9, 'back', '총점')}
                                 disabled={!isOpen}
-                                className={getButtonStyle(
-                                  isOpen,
-                                  !isOpen,
-                                  isBetSelected(game.id, '총점', `Under ${point}`),
-                                  false
-                                )}
+                                className={`flex-1 p-2 rounded-lg text-center text-white text-sm transition-colors ${
+                                  isBetSelected(game.id, '총점', `Under ${point}`)
+                                    ? 'bg-yellow-500 hover:bg-yellow-600'
+                                    : isOpen ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'
+                                }`}
                               >
                                 <div className="font-medium">{game.awayTeam}</div>
                                 <div className="text-xs">{underOdds ? underOdds.toFixed(2) : 'N/A'}</div>
@@ -702,12 +624,11 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                                 <button
                                   onClick={() => handleBetClick(game, `${game.homeTeam} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`, homeOdds, 'back', '핸디캡')}
                                   disabled={!isOpen}
-                                  className={getButtonStyle(
-                                    isOpen,
-                                    !isOpen,
-                                    isBetSelected(game.id, '핸디캡', `${game.homeTeam} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`),
-                                    false
-                                  )}
+                                  className={`flex-1 p-2 rounded-lg text-center text-white text-sm transition-colors ${
+                                    isBetSelected(game.id, '핸디캡', `${game.homeTeam} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`)
+                                      ? 'bg-yellow-500 hover:bg-yellow-600'
+                                      : isOpen ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'
+                                  }`}
                                 >
                                   <div className="font-medium">{game.homeTeam}</div>
                                   <div className="text-xs">{homeOdds.toFixed(2)}</div>
@@ -718,12 +639,11 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                                 <button
                                   onClick={() => handleBetClick(game, `${game.awayTeam} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`, awayOdds, 'back', '핸디캡')}
                                   disabled={!isOpen}
-                                  className={getButtonStyle(
-                                    isOpen,
-                                    !isOpen,
-                                    isBetSelected(game.id, '핸디캡', `${game.awayTeam} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`),
-                                    false
-                                  )}
+                                  className={`flex-1 p-2 rounded-lg text-center text-white text-sm transition-colors ${
+                                    isBetSelected(game.id, '핸디캡', `${game.awayTeam} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`)
+                                      ? 'bg-yellow-500 hover:bg-yellow-600'
+                                      : isOpen ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'
+                                  }`}
                                 >
                                   <div className="font-medium">{game.awayTeam}</div>
                                   <div className="text-xs">{awayOdds.toFixed(2)}</div>
