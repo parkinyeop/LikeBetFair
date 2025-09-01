@@ -319,6 +319,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
     
     await PaymentHistory.create({
       userId: targetOrder.userId,
+      betId: `EXCHANGE_${targetOrder.id}`, // Exchange 주문 ID를 betId로 사용하여 추적 가능
       amount: actualMatchAmount,
       balanceAfter: targetUser.balance, // 🆕 잔고 후 금액
       memo: `매칭 배팅 체결: ${targetOrder.homeTeam} vs ${targetOrder.awayTeam}`,
@@ -327,6 +328,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
     
     await PaymentHistory.create({
       userId: userId,
+      betId: `EXCHANGE_${matchOrder.id}`, // Exchange 주문 ID를 betId로 사용하여 추적 가능
       amount: actualMatchAmount,
       balanceAfter: user.balance, // 🆕 잔고 후 금액
       memo: `매칭 배팅 체결: ${targetOrder.homeTeam} vs ${targetOrder.awayTeam}`,
@@ -663,7 +665,7 @@ router.post('/settle', verifyToken, async (req, res) => {
     // PaymentHistory 기록 (실제 수익 지급만)
     await PaymentHistory.create({
       userId: winner.userId,
-      betId: '00000000-0000-0000-0000-000000000000', // Exchange 거래용 더미 ID
+      betId: `EXCHANGE_${winner.id}`, // Exchange 주문 ID를 betId로 사용하여 추적 가능
       amount: payout,
       memo: `Exchange 정산 수익`,
       paidAt: new Date(),
@@ -723,7 +725,7 @@ router.post('/cancel/:orderId', verifyToken, async (req, res) => {
     // PaymentHistory 기록 (실제 환불만)
     await PaymentHistory.create({
       userId: userId,
-      betId: '00000000-0000-0000-0000-000000000000', // Exchange 거래용 더미 ID
+      betId: `EXCHANGE_${order.id}`, // Exchange 주문 ID를 betId로 사용하여 추적 가능
       amount: refundAmount,
       memo: `Exchange 주문 취소 환불`,
       paidAt: new Date(),
@@ -1563,6 +1565,277 @@ router.get('/partial-matching-history', verifyToken, async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: '부분 매칭 이력 조회 중 오류가 발생했습니다.' 
+    });
+  }
+});
+
+// 🆕 개인 정산 정보 조회 API (PaymentHistory 기반)
+router.get('/settlement-history', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { type, startDate, endDate, limit = 50, offset = 0 } = req.query;
+    
+    const whereClause = { userId };
+    
+    // Exchange 정산 관련 필터링
+    if (type === 'exchange') {
+      whereClause.betId = { [Op.like]: 'EXCHANGE_%' };
+    } else if (type === 'settlement') {
+      whereClause.memo = { [Op.like]: '%정산%' };
+    } else if (type === 'refund') {
+      whereClause.memo = { [Op.like]: '%환불%' };
+    }
+    
+    // 날짜 범위 필터링
+    if (startDate && endDate) {
+      whereClause.paidAt = {
+        [Op.between]: [new Date(startDate), new Date(endDate)]
+      };
+    }
+    
+    const paymentHistory = await PaymentHistory.findAll({
+      where: whereClause,
+      order: [['paidAt', 'DESC']],
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+    
+    // Exchange 주문 정보와 연결
+    const settlementHistory = await Promise.all(
+      paymentHistory.map(async (payment) => {
+        let exchangeOrderInfo = null;
+        
+        // Exchange 주문인 경우 추가 정보 조회
+        if (payment.betId && payment.betId.startsWith('EXCHANGE_')) {
+          const exchangeOrderId = payment.betId.replace('EXCHANGE_', '');
+          try {
+            const exchangeOrder = await ExchangeOrder.findByPk(exchangeOrderId);
+            if (exchangeOrder) {
+              exchangeOrderInfo = {
+                id: exchangeOrder.id,
+                gameId: exchangeOrder.gameId,
+                homeTeam: exchangeOrder.homeTeam,
+                awayTeam: exchangeOrder.awayTeam,
+                side: exchangeOrder.side,
+                price: exchangeOrder.price,
+                amount: exchangeOrder.amount,
+                status: exchangeOrder.status,
+                actualProfit: exchangeOrder.actualProfit,
+                settledAt: exchangeOrder.settledAt
+              };
+            }
+          } catch (error) {
+            console.warn(`Exchange 주문 ${exchangeOrderId} 조회 실패:`, error.message);
+          }
+        }
+        
+        return {
+          id: payment.id,
+          betId: payment.betId,
+          amount: parseFloat(payment.amount),
+          balanceAfter: parseFloat(payment.balanceAfter),
+          memo: payment.memo,
+          paidAt: payment.paidAt,
+          exchangeOrder: exchangeOrderInfo
+        };
+      })
+    );
+    
+    // 통계 계산
+    const summary = {
+      totalAmount: settlementHistory.reduce((sum, p) => sum + p.amount, 0),
+      count: settlementHistory.length,
+      exchangeCount: settlementHistory.filter(p => p.betId && p.betId.startsWith('EXCHANGE_')).length,
+      settlementCount: settlementHistory.filter(p => p.memo && p.memo.includes('정산')).length,
+      refundCount: settlementHistory.filter(p => p.memo && p.memo.includes('환불')).length
+    };
+    
+    res.json({
+      success: true,
+      data: settlementHistory,
+      summary,
+      pagination: {
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        total: settlementHistory.length
+      }
+    });
+    
+  } catch (error) {
+    console.error('개인 정산 정보 조회 오류:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: '개인 정산 정보 조회 중 오류가 발생했습니다.' 
+    });
+  }
+});
+
+// 🆕 통합 정산 리포트 API (Exchange 주문 + PaymentHistory)
+router.get('/unified-settlement-report', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { startDate, endDate, limit = 100 } = req.query;
+    
+    console.log(`📊 사용자 ${userId} 통합 정산 리포트 생성 중...`);
+    
+    // 1. 정산된 Exchange 주문 조회
+    const exchangeWhereClause = { 
+      userId, 
+      status: 'settled' 
+    };
+    
+    if (startDate && endDate) {
+      exchangeWhereClause.settledAt = {
+        [Op.between]: [new Date(startDate), new Date(endDate)]
+      };
+    }
+    
+    const settledOrders = await ExchangeOrder.findAll({
+      where: exchangeWhereClause,
+      order: [['settledAt', 'DESC']],
+      limit: parseInt(limit)
+    });
+    
+    // 2. Exchange 관련 PaymentHistory 조회 (기존 데이터 포함)
+    const paymentWhereClause = { userId };
+    
+    // Exchange 관련 필터링 (새로운 형식 + 기존 형식)
+    paymentWhereClause[Op.or] = [
+      { betId: { [Op.like]: 'EXCHANGE_%' } }, // 새로운 형식
+      { 
+        betId: null,
+        memo: { [Op.or]: [
+          { [Op.like]: '%Exchange%' },
+          { [Op.like]: '%매칭 배팅%' },
+          { [Op.like]: '%정산%' },
+          { [Op.like]: '%환불%' }
+        ]}
+      } // 기존 형식
+    ];
+    
+    if (startDate && endDate) {
+      paymentWhereClause.paidAt = {
+        [Op.between]: [new Date(startDate), new Date(endDate)]
+      };
+    }
+    
+    const paymentHistory = await PaymentHistory.findAll({
+      where: paymentWhereClause,
+      order: [['paidAt', 'DESC']],
+      limit: parseInt(limit)
+    });
+    
+    // 3. 통합 리포트 데이터 구성
+    const unifiedReport = [];
+    
+    // Exchange 주문 데이터 추가
+    settledOrders.forEach(order => {
+      unifiedReport.push({
+        type: 'exchange_order',
+        id: order.id,
+        betId: `EXCHANGE_${order.id}`,
+        amount: parseFloat(order.actualProfit || 0),
+        balanceAfter: null, // Exchange 주문에는 잔고 정보 없음
+        memo: order.settlementNote || 'Exchange 정산',
+        paidAt: order.settledAt,
+        exchangeOrder: {
+          id: order.id,
+          gameId: order.gameId,
+          homeTeam: order.homeTeam,
+          awayTeam: order.awayTeam,
+          side: order.side,
+          price: order.price,
+          amount: order.amount,
+          status: order.status,
+          actualProfit: order.actualProfit,
+          settledAt: order.settledAt
+        }
+      });
+    });
+    
+    // PaymentHistory 데이터 추가
+    paymentHistory.forEach(payment => {
+      let exchangeOrderInfo = null;
+      
+      // Exchange 주문 정보 연결
+      if (payment.betId && payment.betId.startsWith('EXCHANGE_')) {
+        const exchangeOrderId = payment.betId.replace('EXCHANGE_', '');
+        const order = settledOrders.find(o => o.id == exchangeOrderId);
+        if (order) {
+          exchangeOrderInfo = {
+            id: order.id,
+            gameId: order.gameId,
+            homeTeam: order.homeTeam,
+            awayTeam: order.awayTeam,
+            side: order.side,
+            price: order.price,
+            amount: order.amount,
+            status: order.status,
+            actualProfit: order.actualProfit,
+            settledAt: order.settledAt
+          };
+        }
+      }
+      
+      unifiedReport.push({
+        type: 'payment_history',
+        id: payment.id,
+        betId: payment.betId,
+        amount: parseFloat(payment.amount),
+        balanceAfter: parseFloat(payment.balanceAfter),
+        memo: payment.memo,
+        paidAt: payment.paidAt,
+        exchangeOrder: exchangeOrderInfo
+      });
+    });
+    
+    // 4. 시간순 정렬 및 중복 제거
+    unifiedReport.sort((a, b) => new Date(b.paidAt) - new Date(a.paidAt));
+    
+    // 5. 통계 계산
+    const summary = {
+      totalSettledOrders: settledOrders.length,
+      totalPaymentHistory: paymentHistory.length,
+      totalUnifiedRecords: unifiedReport.length,
+      totalAmount: unifiedReport.reduce((sum, r) => sum + r.amount, 0),
+      exchangeOrdersWithPaymentHistory: paymentHistory.filter(p => p.betId && p.betId.startsWith('EXCHANGE_')).length,
+      legacyPaymentHistory: paymentHistory.filter(p => !p.betId || !p.betId.startsWith('EXCHANGE_')).length,
+      settlementCount: unifiedReport.filter(r => r.memo && r.memo.includes('정산')).length,
+      refundCount: unifiedReport.filter(r => r.memo && r.memo.includes('환불')).length
+    };
+    
+    // 6. 사용자별 상세 통계
+    const userStats = {
+      totalProfit: settledOrders.reduce((sum, order) => sum + parseFloat(order.actualProfit || 0), 0),
+      averageProfit: settledOrders.length > 0 ? 
+        settledOrders.reduce((sum, order) => sum + parseFloat(order.actualProfit || 0), 0) / settledOrders.length : 0,
+      winCount: settledOrders.filter(order => parseFloat(order.actualProfit || 0) > 0).length,
+      lossCount: settledOrders.filter(order => parseFloat(order.actualProfit || 0) < 0).length,
+      winRate: settledOrders.length > 0 ? 
+        (settledOrders.filter(order => parseFloat(order.actualProfit || 0) > 0).length / settledOrders.length * 100).toFixed(2) : 0
+    };
+    
+    res.json({
+      success: true,
+      data: unifiedReport,
+      summary,
+      userStats,
+      pagination: {
+        limit: parseInt(limit),
+        total: unifiedReport.length
+      },
+      metadata: {
+        reportGeneratedAt: new Date(),
+        userId: userId,
+        dateRange: startDate && endDate ? { startDate, endDate } : 'all'
+      }
+    });
+    
+  } catch (error) {
+    console.error('통합 정산 리포트 생성 오류:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: '통합 정산 리포트 생성 중 오류가 발생했습니다.' 
     });
   }
 });

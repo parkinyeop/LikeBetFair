@@ -478,7 +478,7 @@ class ExchangeSettlementService {
     // 결제 내역 생성
     await PaymentHistory.create({
       userId,
-      betId: null, // Exchange 주문은 Bet 테이블과 연결되지 않음
+      betId: `EXCHANGE_${order.id}`, // Exchange 주문 ID를 betId로 사용하여 추적 가능
       amount,
       memo,
       paidAt: new Date(),
@@ -557,7 +557,7 @@ class ExchangeSettlementService {
       const refundMemo = this.generateDetailedRefundMemo(order);
       await PaymentHistory.create({
         userId: order.userId,
-        betId: null,
+        betId: `EXCHANGE_${order.id}`, // Exchange 주문 ID를 betId로 사용하여 추적 가능
         amount: order.remainingAmount,
         type: 'refund',
         memo: refundMemo,
@@ -677,7 +677,7 @@ class ExchangeSettlementService {
             // 3. 환불 내역 기록
             await PaymentHistory.create({
               userId: order.userId,
-              betId: null,
+              betId: `EXCHANGE_${order.id}`, // Exchange 주문 ID를 betId로 사용하여 추적 가능
               amount: order.stakeAmount,
               type: 'refund',
               memo: `Exchange 주문 만료로 인한 자동 환불 (경기: ${order.homeTeam} vs ${order.awayTeam})`,
