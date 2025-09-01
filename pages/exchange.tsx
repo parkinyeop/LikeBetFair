@@ -9,9 +9,15 @@ import { useExchangeContext } from '../contexts/ExchangeContext';
 export default function Exchange() {
   const router = useRouter();
   const { 
-    selections,
-    toggleSelection
-  } = useExchangeStore();
+    selectedBet, 
+    setSelectedBet,
+    // 🆕 멀티배팅 관련 상태와 함수들
+    multiBetSelections,
+    addMultiBetSelection,
+    removeMultiBetSelection,
+    clearMultiBet,
+    isMultiBetSelected
+  } = useExchangeContext();
   const [todayGames, setTodayGames] = useState<Record<string, any[]>>({});
   const [todayLoading, setTodayLoading] = useState(false);
   const [todayFlatGames, setTodayFlatGames] = useState<any[]>([]);
@@ -86,6 +92,21 @@ export default function Exchange() {
       console.log('🎯 베팅 선택 해제 완료');
     } else {
       console.log('🎯 새로운 베팅 선택');
+      
+      // 🆕 같은 경기의 다른 선택들을 먼저 제거
+      // selectedBet에서 같은 경기 선택 제거
+      if (selectedBet && selectedBet.gameId === game.id) {
+        console.log('🎯 같은 경기의 기존 선택 제거:', selectedBet.team);
+        setSelectedBet(null);
+      }
+      
+      // 멀티배팅에서 같은 경기 선택들 제거
+      const sameGameSelections = multiBetSelections.filter(mb => mb.gameId === game.id);
+      sameGameSelections.forEach(mb => {
+        console.log('🎯 멀티배팅에서 같은 경기 선택 제거:', mb.team);
+        removeMultiBetSelection(mb.gameId, mb.market, mb.team);
+      });
+      
       // 새로운 베팅 선택
       const newSelectedBet = {
         team,

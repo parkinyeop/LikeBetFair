@@ -199,3 +199,12 @@
 {"timestamp":"2025-09-01T19:10:05.737Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
 {"timestamp":"2025-09-01T19:10:11.113Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
 {"timestamp":"2025-09-01T20:15:10.749Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T20:17:05.442Z","type":"init","status":"start","message":"Starting initial data caching for active categories","categoryCount":14}
+{"timestamp":"2025-09-01T20:17:12.227Z","type":"init","status":"success","message":"Initial data cached successfully for active categories","oddsUpdated":152,"resultsUpdated":"N/A","betsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T20:20:00.645Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T20:20:07.344Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T20:20:07.368Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T20:20:10.909Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T20:20:19.944Z","type":"init","status":"start","message":"Starting initial data caching for active categories","categoryCount":14}
+{"timestamp":"2025-09-01T20:20:27.135Z","type":"init","status":"success","message":"Initial data cached successfully for active categories","oddsUpdated":151,"resultsUpdated":"N/A","betsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T20:25:10.367Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
