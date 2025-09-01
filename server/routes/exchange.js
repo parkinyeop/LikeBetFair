@@ -954,7 +954,13 @@ router.get('/all-orders', async (req, res) => {
         remainingAmount: order.remainingAmount || order.amount,
         filledAmount: order.filledAmount || 0,
         partiallyFilled: order.partiallyFilled || false,
-        displayAmount: displayAmount
+        displayAmount: displayAmount,
+        // 🆕 멀티배팅 필드 추가
+        isMultibet: order.isMultibet || false,
+        totalOdds: order.totalOdds,
+        selectionCount: order.selectionCount,
+        selectionDetails: order.selectionDetails,
+        potentialWinnings: order.potentialWinnings
       };
     });
     
