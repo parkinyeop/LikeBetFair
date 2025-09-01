@@ -77,7 +77,7 @@ interface ExchangeContextType {
   
   // 🆕 멀티배팅 액션들
   addMultiBetSelection: (selection: MultiBetSelection) => void;
-  removeMultiBetSelection: (orderId: number, market: string, selection: string) => void;
+  removeMultiBetSelection: (gameId: string, market: string, team: string) => void;
   updateMultiBetStake: (stake: number) => void;
   clearMultiBet: () => void;
   createMultiBetOrder: () => Promise<{ success: boolean; data?: any; error?: string }>;
@@ -156,9 +156,9 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
   };
 
   // 🆕 멀티배팅 선택 제거
-  const removeMultiBetSelection = (orderId: number, market: string, selection: string) => {
+  const removeMultiBetSelection = (gameId: string, market: string, team: string) => {
     setMultiBetSelections(prev => 
-      prev.filter(s => !(s.orderId === orderId && s.market === market && s.selection === selection))
+      prev.filter(s => !(s.gameId === gameId && s.market === market && s.team === team))
     );
   };
 

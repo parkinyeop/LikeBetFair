@@ -198,3 +198,4 @@
 {"timestamp":"2025-09-01T19:10:05.723Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
 {"timestamp":"2025-09-01T19:10:05.737Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
 {"timestamp":"2025-09-01T19:10:11.113Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T20:15:10.749Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
