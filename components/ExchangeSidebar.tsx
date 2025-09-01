@@ -782,7 +782,7 @@ function OrderHistoryPanel() {
 
         {/* 통계 정보 */}
         <div className="mb-3 p-2 bg-white rounded border border-gray-200">
-          <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="grid grid-cols-3 gap-2 text-xs">
             <div className="text-center">
               <div className="text-gray-500">총 주문</div>
               <div className="font-bold text-gray-800">{stats.total}개</div>
@@ -796,10 +796,20 @@ function OrderHistoryPanel() {
               <div className="font-bold text-yellow-600">{stats.open}개</div>
             </div>
             <div className="text-center">
-                              <div className="text-gray-500">Potential Profit</div>
+              <div className="text-gray-500">Potential Profit</div>
               <div className={`font-bold ${stats.totalPotentialProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                  {stats.totalPotentialProfit >= 0 ? '+' : ''}{Math.round(stats.totalPotentialProfit).toLocaleString()} KRW
+                {stats.totalPotentialProfit >= 0 ? '+' : ''}{Math.round(stats.totalPotentialProfit).toLocaleString()} KRW
               </div>
+            </div>
+            <div className="text-center">
+              <div className="text-gray-500">멀티배팅</div>
+              <div className="font-bold text-yellow-600">
+                {(userOrders || []).filter(order => (order as any).isMultibet).length}개
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-gray-500">체결</div>
+              <div className="font-bold text-green-600">{stats.matched}개</div>
             </div>
           </div>
         </div>
@@ -880,6 +890,12 @@ function OrderHistoryPanel() {
                   {/* 헤더: 주문 타입과 상태 */}
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex items-center space-x-2">
+                      {/* 🆕 멀티배팅 표시 */}
+                      {(order as any).isMultibet && (
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                          🎯 멀티배팅
+                        </span>
+                      )}
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${sideInfo.bg} ${sideInfo.color}`}>
                         {sideInfo.text}
                       </span>
@@ -922,6 +938,69 @@ function OrderHistoryPanel() {
                         선택: {order.selection} ({order.side === 'back' ? '이길 것' : '질 것'})
                       </div>
                     )}
+                    {/* 🆕 멀티배팅 선택 정보 표시 */}
+                    {(order as any).isMultibet && (order as any).selectionDetails && (
+                      <div className="mt-2">
+                        <div className="text-xs text-yellow-700 bg-yellow-50 p-1 rounded mb-2">
+                          🎯 {((order as any).selectionDetails.selections || []).length}개 선택 • 
+                          총 배당: {(() => {
+                            const totalOdds = (order as any).totalOdds;
+                            if (totalOdds && typeof totalOdds === 'number') {
+                              return totalOdds.toFixed(2);
+                            } else if (totalOdds && typeof totalOdds === 'string') {
+                              return parseFloat(totalOdds).toFixed(2);
+                            }
+                            return 'N/A';
+                          })()}
+                        </div>
+                        {/* 각 선택의 상세 정보 표시 */}
+                        <div className="space-y-1">
+                          {((order as any).selectionDetails.selections || []).map((selection: any, idx: number) => {
+                            const isOverUnder = selection.market === 'Over/Under' || selection.market === 'totals';
+                            const isHandicap = selection.market === 'Handicap' || selection.market === 'spreads';
+                            
+                            return (
+                              <div key={idx} className="border-l-2 border-yellow-200 pl-2 py-1">
+                                <div className="flex items-center justify-between text-xs">
+                                  <div className="flex flex-col">
+                                    <span className="font-medium text-gray-800">
+                                      {isOverUnder ? (
+                                        `${selection.option || selection.team} ${selection.point || ''}`
+                                      ) : isHandicap ? (
+                                        selection.team
+                                      ) : (
+                                        selection.team
+                                      )}
+                                    </span>
+                                    <span className="text-gray-500">
+                                      {selection.homeTeam && selection.awayTeam 
+                                        ? `${selection.homeTeam} vs ${selection.awayTeam}`
+                                        : selection.desc || '경기 정보'
+                                      }
+                                    </span>
+                                    <span className="text-gray-400">
+                                      {selection.market} • {selection.commenceTime 
+                                        ? (() => {
+                                            const utcDate = new Date(selection.commenceTime);
+                                            return utcDate.toLocaleString('ko-KR', { 
+                                              month: 'short', 
+                                              day: 'numeric',
+                                              hour: '2-digit',
+                                              minute: '2-digit'
+                                            });
+                                          })()
+                                        : '시간 미정'
+                                      }
+                                    </span>
+                                  </div>
+                                  <span className="text-blue-600 font-medium">@ {selection.odds}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                     {/* 만료된 주문 표시 */}
                     {commenceTime && new Date(commenceTime) < new Date() && (
                       <div className="text-xs text-red-600 mt-1 font-medium">
@@ -950,8 +1029,52 @@ function OrderHistoryPanel() {
                       )}
                     </div>
                     <div className="text-center">
-                      <div className="text-xs text-gray-500">주문 금액</div>
-                      <div className="text-lg font-bold text-gray-800">{order.amount.toLocaleString()} KRW</div>
+                      <div className="text-xs text-gray-500">
+                        {(order as any).isMultibet ? '베팅 금액' : '주문 금액'}
+                      </div>
+                      <div className="text-lg font-bold text-gray-800">
+                        {(() => {
+                          if ((order as any).isMultibet) {
+                            const stakeAmount = (order as any).stakeAmount;
+                            if (stakeAmount && typeof stakeAmount === 'number') {
+                              return stakeAmount.toLocaleString();
+                            } else if (stakeAmount && typeof stakeAmount === 'string') {
+                              return parseFloat(stakeAmount).toLocaleString();
+                            }
+                            return '0';
+                          } else {
+                            return order.amount.toLocaleString();
+                          }
+                        })()} KRW
+                      </div>
+                      {/* 🆕 멀티배팅 예상 수익 표시 */}
+                      {(order as any).isMultibet && (order as any).potentialWinnings && (
+                        <div className="text-xs text-yellow-600 mt-1">
+                          💰 예상 수익: +{(() => {
+                            const potentialWinnings = (order as any).potentialWinnings;
+                            if (potentialWinnings && typeof potentialWinnings === 'number') {
+                              return potentialWinnings.toLocaleString();
+                            } else if (potentialWinnings && typeof potentialWinnings === 'string') {
+                              return parseFloat(potentialWinnings).toLocaleString();
+                            }
+                            return '0';
+                          })()} KRW
+                        </div>
+                      )}
+                      {/* 🆕 멀티배팅 순수익 표시 */}
+                      {(order as any).isMultibet && (order as any).potentialProfit && (
+                        <div className="text-xs text-green-600 mt-1">
+                          🏆 순수익: +{(() => {
+                            const potentialProfit = (order as any).potentialProfit;
+                            if (potentialProfit && typeof potentialProfit === 'number') {
+                              return potentialProfit.toLocaleString();
+                            } else if (potentialProfit && typeof potentialProfit === 'string') {
+                              return parseFloat(potentialProfit).toLocaleString();
+                            }
+                            return '0';
+                          })()} KRW
+                        </div>
+                      )}
                       {/* 🆕 부분 매칭 정보 표시 */}
                       {(order as any).matchInfo && (order as any).matchInfo.partiallyFilled && (
                         <div className="text-xs text-orange-600 mt-1">

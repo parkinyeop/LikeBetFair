@@ -97,11 +97,19 @@ export default function Exchange() {
         awayTeam: game.away_team,
         market: market,
         selection: team,
+        team: team, // 🆕 team 필드 추가
         side: 'back' as const,
         odds: price,
         amount: 0, // 사용자가 입력할 금액
         commenceTime: game.commence_time,
-        sportKey: game.sport_key || 'soccer'
+        sportKey: game.sport_key || 'soccer',
+        desc: `${game.home_team} vs ${game.away_team}`, // 🆕 desc 필드 추가
+        option: market === 'Over/Under' ? team : undefined, // 🆕 option 필드 추가
+        point: market === 'Over/Under' ? (() => {
+          // Over/Under의 경우 point 추출
+          const match = team.match(/(\d+\.?\d*)/);
+          return match ? match[1] : undefined;
+        })() : undefined // 🆕 point 필드 추가
       };
       addMultiBetSelection(multiBetSelection);
       console.log('🎯 새 베팅 선택 완료 및 멀티배팅에 추가:', { team, price, market });

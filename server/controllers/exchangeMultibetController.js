@@ -108,11 +108,15 @@ class ExchangeMultibetController {
             gameId: s.gameId,
             market: s.market,
             selection: s.selection,
+            team: s.team || s.selection, // 🆕 team 필드 추가
             odds: s.odds,
             homeTeam: s.homeTeam,
             awayTeam: s.awayTeam,
             commenceTime: s.commenceTime,
-            sportKey: s.sportKey
+            sportKey: s.sportKey,
+            desc: s.desc || `${s.homeTeam} vs ${s.awayTeam}`, // 🆕 desc 필드 추가
+            option: s.option, // 🆕 option 필드 추가 (Over/Under용)
+            point: s.point // 🆕 point 필드 추가 (Over/Under용)
           })),
           multibetType: 'accumulator',
           description: description || '멀티배팅'

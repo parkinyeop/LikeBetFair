@@ -40,11 +40,15 @@ export interface MultiBetSelection {
   awayTeam: string;
   market: string;
   selection: string;
+  team: string; // 🆕 team 필드 추가
   side: 'back' | 'lay';
   odds: number;
   amount: number;
   commenceTime: string;
   sportKey: string;
+  desc?: string; // 🆕 desc 필드 추가
+  option?: string; // 🆕 option 필드 추가 (Over/Under용)
+  point?: string; // 🆕 point 필드 추가 (Over/Under용)
 }
 
 interface ExchangeContextType {
