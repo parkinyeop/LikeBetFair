@@ -70,6 +70,7 @@ interface ExchangeContextType {
   
   // 🆕 멀티배팅 관련 상태들
   multiBetSelections: MultiBetSelection[];
+  setMultiBetSelections: React.Dispatch<React.SetStateAction<MultiBetSelection[]>>;
   multiBetStake: number;
   multiBetTotalOdds: number;
   multiBetPotentialWinnings: number;
@@ -327,6 +328,7 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
     formatPartialMatchInfo,
     // 🆕 멀티배팅 관련 상태와 함수들 추가
     multiBetSelections,
+    setMultiBetSelections,
     multiBetStake,
     multiBetTotalOdds,
     multiBetPotentialWinnings,
