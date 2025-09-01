@@ -269,7 +269,7 @@ export default function LiveOddsPage() {
   return (
     <div className="p-6">
       <div className="bg-black rounded shadow p-6 mb-4">
-        {/* 헤더 */}
+      {/* 헤더 */}
         <div className="mb-6">
           <div className="flex justify-between items-center mb-6">
             <div>
@@ -645,7 +645,7 @@ export default function LiveOddsPage() {
             <div className="p-4">
               {/* 🆕 투데이 배팅 GameCard와 정확히 동일한 구조 */}
               <div className="space-y-4">
-                {filteredOrders.map((order) => (
+                  {filteredOrders.map((order) => (
                   <div
                     key={order.id}
                     className="bg-gray-800 p-4 rounded shadow border-2 border-blue-400"
@@ -654,8 +654,8 @@ export default function LiveOddsPage() {
                     
                     {/* 🆕 투데이 배팅과 동일: 경기명 (font-semibold) */}
                     <div className="text-white font-semibold mb-2">
-                      {order.homeTeam} vs {order.awayTeam}
-                    </div>
+                              {order.homeTeam} vs {order.awayTeam}
+                            </div>
                     
                     {/* 🆕 투데이 배팅과 동일: 시간 (기본 폰트) */}
                     <div className="mb-4">
@@ -701,10 +701,10 @@ export default function LiveOddsPage() {
                                   </div>
                                   <div className="text-xs mt-1 text-white font-medium">
                                     배당률: {order.price.toFixed(2)}
-                                  </div>
+                            </div>
                                   <div className="text-xs mt-1 text-white font-medium">
                                     금액: {order.amount.toLocaleString()}원
-                                  </div>
+                              </div>
                                 </button>
                                 
                                 {/* 패배 (Lay 가능) */}
@@ -723,7 +723,7 @@ export default function LiveOddsPage() {
                                   </div>
                                   <div className="text-xs mt-1 opacity-90">
                                     매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원
-                                  </div>
+                          </div>
                                 </button>
                               </>
                             );
@@ -740,13 +740,13 @@ export default function LiveOddsPage() {
                                   <div className="font-medium">{order.selection}</div>
                                   <div className="text-xs mt-1 opacity-90">
                                     🎯 Back
-                                  </div>
+                        </div>
                                   <div className="text-xs mt-1 text-white font-medium">
                                     배당률: {order.price.toFixed(2)}
-                                  </div>
+                        </div>
                                   <div className="text-xs mt-1 text-white font-medium">
                                     금액: {order.amount.toLocaleString()}원
-                                  </div>
+                        </div>
                                 </button>
                                 
                                 {/* 무승부 (Lay 가능) */}
@@ -762,10 +762,10 @@ export default function LiveOddsPage() {
                                   <div className="font-medium">무승부</div>
                                   <div className="text-xs mt-1 opacity-90">
                                     📉 Lay 가능
-                                  </div>
+                        </div>
                                   <div className="text-xs mt-1 opacity-90">
                                     매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원
-                                  </div>
+                          </div>
                                 </button>
                                 
                                 {/* 반대 승/패 (Lay 가능) */}
@@ -794,7 +794,7 @@ export default function LiveOddsPage() {
                           return (
                             <>
                               {/* Back 주문이 있는 선택지 (비활성화) */}
-                              <button 
+                          <button
                                 disabled={true}
                                 className={getButtonStyle(false, true, false, false)}
                               >
@@ -808,7 +808,7 @@ export default function LiveOddsPage() {
                                 <div className="text-xs mt-1 text-white font-medium">
                                   금액: {order.amount.toLocaleString()}원
                                 </div>
-                              </button>
+                          </button>
                               
                               {/* Lay 주문이 가능한 반대 선택지 (활성화) */}
                                                               <button 

@@ -1,0 +1,149 @@
+{"timestamp":"2025-09-01T04:21:02.219Z","type":"init","status":"start","message":"Starting initial data caching for active categories","categoryCount":14}
+{"timestamp":"2025-09-01T04:21:08.405Z","type":"init","status":"success","message":"Initial data cached successfully for active categories","oddsUpdated":132,"resultsUpdated":"N/A","betsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T04:25:10.664Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T04:30:00.807Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T04:30:00.813Z","type":"odds","status":"start","message":"Starting high-priority leagues odds update (30min interval)","priority":"high","leagues":["NBA","MLB","KBO","NFL","프리미어리그"]}
+{"timestamp":"2025-09-01T04:30:00.820Z","type":"epl","status":"start","message":"EPL 프리미어리그 데이터 강제 업데이트"}
+{"timestamp":"2025-09-01T04:30:02.894Z","type":"epl","status":"success","message":"EPL 프리미어리그 데이터 업데이트 완료"}
+{"timestamp":"2025-09-01T04:30:04.217Z","type":"odds","status":"success","message":"High-priority odds update completed (30min interval)","priority":"medium","leagues":["NBA","MLB","KBO","NFL","프리미어리그"],"dynamicPriority":"low","oddsUpdated":41,"oddsDetail":{"totalUpdated":41,"newOdds":0,"existingOddsUpdated":41,"skippedOdds":1,"apiCalls":5,"categoriesProcessed":5}}
+{"timestamp":"2025-09-01T04:30:05.989Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T04:30:06.015Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T04:30:11.017Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T04:35:10.326Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T04:38:40.319Z","type":"init","status":"start","message":"Starting initial data caching for active categories","categoryCount":14}
+{"timestamp":"2025-09-01T04:38:46.705Z","type":"init","status":"success","message":"Initial data cached successfully for active categories","oddsUpdated":132,"resultsUpdated":"N/A","betsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T04:40:00.412Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T04:40:04.990Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T04:40:05.017Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T04:40:10.608Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T04:45:12.140Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T04:48:42.413Z","type":"init","status":"start","message":"Starting initial data caching for active categories","categoryCount":14}
+{"timestamp":"2025-09-01T04:48:48.104Z","type":"init","status":"success","message":"Initial data cached successfully for active categories","oddsUpdated":132,"resultsUpdated":"N/A","betsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T04:49:46.426Z","type":"init","status":"start","message":"Starting initial data caching for active categories","categoryCount":14}
+{"timestamp":"2025-09-01T04:49:52.116Z","type":"init","status":"success","message":"Initial data cached successfully for active categories","oddsUpdated":132,"resultsUpdated":"N/A","betsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T04:50:00.438Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T04:50:05.772Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T04:50:05.796Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T04:50:10.587Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T04:55:10.922Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T05:00:00.109Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T05:00:00.114Z","type":"odds","status":"start","message":"Starting high-priority leagues odds update (30min interval)","priority":"high","leagues":["NBA","MLB","KBO","NFL","프리미어리그"]}
+{"timestamp":"2025-09-01T05:00:00.117Z","type":"odds","status":"start","message":"Starting medium-priority leagues odds update (2hour interval)","priority":"medium","leagues":["MLS","KLEAGUE","JLEAGUE","SERIEA"]}
+{"timestamp":"2025-09-01T05:00:00.121Z","type":"epl","status":"start","message":"EPL 프리미어리그 데이터 강제 업데이트"}
+{"timestamp":"2025-09-01T05:00:01.694Z","type":"odds","status":"success","message":"Medium-priority odds update completed (2hour interval)","priority":"medium","leagues":["MLS","KLEAGUE","JLEAGUE","SERIEA"],"dynamicPriority":"low","oddsUpdated":44,"oddsDetail":{"totalUpdated":44,"newOdds":0,"existingOddsUpdated":44,"skippedOdds":0,"apiCalls":4,"categoriesProcessed":4}}
+{"timestamp":"2025-09-01T05:00:02.697Z","type":"odds","status":"success","message":"High-priority odds update completed (30min interval)","priority":"medium","leagues":["NBA","MLB","KBO","NFL","프리미어리그"],"dynamicPriority":"low","oddsUpdated":41,"oddsDetail":{"totalUpdated":41,"newOdds":0,"existingOddsUpdated":41,"skippedOdds":1,"apiCalls":5,"categoriesProcessed":5}}
+{"timestamp":"2025-09-01T05:00:04.880Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T05:00:04.908Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T05:00:04.945Z","type":"epl","status":"success","message":"EPL 프리미어리그 데이터 업데이트 완료"}
+{"timestamp":"2025-09-01T05:00:10.274Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T05:05:10.599Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T05:10:00.790Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T05:10:05.467Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T05:10:05.492Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T05:10:10.954Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T05:15:10.359Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T05:20:00.596Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T05:20:06.766Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T05:20:06.784Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T05:20:10.770Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T05:24:18.955Z","type":"init","status":"start","message":"Starting initial data caching for active categories","categoryCount":14}
+{"timestamp":"2025-09-01T05:24:24.792Z","type":"init","status":"success","message":"Initial data cached successfully for active categories","oddsUpdated":131,"resultsUpdated":"N/A","betsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T05:25:10.178Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T05:30:00.345Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T05:30:00.350Z","type":"odds","status":"start","message":"Starting high-priority leagues odds update (30min interval)","priority":"high","leagues":["NBA","MLB","KBO","NFL","프리미어리그"]}
+{"timestamp":"2025-09-01T05:30:00.355Z","type":"epl","status":"start","message":"EPL 프리미어리그 데이터 강제 업데이트"}
+{"timestamp":"2025-09-01T05:30:03.509Z","type":"epl","status":"success","message":"EPL 프리미어리그 데이터 업데이트 완료"}
+{"timestamp":"2025-09-01T05:30:03.594Z","type":"odds","status":"success","message":"High-priority odds update completed (30min interval)","priority":"medium","leagues":["NBA","MLB","KBO","NFL","프리미어리그"],"dynamicPriority":"low","oddsUpdated":41,"oddsDetail":{"totalUpdated":41,"newOdds":0,"existingOddsUpdated":41,"skippedOdds":1,"apiCalls":5,"categoriesProcessed":5}}
+{"timestamp":"2025-09-01T05:30:06.416Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T05:30:06.437Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T05:30:10.511Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T05:35:10.842Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T05:40:00.971Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T05:40:05.571Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T05:40:05.591Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T05:40:11.160Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T05:45:10.504Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T05:50:00.649Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T05:50:05.449Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T05:50:05.469Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T05:50:10.858Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T05:55:10.229Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T06:00:00.371Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T06:00:00.375Z","type":"odds","status":"start","message":"Starting high-priority leagues odds update (30min interval)","priority":"high","leagues":["NBA","MLB","KBO","NFL","프리미어리그"]}
+{"timestamp":"2025-09-01T06:00:00.381Z","type":"epl","status":"start","message":"EPL 프리미어리그 데이터 강제 업데이트"}
+{"timestamp":"2025-09-01T06:00:03.720Z","type":"epl","status":"success","message":"EPL 프리미어리그 데이터 업데이트 완료"}
+{"timestamp":"2025-09-01T06:00:03.952Z","type":"odds","status":"success","message":"High-priority odds update completed (30min interval)","priority":"medium","leagues":["NBA","MLB","KBO","NFL","프리미어리그"],"dynamicPriority":"low","oddsUpdated":41,"oddsDetail":{"totalUpdated":41,"newOdds":0,"existingOddsUpdated":41,"skippedOdds":1,"apiCalls":5,"categoriesProcessed":5}}
+{"timestamp":"2025-09-01T06:00:05.643Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T06:00:05.668Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T06:00:10.582Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T06:05:11.185Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T06:10:00.564Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T06:10:05.717Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T06:10:05.741Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T06:10:10.762Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T06:15:11.090Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T06:20:00.470Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T06:20:06.106Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T06:20:06.136Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T06:20:10.682Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T06:24:18.898Z","type":"monitor","status":"info","message":"Scheduler status check","isUpdatingResults":false,"isUpdatingOdds":false,"lastUpdateTime":"2025-09-01T06:20:06.136Z","activeCategories":["NBA","MLB","KBO","NFL","프리미어리그","MLS","KLEAGUE","JLEAGUE","SERIEA","BRASILEIRAO","ARGENTINA_PRIMERA","CSL","LALIGA","BUNDESLIGA"],"uptime":3600.212705416,"apiCallEstimate":"~28 calls per hour","memory":{"used":"80MB","total":"92MB"}}
+{"timestamp":"2025-09-01T06:25:11.022Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T06:30:00.309Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T06:30:00.313Z","type":"odds","status":"start","message":"Starting high-priority leagues odds update (30min interval)","priority":"high","leagues":["NBA","MLB","KBO","NFL","프리미어리그"]}
+{"timestamp":"2025-09-01T06:30:00.319Z","type":"epl","status":"start","message":"EPL 프리미어리그 데이터 강제 업데이트"}
+{"timestamp":"2025-09-01T06:30:02.858Z","type":"odds","status":"success","message":"High-priority odds update completed (30min interval)","priority":"medium","leagues":["NBA","MLB","KBO","NFL","프리미어리그"],"dynamicPriority":"low","oddsUpdated":41,"oddsDetail":{"totalUpdated":41,"newOdds":0,"existingOddsUpdated":41,"skippedOdds":1,"apiCalls":5,"categoriesProcessed":5}}
+{"timestamp":"2025-09-01T06:30:03.039Z","type":"epl","status":"success","message":"EPL 프리미어리그 데이터 업데이트 완료"}
+{"timestamp":"2025-09-01T06:30:06.317Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T06:30:06.341Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T06:30:10.514Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T06:35:10.826Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T06:40:00.953Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T06:40:05.581Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T06:40:05.597Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T06:40:11.152Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T06:45:10.476Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T06:50:00.622Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T06:50:06.178Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T06:50:06.198Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T06:50:10.813Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T06:55:11.133Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T07:00:00.358Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T07:00:00.360Z","type":"odds","status":"start","message":"Starting high-priority leagues odds update (30min interval)","priority":"high","leagues":["NBA","MLB","KBO","NFL","프리미어리그"]}
+{"timestamp":"2025-09-01T07:00:00.361Z","type":"odds","status":"start","message":"Starting medium-priority leagues odds update (2hour interval)","priority":"medium","leagues":["MLS","KLEAGUE","JLEAGUE","SERIEA"]}
+{"timestamp":"2025-09-01T07:00:00.363Z","type":"epl","status":"start","message":"EPL 프리미어리그 데이터 강제 업데이트"}
+{"timestamp":"2025-09-01T07:00:02.450Z","type":"odds","status":"success","message":"Medium-priority odds update completed (2hour interval)","priority":"medium","leagues":["MLS","KLEAGUE","JLEAGUE","SERIEA"],"dynamicPriority":"low","oddsUpdated":43,"oddsDetail":{"totalUpdated":43,"newOdds":0,"existingOddsUpdated":43,"skippedOdds":0,"apiCalls":4,"categoriesProcessed":4}}
+{"timestamp":"2025-09-01T07:00:03.517Z","type":"epl","status":"success","message":"EPL 프리미어리그 데이터 업데이트 완료"}
+{"timestamp":"2025-09-01T07:00:03.585Z","type":"odds","status":"success","message":"High-priority odds update completed (30min interval)","priority":"medium","leagues":["NBA","MLB","KBO","NFL","프리미어리그"],"dynamicPriority":"low","oddsUpdated":41,"oddsDetail":{"totalUpdated":41,"newOdds":0,"existingOddsUpdated":41,"skippedOdds":1,"apiCalls":5,"categoriesProcessed":5}}
+{"timestamp":"2025-09-01T07:00:06.802Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T07:00:06.824Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T07:00:10.544Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T07:05:11.118Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T07:10:00.363Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T07:10:06.154Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T07:10:06.184Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T07:10:10.566Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T07:15:10.958Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T07:20:00.337Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T07:20:06.730Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T07:20:06.757Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T07:20:10.545Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T07:24:18.880Z","type":"monitor","status":"info","message":"Scheduler status check","isUpdatingResults":false,"isUpdatingOdds":false,"lastUpdateTime":"2025-09-01T07:20:06.757Z","activeCategories":["NBA","MLB","KBO","NFL","프리미어리그","MLS","KLEAGUE","JLEAGUE","SERIEA","BRASILEIRAO","ARGENTINA_PRIMERA","CSL","LALIGA","BUNDESLIGA"],"uptime":7200.216186458,"apiCallEstimate":"~28 calls per hour","memory":{"used":"81MB","total":"92MB"}}
+{"timestamp":"2025-09-01T07:25:11.002Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T07:30:00.126Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T07:30:00.130Z","type":"odds","status":"start","message":"Starting high-priority leagues odds update (30min interval)","priority":"high","leagues":["NBA","MLB","KBO","NFL","프리미어리그"]}
+{"timestamp":"2025-09-01T07:30:00.134Z","type":"epl","status":"start","message":"EPL 프리미어리그 데이터 강제 업데이트"}
+{"timestamp":"2025-09-01T07:30:01.930Z","type":"epl","status":"success","message":"EPL 프리미어리그 데이터 업데이트 완료"}
+{"timestamp":"2025-09-01T07:30:03.934Z","type":"odds","status":"success","message":"High-priority odds update completed (30min interval)","priority":"medium","leagues":["NBA","MLB","KBO","NFL","프리미어리그"],"dynamicPriority":"low","oddsUpdated":41,"oddsDetail":{"totalUpdated":41,"newOdds":0,"existingOddsUpdated":41,"skippedOdds":5,"apiCalls":5,"categoriesProcessed":5}}
+{"timestamp":"2025-09-01T07:30:06.440Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T07:30:06.470Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T07:30:10.326Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T07:35:10.758Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T07:40:00.120Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T07:40:05.642Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T07:40:05.667Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T07:40:10.340Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T07:45:10.656Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}
+{"timestamp":"2025-09-01T07:50:00.798Z","type":"results","status":"start","message":"Starting cost-efficient game results update","categoryCount":14}
+{"timestamp":"2025-09-01T07:50:06.493Z","type":"bets","status":"start","message":"Starting bet results update after game results"}
+{"timestamp":"2025-09-01T07:50:06.503Z","type":"results","status":"success","message":"Game results and bet results update completed","gameResultsUpdated":0,"gameResultsDetail":{"totalUpdated":0,"newGames":0,"existingGamesUpdated":0,"skippedGames":0,"categoriesProcessed":14},"betResultsUpdated":0,"categoryCount":14}
+{"timestamp":"2025-09-01T07:50:10.975Z","type":"exchange_settlement","status":"success","message":"Exchange 주문 자동 정산 완료"}

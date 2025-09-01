@@ -376,7 +376,7 @@ function OrderPanel() {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">매칭 배당:</span>
-                <span className="font-medium">{selectedBet?.price.toFixed(2)}</span>
+                <span className="font-medium">{(typeof selectedBet?.price === 'string' ? parseFloat(selectedBet.price) : selectedBet?.price || 0).toFixed(2)}</span>
               </div>
             </div>
           </div>
@@ -397,7 +397,7 @@ function OrderPanel() {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">배당:</span>
-                <span className="font-medium">{selectedBet.price.toFixed(2)}</span>
+                <span className="font-medium">{(typeof selectedBet.price === 'string' ? parseFloat(selectedBet.price) : selectedBet.price || 0).toFixed(2)}</span>
               </div>
             </div>
           </div>
@@ -434,7 +434,7 @@ function OrderPanel() {
                     {selection.homeTeam} vs {selection.awayTeam}
                   </div>
                   <div className="text-xs text-yellow-600">
-                    {selection.selection} • {selection.side === 'back' ? '🎯 Back' : '📉 Lay'} • {selection.odds.toFixed(2)}
+                    {selection.selection} • {selection.side === 'back' ? '🎯 Back' : '📉 Lay'} • {(typeof selection.odds === 'string' ? parseFloat(selection.odds) : selection.odds || 0).toFixed(2)}
                   </div>
                 </div>
               ))}
@@ -463,7 +463,7 @@ function OrderPanel() {
               <div className="bg-white p-2 rounded border border-yellow-200">
                 <div className="flex justify-between text-xs mb-1">
                   <span className="text-yellow-700">총 배당률:</span>
-                  <span className="font-medium text-yellow-800">{multiBetTotalOdds.toFixed(2)}</span>
+                  <span className="font-medium text-yellow-800">{(typeof multiBetTotalOdds === 'string' ? parseFloat(multiBetTotalOdds) : multiBetTotalOdds || 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-yellow-700">예상 수익:</span>
@@ -1014,17 +1014,17 @@ function OrderHistoryPanel() {
                     <div className="text-center">
                       <div className="text-xs text-gray-500">Odds</div>
                       <div className="text-lg font-bold text-gray-800">
-                        {order.price.toFixed(2)}
+                        {(typeof order.price === 'string' ? parseFloat(order.price) : order.price || 0).toFixed(2)}
                       </div>
                       {/* 스포츠북 참고 배당률 표시 */}
                       {order.side === 'back' && order.backOdds && (
                         <div className="text-xs text-blue-600">
-                          참고: {order.backOdds.toFixed(2)}
+                          참고: {(typeof order.backOdds === 'string' ? parseFloat(order.backOdds) : order.backOdds || 0).toFixed(2)}
                         </div>
                       )}
                       {order.side === 'lay' && order.layOdds && (
                         <div className="text-xs text-blue-600">
-                          참고: {order.layOdds.toFixed(2)}
+                          참고: {(typeof order.layOdds === 'string' ? parseFloat(order.layOdds) : order.layOdds || 0).toFixed(2)}
                         </div>
                       )}
                     </div>

@@ -33,6 +33,12 @@ export type ExchangeOrder = {
   filledAmount?: number; // 체결된 금액
   partiallyFilled?: boolean; // 부분 체결 여부
   displayAmount?: number; // 화면에 표시할 금액
+  // 🆕 멀티배팅 필드들 추가
+  isMultibet?: boolean;
+  totalOdds?: number;
+  selectionCount?: number;
+  selectionDetails?: any;
+  potentialWinnings?: number;
 };
 
 export interface ExchangeBalance {
