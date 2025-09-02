@@ -44,8 +44,10 @@ export default function AdminDashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      const token = localStorage.getItem('token');
-      console.log('토큰 확인:', token ? '토큰 있음' : '토큰 없음');
+      // AuthContext와 동일한 방식으로 토큰 가져오기
+      const tabId = sessionStorage.getItem('tabId');
+      const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
+      console.log('토큰 확인:', { tabId, hasToken: !!token });
       
       if (!token) {
         setError('로그인 토큰이 없습니다. 다시 로그인해주세요.');

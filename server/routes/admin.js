@@ -5,6 +5,7 @@ import ReferralCode from '../models/referralCodeModel.js';
 import AdminCommission from '../models/adminCommissionModel.js';
 import Bet from '../models/betModel.js';
 import bcrypt from 'bcryptjs';
+import { Op } from 'sequelize';
 
 
 const router = express.Router();
@@ -48,19 +49,19 @@ router.get('/dashboard', verifyToken, requireAdmin(1), async (req, res) => {
     const todayBets = await Bet.findAll({
       where: {
         createdAt: {
-          [require('sequelize').Op.gte]: todayStart,
-          [require('sequelize').Op.lt]: todayEnd
+          [Op.gte]: todayStart,
+          [Op.lt]: todayEnd
         }
       }
     });
 
     const todayBetsCount = todayBets.length;
-    const todayTotalStake = todayBets.reduce((sum, bet) => sum + parseFloat(bet.amount || bet.stake || 0), 0);
+    const todayTotalStake = todayBets.reduce((sum, bet) => sum + parseFloat(bet.stake || 0), 0);
 
     // 전체 통계
     const totalUsers = await User.count();
     const totalBets = await Bet.count();
-    const totalStakeResult = await Bet.sum('amount');
+    const totalStakeResult = await Bet.sum('stake');
     const totalStake = totalStakeResult || 0;
 
     // 활성 사용자 (최근 30일 내 로그인)
@@ -68,7 +69,7 @@ router.get('/dashboard', verifyToken, requireAdmin(1), async (req, res) => {
     const activeUsers = await User.count({
       where: {
         lastLogin: {
-          [require('sequelize').Op.gte]: thirtyDaysAgo
+          [Op.gte]: thirtyDaysAgo
         },
         isActive: true
       }
