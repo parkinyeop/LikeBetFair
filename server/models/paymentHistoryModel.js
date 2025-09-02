@@ -12,7 +12,7 @@ const PaymentHistory = sequelize.define('PaymentHistory', {
     allowNull: false
   },
   betId: {
-    type: DataTypes.UUID,
+    type: DataTypes.STRING,
     allowNull: true
   },
   amount: {
