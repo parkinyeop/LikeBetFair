@@ -354,6 +354,18 @@ const OrderbookPage: React.FC = () => {
       if (filter !== 'all' && order.type !== filter) return false;
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
+        
+        // 🆕 멀티배팅 주문의 경우 selectionDetails.selections 내의 모든 경기 검색
+        if (order.isMultibet && order.selectionDetails?.selections) {
+          return order.selectionDetails.selections.some((selection: any) => 
+            selection.homeTeam?.toLowerCase().includes(searchLower) ||
+            selection.awayTeam?.toLowerCase().includes(searchLower) ||
+            selection.team?.toLowerCase().includes(searchLower) ||
+            selection.selection?.toLowerCase().includes(searchLower)
+          );
+        }
+        
+        // 일반 주문의 경우 기존 로직 사용
         return (
           order.homeTeam?.toLowerCase().includes(searchLower) ||
           order.awayTeam?.toLowerCase().includes(searchLower) ||

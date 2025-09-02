@@ -72,46 +72,84 @@ export default function LiveOddsPage() {
     if (buttonKey.startsWith('lay_')) {
       const order = recentOrders.find(o => String(o.id) === orderId);
       if (order) {
-        // Lay 버튼의 선택지 추출 (예: lay_승리 -> 승리, lay_핸디캡_Minnesota United FC +0.5 -> Minnesota United FC +0.5)
-        let selection = buttonKey.replace('lay_', '');
-        
-        // 🆕 마켓명도 제거 (예: 핸디캡_, totals_ 등)
-        if (selection.includes('_')) {
-          selection = selection.split('_').slice(1).join('_');
-        }
-        
-        // 🆕 팀명만 추출하여 검색어로 사용
         let searchQuery = '';
         
-        if (selection === '승리' || selection === 'Win') {
-          searchQuery = order.homeTeam || '';
-        } else if (selection === '패배' || selection === 'Loss') {
-          searchQuery = order.awayTeam || '';
-        } else if (selection === '무승부' || selection === 'Draw') {
-          // 무승부는 팀명으로 검색할 수 없으므로 경기 전체를 검색
-          searchQuery = `${order.homeTeam} ${order.awayTeam}`;
-        } else {
-          // 핸디캡이나 다른 마켓의 경우 팀명만 추출
-          // 예: "Minnesota United FC +0.5" -> "Minnesota United FC"
-          // 예: "Over 2.5" -> "Over"
-          // 예: "Under 2.5" -> "Under"
+        // 🆕 멀티배팅 주문의 경우 특별 처리
+        if ((order as any).isMultibet && (order as any).selectionDetails?.selections) {
+          // 멀티배팅 주문: 클릭한 버튼에 해당하는 팀만 검색
+          let selection = buttonKey.replace('lay_', '');
           
-          // 숫자나 특수문자가 포함된 경우 마지막 부분 제거
-          const parts = selection.split(' ');
-          let teamName = '';
-          
-          if (selection.includes('+') || selection.includes('-') || selection.includes('.')) {
-            // 핸디캡이나 오버/언더: 마지막 숫자 부분 제거
-            teamName = parts.slice(0, -1).join(' ');
-          } else {
-            // 일반적인 경우: 전체 사용
-            teamName = selection;
+          // 마켓명 제거 (예: 핸디캡_, totals_ 등)
+          if (selection.includes('_')) {
+            selection = selection.split('_').slice(1).join('_');
           }
           
-          searchQuery = teamName;
+          // 클릭한 선택지에 해당하는 팀명 찾기
+          const clickedSelection = (order as any).selectionDetails.selections.find((s: any) => 
+            s.team === selection || s.selection === selection
+          );
+          
+          if (clickedSelection) {
+            searchQuery = clickedSelection.team || clickedSelection.selection;
+            console.log('🔍 멀티배팅 검색어 추출:', { 
+              multibetId: order.id, 
+              clickedSelection: selection,
+              searchQuery,
+              foundSelection: clickedSelection
+            });
+          } else {
+            // 찾지 못한 경우 첫 번째 경기의 팀명으로 검색
+            const firstSelection = (order as any).selectionDetails.selections[0];
+            if (firstSelection) {
+              searchQuery = firstSelection.team || firstSelection.selection;
+              console.log('🔍 멀티배팅 검색어 추출 (fallback):', { 
+                multibetId: order.id, 
+                firstGame: firstSelection,
+                searchQuery 
+              });
+            }
+          }
+        } else {
+          // 일반 주문의 경우 기존 로직 사용
+          // Lay 버튼의 선택지 추출 (예: lay_승리 -> 승리, lay_핸디캡_Minnesota United FC +0.5 -> Minnesota United FC +0.5)
+          let selection = buttonKey.replace('lay_', '');
+          
+          // 🆕 마켓명도 제거 (예: 핸디캡_, totals_ 등)
+          if (selection.includes('_')) {
+            selection = selection.split('_').slice(1).join('_');
+          }
+          
+          // 🆕 팀명만 추출하여 검색어로 사용
+          if (selection === '승리' || selection === 'Win') {
+            searchQuery = order.homeTeam || '';
+          } else if (selection === '패배' || selection === 'Loss') {
+            searchQuery = order.awayTeam || '';
+          } else if (selection === '무승부' || selection === 'Draw') {
+            // 무승부는 팀명으로 검색할 수 없으므로 경기 전체를 검색
+            searchQuery = `${order.homeTeam} ${order.awayTeam}`;
+          } else {
+            // 핸디캡이나 다른 마켓의 경우 팀명만 추출
+            // 예: "Minnesota United FC +0.5" -> "Minnesota United FC"
+            // 예: "Over 2.5" -> "Over"
+            // 예: "Under 2.5" -> "Under"
+            
+            // 숫자나 특수문자가 포함된 경우 마지막 부분 제거
+            const parts = selection.split(' ');
+            let teamName = '';
+            
+            if (selection.includes('+') || selection.includes('-') || selection.includes('.')) {
+              // 핸디캡이나 오버/언더: 마지막 숫자 부분 제거
+              teamName = parts.slice(0, -1).join(' ');
+            } else {
+              // 일반적인 경우: 전체 사용
+              teamName = selection;
+            }
+            
+            searchQuery = teamName;
+          }
+          
+          console.log('🔍 일반 주문 검색어 추출:', { selection, searchQuery });
         }
-        
-        console.log('🔍 검색어 추출:', { selection, searchQuery });
         
         // orderbook 페이지로 이동하면서 검색어 설정
         const encodedSearch = encodeURIComponent(searchQuery);
