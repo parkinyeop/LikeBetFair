@@ -57,7 +57,8 @@ function OrderPanel() {
     multiBetPotentialWinnings,
     updateMultiBetStake,
     createMultiBetOrder,
-    clearMultiBet
+    clearMultiBet,
+    removeMultiBetSelection
   } = useExchangeContext();
   const { balance, username, token } = useAuth(); // 🆕 token 추가
   
@@ -322,11 +323,11 @@ function OrderPanel() {
   return (
     <div className="h-full overflow-y-auto">
       {/* 마지막 업데이트 정보 */}
-      <div className="bg-blue-50 p-2 rounded mb-3 border border-blue-200">
+      <div className="bg-gray-50 p-3 rounded-lg mb-4 border border-gray-200">
         <div className="flex justify-between items-center">
-          <h3 className="font-semibold text-sm text-blue-800">실시간 업데이트</h3>
-          <div className="text-xs text-blue-600">
-                            {lastUpdate.toLocaleTimeString('en-US', { 
+          <h3 className="font-semibold text-gray-900">실시간 업데이트</h3>
+          <div className="text-sm text-gray-600">
+            {lastUpdate.toLocaleTimeString('en-US', { 
               hour: '2-digit', 
               minute: '2-digit' 
             })}
@@ -336,123 +337,46 @@ function OrderPanel() {
 
 
 
-      {/* 선택된 배팅 정보 */}
-      <div className="bg-gray-50 p-3 rounded mb-3 border border-gray-200">
-        <h3 className="font-semibold mb-2 text-sm text-gray-700">
-          {isMatchMode ? '매칭 배팅 정보' : '선택된 배팅'}
-          {isMatchMode && (
-            <button 
-              onClick={deactivateMatchMode}
-              className="ml-2 text-xs text-red-600 hover:text-red-800 underline"
-            >
-              매칭 모드 해제
-            </button>
-          )}
-        </h3>
-        
-        {isMatchMode && matchTargetOrder ? (
-          <div className="space-y-2 text-sm">
-            <div className="bg-blue-50 p-2 rounded border border-blue-200 mb-2">
-              <div className="text-xs text-blue-700 mb-1">매칭 대상 주문</div>
-              <div className="font-medium text-blue-800">
-                {matchTargetOrder.homeTeam} vs {matchTargetOrder.awayTeam}
-              </div>
-              <div className="text-xs text-blue-600">
-                {matchTargetOrder.selection} • {matchTargetOrder.type === 'back' ? '🎯 Back(Win)' : '📉 Lay(Loss)'}
-              </div>
-              {/* 🆕 부분 매칭 정보 표시 */}
-              <div className="text-xs text-green-600 mt-1">
-                💰 가능 금액: {formatPartialMatchInfo(matchTargetOrder)}
-              </div>
-              {matchTargetOrder.partiallyFilled && (
-                <div className="text-xs text-orange-600 mt-1">
-                  ⚡ 부분 체결된 주문
-                </div>
-              )}
-            </div>
-            
-            <div className="text-center">
-              <div className="font-bold text-lg text-gray-800 mb-1">{selectedBet?.team}</div>
-              <div className="text-xs text-gray-500">매칭 배팅</div>
-            </div>
-            
-            <div className="space-y-1">
-              <div className="flex justify-between">
-                <span className="text-gray-600">매칭 타입:</span>
-                <span className={`font-medium ${selectedBet?.type === 'back' ? 'text-blue-600' : 'text-pink-600'}`}>
-                  {selectedBet?.type === 'back' ? '🎯 Back(Win)' : '📉 Lay(Loss)'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">매칭 배당:</span>
-                <span className="font-medium">{(typeof selectedBet?.price === 'string' ? parseFloat(selectedBet.price) : selectedBet?.price || 0).toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-        ) : selectedBet ? (
-          <div className="space-y-2 text-sm">
-            <div className="text-center">
-              <div className="font-bold text-lg text-gray-800 mb-1">{selectedBet.team}</div>
-              {selectedBet.market && (
-                <div className="text-gray-500 text-xs">{selectedBet.market}</div>
-              )}
-            </div>
-            <div className="space-y-1">
-              <div className="flex justify-between">
-                <span className="text-gray-600">유형:</span>
-                <span className={`font-medium ${selectedBet.type === 'back' ? 'text-blue-600' : 'text-pink-600'}`}>
-                  {selectedBet.type === 'back' ? 'Back (베팅)' : 'Lay (레이)'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">배당:</span>
-                <span className="font-medium">{(typeof selectedBet.price === 'string' ? parseFloat(selectedBet.price) : selectedBet.price || 0).toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">상태:</span>
-              <span className="font-medium text-red-600">미선택</span>
-            </div>
-            <p className="text-sm text-gray-500">중앙에서 Back/Lay 버튼을 클릭하여 배팅을 선택하세요.</p>
-          </div>
-        )}
-
-        {/* 🆕 멀티배팅 정보 표시 */}
-        {multiBetSelections.length > 0 && (
-          <div className="bg-yellow-50 p-3 rounded mb-3 border border-yellow-200">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="font-semibold text-sm text-yellow-800">
-                🎯 멀티배팅 선택 ({multiBetSelections.length}개)
+      {/* 배팅 선택 정보 표시 */}
+      {multiBetSelections.length > 0 ? (
+          <div className="bg-white p-4 rounded-lg mb-4 shadow-md border border-gray-200">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-lg font-bold text-gray-900">
+                🎯 배팅 선택 ({multiBetSelections.length}개)
               </h3>
               <button 
                 onClick={clearMultiBet}
-                className="text-xs text-red-600 hover:text-red-800 underline"
+                className="text-sm text-red-600 hover:text-red-800 underline font-medium"
               >
                 초기화
               </button>
             </div>
             
             {/* 선택된 경기들 */}
-            <div className="space-y-2 mb-3">
+            <div className="space-y-3 mb-4">
               {multiBetSelections.map((selection, index) => (
-                <div key={index} className="bg-white p-2 rounded border border-yellow-200">
-                  <div className="text-xs text-yellow-700 mb-1">
+                <div key={index} className="bg-gray-50 p-3 rounded border border-gray-200 relative">
+                  <button
+                    onClick={() => removeMultiBetSelection(selection.gameId, selection.market, selection.selection)}
+                    className="absolute top-2 right-2 text-red-600 hover:text-red-800 text-sm font-medium underline"
+                    title="개별 삭제"
+                  >
+                    삭제
+                  </button>
+                  <div className="text-sm font-medium text-gray-900 mb-1 pr-6">
                     {selection.homeTeam} vs {selection.awayTeam}
                   </div>
-                  <div className="text-xs text-yellow-600">
-                    {selection.selection} • {selection.side === 'back' ? '🎯 Back' : '📉 Lay'} • {(typeof selection.odds === 'string' ? parseFloat(selection.odds) : selection.odds || 0).toFixed(2)}
+                  <div className="text-sm text-gray-700 pr-6">
+                    {selection.selection} • {selection.side === 'back' ? '🎯 Back' : '📉 Lay'} • <span className="font-bold text-blue-600">{(typeof selection.odds === 'string' ? parseFloat(selection.odds) : selection.odds || 0).toFixed(2)}</span>
                   </div>
                 </div>
               ))}
             </div>
             
-            {/* 멀티배팅 베팅 폼 */}
-            <div className="space-y-2">
+            {/* 배팅 폼 */}
+            <div className="space-y-4">
               <div>
-                <label className="block text-xs text-yellow-700 mb-1">베팅 금액 (KRW)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">베팅 금액 (KRW)</label>
                 <input
                   type="text"
                   value={multiBetStake > 0 ? multiBetStake.toLocaleString() : ''}
@@ -465,20 +389,22 @@ function OrderPanel() {
                     }
                   }}
                   placeholder="베팅 금액 입력"
-                  className="w-full px-2 py-1 text-sm border border-yellow-300 rounded focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                  className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
               
-              <div className="bg-white p-2 rounded border border-yellow-200">
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-yellow-700">총 배당률:</span>
-                  <span className="font-medium text-yellow-800">{(typeof multiBetTotalOdds === 'string' ? parseFloat(multiBetTotalOdds) : multiBetTotalOdds || 0).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-yellow-700">예상 수익:</span>
-                  <span className="font-medium text-yellow-800">
-                    {multiBetPotentialWinnings > 0 ? `+${multiBetPotentialWinnings.toLocaleString()}` : '0'} KRW
-                  </span>
+              <div className="bg-blue-50 p-4 rounded">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-700">총 배당률:</span>
+                    <span className="font-bold text-blue-600">{(typeof multiBetTotalOdds === 'string' ? parseFloat(multiBetTotalOdds) : multiBetTotalOdds || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-700">예상 수익:</span>
+                    <span className="font-bold text-green-600">
+                      {multiBetPotentialWinnings > 0 ? `+${multiBetPotentialWinnings.toLocaleString()}` : '0'} KRW
+                    </span>
+                  </div>
                 </div>
               </div>
               
@@ -486,121 +412,37 @@ function OrderPanel() {
                 onClick={async () => {
                   const result = await createMultiBetOrder();
                   if (result.success) {
-                    alert('멀티배팅 주문이 성공적으로 생성되었습니다!');
+                    alert('배팅 주문이 성공적으로 생성되었습니다!');
                   } else {
-                    alert(`멀티배팅 주문 생성 실패: ${result.error}`);
+                    alert(`배팅 주문 생성 실패: ${result.error}`);
                   }
                 }}
                 disabled={multiBetStake <= 0}
-                className="w-full py-2 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                className={`w-full py-3 px-4 rounded font-semibold transition-colors ${
+                  multiBetStake <= 0
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
               >
-                🎯 멀티배팅 주문 생성
+                🎯 배팅 주문 생성
               </button>
             </div>
           </div>
+        ) : (
+          /* 미선택 상태 */
+          <div className="bg-white p-4 rounded-lg mb-4 shadow-md border border-gray-200">
+            <div className="text-center">
+              <div className="text-lg font-bold text-gray-900 mb-2">배팅을 선택하세요</div>
+              <p className="text-sm text-gray-600">중앙에서 Back/Lay 버튼을 클릭하여 배팅을 선택하세요.</p>
+            </div>
+          </div>
         )}
-      </div>
 
-      {/* Exchange 주문 폼 */}
-      <div className="bg-gray-50 p-3 rounded mb-3">
-        <h3 className="font-semibold mb-2 text-sm text-gray-700">
-          {isMatchMode ? '매칭 배팅 주문' : 'Exchange 주문'}
-        </h3>
-        <div className="space-y-2">
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              {isMatchMode ? '매칭 배당' : 'Odds'}
-            </label>
-            <input 
-              type="number" 
-              step="0.01"
-              value={form.price} 
-              onChange={e => {
-                const newPrice = +e.target.value;
-                setForm(f => ({ ...f, price: newPrice }));
-                if (selectedBet) {
-                  setSelectedBet({ ...selectedBet, price: newPrice });
-                }
-              }} 
-              className="w-full p-1 border rounded text-sm"
-              readOnly={isMatchMode}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">
-                          {isMatchMode ? 
-              `배팅 금액 (1 ~ ${Math.floor(getAvailableMatchAmount()).toLocaleString()} KRW)` : 
-              'Amount (KRW)'
-            }
-            </label>
-            {/* 🆕 부분 매칭 모드에서 범위 표시 */}
-            {isMatchMode && (
-              <div className="text-xs text-gray-500 mb-1">
-                              💡 원하는 금액만큼 부분 매칭 가능 
-              (최대 매칭 가능: {Math.floor(getMaxMatchAmount()).toLocaleString()} KRW)
-              </div>
-            )}
-            <input 
-              type="text" 
-              value={form.amount > 0 ? form.amount.toLocaleString() : ''} 
-              onChange={e => {
-                // 🆕 스포츠북과 동일한 방식: 콤마 제거 후 숫자만 처리
-                const value = e.target.value.replace(/,/g, ''); // 콤마 제거
-                if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                  let numValue = value === '' ? 0 : parseFloat(value);
-                  
-                  // 🆕 매칭 모드에서 최대 리스크 금액 초과 시 제한
-                  if (isMatchMode) {
-                    const maxRiskAmount = getAvailableMatchAmount();
-                    if (numValue > maxRiskAmount) {
-                      numValue = maxRiskAmount;
-                    }
-                  }
-                  
-                  setForm(f => ({ ...f, amount: numValue }));
-                }
-              }}
-              className="w-full p-1 border rounded text-sm"
-              placeholder={isMatchMode ? "원하는 금액 입력" : "0"}
-            />
-            {/* 🆕 매칭 모드에서 빠른 금액 선택 버튼 */}
-            {isMatchMode && (
-              <div className="flex space-x-1 mt-1">
-                {[0.25, 0.5, 0.75, 1.0].map(ratio => (
-                  <button
-                    key={ratio}
-                    onClick={() => {
-                      const maxAmount = getAvailableMatchAmount();
-                      const quickAmount = Math.floor(maxAmount * ratio);
-                      setForm(f => ({ ...f, amount: quickAmount }));
-                    }}
-                    className="flex-1 py-1 px-2 text-xs bg-blue-100 hover:bg-blue-200 rounded text-blue-700"
-                  >
-                    {ratio === 1 ? '전액' : `${Math.round(ratio * 100)}%`}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <button 
-            onClick={handleOrder}
-            disabled={loading || !selectedBet || (isMatchMode && form.amount <= 0)}
-            className={`w-full py-1 px-2 rounded text-sm font-medium ${
-              isMatchMode 
-                ? 'bg-green-600 hover:bg-green-700 text-white' 
-                : 'bg-blue-600 hover:bg-blue-700 text-white'
-            } disabled:bg-gray-400`}
-          >
-            {loading ? '처리중...' : isMatchMode ? 
-              `🎯 부분 매칭 (${Math.floor(form.amount).toLocaleString()} KRW)` : 
-              '주문하기'}
-          </button>
-        </div>
-      </div>
+
       
       {/* 에러 메시지 */}
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-2 rounded mb-3 text-sm">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm font-medium">
           {error}
           <button onClick={clearError} className="float-right font-bold">&times;</button>
         </div>

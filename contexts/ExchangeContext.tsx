@@ -161,6 +161,11 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
     setMultiBetSelections(prev => 
       prev.filter(s => !(s.gameId === gameId && s.market === market && s.team === team))
     );
+    
+    // 🆕 selectedBet에서도 같은 베팅이면 제거
+    if (selectedBet && selectedBet.gameId === gameId && selectedBet.market === market && selectedBet.team === team) {
+      setSelectedBet(null);
+    }
   };
 
   // 🆕 멀티배팅 선택 상태 확인
