@@ -261,6 +261,112 @@ router.get('/exchange/stats', verifyToken, requireAdmin(1), async (req, res) => 
   }
 });
 
+// Exchange 일별 주문 통계 조회 (그래프용)
+router.get('/exchange/daily-stats', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    const { year, month } = req.query;
+    
+    // 기본값: 현재 년월
+    const targetYear = year ? parseInt(year) : new Date().getFullYear();
+    const targetMonth = month ? parseInt(month) - 1 : new Date().getMonth(); // month는 0-based
+    
+    // 해당 월의 시작일과 종료일
+    const monthStart = new Date(targetYear, targetMonth, 1);
+    const monthEnd = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59, 999);
+    
+    console.log(`📊 Exchange 일별 통계 조회: ${targetYear}-${targetMonth + 1}`);
+    console.log(`   기간: ${monthStart.toISOString()} ~ ${monthEnd.toISOString()}`);
+    
+    // 해당 월의 모든 Exchange 주문 조회
+    const orders = await ExchangeOrder.findAll({
+      where: {
+        createdAt: { [Op.gte]: monthStart, [Op.lte]: monthEnd }
+      },
+      attributes: [
+        'id',
+        'createdAt',
+        'status',
+        'amount',
+        'isMultibet'
+      ],
+      order: [['createdAt', 'ASC']]
+    });
+    
+    // 일별로 그룹화
+    const dailyStats = {};
+    const daysInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+    
+    // 해당 월의 모든 날짜 초기화
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateKey = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      dailyStats[dateKey] = {
+        date: dateKey,
+        totalOrders: 0,
+        matchedOrders: 0,
+        openOrders: 0,
+        settledOrders: 0,
+        multibets: 0,
+        volume: 0
+      };
+    }
+    
+    // 주문 데이터로 통계 계산
+    orders.forEach(order => {
+      const orderDate = new Date(order.createdAt);
+      const dateKey = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, '0')}-${String(orderDate.getDate()).padStart(2, '0')}`;
+      
+      if (dailyStats[dateKey]) {
+        dailyStats[dateKey].totalOrders++;
+        dailyStats[dateKey].volume += order.amount || 0;
+        
+        if (order.isMultibet) {
+          dailyStats[dateKey].multibets++;
+        }
+        
+        switch (order.status) {
+          case 'matched':
+            dailyStats[dateKey].matchedOrders++;
+            break;
+          case 'open':
+            dailyStats[dateKey].openOrders++;
+            break;
+          case 'settled':
+            dailyStats[dateKey].settledOrders++;
+            break;
+        }
+      }
+    });
+    
+    // 배열로 변환
+    const dailyStatsArray = Object.values(dailyStats);
+    
+    // 월별 요약 통계
+    const monthlySummary = {
+      totalOrders: orders.length,
+      totalVolume: orders.reduce((sum, order) => sum + (order.amount || 0), 0),
+      totalMultibets: orders.filter(order => order.isMultibet).length,
+      matchedOrders: orders.filter(order => order.status === 'matched').length,
+      openOrders: orders.filter(order => order.status === 'open').length,
+      settledOrders: orders.filter(order => order.status === 'settled').length
+    };
+    
+    res.json({
+      dailyStats: dailyStatsArray,
+      monthlySummary,
+      period: {
+        year: targetYear,
+        month: targetMonth + 1,
+        monthStart: monthStart.toISOString(),
+        monthEnd: monthEnd.toISOString()
+      }
+    });
+    
+  } catch (error) {
+    console.error('Exchange daily stats error:', error);
+    res.status(500).json({ message: '일별 통계를 불러오는 중 오류가 발생했습니다.' });
+  }
+});
+
 // Exchange 주문 목록 조회
 router.get('/exchange/orders', verifyToken, requireAdmin(1), async (req, res) => {
   try {
@@ -286,6 +392,7 @@ router.get('/exchange/orders', verifyToken, requireAdmin(1), async (req, res) =>
         as: 'user',
         attributes: ['id', 'username', 'email']
       }],
+      attributes: { exclude: [] }, // 모든 필드 포함
       order: [['createdAt', 'DESC']],
       limit: parseInt(limit),
       offset: parseInt(offset)
@@ -399,6 +506,69 @@ router.get('/exchange/settlements', verifyToken, requireAdmin(1), async (req, re
   } catch (error) {
     console.error('Exchange settlements error:', error);
     res.status(500).json({ message: '정산 내역을 불러오는 중 오류가 발생했습니다.' });
+  }
+});
+
+// Exchange 주문의 매치된 주문들 조회
+router.get('/exchange/orders/:orderId/matches', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    
+    // 원본 주문 조회
+    const originalOrder = await ExchangeOrder.findByPk(orderId, {
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['id', 'username', 'email']
+      }],
+      attributes: { exclude: [] } // 모든 필드 포함
+    });
+    
+    if (!originalOrder) {
+      return res.status(404).json({ message: '주문을 찾을 수 없습니다.' });
+    }
+    
+    let matchedOrders = [];
+    
+    // 매치된 주문들 조회 (양방향)
+    if (originalOrder.matchedOrderId) {
+      // 이 주문이 다른 주문과 매치된 경우 - 매치된 원본 주문 조회
+      const matchedOriginalOrder = await ExchangeOrder.findByPk(originalOrder.matchedOrderId, {
+        include: [{
+          model: User,
+          as: 'user',
+          attributes: ['id', 'username', 'email']
+        }],
+        attributes: { exclude: [] } // 모든 필드 포함
+      });
+      if (matchedOriginalOrder) {
+        matchedOrders.push(matchedOriginalOrder);
+      }
+    }
+    
+    // 이 주문과 매치된 다른 주문들 조회 (matchedOrderId가 현재 주문 ID인 주문들)
+    const ordersMatchedToThis = await ExchangeOrder.findAll({
+      where: {
+        matchedOrderId: orderId
+      },
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['id', 'username', 'email']
+      }],
+      attributes: { exclude: [] }, // 모든 필드 포함
+      order: [['createdAt', 'ASC']]
+    });
+    
+    matchedOrders = matchedOrders.concat(ordersMatchedToThis);
+    
+    res.json({
+      originalOrder,
+      matchedOrders
+    });
+  } catch (error) {
+    console.error('Exchange order matches error:', error);
+    res.status(500).json({ message: '매치된 주문 정보를 불러오는 중 오류가 발생했습니다.' });
   }
 });
 

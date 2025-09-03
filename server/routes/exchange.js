@@ -69,12 +69,30 @@ async function processPartialMatching(orderData) {
     
     // 기존 주문 업데이트
     const newRemainingAmount = availableAmount - matchAmount;
-    const newFilledAmount = (existingOrder.filledAmount || 0) + matchAmount;
+    
+    // Exchange 매치 금액 계산 (Back/Lay에 따라 다름)
+    let actualFilledAmount;
+    if (existingOrder.side === 'back') {
+      // Back 베팅: filledAmount = stake (베팅 금액)
+      actualFilledAmount = matchAmount;
+    } else {
+      // Lay 베팅: filledAmount = stake × (odds - 1) (리스크 금액)
+      actualFilledAmount = Math.floor(matchAmount * (existingOrder.price - 1));
+    }
+    
+    const newFilledAmount = (existingOrder.filledAmount || 0) + actualFilledAmount;
     const newStatus = newRemainingAmount > 0 ? 'open' : 'matched';
+    
+    console.log(`💰 매치 금액 계산: ${existingOrder.side} 주문 #${existingOrder.id}`);
+    console.log(`   매치 금액: ₩${matchAmount.toLocaleString()}`);
+    console.log(`   배당률: ${existingOrder.price}`);
+    console.log(`   실제 체결 금액: ₩${actualFilledAmount.toLocaleString()}`);
+    console.log(`   누적 체결 금액: ₩${newFilledAmount.toLocaleString()}`);
     
     await existingOrder.update({
       remainingAmount: newRemainingAmount,
       filledAmount: newFilledAmount,
+      originalAmount: existingOrder.originalAmount || existingOrder.amount,
       partiallyFilled: newFilledAmount > 0 && newRemainingAmount > 0,
       status: newStatus
     });
@@ -492,11 +510,24 @@ router.post('/order', verifyToken, async (req, res) => {
     const createdMatchedOrders = [];
     for (const match of partialMatchResult.matches) {
       // 매칭된 부분에 대한 새 주문 생성
+      // Exchange 매치 금액 계산 (Back/Lay에 따라 다름)
+      let filledAmount;
+      if (side === 'back') {
+        // Back 베팅: filledAmount = stake (베팅 금액)
+        filledAmount = match.matchAmount;
+      } else {
+        // Lay 베팅: filledAmount = stake × (odds - 1) (리스크 금액)
+        filledAmount = Math.floor(match.matchAmount * (match.matchPrice - 1));
+      }
+      
       const matchedOrder = await ExchangeOrder.create({
         ...baseOrderData,
         amount: match.matchAmount,
         status: 'matched',
         matchedOrderId: match.existingOrder.id,
+        filledAmount: filledAmount,
+        originalAmount: match.matchAmount,
+        remainingAmount: 0,
         stakeAmount: side === 'back' ? match.matchAmount : Math.floor((match.matchPrice - 1) * match.matchAmount),
         potentialProfit: side === 'back' ? Math.floor((match.matchPrice - 1) * match.matchAmount) : match.matchAmount
       });

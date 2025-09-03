@@ -129,7 +129,7 @@ class ExchangeMultibetValidationService {
     try {
       // 1. 같은 경기 제한 (최대 3개)
       const gameCounts = {};
-      selections.forEach(selection => {
+      for (const selection of selections) {
         gameCounts[selection.gameId] = (gameCounts[selection.gameId] || 0) + 1;
         if (gameCounts[selection.gameId] > BETTING_CONFIG.MAX_SAME_GAME_BETS) {
           return { 
@@ -137,9 +137,9 @@ class ExchangeMultibetValidationService {
             reason: `같은 경기에는 최대 ${BETTING_CONFIG.MAX_SAME_GAME_BETS}개까지 베팅 가능합니다.` 
           };
         }
-      });
+      }
 
-      // 2. 승패 + 핸디캡 동시 배팅 금지
+      // 2. 승패 + 핸디캡 동시 배팅 금지 (스포츠북과 동일)
       for (const selection of selections) {
         const sameGameSelections = selections.filter(s => s.gameId === selection.gameId);
         const hasWinLoss = sameGameSelections.some(s => s.market === '승패' || s.market === 'h2h');
@@ -150,16 +150,7 @@ class ExchangeMultibetValidationService {
         }
       }
 
-      // 3. 승패 + 언더오버 동시 배팅 금지
-      for (const selection of selections) {
-        const sameGameSelections = selections.filter(s => s.gameId === selection.gameId);
-        const hasWinLoss = sameGameSelections.some(s => s.market === '승패' || s.market === 'h2h');
-        const hasTotals = sameGameSelections.some(s => s.market === '언더오버' || s.market === 'totals');
-        
-        if (hasWinLoss && hasTotals) {
-          return { isValid: false, reason: '같은 경기에서 승패와 언더오버를 동시에 베팅할 수 없습니다.' };
-        }
-      }
+      // 3. 승패 + 언더오버, 핸디캡 + 언더오버는 허용 (스포츠북과 동일)
 
       return { isValid: true };
 

@@ -1,6 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import { Bar } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 import Header from '../../components/Header';
 
 interface ExchangeStats {
@@ -37,6 +56,7 @@ interface ExchangeOrder {
   potentialProfit: number;
   actualProfit?: number;
   settledAt?: string;
+  matchedOrders?: ExchangeOrder[];
 }
 
 interface SettlementHistory {
@@ -52,6 +72,25 @@ interface SettlementHistory {
   orders: any[];
 }
 
+interface DailyStats {
+  date: string;
+  totalOrders: number;
+  matchedOrders: number;
+  openOrders: number;
+  settledOrders: number;
+  multibets: number;
+  volume: number;
+}
+
+interface MonthlySummary {
+  totalOrders: number;
+  totalVolume: number;
+  totalMultibets: number;
+  matchedOrders: number;
+  openOrders: number;
+  settledOrders: number;
+}
+
 export default function ExchangeAdmin() {
   const { isLoggedIn, isAdmin, adminLevel, username } = useAuth();
   const router = useRouter();
@@ -59,10 +98,16 @@ export default function ExchangeAdmin() {
   const [exchangeStats, setExchangeStats] = useState<ExchangeStats | null>(null);
   const [orders, setOrders] = useState<ExchangeOrder[]>([]);
   const [settlements, setSettlements] = useState<SettlementHistory[]>([]);
+  const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
+  const [monthlySummary, setMonthlySummary] = useState<MonthlySummary | null>(null);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedOrder, setSelectedOrder] = useState<ExchangeOrder | null>(null);
+  const [showOrderModal, setShowOrderModal] = useState(false);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -78,6 +123,13 @@ export default function ExchangeAdmin() {
 
     fetchExchangeData();
   }, [isLoggedIn, isAdmin, adminLevel, router]);
+
+  // 월별 필터 변경 시 일별 통계 다시 조회
+  useEffect(() => {
+    if (isLoggedIn && isAdmin) {
+      fetchDailyStats();
+    }
+  }, [selectedYear, selectedMonth, isLoggedIn, isAdmin]);
 
   const fetchExchangeData = async () => {
     try {
@@ -117,12 +169,139 @@ export default function ExchangeAdmin() {
         setSettlements(settlementsData.settlements || []);
       }
 
+      // 일별 통계 조회
+      await fetchDailyStats();
+
       setError('');
     } catch (err) {
       console.error('Exchange 데이터 로딩 오류:', err);
       setError('데이터를 불러오는 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDailyStats = async () => {
+    try {
+      const tabId = sessionStorage.getItem('tabId');
+      const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
+      if (!token) return;
+
+      const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+      const url = `http://localhost:5050/api/admin/exchange/daily-stats?year=${selectedYear}&month=${selectedMonth}`;
+      
+      const response = await fetch(url, { headers });
+      if (response.ok) {
+        const data = await response.json();
+        setDailyStats(data.dailyStats || []);
+        setMonthlySummary(data.monthlySummary || null);
+        console.log('일별 통계 데이터:', data);
+      }
+    } catch (err) {
+      console.error('일별 통계 로딩 오류:', err);
+    }
+  };
+
+  // 차트 데이터 준비
+  const prepareChartData = () => {
+    const labels = dailyStats.map(stat => {
+      const date = new Date(stat.date);
+      return `${date.getMonth() + 1}/${date.getDate()}`;
+    });
+
+    const totalOrdersData = dailyStats.map(stat => stat.totalOrders);
+    const matchedOrdersData = dailyStats.map(stat => stat.matchedOrders);
+    const openOrdersData = dailyStats.map(stat => stat.openOrders);
+    const settledOrdersData = dailyStats.map(stat => stat.settledOrders);
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: '전체 주문',
+          data: totalOrdersData,
+          backgroundColor: 'rgba(59, 130, 246, 0.8)',
+          borderColor: 'rgba(59, 130, 246, 1)',
+          borderWidth: 1,
+        },
+        {
+          label: '매칭된 주문',
+          data: matchedOrdersData,
+          backgroundColor: 'rgba(34, 197, 94, 0.8)',
+          borderColor: 'rgba(34, 197, 94, 1)',
+          borderWidth: 1,
+        },
+        {
+          label: '대기 중인 주문',
+          data: openOrdersData,
+          backgroundColor: 'rgba(251, 191, 36, 0.8)',
+          borderColor: 'rgba(251, 191, 36, 1)',
+          borderWidth: 1,
+        },
+        {
+          label: '정산된 주문',
+          data: settledOrdersData,
+          backgroundColor: 'rgba(168, 85, 247, 0.8)',
+          borderColor: 'rgba(168, 85, 247, 1)',
+          borderWidth: 1,
+        },
+      ],
+    };
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: true,
+        text: `${selectedYear}년 ${selectedMonth}월 일별 Exchange 주문 현황`,
+      },
+    },
+    scales: {
+      x: {
+        ticks: {
+          maxRotation: 45,
+          minRotation: 0,
+        },
+      },
+      y: {
+        beginAtZero: true,
+        ticks: {
+          stepSize: 1,
+        },
+      },
+    },
+  };
+
+  const handleOrderClick = async (order: ExchangeOrder) => {
+    try {
+      const tabId = sessionStorage.getItem('tabId');
+      const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
+      if (!token) return;
+
+      const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+      
+      // 매치된 주문들 조회
+      const matchedOrdersResponse = await fetch(`http://localhost:5050/api/admin/exchange/orders/${order.id}/matches`, { headers });
+      let matchedOrders = [];
+      
+      if (matchedOrdersResponse.ok) {
+        const matchedData = await matchedOrdersResponse.json();
+        matchedOrders = matchedData.matchedOrders || [];
+      }
+      
+      // 주문 상세 정보 설정
+      setSelectedOrder({
+        ...order,
+        matchedOrders: matchedOrders
+      });
+      setShowOrderModal(true);
+    } catch (err) {
+      console.error('주문 상세 정보 로딩 오류:', err);
     }
   };
 
@@ -315,6 +494,78 @@ export default function ExchangeAdmin() {
                           <p className="text-2xl font-bold text-gray-900">{exchangeStats.total.settlements}</p>
                         </div>
                       </div>
+
+                      {/* 일별 주문 현황 차트 */}
+                      <div className="bg-white p-6 rounded-lg shadow">
+                        <div className="flex justify-between items-center mb-6">
+                          <h3 className="text-lg font-semibold text-gray-900">일별 주문 현황</h3>
+                          
+                          {/* 월별 필터 */}
+                          <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-2">
+                              <label className="text-sm font-medium text-gray-700">년도:</label>
+                              <select
+                                value={selectedYear}
+                                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                                className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              >
+                                {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
+                                  <option key={year} value={year}>{year}년</option>
+                                ))}
+                              </select>
+                            </div>
+                            
+                            <div className="flex items-center space-x-2">
+                              <label className="text-sm font-medium text-gray-700">월:</label>
+                              <select
+                                value={selectedMonth}
+                                onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                                className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              >
+                                {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                                  <option key={month} value={month}>{month}월</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 월별 요약 통계 */}
+                        {monthlySummary && (
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-blue-600">{monthlySummary.totalOrders}</div>
+                              <div className="text-sm text-gray-600">총 주문</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-green-600">{monthlySummary.matchedOrders}</div>
+                              <div className="text-sm text-gray-600">매칭된 주문</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-yellow-600">{monthlySummary.openOrders}</div>
+                              <div className="text-sm text-gray-600">대기 중인 주문</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-purple-600">{monthlySummary.settledOrders}</div>
+                              <div className="text-sm text-gray-600">정산된 주문</div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 차트 */}
+                        <div className="w-full h-96 relative">
+                          {dailyStats.length > 0 ? (
+                            <Bar data={prepareChartData()} options={chartOptions} />
+                          ) : (
+                            <div className="flex items-center justify-center h-full text-gray-500">
+                              <div className="text-center">
+                                <div className="text-4xl mb-2">📊</div>
+                                <div>해당 기간의 데이터가 없습니다.</div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -368,7 +619,11 @@ export default function ExchangeAdmin() {
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
                               {filteredOrders.map((order) => (
-                                <tr key={order.id} className="hover:bg-gray-50">
+                                <tr 
+                                  key={order.id} 
+                                  className="hover:bg-gray-50 cursor-pointer"
+                                  onClick={() => handleOrderClick(order)}
+                                >
                                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                     #{order.id}
                                   </td>
@@ -412,7 +667,10 @@ export default function ExchangeAdmin() {
                                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                     {order.status === 'open' && (
                                       <button
-                                        onClick={() => handleOrderStatusChange(order.id, 'cancelled')}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOrderStatusChange(order.id, 'cancelled');
+                                        }}
                                         className="text-red-600 hover:text-red-900"
                                       >
                                         취소
@@ -547,6 +805,241 @@ export default function ExchangeAdmin() {
                     </div>
                   )}
                 </>
+              )}
+
+              {/* 주문 상세 모달 */}
+              {showOrderModal && selectedOrder && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                  <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+                    <div className="mt-3">
+                      {/* 모달 헤더 */}
+                      <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-lg font-medium text-gray-900">
+                          주문 상세 정보 - #{selectedOrder.id}
+                        </h3>
+                        <button
+                          onClick={() => setShowOrderModal(false)}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                          </svg>
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* 주문자 정보 */}
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <h4 className="text-md font-semibold text-gray-900 mb-3">주문자 정보</h4>
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-600">사용자명:</span>
+                              <span className="text-sm font-medium">{selectedOrder.user?.username || 'N/A'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-600">이메일:</span>
+                              <span className="text-sm font-medium">{selectedOrder.user?.email || 'N/A'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-600">주문 타입:</span>
+                              <span className={`text-sm font-medium px-2 py-1 rounded ${
+                                selectedOrder.side === 'back' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-red-100 text-red-800'
+                              }`}>
+                                {selectedOrder.side === 'back' ? 'Back' : 'Lay'}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-600">배당률:</span>
+                              <span className="text-sm font-medium">{selectedOrder.price.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-600">주문 금액:</span>
+                              <span className="text-sm font-medium">₩{selectedOrder.amount.toLocaleString()}</span>
+                            </div>
+                            {selectedOrder.status === 'matched' && (
+                              <>
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-gray-600">체결 금액:</span>
+                                  <span className="text-sm font-medium text-green-600">₩{selectedOrder.filledAmount?.toLocaleString() || selectedOrder.amount.toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-gray-600">매치 비율:</span>
+                                  <span className="text-sm font-medium text-blue-600">
+                                    {selectedOrder.filledAmount && selectedOrder.originalAmount 
+                                      ? `${((selectedOrder.filledAmount / selectedOrder.originalAmount) * 100).toFixed(1)}%`
+                                      : '100%'
+                                    }
+                                  </span>
+                                </div>
+                                {selectedOrder.remainingAmount > 0 && (
+                                  <div className="flex justify-between">
+                                    <span className="text-sm text-gray-600">남은 금액:</span>
+                                    <span className="text-sm font-medium text-orange-600">₩{selectedOrder.remainingAmount.toLocaleString()}</span>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-600">상태:</span>
+                              <span className={`text-sm font-medium px-2 py-1 rounded ${
+                                selectedOrder.status === 'open' ? 'bg-blue-100 text-blue-800' :
+                                selectedOrder.status === 'matched' ? 'bg-green-100 text-green-800' :
+                                selectedOrder.status === 'settled' ? 'bg-gray-100 text-gray-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {selectedOrder.status}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 경기 정보 또는 선택된 경기들 */}
+                        {selectedOrder.isMultibet && selectedOrder.selectionDetails && selectedOrder.selectionDetails.selections && selectedOrder.selectionDetails.selections.length > 0 ? (
+                          <div className="bg-gray-50 p-4 rounded-lg">
+                            <h4 className="text-md font-semibold text-gray-900 mb-3">선택된 경기들</h4>
+                            <div className="space-y-3">
+                              {selectedOrder.selectionDetails.selections.map((selection, index) => (
+                                <div key={index} className="bg-white p-3 rounded-lg border border-gray-200">
+                                  <div className="flex justify-between items-start">
+                                    <div className="flex-1">
+                                      <div className="font-medium text-gray-900 text-sm">
+                                        {selection.homeTeam} vs {selection.awayTeam}
+                                      </div>
+                                      <div className="text-xs text-gray-600 mt-1">
+                                        <span className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs mr-1">
+                                          {selection.market}
+                                        </span>
+                                        <span className="inline-block bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
+                                          {selection.selection}
+                                        </span>
+                                      </div>
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        {new Date(selection.commenceTime).toLocaleString('ko-KR')}
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-sm font-bold text-orange-600">
+                                        {selection.odds?.toFixed(2) || 'N/A'}
+                                      </div>
+                                      <div className="text-xs text-gray-500">배당률</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : !selectedOrder.isMultibet ? (
+                          <div className="bg-gray-50 p-4 rounded-lg">
+                            <h4 className="text-md font-semibold text-gray-900 mb-3">경기 정보</h4>
+                            <div className="space-y-2">
+                              <div className="flex justify-between">
+                                <span className="text-sm text-gray-600">경기:</span>
+                                <span className="text-sm font-medium">{selectedOrder.homeTeam} vs {selectedOrder.awayTeam}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-sm text-gray-600">스포츠:</span>
+                                <span className="text-sm font-medium">{selectedOrder.sportKey}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-sm text-gray-600">마켓:</span>
+                                <span className="text-sm font-medium">{selectedOrder.market}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-sm text-gray-600">경기 시간:</span>
+                                <span className="text-sm font-medium">
+                                  {new Date(selectedOrder.commenceTime).toLocaleString('ko-KR')}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-sm text-gray-600">주문 생성:</span>
+                                <span className="text-sm font-medium">
+                                  {new Date(selectedOrder.createdAt).toLocaleString('ko-KR')}
+                                </span>
+                              </div>
+                              {selectedOrder.settledAt && (
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-gray-600">정산 시간:</span>
+                                  <span className="text-sm font-medium">
+                                    {new Date(selectedOrder.settledAt).toLocaleString('ko-KR')}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {/* 매치배팅자 정보 */}
+                      {selectedOrder.matchedOrders && selectedOrder.matchedOrders.length > 0 && (
+                        <div className="mt-6">
+                          <h4 className="text-md font-semibold text-gray-900 mb-3">매치배팅자 정보</h4>
+                          <div className="bg-white border rounded-lg overflow-hidden">
+                            <table className="min-w-full divide-y divide-gray-200">
+                              <thead className="bg-gray-50">
+                                <tr>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">사용자명</th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">이메일</th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">매치 금액</th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">매치 시간</th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">상태</th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {selectedOrder.matchedOrders.map((match) => (
+                                  <tr key={match.id}>
+                                    <td className="px-4 py-2 text-sm font-medium text-gray-900">
+                                      {match.user?.username || 'N/A'}
+                                    </td>
+                                    <td className="px-4 py-2 text-sm text-gray-900">
+                                      {match.user?.email || 'N/A'}
+                                    </td>
+                                    <td className="px-4 py-2 text-sm text-gray-900">
+                                      <div className="space-y-1">
+                                        <div className="font-medium">₩{match.filledAmount?.toLocaleString() || match.amount.toLocaleString()}</div>
+                                        {match.filledAmount && match.originalAmount && match.filledAmount !== match.originalAmount && (
+                                          <div className="text-xs text-gray-500">
+                                            전체: ₩{match.originalAmount.toLocaleString()} 
+                                            ({((match.filledAmount / match.originalAmount) * 100).toFixed(1)}%)
+                                          </div>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-2 text-sm text-gray-900">
+                                      {new Date(match.createdAt).toLocaleString('ko-KR')}
+                                    </td>
+                                    <td className="px-4 py-2">
+                                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                        match.status === 'matched' ? 'bg-green-100 text-green-800' :
+                                        match.status === 'settled' ? 'bg-gray-100 text-gray-800' :
+                                        'bg-red-100 text-red-800'
+                                      }`}>
+                                        {match.status}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+
+
+                      {/* 모달 푸터 */}
+                      <div className="mt-6 flex justify-end">
+                        <button
+                          onClick={() => setShowOrderModal(false)}
+                          className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors"
+                        >
+                          닫기
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           </div>
