@@ -236,6 +236,9 @@ function OrderPanel() {
           setForm({ side: 'back', price: 0, amount: 0 });
           setSelectedBet(null);
           
+          // 🆕 멀티배팅 선택들도 초기화
+          clearMultiBet();
+          
           // 주문 내역 새로고침
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new Event('exchangeOrderPlaced'));
@@ -298,6 +301,9 @@ function OrderPanel() {
       // 폼 초기화
       setForm({ side: 'back', price: 0, amount: 0 });
       setSelectedBet(null);
+      
+      // 🆕 멀티배팅 선택들도 초기화
+      clearMultiBet();
       
       // 주문 내역 새로고침 (useEffect에서 자동으로 처리되지만 즉시 반영을 위해)
       if (typeof window !== 'undefined') {
