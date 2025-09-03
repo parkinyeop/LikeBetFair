@@ -459,6 +459,7 @@ function OrderHistoryPanel() {
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'price'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
   // 주문 상태별 한글 표시
   const getStatusDisplay = (status: string, commenceTime?: string) => {
@@ -621,18 +622,33 @@ function OrderHistoryPanel() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="bg-gray-50 p-3 rounded">
+        {/* 접을 수 있는 헤더 */}
         <div className="flex justify-between items-center mb-3">
-          <h3 className="font-semibold text-sm text-gray-700">내 주문 내역</h3>
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex items-center space-x-2 text-left hover:bg-gray-100 p-1 rounded transition-colors"
+          >
+            <svg
+              className={`w-4 h-4 text-gray-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            <h3 className="font-semibold text-sm text-gray-700">내 주문 내역</h3>
+          </button>
           <div className="text-right">
             <div className="text-xs text-gray-500">{filteredOrders.length}/{(userOrders || []).length}개 주문</div>
             <div className="text-xs text-gray-400">
-                              Last Update: {lastUpdate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+              Last Update: {lastUpdate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
             </div>
           </div>
         </div>
 
-        {/* 통계 정보 */}
-        <div className="mb-3 p-2 bg-white rounded border border-gray-200">
+        {/* 접을 수 있는 내용 - 통계 정보 */}
+        {isExpanded && (
+          <div className="mb-3 p-2 bg-white rounded border border-gray-200">
           <div className="grid grid-cols-3 gap-2 text-xs">
             <div className="text-center">
               <div className="text-gray-500">총 주문</div>
@@ -664,8 +680,9 @@ function OrderHistoryPanel() {
             </div>
           </div>
         </div>
+        )}
 
-        {/* 필터 및 정렬 컨트롤 */}
+        {/* 필터 및 정렬 컨트롤 - 항상 표시 */}
         <div className="mb-3 space-y-2">
           {/* 상태 필터 */}
           <div className="flex space-x-1">
@@ -715,6 +732,7 @@ function OrderHistoryPanel() {
           </div>
         </div>
         
+        {/* 주문 목록 - 항상 표시 */}
         {filteredOrders.length === 0 ? (
           <div className="text-center py-8">
             <div className="text-gray-400 text-4xl mb-2">📋</div>
