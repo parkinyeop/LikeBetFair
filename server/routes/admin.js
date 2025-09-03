@@ -4,6 +4,8 @@ import User from '../models/userModel.js';
 import ReferralCode from '../models/referralCodeModel.js';
 import AdminCommission from '../models/adminCommissionModel.js';
 import Bet from '../models/betModel.js';
+import ExchangeOrder from '../models/exchangeOrderModel.js';
+import PaymentHistory from '../models/paymentHistoryModel.js';
 import bcrypt from 'bcryptjs';
 import { Op } from 'sequelize';
 
@@ -90,6 +92,58 @@ router.get('/dashboard', verifyToken, requireAdmin(1), async (req, res) => {
     });
     const totalCommissions = commissionsResult || 0;
 
+    // Exchange 통계
+    const todayExchangeOrders = await ExchangeOrder.count({
+      where: {
+        createdAt: {
+          [Op.gte]: todayStart,
+          [Op.lt]: todayEnd
+        }
+      }
+    });
+
+    const todayMatchedOrders = await ExchangeOrder.count({
+      where: {
+        status: 'matched',
+        createdAt: {
+          [Op.gte]: todayStart,
+          [Op.lt]: todayEnd
+        }
+      }
+    });
+
+    const todayExchangeVolume = await ExchangeOrder.sum('amount', {
+      where: {
+        createdAt: {
+          [Op.gte]: todayStart,
+          [Op.lt]: todayEnd
+        }
+      }
+    });
+
+    // Exchange 수수료 (PaymentHistory에서 Exchange 관련 수수료 조회)
+    const todayExchangeCommission = await PaymentHistory.sum('amount', {
+      where: {
+        memo: { [Op.like]: '%EXCHANGE%' },
+        createdAt: {
+          [Op.gte]: todayStart,
+          [Op.lt]: todayEnd
+        }
+      }
+    });
+
+    const totalOpenOrders = await ExchangeOrder.count({
+      where: { status: 'open' }
+    });
+
+    const totalMultibets = await ExchangeOrder.count({
+      where: { isMultibet: true }
+    });
+
+    const totalSettlements = await ExchangeOrder.count({
+      where: { status: 'settled' }
+    });
+
     const dashboardData = {
       today: {
         bets: todayBetsCount,
@@ -104,6 +158,19 @@ router.get('/dashboard', verifyToken, requireAdmin(1), async (req, res) => {
       admin: {
         referrals: referrals,
         commissions: Math.round(totalCommissions)
+      },
+      exchange: {
+        today: {
+          orders: todayExchangeOrders,
+          matchedOrders: todayMatchedOrders,
+          totalVolume: Math.round(todayExchangeVolume || 0),
+          commission: Math.round(todayExchangeCommission || 0)
+        },
+        total: {
+          openOrders: totalOpenOrders,
+          multibets: totalMultibets,
+          settlements: totalSettlements
+        }
       }
     };
 
@@ -111,6 +178,247 @@ router.get('/dashboard', verifyToken, requireAdmin(1), async (req, res) => {
   } catch (error) {
     console.error('Dashboard error:', error);
     res.status(500).json({ message: '대시보드 데이터를 불러오는 중 오류가 발생했습니다.' });
+  }
+});
+
+// =============================================================================
+// Exchange 관리
+// =============================================================================
+
+// Exchange 통계 조회
+router.get('/exchange/stats', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+
+    const todayOrders = await ExchangeOrder.count({
+      where: {
+        createdAt: {
+          [Op.gte]: todayStart,
+          [Op.lt]: todayEnd
+        }
+      }
+    });
+
+    const todayMatchedOrders = await ExchangeOrder.count({
+      where: {
+        status: 'matched',
+        createdAt: {
+          [Op.gte]: todayStart,
+          [Op.lt]: todayEnd
+        }
+      }
+    });
+
+    const todayVolume = await ExchangeOrder.sum('amount', {
+      where: {
+        createdAt: {
+          [Op.gte]: todayStart,
+          [Op.lt]: todayEnd
+        }
+      }
+    });
+
+    const todayCommission = await PaymentHistory.sum('amount', {
+      where: {
+        memo: { [Op.like]: '%EXCHANGE%' },
+        createdAt: {
+          [Op.gte]: todayStart,
+          [Op.lt]: todayEnd
+        }
+      }
+    });
+
+    const totalOpenOrders = await ExchangeOrder.count({
+      where: { status: 'open' }
+    });
+
+    const totalMultibets = await ExchangeOrder.count({
+      where: { isMultibet: true }
+    });
+
+    const totalSettlements = await ExchangeOrder.count({
+      where: { status: 'settled' }
+    });
+
+    res.json({
+      today: {
+        orders: todayOrders,
+        matchedOrders: todayMatchedOrders,
+        totalVolume: Math.round(todayVolume || 0),
+        commission: Math.round(todayCommission || 0)
+      },
+      total: {
+        openOrders: totalOpenOrders,
+        multibets: totalMultibets,
+        settlements: totalSettlements
+      }
+    });
+  } catch (error) {
+    console.error('Exchange stats error:', error);
+    res.status(500).json({ message: 'Exchange 통계를 불러오는 중 오류가 발생했습니다.' });
+  }
+});
+
+// Exchange 주문 목록 조회
+router.get('/exchange/orders', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    const { page = 1, limit = 50, status, search } = req.query;
+    const offset = (page - 1) * limit;
+
+    const whereCondition = {};
+    if (status && status !== 'all') {
+      whereCondition.status = status;
+    }
+    if (search) {
+      whereCondition[Op.or] = [
+        { homeTeam: { [Op.iLike]: `%${search}%` } },
+        { awayTeam: { [Op.iLike]: `%${search}%` } },
+        { gameId: { [Op.iLike]: `%${search}%` } }
+      ];
+    }
+
+    const orders = await ExchangeOrder.findAll({
+      where: whereCondition,
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['id', 'username', 'email']
+      }],
+      order: [['createdAt', 'DESC']],
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+
+    const totalCount = await ExchangeOrder.count({ where: whereCondition });
+
+    res.json({
+      orders: orders,
+      totalCount: totalCount,
+      page: parseInt(page),
+      totalPages: Math.ceil(totalCount / limit)
+    });
+  } catch (error) {
+    console.error('Exchange orders error:', error);
+    res.status(500).json({ message: 'Exchange 주문을 불러오는 중 오류가 발생했습니다.' });
+  }
+});
+
+// Exchange 멀티배팅 목록 조회
+router.get('/exchange/multibets', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    const multibets = await ExchangeOrder.findAll({
+      where: { isMultibet: true },
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['id', 'username', 'email']
+      }],
+      order: [['createdAt', 'DESC']]
+    });
+
+    res.json({ multibets });
+  } catch (error) {
+    console.error('Exchange multibets error:', error);
+    res.status(500).json({ message: '멀티배팅 목록을 불러오는 중 오류가 발생했습니다.' });
+  }
+});
+
+// Exchange 정산 내역 조회
+router.get('/exchange/settlements', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    // Exchange 관련 정산된 주문들 조회
+    const settledOrders = await ExchangeOrder.findAll({
+      where: {
+        status: 'settled',
+        settledAt: { [Op.not]: null }
+      },
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['id', 'username', 'email']
+      }],
+      order: [['settledAt', 'DESC']],
+      limit: 100
+    });
+
+    // PaymentHistory에서 Exchange 관련 결제 내역 조회
+    const paymentHistory = await PaymentHistory.findAll({
+      where: {
+        memo: { [Op.like]: '%Exchange%' }
+      },
+      order: [['createdAt', 'DESC']],
+      limit: 100
+    });
+
+    // 정산 내역을 경기별로 그룹화
+    const settlementsByGame = {};
+    
+    settledOrders.forEach(order => {
+      const gameKey = `${order.homeTeam} vs ${order.awayTeam}`;
+      if (!settlementsByGame[gameKey]) {
+        settlementsByGame[gameKey] = {
+          gameKey,
+          homeTeam: order.homeTeam,
+          awayTeam: order.awayTeam,
+          settledAt: order.settledAt,
+          settledOrders: 0,
+          totalVolume: 0,        // 총 거래량 (양쪽 베팅 금액 합계)
+          totalCommission: 0,    // 총 수수료 (Exchange 수익)
+          winningAmount: 0,      // 승리한 베터들의 총 수익
+          losingAmount: 0,       // 패배한 베터들의 총 손실
+          orders: []
+        };
+      }
+      
+      settlementsByGame[gameKey].settledOrders++;
+      
+      // Exchange는 제로섬 게임이므로 실제 수익/손실을 분리해서 계산
+      const profit = parseFloat(order.actualProfit || 0);
+      if (profit > 0) {
+        settlementsByGame[gameKey].winningAmount += profit;
+      } else if (profit < 0) {
+        settlementsByGame[gameKey].losingAmount += Math.abs(profit);
+      }
+      
+      // 총 거래량 (베팅 금액의 절댓값 합계)
+      settlementsByGame[gameKey].totalVolume += Math.abs(profit) + Math.abs(order.stakeAmount || 0);
+      
+      settlementsByGame[gameKey].orders.push(order);
+    });
+
+    const settlements = Object.values(settlementsByGame);
+
+    res.json({ 
+      settlements,
+      paymentHistory,
+      totalSettledOrders: settledOrders.length,
+      totalPaymentRecords: paymentHistory.length
+    });
+  } catch (error) {
+    console.error('Exchange settlements error:', error);
+    res.status(500).json({ message: '정산 내역을 불러오는 중 오류가 발생했습니다.' });
+  }
+});
+
+// Exchange 주문 상태 변경
+router.patch('/exchange/orders/:orderId/status', verifyToken, requireAdmin(2), async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { status } = req.body;
+
+    const order = await ExchangeOrder.findByPk(orderId);
+    if (!order) {
+      return res.status(404).json({ message: '주문을 찾을 수 없습니다.' });
+    }
+
+    await order.update({ status });
+    
+    res.json({ message: '주문 상태가 변경되었습니다.' });
+  } catch (error) {
+    console.error('Exchange order status change error:', error);
+    res.status(500).json({ message: '주문 상태 변경 중 오류가 발생했습니다.' });
   }
 });
 

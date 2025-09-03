@@ -18,6 +18,19 @@ interface DashboardData {
     referrals: number;
     commissions: number;
   };
+  exchange: {
+    today: {
+      orders: number;
+      matchedOrders: number;
+      totalVolume: number;
+      commission: number;
+    };
+    total: {
+      openOrders: number;
+      multibets: number;
+      settlements: number;
+    };
+  };
 }
 
 export default function AdminDashboard() {
@@ -143,24 +156,52 @@ export default function AdminDashboard() {
                 <>
                   {/* 대시보드 카드들 */}
                   {dashboardData && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                      <div className="bg-white p-6 rounded-lg shadow">
-                        <h3 className="text-sm font-medium text-gray-500">오늘 베팅 수</h3>
-                        <p className="text-2xl font-bold text-gray-900">{dashboardData.today.bets}</p>
+                    <>
+                      {/* 기본 통계 */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div className="bg-white p-6 rounded-lg shadow">
+                          <h3 className="text-sm font-medium text-gray-500">오늘 베팅 수</h3>
+                          <p className="text-2xl font-bold text-gray-900">{dashboardData.today.bets}</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-lg shadow">
+                          <h3 className="text-sm font-medium text-gray-500">오늘 베팅 금액</h3>
+                          <p className="text-2xl font-bold text-gray-900">₩{dashboardData.today.stake.toLocaleString()}</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-lg shadow">
+                          <h3 className="text-sm font-medium text-gray-500">전체 사용자</h3>
+                          <p className="text-2xl font-bold text-gray-900">{dashboardData.total.users}</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-lg shadow">
+                          <h3 className="text-sm font-medium text-gray-500">활성 사용자</h3>
+                          <p className="text-2xl font-bold text-gray-900">{dashboardData.total.activeUsers}</p>
+                        </div>
                       </div>
-                      <div className="bg-white p-6 rounded-lg shadow">
-                        <h3 className="text-sm font-medium text-gray-500">오늘 베팅 금액</h3>
-                        <p className="text-2xl font-bold text-gray-900">₩{dashboardData.today.stake.toLocaleString()}</p>
-                      </div>
-                      <div className="bg-white p-6 rounded-lg shadow">
-                        <h3 className="text-sm font-medium text-gray-500">전체 사용자</h3>
-                        <p className="text-2xl font-bold text-gray-900">{dashboardData.total.users}</p>
-                      </div>
-                      <div className="bg-white p-6 rounded-lg shadow">
-                        <h3 className="text-sm font-medium text-gray-500">활성 사용자</h3>
-                        <p className="text-2xl font-bold text-gray-900">{dashboardData.total.activeUsers}</p>
-                      </div>
-                    </div>
+
+                      {/* Exchange 통계 */}
+                      {dashboardData.exchange && (
+                        <div className="mb-8">
+                          <h2 className="text-xl font-bold text-gray-900 mb-4">📊 Exchange 통계</h2>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-6 rounded-lg shadow border border-purple-200">
+                              <h3 className="text-sm font-medium text-purple-600">오늘 Exchange 주문</h3>
+                              <p className="text-2xl font-bold text-purple-900">{dashboardData.exchange.today.orders}</p>
+                            </div>
+                            <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-6 rounded-lg shadow border border-purple-200">
+                              <h3 className="text-sm font-medium text-purple-600">매칭된 주문</h3>
+                              <p className="text-2xl font-bold text-purple-900">{dashboardData.exchange.today.matchedOrders}</p>
+                            </div>
+                            <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-6 rounded-lg shadow border border-purple-200">
+                              <h3 className="text-sm font-medium text-purple-600">총 거래량</h3>
+                              <p className="text-2xl font-bold text-purple-900">₩{dashboardData.exchange.today.totalVolume.toLocaleString()}</p>
+                            </div>
+                            <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-6 rounded-lg shadow border border-purple-200">
+                              <h3 className="text-sm font-medium text-purple-600">수수료 수익</h3>
+                              <p className="text-2xl font-bold text-purple-900">₩{dashboardData.exchange.today.commission.toLocaleString()}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
               )}
@@ -168,6 +209,31 @@ export default function AdminDashboard() {
               {/* 관리 메뉴 그리드 */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
                 
+                {/* Exchange 관리 */}
+                <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+                  <div className="flex items-center mb-4">
+                    <div className="bg-purple-100 p-3 rounded-full">
+                      <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 ml-3">Exchange 관리</h3>
+                  </div>
+                  <p className="text-gray-600 mb-4">Exchange 주문 관리, 멀티배팅, 정산 처리</p>
+                  <div className="space-y-2 text-sm text-gray-500">
+                    <div>• Exchange 주문 모니터링</div>
+                    <div>• 멀티배팅 관리</div>
+                    <div>• 정산 처리 및 내역</div>
+                    <div>• 실시간 호가 현황</div>
+                  </div>
+                  <button 
+                    onClick={() => router.push('/admin/exchange')}
+                    className="mt-4 w-full bg-purple-600 text-white py-2 px-4 rounded hover:bg-purple-700 transition-colors"
+                  >
+                    Exchange 관리하기
+                  </button>
+                </div>
+
                 {/* 사용자 관리 */}
                 <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
                   <div className="flex items-center mb-4">
