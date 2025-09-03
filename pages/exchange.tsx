@@ -93,17 +93,56 @@ export default function Exchange() {
     } else {
       console.log('🎯 새로운 베팅 선택');
       
-      // 🆕 같은 경기의 다른 선택들을 먼저 제거
-      // selectedBet에서 같은 경기 선택 제거
-      if (selectedBet && selectedBet.gameId === game.id) {
-        console.log('🎯 같은 경기의 기존 선택 제거:', selectedBet.team);
+      // 🆕 익스체인지에서 승패+핸디캡 조합 제한 (스포츠북과 동일)
+      const isWinLoss = market === '승패';
+      const isHandicap = market === '핸디캡';
+      
+      // 승패 선택 시: 같은 경기의 핸디캡 제거
+      if (isWinLoss) {
+        const handicapSelections = multiBetSelections.filter(mb => 
+          mb.gameId === game.id && mb.market === '핸디캡'
+        );
+        handicapSelections.forEach(mb => {
+          console.log('🎯 승패 선택으로 인한 핸디캡 제거:', mb.team);
+          removeMultiBetSelection(mb.gameId, mb.market, mb.team);
+        });
+        
+        // selectedBet에서도 핸디캡 제거
+        if (selectedBet && selectedBet.gameId === game.id && selectedBet.market === '핸디캡') {
+          console.log('🎯 승패 선택으로 인한 selectedBet 핸디캡 제거:', selectedBet.team);
+          setSelectedBet(null);
+        }
+      }
+      
+      // 핸디캡 선택 시: 같은 경기의 승패 제거
+      if (isHandicap) {
+        const winLossSelections = multiBetSelections.filter(mb => 
+          mb.gameId === game.id && mb.market === '승패'
+        );
+        winLossSelections.forEach(mb => {
+          console.log('🎯 핸디캡 선택으로 인한 승패 제거:', mb.team);
+          removeMultiBetSelection(mb.gameId, mb.market, mb.team);
+        });
+        
+        // selectedBet에서도 승패 제거
+        if (selectedBet && selectedBet.gameId === game.id && selectedBet.market === '승패') {
+          console.log('🎯 핸디캡 선택으로 인한 selectedBet 승패 제거:', selectedBet.team);
+          setSelectedBet(null);
+        }
+      }
+      
+      // 🆕 같은 마켓의 기존 선택 제거 (승패+총점, 총점+핸디캡은 허용)
+      if (selectedBet && selectedBet.gameId === game.id && selectedBet.market === market) {
+        console.log('🎯 같은 경기+같은 마켓의 기존 선택 제거:', selectedBet.team);
         setSelectedBet(null);
       }
       
-      // 멀티배팅에서 같은 경기 선택들 제거
-      const sameGameSelections = multiBetSelections.filter(mb => mb.gameId === game.id);
-      sameGameSelections.forEach(mb => {
-        console.log('🎯 멀티배팅에서 같은 경기 선택 제거:', mb.team);
+      // 멀티배팅에서 같은 경기+같은 마켓 선택만 제거
+      const sameGameMarketSelections = multiBetSelections.filter(mb => 
+        mb.gameId === game.id && mb.market === market
+      );
+      sameGameMarketSelections.forEach(mb => {
+        console.log('🎯 멀티배팅에서 같은 경기+같은 마켓 선택 제거:', mb.team);
         removeMultiBetSelection(mb.gameId, mb.market, mb.team);
       });
       
