@@ -1708,6 +1708,12 @@ export default function Exchange() {
     
     const handleOrderPlaced = () => {
       console.log('🔄 주문 완료 이벤트 감지, 익스체인지 홈 투데이 베팅 데이터 새로고침');
+      
+      // 🆕 주문 완료 후 선택 상태 초기화
+      console.log('🎯 주문 완료로 인한 선택 상태 초기화');
+      setSelectedBet(null);
+      clearMultiBet();
+      
       if (viewMode === 'today') {
         fetchTodayGames();
       }

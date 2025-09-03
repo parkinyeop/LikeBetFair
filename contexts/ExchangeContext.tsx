@@ -218,6 +218,12 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
       if (result.success) {
         // 성공 시 멀티배팅 초기화
         clearMultiBet();
+        
+        // 🆕 주문 완료 이벤트 발생
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('exchangeOrderPlaced'));
+        }
+        
         return { success: true, data: result.data };
       } else {
         return { success: false, error: result.message || '멀티배팅 주문 생성에 실패했습니다.' };

@@ -68,6 +68,9 @@ function OrderPanel() {
   useEffect(() => {
     if (selectedBet && selectedBet.price) {
       setForm(prev => ({ ...prev, price: selectedBet.price }));
+    } else if (!selectedBet) {
+      // 🆕 선택된 베팅이 없으면 배당율도 0으로 초기화
+      setForm(prev => ({ ...prev, price: 0 }));
     }
   }, [selectedBet]);
 
@@ -232,8 +235,8 @@ function OrderPanel() {
           // 매칭 모드 비활성화
           deactivateMatchMode();
           
-          // 폼 초기화
-          setForm({ side: 'back', price: 0, amount: 0 });
+          // 폼 초기화 (배당율은 유지)
+          setForm(prev => ({ ...prev, amount: 0 }));
           setSelectedBet(null);
           
           // 🆕 멀티배팅 선택들도 초기화
@@ -298,8 +301,8 @@ function OrderPanel() {
         deactivateMatchMode();
       }
       
-      // 폼 초기화
-      setForm({ side: 'back', price: 0, amount: 0 });
+      // 폼 초기화 (배당율은 유지)
+      setForm(prev => ({ ...prev, amount: 0 }));
       setSelectedBet(null);
       
       // 🆕 멀티배팅 선택들도 초기화
