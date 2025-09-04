@@ -965,86 +965,96 @@ function OrderHistoryPanel() {
                 <div key={order.id} className="relative">
                   {/* 구분선 - 첫 번째 주문이 아닌 경우에만 표시 */}
                   {index > 0 && (
-                    <div className="flex items-center my-6">
-                      <div className="flex-1 border-t-2 border-gray-300"></div>
-                      <div className="px-4 py-1 text-xs font-medium text-gray-500 bg-gray-100 rounded-full border border-gray-200">
-                        주문 #{index + 1}
-                      </div>
-                      <div className="flex-1 border-t-2 border-gray-300"></div>
+                    <div className="my-4">
+                      <div className="border-t border-gray-200"></div>
                     </div>
                   )}
                   
                   <div className="bg-white rounded-xl border-2 border-gray-200 p-4 hover:shadow-lg hover:border-gray-300 transition-all duration-200 shadow-sm">
-                  {/* 주문 번호 헤더 */}
-                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold">
-                        {index + 1}
-                      </div>
-                      <span className="text-sm font-medium text-gray-600">주문 #{index + 1}</span>
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      ID: {order.id}
-                    </div>
-                  </div>
                   
-                  {/* 헤더: 주문 타입과 상태 */}
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex items-center space-x-2">
+                  {/* 멀티배팅 표시 */}
+                  {(order as any).isMultibet && (order as any).selectionDetails && (order as any).selectionDetails.selections && (
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-bold text-gray-800">
+                        배팅({((order as any).selectionDetails.selections || []).length}개)
+                      </span>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${sideInfo.bg} ${sideInfo.color}`}>
                         {sideInfo.text}
                       </span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusInfo.bg} ${statusInfo.color}`}>
-                        {statusInfo.text}
-                      </span>
                     </div>
-                    <div className="text-right">
-                      <div className="text-xs text-gray-500">{dateInfo.date}</div>
-                      <div className="text-xs text-gray-400">{dateInfo.time}</div>
-                    </div>
-                  </div>
-
-                  {/* 기본 경기 정보 - 최대한 간략화 */}
-                  <div className="mb-2">
-                    <div className="text-sm font-medium text-gray-800">
-                      {homeTeam && awayTeam 
-                        ? `${homeTeam} vs ${awayTeam}`
-                        : order.selection || '선택된 팀'
-                      }
-                    </div>
-                    </div>
-
-                  {/* 핵심 수치 정보 - 카드 형태로 개선 */}
-                  <div className="grid grid-cols-3 gap-2 mb-3">
-                    <div className="bg-gray-50 rounded-lg p-2 text-center">
-                      <div className="text-xs text-gray-500 mb-1">배당</div>
-                      <div className="text-sm font-bold text-gray-800">
-                        {(typeof order.price === 'string' ? parseFloat(order.price) : order.price || 0).toFixed(2)}
+                  )}
+                  
+                  {/* 핵심 정보 표시 */}
+                  <div className="space-y-2">
+                    {/* 멀티배팅인 경우 각 배팅 표시 */}
+                    {(order as any).isMultibet && (order as any).selectionDetails && (order as any).selectionDetails.selections ? (
+                      <div className="space-y-2">
+                        {((order as any).selectionDetails.selections || []).map((selection: any, idx: number) => (
+                          <div key={idx} className="flex items-center justify-between text-sm">
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-800">
+                                {selection.team || selection.selection}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {selection.market || '승패'}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-bold text-gray-800">
+                                @{selection.odds?.toFixed(2) || '0.00'}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
+                    ) : (
+                      /* 단일 배팅인 경우 */
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-bold text-gray-800">
+                            {order.selection || '선택된 팀'}
+                          </span>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${sideInfo.bg} ${sideInfo.color}`}>
+                            {sideInfo.text}
+                          </span>
                         </div>
-                    <div className="bg-gray-50 rounded-lg p-2 text-center">
-                      <div className="text-xs text-gray-500 mb-1">금액</div>
-                      <div className="text-sm font-bold text-gray-800">
-                        {(() => {
-                          if ((order as any).isMultibet) {
-                            const stakeAmount = (order as any).stakeAmount;
-                            if (stakeAmount && typeof stakeAmount === 'number') {
-                              return stakeAmount.toLocaleString();
-                            } else if (stakeAmount && typeof stakeAmount === 'string') {
-                              return parseFloat(stakeAmount).toLocaleString();
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="text-xs text-gray-500">
+                            {order.market || '승패'}
+                          </div>
+                          <div className="font-bold text-gray-800">
+                            @{(typeof order.price === 'string' ? parseFloat(order.price) : order.price || 0).toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* 배팅금액과 수익 정보 */}
+                    <div className="flex items-center justify-between text-sm pt-2 border-t border-gray-100">
+                      <div className="flex items-center space-x-4">
+                        <span className="text-gray-500">배팅금액</span>
+                        <span className="font-bold text-gray-800">
+                          {(() => {
+                            if ((order as any).isMultibet) {
+                              const stakeAmount = (order as any).stakeAmount;
+                              if (stakeAmount && typeof stakeAmount === 'number') {
+                                return stakeAmount.toLocaleString();
+                              } else if (stakeAmount && typeof stakeAmount === 'string') {
+                                return parseFloat(stakeAmount).toLocaleString();
+                              }
+                              return '0';
+                            } else {
+                              return order.amount.toLocaleString();
                             }
-                            return '0';
-                          } else {
-                            return order.amount.toLocaleString();
-                          }
-                        })()}원
+                          })()}원
+                        </span>
                       </div>
-                        </div>
-                    <div className="bg-gray-50 rounded-lg p-2 text-center">
-                      <div className="text-xs text-gray-500 mb-1">수익</div>
-                      <div className={`text-sm font-bold ${potentialProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {potentialProfit >= 0 ? '+' : ''}{potentialProfit.toLocaleString()}원
-                        </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-gray-500">수익</span>
+                        <span className={`text-sm font-bold ${potentialProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {potentialProfit >= 0 ? '+' : ''}{potentialProfit.toLocaleString()}원
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -1078,44 +1088,17 @@ function OrderHistoryPanel() {
                   {selectedOrderId === order.id && (
                     <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                       <div className="space-y-4">
-                        {/* 기본 정보 섹션 */}
-                        <div className="space-y-3">
-                          <h4 className="text-xs font-semibold text-gray-700 border-b border-gray-200 pb-1">기본 정보</h4>
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-center py-1">
-                              <span className="text-xs text-gray-600">생성 시간</span>
-                              <span className="text-xs font-medium">{new Date(order.createdAt).toLocaleString('ko-KR')}</span>
-                        </div>
-                            <div className="flex justify-between items-center py-1">
-                              <span className="text-xs text-gray-600">수정 시간</span>
-                              <span className="text-xs font-medium">{new Date(order.updatedAt).toLocaleString('ko-KR')}</span>
-                        </div>
-                            <div className="flex justify-between items-center py-1">
-                              <span className="text-xs text-gray-600">게임 ID</span>
-                              <span className="text-xs font-medium text-blue-600">{order.gameId}</span>
-                        </div>
-                            <div className="flex justify-between items-center py-1">
-                              <span className="text-xs text-gray-600">마켓</span>
-                              <span className="text-xs font-medium">{order.market}</span>
-                        </div>
-                        {order.line && (
-                              <div className="flex justify-between items-center py-1">
-                                <span className="text-xs text-gray-600">라인</span>
-                                <span className="text-xs font-medium">{order.line}</span>
-                          </div>
-                        )}
-                          </div>
+                        {/* 생성 시간 */}
+                        <div className="text-xs text-gray-500">
+                          {new Date(order.createdAt).toLocaleString('ko-KR')}
                         </div>
                         
-                        {/* 매칭 정보 섹션 */}
+                        {/* 매칭 정보 */}
                         {order.matchedOrderId && (
-                          <div className="space-y-3">
-                            <h4 className="text-xs font-semibold text-gray-700 border-b border-gray-200 pb-1">매칭 정보</h4>
-                            <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-                              <div className="flex justify-between items-center">
-                                <span className="text-xs text-gray-600">매칭된 주문</span>
-                                <span className="text-xs font-medium text-green-600">#{order.matchedOrderId}</span>
-                              </div>
+                          <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-gray-600">매칭된 주문</span>
+                              <span className="text-xs font-medium text-green-600">#{order.matchedOrderId}</span>
                             </div>
                           </div>
                         )}
@@ -1174,45 +1157,6 @@ function OrderHistoryPanel() {
                           </div>
                         )}
 
-                        {/* 부분 매칭 상세 정보 */}
-                        {(order as any).matchInfo && (
-                          <div className="space-y-3">
-                            <h4 className="text-xs font-semibold text-gray-700 border-b border-gray-200 pb-1 flex items-center">
-                              <svg className="w-3 h-3 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              매칭 정보
-                            </h4>
-                            <div className="space-y-2">
-                              <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                                <span className="text-xs text-gray-600">원래 금액</span>
-                                <span className="text-xs font-medium">{(order as any).matchInfo.originalAmount.toLocaleString()}원</span>
-                            </div>
-                              <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                                <span className="text-xs text-gray-600">체결 금액</span>
-                                <span className="text-xs font-medium text-green-600">{(order as any).matchInfo.filledAmount.toLocaleString()}원</span>
-                            </div>
-                              <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                                <span className="text-xs text-gray-600">남은 금액</span>
-                                <span className="text-xs font-medium">
-                                  {order.status === 'matched' ? (
-                                    <span className="text-gray-500">0원 (완전 체결)</span>
-                                  ) : (order as any).matchInfo.remainingAmount > 0 ? (
-                                    <span className="text-orange-600">{(order as any).matchInfo.remainingAmount.toLocaleString()}원</span>
-                                  ) : (
-                                    <span className="text-gray-500">0원</span>
-                                  )}
-                                </span>
-                            </div>
-                            {(order as any).matchInfo.matchCount > 0 && (
-                                <div className="flex justify-between items-center py-2">
-                                  <span className="text-xs text-gray-600">매칭 횟수</span>
-                                  <span className="text-xs font-medium text-blue-600">{(order as any).matchInfo.matchCount}회</span>
-                              </div>
-                            )}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     </div>
                   )}

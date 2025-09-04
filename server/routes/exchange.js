@@ -251,6 +251,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
       gameResultId: targetOrder.gameResultId,
       selection: targetOrder.selection,
       selectionDetails: targetOrder.selectionDetails,
+      isMultibet: targetOrder.isMultibet, // 🆕 멀티배팅 정보 추가
       stakeAmount: stakeAmount, // 🆕 올바른 리스크 금액 사용
       potentialProfit: matchType === 'back' ? Math.floor((targetOrder.price - 1) * actualMatchAmount) : actualMatchAmount,
       autoSettlement: true,
