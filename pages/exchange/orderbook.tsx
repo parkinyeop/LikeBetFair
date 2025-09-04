@@ -186,12 +186,15 @@ const OrderbookPage: React.FC = () => {
         type: targetOrder.type as 'back' | 'lay',
         odds: targetOrder.odds,
         amount: targetOrder.amount,
-        selection: targetOrder.selection || '',
+        selection: targetOrder.selection || (targetOrder.isMultibet ? '멀티배팅' : ''),
         homeTeam: targetOrder.homeTeam || '',
         awayTeam: targetOrder.awayTeam || '',
         gameId: targetOrder.gameId,
         commenceTime: targetOrder.commenceTime || '',
-        sportKey: targetOrder.sportKey || ''
+        sportKey: targetOrder.sportKey || '',
+        // 🆕 멀티배팅 정보 추가
+        isMultibet: targetOrder.isMultibet || false,
+        selectionDetails: targetOrder.selectionDetails || []
       };
       
       activateMatchMode(matchTargetOrder);

@@ -30,6 +30,9 @@ export interface MatchTargetOrder {
   filledAmount?: number;
   partiallyFilled?: boolean;
   displayAmount?: number; // 화면에 표시할 금액
+  // 🆕 멀티배팅 필드들 추가
+  isMultibet?: boolean;
+  selectionDetails?: any[] | { selections: any[]; description?: string; multibetType?: string };
 }
 
 // 🆕 멀티배팅 선택 인터페이스
@@ -124,7 +127,9 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
       return;
     }
 
-    const totalOdds = multiBetSelections.reduce((acc, selection) => acc * selection.odds, 1);
+    const totalOdds = multiBetSelections.length > 0 
+      ? multiBetSelections.reduce((acc, selection) => acc * (selection.odds || 1), 1)
+      : 1;
     setMultiBetTotalOdds(totalOdds);
     
     if (multiBetStake > 0) {
@@ -262,6 +267,22 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
       awayTeam: targetOrder.awayTeam,
       commenceTime: targetOrder.commenceTime
     });
+    
+    // 멀티배팅인 경우 selectionDetails를 multiBetSelections로 설정
+    if (targetOrder.isMultibet && targetOrder.selectionDetails) {
+      console.log('🎯 멀티배팅 매칭 모드 활성화:', targetOrder.selectionDetails);
+      
+      // selectionDetails가 객체인 경우 selections 배열 추출
+      const selections = Array.isArray(targetOrder.selectionDetails) 
+        ? targetOrder.selectionDetails 
+        : targetOrder.selectionDetails.selections || [];
+      
+      console.log('🎯 추출된 selections:', selections);
+      setMultiBetSelections(selections);
+    } else {
+      // 단일 배팅인 경우 멀티배팅 선택 초기화
+      setMultiBetSelections([]);
+    }
   };
 
   // 매칭 모드 비활성화
