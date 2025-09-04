@@ -325,7 +325,7 @@ function OrderPanel() {
       {/* 마지막 업데이트 정보 */}
       <div className="bg-gray-50 p-3 rounded-lg mb-4 border border-gray-200">
         <div className="flex justify-between items-center">
-          <h3 className="font-semibold text-gray-900">실시간 업데이트</h3>
+          <h3 className="text-sm font-semibold text-gray-900">실시간 업데이트</h3>
           <div className="text-sm text-gray-600">
             {lastUpdate.toLocaleTimeString('en-US', { 
               hour: '2-digit', 
@@ -341,7 +341,7 @@ function OrderPanel() {
       {multiBetSelections.length > 0 ? (
           <div className="bg-white p-4 rounded-lg mb-4 shadow-md border border-gray-200">
             <div className="flex justify-between items-center mb-3">
-              <h3 className="text-lg font-bold text-gray-900">
+              <h3 className="text-sm font-bold text-gray-900">
                 🎯 배팅 선택 ({multiBetSelections.length}개)
               </h3>
               <button 
@@ -389,7 +389,7 @@ function OrderPanel() {
                     }
                   }}
                   placeholder="베팅 금액 입력"
-                  className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 />
               </div>
               
@@ -418,7 +418,7 @@ function OrderPanel() {
                   }
                 }}
                 disabled={multiBetStake <= 0}
-                className={`w-full py-3 px-4 rounded font-semibold transition-colors ${
+                className={`w-full py-3 px-4 rounded text-sm font-semibold transition-colors ${
                   multiBetStake <= 0
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : 'bg-blue-600 text-white hover:bg-blue-700'
@@ -432,7 +432,7 @@ function OrderPanel() {
           /* 미선택 상태 */
           <div className="bg-white p-4 rounded-lg mb-4 shadow-md border border-gray-200">
             <div className="text-center">
-              <div className="text-lg font-bold text-gray-900 mb-2">배팅을 선택하세요</div>
+              <div className="text-sm font-bold text-gray-900 mb-2">배팅을 선택하세요</div>
               <p className="text-sm text-gray-600">중앙에서 Back/Lay 버튼을 클릭하여 배팅을 선택하세요.</p>
             </div>
           </div>
@@ -455,9 +455,10 @@ function OrderHistoryPanel() {
   const { orders: userOrders, cancelOrder, loading, fetchOrders } = useExchange();
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState<number | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'date' | 'amount' | 'price'>('date');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  // 필터 및 정렬 관련 상태 - 주석 처리 (나중에 재활용 가능)
+  // const [statusFilter, setStatusFilter] = useState<string>('all');
+  // const [sortBy, setSortBy] = useState<'date' | 'amount' | 'price'>('date');
+  // const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
@@ -526,37 +527,41 @@ function OrderHistoryPanel() {
     setSelectedOrderId(selectedOrderId === orderId ? null : orderId);
   };
 
-  // 필터링된 주문 목록
-  const filteredOrders = (userOrders || [])
-    .filter(order => statusFilter === 'all' || order.status === statusFilter)
-    .sort((a, b) => {
-      let aValue: any, bValue: any;
-      
-      switch (sortBy) {
-        case 'date':
-          aValue = new Date(a.createdAt).getTime();
-          bValue = new Date(b.createdAt).getTime();
-          break;
-        case 'amount':
-          aValue = a.amount;
-          bValue = b.amount;
-          break;
-        case 'price':
-          aValue = a.price;
-          bValue = b.price;
-          break;
-        default:
-          aValue = new Date(a.createdAt).getTime();
-          bValue = new Date(b.createdAt).getTime();
-      }
-      
-      return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
-    });
+  // 필터링된 주문 목록 - 주석 처리 (나중에 재활용 가능)
+  // const filteredOrders = (userOrders || [])
+  //   .filter(order => statusFilter === 'all' || order.status === statusFilter)
+  //   .sort((a, b) => {
+  //     let aValue: any, bValue: any;
+  //     
+  //     switch (sortBy) {
+  //       case 'date':
+  //         aValue = new Date(a.createdAt).getTime();
+  //         bValue = new Date(b.createdAt).getTime();
+  //         break;
+  //       case 'amount':
+  //         aValue = a.amount;
+  //         bValue = b.amount;
+  //         break;
+  //       case 'price':
+  //         aValue = a.price;
+  //         bValue = b.price;
+  //         break;
+  //       default:
+  //         aValue = new Date(a.createdAt).getTime();
+  //         bValue = new Date(b.createdAt).getTime();
+  //     }
+  //     
+  //     return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
+  //   });
 
-  // 정렬 방향 토글
-  const toggleSortOrder = () => {
-    setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-  };
+  // 기본 주문 목록 (날짜순 내림차순만)
+  const filteredOrders = (userOrders || [])
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  // 정렬 방향 토글 - 주석 처리 (나중에 재활용 가능)
+  // const toggleSortOrder = () => {
+  //   setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+  // };
 
   // 실시간 업데이트 (30초마다)
   React.useEffect(() => {
@@ -639,7 +644,7 @@ function OrderHistoryPanel() {
             <h3 className="font-semibold text-sm text-gray-700">내 주문 내역</h3>
           </button>
           <div className="text-right">
-            <div className="text-xs text-gray-500">{filteredOrders.length}/{(userOrders || []).length}개 주문</div>
+            <div className="text-xs text-gray-500">{(userOrders || []).length}개 주문</div>
             <div className="text-xs text-gray-400">
               Last Update: {lastUpdate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
             </div>
@@ -648,43 +653,45 @@ function OrderHistoryPanel() {
 
         {/* 접을 수 있는 내용 - 통계 정보 */}
         {isExpanded && (
-          <div className="mb-3 p-2 bg-white rounded border border-gray-200">
-          <div className="grid grid-cols-3 gap-2 text-xs">
-            <div className="text-center">
-              <div className="text-gray-500">총 주문</div>
-              <div className="font-bold text-gray-800">{stats.total}개</div>
+          <div className="mb-3 p-3 bg-white rounded border border-gray-200">
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="text-center p-2 bg-gray-50 rounded">
+                <div className="text-gray-500 mb-1">총 주문</div>
+                <div className="font-bold text-lg text-gray-800">{stats.total}개</div>
             </div>
-            <div className="text-center">
-              <div className="text-gray-500">총 금액</div>
-              <div className="font-bold text-gray-800">{stats.totalAmount.toLocaleString()} KRW</div>
+              <div className="text-center p-2 bg-gray-50 rounded">
+                <div className="text-gray-500 mb-1">총 금액</div>
+                <div className="font-bold text-lg text-gray-800">{stats.totalAmount.toLocaleString()}원</div>
             </div>
-            <div className="text-center">
-              <div className="text-gray-500">미체결</div>
-              <div className="font-bold text-yellow-600">{stats.open}개</div>
+              <div className="text-center p-2 bg-yellow-50 rounded">
+                <div className="text-gray-500 mb-1">미체결</div>
+                <div className="font-bold text-lg text-yellow-600">{stats.open}개</div>
             </div>
-            <div className="text-center">
-              <div className="text-gray-500">Potential Profit</div>
-              <div className={`font-bold ${stats.totalPotentialProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {stats.totalPotentialProfit >= 0 ? '+' : ''}{Math.round(stats.totalPotentialProfit).toLocaleString()} KRW
+              <div className="text-center p-2 bg-green-50 rounded">
+                <div className="text-gray-500 mb-1">체결</div>
+                <div className="font-bold text-lg text-green-600">{stats.matched}개</div>
               </div>
+              <div className="text-center p-2 bg-blue-50 rounded">
+                <div className="text-gray-500 mb-1">잠재 수익</div>
+                <div className={`font-bold text-lg ${stats.totalPotentialProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {stats.totalPotentialProfit >= 0 ? '+' : ''}{Math.round(stats.totalPotentialProfit).toLocaleString()}원
             </div>
-            <div className="text-center">
-              <div className="text-gray-500">멀티배팅</div>
-              <div className="font-bold text-yellow-600">
+              </div>
+              <div className="text-center p-2 bg-purple-50 rounded">
+                <div className="text-gray-500 mb-1">멀티배팅</div>
+                <div className="font-bold text-lg text-purple-600">
                 {(userOrders || []).filter(order => (order as any).isMultibet).length}개
               </div>
-            </div>
-            <div className="text-center">
-              <div className="text-gray-500">체결</div>
-              <div className="font-bold text-green-600">{stats.matched}개</div>
             </div>
           </div>
         </div>
         )}
 
-        {/* 필터 및 정렬 컨트롤 - 항상 표시 */}
+        {/* 필터 및 정렬 컨트롤 - 주석 처리 (나중에 재활용 가능) */}
+        {/* 
         <div className="mb-3 space-y-2">
           {/* 상태 필터 */}
+          {/* 
           <div className="flex space-x-1">
             {['all', 'open', 'matched', 'cancelled'].map(status => (
               <button
@@ -702,8 +709,10 @@ function OrderHistoryPanel() {
               </button>
             ))}
           </div>
+          */}
           
           {/* 정렬 컨트롤 */}
+          {/* 
           <div className="flex space-x-1">
             {[
               { key: 'date', label: '날짜' },
@@ -730,7 +739,8 @@ function OrderHistoryPanel() {
               </button>
             ))}
           </div>
-        </div>
+          */}
+        {/* </div> */}
         
         {/* 주문 목록 - 항상 표시 */}
         {filteredOrders.length === 0 ? (
@@ -740,8 +750,8 @@ function OrderHistoryPanel() {
             <p className="text-gray-400 text-xs mt-1">중앙에서 Back/Lay 버튼을 클릭하여 주문을 생성하세요.</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {filteredOrders.slice(0, 10).map((order) => {
+          <div className="space-y-0">
+            {filteredOrders.slice(0, 10).map((order, index) => {
               const statusInfo = getStatusDisplay(order.status, order.commenceTime);
               const sideInfo = getSideDisplay(order.side);
               const dateInfo = formatDate(order.createdAt);
@@ -755,16 +765,35 @@ function OrderHistoryPanel() {
               const commenceTime = order.commenceTime || bestOrder?.commenceTime || gr?.commenceTime || null;
               
               return (
-                <div key={order.id} className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-sm transition-shadow">
+                <div key={order.id} className="relative">
+                  {/* 구분선 - 첫 번째 주문이 아닌 경우에만 표시 */}
+                  {index > 0 && (
+                    <div className="flex items-center my-6">
+                      <div className="flex-1 border-t-2 border-gray-300"></div>
+                      <div className="px-4 py-1 text-xs font-medium text-gray-500 bg-gray-100 rounded-full border border-gray-200">
+                        주문 #{index + 1}
+                      </div>
+                      <div className="flex-1 border-t-2 border-gray-300"></div>
+                    </div>
+                  )}
+                  
+                  <div className="bg-white rounded-xl border-2 border-gray-200 p-4 hover:shadow-lg hover:border-gray-300 transition-all duration-200 shadow-sm">
+                  {/* 주문 번호 헤더 */}
+                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold">
+                        {index + 1}
+                      </div>
+                      <span className="text-sm font-medium text-gray-600">주문 #{index + 1}</span>
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      ID: {order.id}
+                    </div>
+                  </div>
+                  
                   {/* 헤더: 주문 타입과 상태 */}
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex items-center space-x-2">
-                      {/* 🆕 멀티배팅 표시 */}
-                      {(order as any).isMultibet && (
-                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                          🎯 멀티배팅
-                        </span>
-                      )}
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${sideInfo.bg} ${sideInfo.color}`}>
                         {sideInfo.text}
                       </span>
@@ -778,130 +807,27 @@ function OrderHistoryPanel() {
                     </div>
                   </div>
 
-                  {/* 경기 정보 */}
+                  {/* 기본 경기 정보 - 최대한 간략화 */}
                   <div className="mb-2">
-                    <div className="text-sm font-medium text-gray-800 mb-1">
+                    <div className="text-sm font-medium text-gray-800">
                       {homeTeam && awayTeam 
                         ? `${homeTeam} vs ${awayTeam}`
                         : order.selection || '선택된 팀'
                       }
                     </div>
-                    <div className="text-xs text-gray-500">
-                      {order.market} • {commenceTime 
-                        ? (() => {
-                            // 🚨 수정: 하드코딩된 KST 변환 제거
-                            // 브라우저의 로컬 시간대 설정을 사용하여 자동 변환
-                            const utcDate = new Date(commenceTime);
-                            return utcDate.toLocaleString('ko-KR', { 
-                              month: 'short', 
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            });
-                          })()
-                        : '시간 미정'
-                      }
                     </div>
-                    {order.selection && (
-                      <div className="text-xs text-blue-600 mt-1">
-                        선택: {order.selection} ({order.side === 'back' ? '이길 것' : '질 것'})
-                      </div>
-                    )}
-                    {/* 🆕 멀티배팅 선택 정보 표시 */}
-                    {(order as any).isMultibet && (order as any).selectionDetails && (
-                      <div className="mt-2">
-                        <div className="text-xs text-yellow-700 bg-yellow-50 p-1 rounded mb-2">
-                          🎯 {((order as any).selectionDetails.selections || []).length}개 선택 • 
-                          총 배당: {(() => {
-                            const totalOdds = (order as any).totalOdds;
-                            if (totalOdds && typeof totalOdds === 'number') {
-                              return totalOdds.toFixed(2);
-                            } else if (totalOdds && typeof totalOdds === 'string') {
-                              return parseFloat(totalOdds).toFixed(2);
-                            }
-                            return 'N/A';
-                          })()}
-                        </div>
-                        {/* 각 선택의 상세 정보 표시 */}
-                        <div className="space-y-1">
-                          {((order as any).selectionDetails.selections || []).map((selection: any, idx: number) => {
-                            const isOverUnder = selection.market === 'Over/Under' || selection.market === 'totals';
-                            const isHandicap = selection.market === 'Handicap' || selection.market === 'spreads';
-                            
-                            return (
-                              <div key={idx} className="border-l-2 border-yellow-200 pl-2 py-1">
-                                <div className="flex items-center justify-between text-xs">
-                                  <div className="flex flex-col">
-                                    <span className="font-medium text-gray-800">
-                                      {isOverUnder ? (
-                                        `${selection.option || selection.team} ${selection.point || ''}`
-                                      ) : isHandicap ? (
-                                        selection.team
-                                      ) : (
-                                        selection.team
-                                      )}
-                                    </span>
-                                    <span className="text-gray-500">
-                                      {selection.homeTeam && selection.awayTeam 
-                                        ? `${selection.homeTeam} vs ${selection.awayTeam}`
-                                        : selection.desc || '경기 정보'
-                                      }
-                                    </span>
-                                    <span className="text-gray-400">
-                                      {selection.market} • {selection.commenceTime 
-                                        ? (() => {
-                                            const utcDate = new Date(selection.commenceTime);
-                                            return utcDate.toLocaleString('ko-KR', { 
-                                              month: 'short', 
-                                              day: 'numeric',
-                                              hour: '2-digit',
-                                              minute: '2-digit'
-                                            });
-                                          })()
-                                        : '시간 미정'
-                                      }
-                                    </span>
-                                  </div>
-                                  <span className="text-blue-600 font-medium">@ {selection.odds}</span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                    {/* 만료된 주문 표시 */}
-                    {commenceTime && new Date(commenceTime) < new Date() && (
-                      <div className="text-xs text-red-600 mt-1 font-medium">
-                        ⚠️ 경기 만료됨
-                      </div>
-                    )}
-                  </div>
 
-                  {/* 배당률과 금액 정보 */}
-                  <div className="flex justify-between items-center mb-2">
-                    <div className="text-center">
-                      <div className="text-xs text-gray-500">Odds</div>
-                      <div className="text-lg font-bold text-gray-800">
+                  {/* 핵심 수치 정보 - 카드 형태로 개선 */}
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    <div className="bg-gray-50 rounded-lg p-2 text-center">
+                      <div className="text-xs text-gray-500 mb-1">배당</div>
+                      <div className="text-sm font-bold text-gray-800">
                         {(typeof order.price === 'string' ? parseFloat(order.price) : order.price || 0).toFixed(2)}
                       </div>
-                      {/* 스포츠북 참고 배당률 표시 */}
-                      {order.side === 'back' && order.backOdds && (
-                        <div className="text-xs text-blue-600">
-                          참고: {(typeof order.backOdds === 'string' ? parseFloat(order.backOdds) : order.backOdds || 0).toFixed(2)}
                         </div>
-                      )}
-                      {order.side === 'lay' && order.layOdds && (
-                        <div className="text-xs text-blue-600">
-                          참고: {(typeof order.layOdds === 'string' ? parseFloat(order.layOdds) : order.layOdds || 0).toFixed(2)}
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xs text-gray-500">
-                        {(order as any).isMultibet ? '베팅 금액' : '주문 금액'}
-                      </div>
-                      <div className="text-lg font-bold text-gray-800">
+                    <div className="bg-gray-50 rounded-lg p-2 text-center">
+                      <div className="text-xs text-gray-500 mb-1">금액</div>
+                      <div className="text-sm font-bold text-gray-800">
                         {(() => {
                           if ((order as any).isMultibet) {
                             const stakeAmount = (order as any).stakeAmount;
@@ -914,129 +840,180 @@ function OrderHistoryPanel() {
                           } else {
                             return order.amount.toLocaleString();
                           }
-                        })()} KRW
+                        })()}원
                       </div>
-                      {/* 🆕 멀티배팅 예상 수익 표시 */}
-                      {(order as any).isMultibet && (order as any).potentialWinnings && (
-                        <div className="text-xs text-yellow-600 mt-1">
-                          💰 예상 수익: +{(() => {
-                            const potentialWinnings = (order as any).potentialWinnings;
-                            if (potentialWinnings && typeof potentialWinnings === 'number') {
-                              return potentialWinnings.toLocaleString();
-                            } else if (potentialWinnings && typeof potentialWinnings === 'string') {
-                              return parseFloat(potentialWinnings).toLocaleString();
-                            }
-                            return '0';
-                          })()} KRW
                         </div>
-                      )}
-                      {/* 🆕 멀티배팅 순수익 표시 */}
-                      {(order as any).isMultibet && (order as any).potentialProfit && (
-                        <div className="text-xs text-green-600 mt-1">
-                          🏆 순수익: +{(() => {
-                            const potentialProfit = (order as any).potentialProfit;
-                            if (potentialProfit && typeof potentialProfit === 'number') {
-                              return potentialProfit.toLocaleString();
-                            } else if (potentialProfit && typeof potentialProfit === 'string') {
-                              return parseFloat(potentialProfit).toLocaleString();
-                            }
-                            return '0';
-                          })()} KRW
+                    <div className="bg-gray-50 rounded-lg p-2 text-center">
+                      <div className="text-xs text-gray-500 mb-1">수익</div>
+                      <div className={`text-sm font-bold ${potentialProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {potentialProfit >= 0 ? '+' : ''}{potentialProfit.toLocaleString()}원
                         </div>
-                      )}
-                      {/* 🆕 부분 매칭 정보 표시 */}
-                      {(order as any).matchInfo && (order as any).matchInfo.partiallyFilled && (
-                        <div className="text-xs text-orange-600 mt-1">
-                          📈 {(order as any).matchInfo.fillPercentage}% 체결
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xs text-gray-500">Potential Profit</div>
-                      <div className={`text-lg font-bold ${potentialProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                  {potentialProfit >= 0 ? '+' : ''}{potentialProfit.toLocaleString()} KRW
-                      </div>
                     </div>
                   </div>
 
-                  {/* 주문 ID */}
-                  <div className="text-xs text-gray-400 text-center pt-1 border-t border-gray-100">
-                    주문 ID: {order.id}
-                  </div>
-
-                  {/* 액션 버튼 */}
-                  <div className="flex justify-between items-center pt-2 mt-2 border-t border-gray-100">
+                  {/* 액션 버튼 - 개선된 디자인 */}
+                  <div className="flex justify-between items-center pt-3 mt-3 border-t border-gray-200">
                     <button
                       onClick={() => toggleOrderDetail(order.id)}
-                      className="text-xs text-blue-600 hover:text-blue-800 transition-colors"
+                      className="flex items-center space-x-1 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
                     >
-                      {selectedOrderId === order.id ? '상세 숨기기' : '상세보기'}
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>{selectedOrderId === order.id ? '상세 숨기기' : '상세 보기'}</span>
                     </button>
                     
                     {order.status === 'open' && (
                       <button
                         onClick={() => setShowCancelConfirm(order.id)}
                         disabled={loading}
-                        className="text-xs text-red-600 hover:text-red-800 transition-colors disabled:opacity-50"
+                        className="flex items-center space-x-1 px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
                       >
-                        취소
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        <span>취소</span>
                       </button>
                     )}
                   </div>
 
                   {/* 상세 정보 (토글) */}
                   {selectedOrderId === order.id && (
-                    <div className="mt-3 p-2 bg-gray-50 rounded text-xs">
-                      <div className="space-y-1">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">생성 시간:</span>
-                          <span>{new Date(order.createdAt).toLocaleString('ko-KR')}</span>
+                    <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="space-y-4">
+                        {/* 기본 정보 섹션 */}
+                        <div className="space-y-3">
+                          <h4 className="text-xs font-semibold text-gray-700 border-b border-gray-200 pb-1">기본 정보</h4>
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center py-1">
+                              <span className="text-xs text-gray-600">생성 시간</span>
+                              <span className="text-xs font-medium">{new Date(order.createdAt).toLocaleString('ko-KR')}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">수정 시간:</span>
-                          <span>{new Date(order.updatedAt).toLocaleString('ko-KR')}</span>
+                            <div className="flex justify-between items-center py-1">
+                              <span className="text-xs text-gray-600">수정 시간</span>
+                              <span className="text-xs font-medium">{new Date(order.updatedAt).toLocaleString('ko-KR')}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">게임 ID:</span>
-                          <span>{order.gameId}</span>
+                            <div className="flex justify-between items-center py-1">
+                              <span className="text-xs text-gray-600">게임 ID</span>
+                              <span className="text-xs font-medium text-blue-600">{order.gameId}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">마켓:</span>
-                          <span>{order.market}</span>
+                            <div className="flex justify-between items-center py-1">
+                              <span className="text-xs text-gray-600">마켓</span>
+                              <span className="text-xs font-medium">{order.market}</span>
                         </div>
                         {order.line && (
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">라인:</span>
-                            <span>{order.line}</span>
+                              <div className="flex justify-between items-center py-1">
+                                <span className="text-xs text-gray-600">라인</span>
+                                <span className="text-xs font-medium">{order.line}</span>
                           </div>
                         )}
+                          </div>
+                        </div>
+                        
+                        {/* 매칭 정보 섹션 */}
                         {order.matchedOrderId && (
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">매칭 주문:</span>
-                            <span className="text-green-600">#{order.matchedOrderId}</span>
+                          <div className="space-y-3">
+                            <h4 className="text-xs font-semibold text-gray-700 border-b border-gray-200 pb-1">매칭 정보</h4>
+                            <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs text-gray-600">매칭된 주문</span>
+                                <span className="text-xs font-medium text-green-600">#{order.matchedOrderId}</span>
+                              </div>
+                            </div>
                           </div>
                         )}
-                        {/* 🆕 부분 매칭 상세 정보 */}
+                        {/* 멀티배팅 상세 정보 */}
+                        {(order as any).isMultibet && (order as any).selectionDetails && (
+                          <div className="space-y-3">
+                            <h4 className="text-xs font-semibold text-gray-700 border-b border-gray-200 pb-1 flex items-center">
+                              <svg className="w-3 h-3 mr-2 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                              </svg>
+                              멀티배팅 상세
+                            </h4>
+                            <div className="space-y-3">
+                              {((order as any).selectionDetails.selections || []).map((selection: any, idx: number) => {
+                                const isOverUnder = selection.market === 'Over/Under' || selection.market === 'totals';
+                                const isHandicap = selection.market === 'Handicap' || selection.market === 'spreads';
+                                
+                                return (
+                                  <div key={idx} className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div className="text-xs font-medium text-yellow-800">
+                                        {isOverUnder ? (
+                                          `${selection.option || selection.team} ${selection.point || ''}`
+                                        ) : isHandicap ? (
+                                          selection.team
+                                        ) : (
+                                          selection.team
+                                        )}
+                                      </div>
+                                      <div className="text-xs font-bold text-blue-600">@ {selection.odds}</div>
+                                    </div>
+                                    <div className="text-xs text-gray-600 mb-1">
+                                      {selection.homeTeam && selection.awayTeam 
+                                        ? `${selection.homeTeam} vs ${selection.awayTeam}`
+                                        : selection.desc || '경기 정보'
+                                      }
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {selection.market} • {selection.commenceTime 
+                                        ? (() => {
+                                            const utcDate = new Date(selection.commenceTime);
+                                            return utcDate.toLocaleString('ko-KR', { 
+                                              month: 'short', 
+                                              day: 'numeric',
+                                              hour: '2-digit',
+                                              minute: '2-digit'
+                                            });
+                                          })()
+                                        : '시간 미정'
+                                      }
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 부분 매칭 상세 정보 */}
                         {(order as any).matchInfo && (
-                          <div className="border-t border-gray-200 pt-1 mt-1">
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">원래 금액:</span>
-                              <span>{(order as any).matchInfo.originalAmount.toLocaleString()} KRW</span>
+                          <div className="space-y-3">
+                            <h4 className="text-xs font-semibold text-gray-700 border-b border-gray-200 pb-1 flex items-center">
+                              <svg className="w-3 h-3 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              매칭 정보
+                            </h4>
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                                <span className="text-xs text-gray-600">원래 금액</span>
+                                <span className="text-xs font-medium">{(order as any).matchInfo.originalAmount.toLocaleString()}원</span>
                             </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">체결 금액:</span>
-                              <span className="text-green-600">{(order as any).matchInfo.filledAmount.toLocaleString()} KRW</span>
+                              <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                                <span className="text-xs text-gray-600">체결 금액</span>
+                                <span className="text-xs font-medium text-green-600">{(order as any).matchInfo.filledAmount.toLocaleString()}원</span>
                             </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">남은 금액:</span>
-                              <span className="text-orange-600">{(order as any).matchInfo.remainingAmount.toLocaleString()} KRW</span>
+                              <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                                <span className="text-xs text-gray-600">남은 금액</span>
+                                <span className="text-xs font-medium">
+                                  {order.status === 'matched' ? (
+                                    <span className="text-gray-500">0원 (완전 체결)</span>
+                                  ) : (order as any).matchInfo.remainingAmount > 0 ? (
+                                    <span className="text-orange-600">{(order as any).matchInfo.remainingAmount.toLocaleString()}원</span>
+                                  ) : (
+                                    <span className="text-gray-500">0원</span>
+                                  )}
+                                </span>
                             </div>
                             {(order as any).matchInfo.matchCount > 0 && (
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">매칭 횟수:</span>
-                                <span className="text-blue-600">{(order as any).matchInfo.matchCount}회</span>
+                                <div className="flex justify-between items-center py-2">
+                                  <span className="text-xs text-gray-600">매칭 횟수</span>
+                                  <span className="text-xs font-medium text-blue-600">{(order as any).matchInfo.matchCount}회</span>
                               </div>
                             )}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1045,25 +1022,35 @@ function OrderHistoryPanel() {
 
                   {/* 취소 확인 모달 */}
                   {showCancelConfirm === order.id && (
-                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
-                      <div className="text-xs text-red-700 mb-2">정말로 이 주문을 취소하시겠습니까?</div>
-                      <div className="flex space-x-2">
+                    <div className="mt-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-center mb-3">
+                        <svg className="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                        <div className="text-sm font-medium text-red-800">주문 취소 확인</div>
+                      </div>
+                      <div className="text-sm text-red-700 mb-4">
+                        정말로 이 주문을 취소하시겠습니까?<br/>
+                        취소된 주문은 복구할 수 없습니다.
+                      </div>
+                      <div className="flex space-x-3">
                         <button
                           onClick={() => handleCancelOrder(order.id)}
                           disabled={loading}
-                          className="flex-1 py-1 px-2 bg-red-600 text-white text-xs rounded hover:bg-red-700 disabled:opacity-50"
+                          className="flex-1 py-2 px-4 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
                         >
                           {loading ? '처리중...' : '확인'}
                         </button>
                         <button
                           onClick={() => setShowCancelConfirm(null)}
-                          className="flex-1 py-1 px-2 bg-gray-300 text-gray-700 text-xs rounded hover:bg-gray-400"
+                          className="flex-1 py-2 px-4 bg-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-400 transition-colors"
                         >
                           취소
                         </button>
                       </div>
                     </div>
                   )}
+                  </div>
                 </div>
               );
             })}
