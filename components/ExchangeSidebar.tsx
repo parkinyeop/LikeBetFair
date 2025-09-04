@@ -240,8 +240,8 @@ function OrderPanel() {
           setForm(prev => ({ ...prev, amount: 0 }));
           setSelectedBet(null);
           
-          // 🆕 멀티배팅 선택들도 초기화
-          clearMultiBet();
+          // 🆕 매칭 배팅에서는 멀티배팅 선택 유지 (초기화하지 않음)
+          // clearMultiBet();
           
           // 주문 내역 새로고침
           if (typeof window !== 'undefined') {
@@ -367,22 +367,22 @@ function OrderPanel() {
         </div>
       )}
 
-      {/* 멀티배팅 선택 정보 표시 - 매칭 모드가 아닐 때만 */}
-      {!isMatchMode && multiBetSelections.length > 0 ? (
+      {/* 멀티배팅 선택 정보 표시 - 항상 표시 */}
+      {(multiBetSelections.length > 0 || (isMatchMode && matchTargetOrder)) ? (
           <div className="bg-white p-4 rounded-lg mb-4 shadow-md border border-gray-200">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-sm font-bold text-gray-900">
-                🎯 배팅 선택 ({multiBetSelections.length}개)
+                {isMatchMode ? `🎯 배팅 (${multiBetSelections.length}개)` : `🎯 배팅 선택 (${multiBetSelections.length}개)`}
               </h3>
               <button 
-                onClick={clearMultiBet}
+                onClick={isMatchMode ? deactivateMatchMode : clearMultiBet}
                 className="text-sm text-red-600 hover:text-red-800 underline font-medium"
               >
-                초기화
+                {isMatchMode ? '취소' : '초기화'}
               </button>
             </div>
             
-            {/* 선택된 경기들 */}
+            {/* 멀티배팅 선택된 경기들 (항상 표시) */}
             <div className="space-y-3 mb-4">
               {multiBetSelections.map((selection, index) => (
                 <div key={index} className="bg-gray-50 p-3 rounded border border-gray-200 relative">
@@ -406,21 +406,56 @@ function OrderPanel() {
             {/* 배팅 폼 */}
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">베팅 금액 (KRW)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {isMatchMode ? '배팅 금액 (KRW)' : '베팅 금액 (KRW)'}
+                </label>
+                {/* 매칭 모드에서 부분 매칭 안내 */}
+                {isMatchMode && (
+                  <div className="text-xs text-gray-500 mb-1">
+                    💡 부분 매칭 가능 (최대: {Math.floor(getMaxMatchAmount()).toLocaleString()} KRW)
+                  </div>
+                )}
                 <input
                   type="text"
-                  value={multiBetStake > 0 ? multiBetStake.toLocaleString() : ''}
+                  value={isMatchMode ? (form.amount > 0 ? Math.floor(form.amount).toLocaleString() : '') : (multiBetStake > 0 ? multiBetStake.toLocaleString() : '')}
                   onChange={(e) => {
-                    // 🆕 스포츠북과 동일한 방식: 콤마 제거 후 숫자만 처리
-                    const value = e.target.value.replace(/,/g, ''); // 콤마 제거
-                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                      const numValue = value === '' ? 0 : parseFloat(value);
-                      updateMultiBetStake(numValue);
+                    const value = e.target.value.replace(/,/g, '');
+                    if (value === '' || /^\d*$/.test(value)) {
+                      let numValue = value === '' ? 0 : parseInt(value);
+                      
+                      if (isMatchMode) {
+                        // 매칭 모드에서 최대 리스크 금액 초과 시 제한
+                        const maxRiskAmount = getAvailableMatchAmount();
+                        if (numValue > maxRiskAmount) {
+                          numValue = Math.floor(maxRiskAmount);
+                        }
+                        setForm(f => ({ ...f, amount: numValue }));
+                      } else {
+                        updateMultiBetStake(numValue);
+                      }
                     }
                   }}
-                  placeholder="베팅 금액 입력"
+                  placeholder={isMatchMode ? "원하는 금액 입력" : "베팅 금액 입력"}
                   className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 />
+                {/* 매칭 모드에서 빠른 금액 선택 버튼 */}
+                {isMatchMode && (
+                  <div className="flex space-x-1 mt-1">
+                    {[0.25, 0.5, 0.75, 1.0].map(ratio => (
+                      <button
+                        key={ratio}
+                        onClick={() => {
+                          const maxAmount = getAvailableMatchAmount();
+                          const quickAmount = Math.floor(maxAmount * ratio);
+                          setForm(f => ({ ...f, amount: quickAmount }));
+                        }}
+                        className="flex-1 py-1 px-2 text-xs bg-blue-100 hover:bg-blue-200 rounded text-blue-700"
+                      >
+                        {ratio === 1 ? '전액' : `${Math.round(ratio * 100)}%`}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               
               <div className="bg-blue-50 p-4 rounded">
@@ -439,7 +474,7 @@ function OrderPanel() {
               </div>
               
               <button
-                onClick={async () => {
+                onClick={isMatchMode ? handleOrder : async () => {
                   const result = await createMultiBetOrder();
                   if (result.success) {
                     alert('배팅 주문이 성공적으로 생성되었습니다!');
@@ -447,26 +482,29 @@ function OrderPanel() {
                     alert(`배팅 주문 생성 실패: ${result.error}`);
                   }
                 }}
-                disabled={multiBetStake <= 0}
+                disabled={isMatchMode ? (loading || form.amount <= 0) : (multiBetStake <= 0)}
                 className={`w-full py-3 px-4 rounded text-sm font-semibold transition-colors ${
-                  multiBetStake <= 0
+                  (isMatchMode ? (loading || form.amount <= 0) : (multiBetStake <= 0))
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : 'bg-blue-600 text-white hover:bg-blue-700'
                 }`}
               >
-                🎯 배팅 주문 생성
+                {loading ? '처리중...' : isMatchMode ? 
+                  `🎯 매칭 (${Math.floor(form.amount).toLocaleString()}원)` : 
+                  '🎯 배팅 주문 생성'}
               </button>
             </div>
           </div>
-        ) : !isMatchMode ? (
-          /* 미선택 상태 - 매칭 모드가 아닐 때만 */
+        ) : (
+          /* 미선택 상태 */
           <div className="bg-white p-4 rounded-lg mb-4 shadow-md border border-gray-200">
             <div className="text-center">
               <div className="text-sm font-bold text-gray-900 mb-2">배팅을 선택하세요</div>
               <p className="text-sm text-gray-600">중앙에서 Back/Lay 버튼을 클릭하여 배팅을 선택하세요.</p>
             </div>
           </div>
-        ) : null}
+        )}
+
 
 
       
