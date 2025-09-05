@@ -3,32 +3,8 @@ import { useExchange, ExchangeOrder, OrderForm } from '../hooks/useExchange';
 import { useAuth } from '../contexts/AuthContext';
 import { useExchangeContext } from '../contexts/ExchangeContext';
 
-// GameResults 타입 정의 (간단 버전)
-type GameResult = {
-  id: string;
-  homeTeam: string | null;
-  awayTeam: string | null;
-  commenceTime: string | null;
-};
-
-// GameResults를 가져오는 mock 훅 (실제 프로젝트에서는 API 호출로 대체)
-function useGameResults(gameIds: string[]): Record<string, GameResult> {
-  const [gameResults, setGameResults] = useState<Record<string, GameResult>>({});
-
-  useEffect(() => {
-    if (gameIds.length === 0) return;
-    // 실제로는 API 호출 필요
-    fetch(`/api/exchange/game-results?ids=${gameIds.join(',')}`)
-      .then(res => res.json())
-      .then((data: GameResult[]) => {
-        const map: Record<string, GameResult> = {};
-        data.forEach(gr => { map[gr.id] = gr; });
-        setGameResults(map);
-      });
-  }, [gameIds.join(',')]);
-
-  return gameResults;
-}
+// 🗑️ 불필요한 GameResults 관련 코드 제거 완료
+// ExchangeOrder 자체에 필요한 모든 정보가 이미 포함되어 있음
 
 function OrderPanel() {
   const { 
@@ -662,15 +638,7 @@ function OrderHistoryPanel() {
     return { total, open, matched, totalAmount, totalPotentialProfit };
   }, [userOrders]);
 
-  // 주문에 필요한 gameId 목록 추출
-  const gameIds = React.useMemo(() => {
-    return (userOrders || [])
-      .map(order => order.gameId)
-      .filter((id, idx, arr) => id && arr.indexOf(id) === idx);
-  }, [userOrders]);
-
-  // GameResults fetch
-  const gameResults = useGameResults(gameIds);
+  // 🗑️ 불필요한 gameIds 추출 및 GameResults API 호출 제거
 
   // gameId별로 정보가 가장 많이 채워진 주문을 맵으로 저장
   const bestOrderInfoByGameId = React.useMemo(() => {
@@ -825,12 +793,11 @@ function OrderHistoryPanel() {
               const dateInfo = formatDate(order.createdAt);
               const potentialProfit = calculatePotentialProfit(order);
               
-              // 보완된 경기 정보
-              const gr = order.gameId ? gameResults[order.gameId] : undefined;
+              // 경기 정보 (간소화된 2단계 Fallback)
               const bestOrder = order.gameId ? bestOrderInfoByGameId[order.gameId] : undefined;
-              const homeTeam = order.homeTeam || bestOrder?.homeTeam || gr?.homeTeam || '';
-              const awayTeam = order.awayTeam || bestOrder?.awayTeam || gr?.awayTeam || '';
-              const commenceTime = order.commenceTime || bestOrder?.commenceTime || gr?.commenceTime || null;
+              const homeTeam = order.homeTeam || bestOrder?.homeTeam || '';
+              const awayTeam = order.awayTeam || bestOrder?.awayTeam || '';
+              const commenceTime = order.commenceTime || bestOrder?.commenceTime || null;
               
               return (
                 <div key={order.id} className="relative">
