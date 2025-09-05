@@ -18,7 +18,7 @@ export default function LiveOddsPage() {
   const [filteredOrders, setFilteredOrders] = useState<ExchangeOrder[]>([]);
   const [selectedSport, setSelectedSport] = useState<string>('all');
   const [selectedMarket, setSelectedMarket] = useState<string>('all');
-  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [selectedLeague, setSelectedLeague] = useState<string>('all');
   
   // 🎯 버튼별 선택 상태 관리 추가
   const [selectedButtons, setSelectedButtons] = useState<{[orderId: string]: string}>({});
@@ -35,6 +35,28 @@ export default function LiveOddsPage() {
     return multiBetSelections.some(s => 
       s.orderId === orderId && s.market === market && s.selection === selection
     );
+  };
+
+  // 🆕 sportKey를 리그명으로 변환하는 함수
+  const getLeagueFromSportKey = (sportKey: string): string => {
+    const leagueMap: { [key: string]: string } = {
+      'soccer_korea_kleague1': 'K League',
+      'soccer_japan_j_league': 'J League', 
+      'soccer_italy_serie_a': 'Serie A',
+      'soccer_brazil_campeonato': 'Brasileirao',
+      'soccer_usa_mls': 'MLS',
+      'soccer_argentina_primera_division': 'Argentina Primera',
+      'soccer_china_superleague': 'Chinese Super League',
+      'soccer_spain_primera_division': 'La Liga',
+      'soccer_germany_bundesliga': 'Bundesliga',
+      'soccer_england_premier_league': 'Premier League',
+      'basketball_nba': 'NBA',
+      'basketball_kbl': 'KBL',
+      'baseball_mlb': 'MLB',
+      'baseball_kbo': 'KBO',
+      'americanfootball_nfl': 'NFL'
+    };
+    return leagueMap[sportKey] || sportKey;
   };
 
   // 🆕 멀티배팅 선택 토글
@@ -58,7 +80,7 @@ export default function LiveOddsPage() {
     };
 
     if (isMultiBetSelected(order.id, order.market || '', selection)) {
-      removeMultiBetSelection(order.id, order.market || '', selection);
+      removeMultiBetSelection(String(order.id), order.market || '', selection);
     } else {
       addMultiBetSelection(multiBetSelection);
     }
@@ -214,8 +236,58 @@ export default function LiveOddsPage() {
     };
   }, [fetchAllOpenOrders]);
 
-  // 🆕 멀티배팅 주문과 일반 주문 분리
-  const multibetOrders = recentOrders.filter(order => (order as any).isMultibet);
+  // 🆕 멀티배팅 주문과 일반 주문 분리 (필터링 적용)
+  const multibetOrders = recentOrders.filter(order => {
+    if (!(order as any).isMultibet) return false;
+    
+    // 멀티배팅 주문의 개별 경기들 중 하나라도 조건을 만족하면 전체 주문 표시
+    const selections = (order as any).selectionDetails?.selections || [];
+    
+    // 스포츠 필터
+    if (selectedSport !== 'all') {
+      const hasMatchingSport = selections.some((selection: any) => {
+        const sportKey = selection.sportKey || order.sportKey || '';
+        let matches = false;
+        
+        if (selectedSport === 'baseball') {
+          matches = sportKey.startsWith('baseball') || sportKey.includes('kbo') || sportKey.includes('mlb');
+        } else if (selectedSport === 'soccer') {
+          matches = sportKey.startsWith('soccer') || sportKey.includes('league') || sportKey.includes('liga');
+        } else if (selectedSport === 'basketball') {
+          matches = sportKey.startsWith('basketball') || sportKey.includes('nba') || sportKey.includes('kbl');
+        } else if (selectedSport === 'americanfootball') {
+          matches = sportKey.startsWith('americanfootball') || sportKey.includes('nfl');
+        } else {
+          matches = sportKey.startsWith(selectedSport);
+        }
+        
+        return matches;
+      });
+      
+      if (!hasMatchingSport) return false;
+    }
+    
+    // 마켓 필터
+    if (selectedMarket !== 'all') {
+      const hasMatchingMarket = selections.some((selection: any) => 
+        (selection.market || order.market) === selectedMarket
+      );
+      if (!hasMatchingMarket) return false;
+    }
+    
+    // 리그 필터
+    if (selectedLeague !== 'all') {
+      const hasMatchingLeague = selections.some((selection: any) => {
+        const selectionSportKey = selection.sportKey || order.sportKey || '';
+        const selectionLeague = getLeagueFromSportKey(selectionSportKey);
+        return selectionLeague === selectedLeague;
+      });
+      if (!hasMatchingLeague) return false;
+    }
+    
+    return true;
+  });
+  
   const regularOrders = recentOrders.filter(order => !(order as any).isMultibet);
   
   // 🆕 디버깅 로그 추가 (한 번만 실행되도록 수정)
@@ -227,11 +299,82 @@ export default function LiveOddsPage() {
 
   // 필터링 로직
   useEffect(() => {
-    let filtered = recentOrders.filter(order => !(order as any).isMultibet); // 일반 주문만 필터링
+    console.log('🔍 필터링 시작:', {
+      selectedSport,
+      selectedMarket,
+      selectedLeague,
+      totalOrders: recentOrders.length,
+      recentOrders: recentOrders.map(o => ({ 
+        id: o.id, 
+        sportKey: o.sportKey, 
+        market: o.market, 
+        isMultibet: (o as any).isMultibet 
+      }))
+    });
+
+    // 일반 주문과 멀티배팅 주문의 개별 경기들을 모두 포함
+    let allOrders = [...recentOrders.filter(order => !(order as any).isMultibet)]; // 일반 주문
+    
+    // 멀티배팅 주문의 개별 경기들을 추가
+    recentOrders.filter(order => (order as any).isMultibet).forEach(multibetOrder => {
+      if ((multibetOrder as any).selectionDetails?.selections) {
+        (multibetOrder as any).selectionDetails.selections.forEach((selection: any, idx: number) => {
+          // 각 선택지를 개별 주문으로 변환
+          const individualOrder = {
+            id: `${multibetOrder.id}_${idx}`,
+            userId: multibetOrder.userId,
+            gameId: selection.gameId || multibetOrder.gameId,
+            market: selection.market || multibetOrder.market,
+            line: selection.line || 0,
+            side: selection.side || 'back',
+            price: selection.odds || multibetOrder.price,
+            amount: multibetOrder.amount,
+            selection: selection.selection,
+            status: multibetOrder.status,
+            createdAt: multibetOrder.createdAt,
+            updatedAt: multibetOrder.updatedAt,
+            homeTeam: selection.homeTeam,
+            awayTeam: selection.awayTeam,
+            commenceTime: selection.commenceTime,
+            sportKey: selection.sportKey || multibetOrder.sportKey,
+            isMultibetSelection: true, // 멀티배팅에서 온 선택지임을 표시
+            parentMultibetId: multibetOrder.id
+          } as any;
+          allOrders.push(individualOrder);
+        });
+      }
+    });
+    
+    let filtered = allOrders;
+    console.log('🔍 모든 주문 포함 후:', filtered.length);
 
     // 스포츠 필터
     if (selectedSport !== 'all') {
-      filtered = filtered.filter(order => order.sportKey === selectedSport);
+      filtered = filtered.filter(order => {
+        const sportKey = order.sportKey || '';
+        let matches = false;
+        
+        if (selectedSport === 'baseball') {
+          // 야구: baseball로 시작하거나 kbo가 포함된 경우
+          matches = sportKey.startsWith('baseball') || sportKey.includes('kbo') || sportKey.includes('mlb');
+        } else if (selectedSport === 'soccer') {
+          // 축구: soccer로 시작하거나 축구 관련 키워드가 포함된 경우
+          matches = sportKey.startsWith('soccer') || sportKey.includes('league') || sportKey.includes('liga');
+        } else if (selectedSport === 'basketball') {
+          // 농구: basketball로 시작하거나 nba, kbl이 포함된 경우
+          matches = sportKey.startsWith('basketball') || sportKey.includes('nba') || sportKey.includes('kbl');
+        } else if (selectedSport === 'americanfootball') {
+          // 미식축구: americanfootball로 시작하거나 nfl이 포함된 경우
+          matches = sportKey.startsWith('americanfootball') || sportKey.includes('nfl');
+        } else {
+          // 기본: startsWith 사용
+          matches = sportKey.startsWith(selectedSport);
+        }
+        
+        console.log('🔍 스포츠 필터:', { sportKey, selectedSport, matches });
+        return matches;
+      });
+      console.log('🔍 스포츠 필터 후:', filtered.length);
     }
 
     // 마켓 필터
@@ -239,17 +382,25 @@ export default function LiveOddsPage() {
       filtered = filtered.filter(order => order.market === selectedMarket);
     }
 
-    // 검색어 필터
-    if (searchTerm) {
-      filtered = filtered.filter(order => 
-        order.homeTeam?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.awayTeam?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.selection?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+    // 리그 필터
+    if (selectedLeague !== 'all') {
+      filtered = filtered.filter(order => {
+        const orderLeague = getLeagueFromSportKey(order.sportKey || '');
+        return orderLeague === selectedLeague;
+      });
     }
 
+    console.log('🔍 필터링 결과:', {
+      selectedSport,
+      selectedMarket, 
+      selectedLeague,
+      totalOrders: recentOrders.length,
+      filteredCount: filtered.length,
+      filteredOrders: filtered.map(o => ({ id: o.id, sportKey: o.sportKey, market: o.market }))
+    });
+    
     setFilteredOrders(filtered);
-  }, [recentOrders, selectedSport, selectedMarket, searchTerm]);
+  }, [recentOrders, selectedSport, selectedMarket, selectedLeague]);
 
   // 스포츠별 통계
   const sportStats = recentOrders.reduce((acc, order) => {
@@ -300,6 +451,17 @@ export default function LiveOddsPage() {
       '핸디캡': '핸디캡'
     };
     return marketNames[market] || market;
+  };
+
+  // 스포츠별 하위 리그 매핑
+  const getLeaguesBySport = (sport: string) => {
+    const leagues: Record<string, string[]> = {
+      'soccer': ['K League', 'J League', 'Serie A', 'Brasileirao', 'MLS', 'Argentina Primera', 'Chinese Super League', 'La Liga', 'Bundesliga', 'Premier League'],
+      'basketball': ['NBA', 'KBL'],
+      'baseball': ['KBO', 'MLB'],
+      'americanfootball': ['NFL']
+    };
+    return leagues[sport] || [];
   };
 
 
@@ -364,67 +526,138 @@ export default function LiveOddsPage() {
             </div>
           </div>
 
-          {/* 필터 및 검색 */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            {/* 스포츠 필터 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">스포츠</label>
-              <select
-                value={selectedSport}
-                onChange={(e) => setSelectedSport(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white"
-              >
-                <option value="all">전체 스포츠</option>
-                {Object.keys(sportStats).map(sport => (
-                  <option key={sport} value={sport}>
-                    {getSportIcon(sport)} {sport}
-                  </option>
+          {/* Exchange 홈 리그뷰와 동일한 스타일 필터 */}
+          <div className="mb-6">
+            {/* 상위 카테고리 탭 */}
+            <div className="mb-6">
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => {
+                    setSelectedSport('all');
+                    setSelectedLeague('all');
+                  }}
+                  className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                    selectedSport === 'all'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  전체
+                </button>
+                {['Soccer', 'Basketball', 'Baseball', 'American Football'].map((mainCategory) => (
+                  <button
+                    key={mainCategory}
+                    onClick={() => {
+                      setSelectedSport(mainCategory.toLowerCase());
+                      setSelectedLeague('all'); // 스포츠 변경 시 리그 초기화
+                    }}
+                    className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                      selectedSport === mainCategory.toLowerCase()
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    {mainCategory}
+                  </button>
                 ))}
-              </select>
+              </div>
+              
+              {/* 하위 카테고리 버튼들 */}
+              {selectedSport !== 'all' && (
+                <div className="mb-6">
+                  <div className="text-lg font-bold mb-3 text-blue-300">
+                    {selectedSport === 'soccer' ? 'Soccer' : 
+                     selectedSport === 'basketball' ? 'Basketball' :
+                     selectedSport === 'baseball' ? 'Baseball' :
+                     selectedSport === 'americanfootball' ? 'American Football' : selectedSport}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {getLeaguesBySport(selectedSport).map((league) => (
+                      <button
+                        key={league}
+                        onClick={() => setSelectedLeague(selectedLeague === league ? 'all' : league)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors relative border-2 shadow-sm ${
+                          selectedLeague === league
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-blue-900 border-blue-400 text-blue-200 hover:bg-blue-800 hover:border-blue-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span>{league}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* 선택된 카테고리 정보 */}
+            {selectedLeague !== 'all' && (
+              <div className="mb-4">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-semibold text-white">
+                    현재 선택: {selectedLeague}
+                  </h2>
+                </div>
+                
+                {/* 호가 수 정보 표시 */}
+                <div className="bg-blue-900 border border-blue-700 rounded-lg p-4 mt-2">
+                  <div className="flex justify-between items-center">
+                    <div className="text-blue-200">
+                      <span className="font-semibold">{filteredOrders.length}</span>개의 호가
+                    </div>
+                    <div className="text-blue-300 text-sm">
+                      {selectedSport !== 'all' ? `${selectedSport} • ` : ''}{selectedLeague}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* 마켓 필터 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">마켓</label>
-              <select
-                value={selectedMarket}
-                onChange={(e) => setSelectedMarket(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white"
-              >
-                <option value="all">전체 마켓</option>
-                {Object.keys(marketStats).map(market => (
-                  <option key={market} value={market}>
-                    {getMarketDisplayName(market)}
-                  </option>
+            <div className="mb-4">
+              <div className="flex flex-wrap gap-2">
+                {Object.keys(marketStats)
+                  .filter(market => 
+                    market !== 'multibet' && 
+                    market !== '핸디캡' && 
+                    market !== 'spreads' && 
+                    market !== 'Win/Loss' && 
+                    market !== 'h2h'
+                  )
+                  .map(market => (
+                  <button
+                    key={market}
+                    onClick={() => setSelectedMarket(selectedMarket === market ? 'all' : market)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors relative border-2 shadow-sm ${
+                      selectedMarket === market
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-gray-700 border-gray-400 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>{getMarketDisplayName(market)}</span>
+                    </div>
+                  </button>
                 ))}
-              </select>
+              </div>
             </div>
 
-            {/* 검색 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">검색</label>
-              <input
-                type="text"
-                placeholder="팀명 또는 선택 검색..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white placeholder-gray-400"
-              />
-            </div>
-
-            {/* 새로고침 */}
-            <div className="flex items-end">
+            {/* 새로고침 버튼 */}
+            <div className="flex justify-end">
               <button
                 onClick={() => window.location.reload()}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center space-x-2"
               >
-                🔄 새로고침
+                <span>🔄</span>
+                <span>새로고침</span>
               </button>
             </div>
           </div>
         </div>
 
-        {/* 🆕 멀티배팅 주문 목록 */}
+        {/* 멀티배팅 주문 목록 */}
         {multibetOrders.length > 0 && (
           <div className="bg-black rounded-lg shadow mb-6">
             <div className="p-4 border-b border-gray-700">
@@ -474,8 +707,17 @@ export default function LiveOddsPage() {
                         <div className="text-white font-semibold mb-2">
                           {selection.homeTeam} vs {selection.awayTeam}
                         </div>
+                        <div className="text-blue-300 text-sm mb-2">
+                          {getLeagueFromSportKey(selection.sportKey || '')}
+                        </div>
                         <div className="text-white mb-2">
                           {selection.commenceTime ? convertUTCToKST(selection.commenceTime) : '시간 미정'}
+                        </div>
+                        <div className="text-gray-300 text-sm">
+                          {selection.selection} • {selection.side === 'back' ? '🎯 Back' : '📉 Lay'} • {selection.odds?.toFixed(2)}배당
+                        </div>
+                        <div className="text-gray-400 text-xs">
+                          {selection.market} • {selection.sportKey}
                         </div>
                         <div className="flex space-x-4">
                           {(() => {
@@ -674,8 +916,8 @@ export default function LiveOddsPage() {
               <div className="text-gray-400 text-4xl mb-4">📊</div>
               <h3 className="text-lg font-semibold text-gray-300 mb-2">호가가 없습니다</h3>
               <p className="text-gray-400">
-                {searchTerm || selectedSport !== 'all' || selectedMarket !== 'all' 
-                  ? '검색 조건에 맞는 호가가 없습니다.' 
+                {selectedSport !== 'all' || selectedMarket !== 'all' || selectedLeague !== 'all'
+                  ? '선택한 필터 조건에 맞는 호가가 없습니다.' 
                   : '현재 등록된 호가가 없습니다.'}
               </p>
             </div>
@@ -688,12 +930,20 @@ export default function LiveOddsPage() {
                     key={order.id}
                     className="bg-gray-800 p-4 rounded shadow border-2 border-blue-400"
                   >
-
-                    
                     {/* 🆕 투데이 배팅과 동일: 경기명 (font-semibold) */}
                     <div className="text-white font-semibold mb-2">
-                              {order.homeTeam} vs {order.awayTeam}
-                            </div>
+                      {order.homeTeam} vs {order.awayTeam}
+                    </div>
+                    
+                    {/* 🆕 리그 정보 추가 */}
+                    <div className="text-blue-300 text-sm mb-2">
+                      {getLeagueFromSportKey(order.sportKey || '')}
+                      {(order as any).isMultibetSelection && (
+                        <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
+                          🎯 멀티배팅
+                        </span>
+                      )}
+                    </div>
                     
                     {/* 🆕 투데이 배팅과 동일: 시간 (기본 폰트) */}
                     <div className="mb-4">
