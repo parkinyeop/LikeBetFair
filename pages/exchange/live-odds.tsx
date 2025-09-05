@@ -255,7 +255,7 @@ export default function LiveOddsPage() {
           matches = sportKey.startsWith('soccer') || sportKey.includes('league') || sportKey.includes('liga');
         } else if (selectedSport === 'basketball') {
           matches = sportKey.startsWith('basketball') || sportKey.includes('nba') || sportKey.includes('kbl');
-        } else if (selectedSport === 'americanfootball') {
+        } else if (selectedSport === 'americanfootball' || selectedSport === 'american football') {
           matches = sportKey.startsWith('americanfootball') || sportKey.includes('nfl');
         } else {
           matches = sportKey.startsWith(selectedSport);
@@ -363,7 +363,7 @@ export default function LiveOddsPage() {
         } else if (selectedSport === 'basketball') {
           // 농구: basketball로 시작하거나 nba, kbl이 포함된 경우
           matches = sportKey.startsWith('basketball') || sportKey.includes('nba') || sportKey.includes('kbl');
-        } else if (selectedSport === 'americanfootball') {
+        } else if (selectedSport === 'americanfootball' || selectedSport === 'american football') {
           // 미식축구: americanfootball로 시작하거나 nfl이 포함된 경우
           matches = sportKey.startsWith('americanfootball') || sportKey.includes('nfl');
         } else {
