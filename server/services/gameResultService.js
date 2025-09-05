@@ -199,7 +199,7 @@ class GameResultService {
         response = await axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsround.php`, {
           params: {
             id: leagueId,
-            r: 'current'
+            r: '1'
           },
           timeout: 15000
         });
