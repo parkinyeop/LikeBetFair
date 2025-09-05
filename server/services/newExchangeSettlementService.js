@@ -185,7 +185,7 @@ class NewExchangeSettlementService {
       }
       
       // 주문 결과 결정
-      const orderResult = this.determineOrderResult(order, winner);
+      const orderResult = this.determineOrderResult(order, winner, gameResult);
       
       // 정산 실행
       const settlement = await this.processSettlement(order, orderResult, gameResult);
@@ -224,22 +224,64 @@ class NewExchangeSettlementService {
   }
 
   /**
+   * 배팅 선택과 경기 결과 매칭 확인
+   * @param {string} selection - 배팅 선택
+   * @param {string} winner - 경기 승자
+   * @param {string} homeTeam - 홈팀명
+   * @param {string} awayTeam - 어웨이팀명
+   * @returns {boolean} 선택이 맞는지 여부
+   */
+  isSelectionCorrect(selection, winner, homeTeam, awayTeam) {
+    if (!selection) return false;
+    
+    // 무승부 처리
+    if (selection === '무승부' || selection === 'Draw') {
+      return winner === 'draw';
+    }
+    
+    // 정확한 팀명 매칭
+    if (selection === homeTeam) {
+      return winner === 'home';
+    } else if (selection === awayTeam) {
+      return winner === 'away';
+    }
+    
+    // 팀명 유사도 매칭 (teamMatchingService 활용)
+    const homeMatch = this.teamMatching.isTeamMatch(selection, homeTeam);
+    if (homeMatch) {
+      return winner === 'home';
+    }
+    
+    const awayMatch = this.teamMatching.isTeamMatch(selection, awayTeam);
+    if (awayMatch) {
+      return winner === 'away';
+    }
+    
+    return false;
+  }
+
+  /**
    * 주문 결과 결정
    * @param {Object} order - Exchange 주문
    * @param {string} winner - 승자
+   * @param {Object} gameResult - 경기 결과
    * @returns {string} 주문 결과 ('won' | 'lost')
    */
-  determineOrderResult(order, winner) {
-    // Back 배팅: 선택한 팀이 이기면 승리
-    // Lay 배팅: 선택한 팀이 지면 승리
+  determineOrderResult(order, winner, gameResult) {
+    const isCorrect = this.isSelectionCorrect(
+      order.selection,
+      winner,
+      gameResult.homeTeam,
+      gameResult.awayTeam
+    );
     
     if (order.side === 'back') {
-      return winner === 'home' ? 'won' : 'lost';
+      return isCorrect ? 'won' : 'lost';
     } else if (order.side === 'lay') {
-      return winner === 'home' ? 'lost' : 'won';
+      return isCorrect ? 'lost' : 'won';
     }
     
-    return 'lost'; // 기본값
+    return 'lost';
   }
 
   /**
