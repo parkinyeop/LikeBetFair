@@ -599,15 +599,73 @@ router.patch('/exchange/orders/:orderId/status', verifyToken, requireAdmin(2), a
 // 사용자 목록 조회
 router.get('/users', verifyToken, requireAdmin(2), async (req, res) => {
   try {
-    const users = await User.findAll({
+    const { 
+      page = 1, 
+      limit = 20, 
+      search = '', 
+      status = 'all', 
+      adminLevel = 'all',
+      sortBy = 'createdAt',
+      sortOrder = 'DESC'
+    } = req.query;
+
+    const offset = (page - 1) * limit;
+    const where = {};
+
+    // 검색 필터
+    if (search) {
+      where[Op.or] = [
+        { username: { [Op.iLike]: `%${search}%` } },
+        { email: { [Op.iLike]: `%${search}%` } },
+        { referralCode: { [Op.iLike]: `%${search}%` } }
+      ];
+    }
+
+    // 상태 필터
+    if (status !== 'all') {
+      where.isActive = status === 'active';
+    }
+
+    // 관리자 레벨 필터
+    if (adminLevel !== 'all') {
+      where.adminLevel = parseInt(adminLevel);
+    }
+
+    // 정렬 설정
+    let orderClause;
+    switch (sortBy) {
+      case 'username':
+        orderClause = [['username', sortOrder]];
+        break;
+      case 'balance':
+        orderClause = [['balance', sortOrder]];
+        break;
+      case 'lastLogin':
+        orderClause = [['lastLogin', sortOrder]];
+        break;
+      default: // createdAt
+        orderClause = [['createdAt', sortOrder]];
+    }
+
+    const { count, rows: users } = await User.findAndCountAll({
+      where,
       attributes: { exclude: ['password'] },
-      limit: 10,
-      order: [['createdAt', 'DESC']]
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      order: orderClause
     });
+
+    const totalPages = Math.ceil(count / limit);
 
     res.json({
       message: '사용자 목록 조회 성공',
-      users
+      users,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages,
+        totalItems: count,
+        itemsPerPage: parseInt(limit)
+      }
     });
   } catch (error) {
     console.error('Users list error:', error);

@@ -251,7 +251,10 @@ export default function AdminDashboard() {
                     <div>• 잔액 수정 및 이력 관리</div>
                     <div>• 사용자 상세 정보 조회</div>
                   </div>
-                  <button className="mt-4 w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors">
+                  <button 
+                    onClick={() => router.push('/admin/users')}
+                    className="mt-4 w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors"
+                  >
                     사용자 관리하기
                   </button>
                 </div>
