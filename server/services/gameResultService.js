@@ -195,15 +195,24 @@ class GameResultService {
         });
         console.log(`[GameResult] 북미 리그 시즌 API 사용: ${sportKey} (${currentYear})`);
       } else {
-        // 유럽 리그: 라운드 기반 (EPL, 세리에A, 라리가 등)
-        response = await axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsround.php`, {
-          params: {
-            id: leagueId,
-            r: '1'
-          },
-          timeout: 15000
-        });
-        console.log(`[GameResult] 유럽 리그 라운드 API 사용: ${sportKey}`);
+        // 유럽 리그: 최근 + 예정 경기 조합으로 시간 범위 내 데이터 수집
+        const [lastResponse, nextResponse] = await Promise.all([
+          axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventslast.php`, {
+            params: { id: leagueId },
+            timeout: 15000
+          }),
+          axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsnext.php`, {
+            params: { id: leagueId },
+            timeout: 15000
+          })
+        ]);
+        
+        const lastEvents = lastResponse.data?.events || [];
+        const nextEvents = nextResponse.data?.events || [];
+        const allEvents = [...lastEvents, ...nextEvents];
+        
+        response = { data: { events: allEvents } };
+        console.log(`[GameResult] 유럽 리그 최근+예정 API 사용: ${sportKey} (${lastEvents.length}+${nextEvents.length}개)`);
       }
 
       const events = response.data?.events || [];
@@ -333,15 +342,24 @@ class GameResultService {
         });
         console.log(`[Fallback] 북미 리그 시즌 API 사용: ${sportKey} (${currentYear})`);
       } else {
-        // 유럽 리그: 라운드 기반 (EPL, 세리에A, 라리가 등)
-        response = await axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsround.php`, {
-          params: {
-            id: leagueId,
-            r: 'current'
-          },
-          timeout: 15000 // 15초 타임아웃
-        });
-        console.log(`[Fallback] 유럽 리그 라운드 API 사용: ${sportKey}`);
+        // 유럽 리그: 최근 + 예정 경기 조합으로 시간 범위 내 데이터 수집
+        const [lastResponse, nextResponse] = await Promise.all([
+          axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventslast.php`, {
+            params: { id: leagueId },
+            timeout: 15000
+          }),
+          axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsnext.php`, {
+            params: { id: leagueId },
+            timeout: 15000
+          })
+        ]);
+        
+        const lastEvents = lastResponse.data?.events || [];
+        const nextEvents = nextResponse.data?.events || [];
+        const allEvents = [...lastEvents, ...nextEvents];
+        
+        response = { data: { events: allEvents } };
+        console.log(`[Fallback] 유럽 리그 최근+예정 API 사용: ${sportKey} (${lastEvents.length}+${nextEvents.length}개)`);
       }
 
       const events = response.data?.events || [];
