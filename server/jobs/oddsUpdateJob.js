@@ -74,12 +74,14 @@ if (!fs.existsSync(logsDir)) {
 // 로그 파일 크기 제한 (10MB)
 const MAX_LOG_SIZE = 10 * 1024 * 1024; // 10MB
 
-// 로그 파일 정리 함수
+// 로그 파일 정리 함수 (분리된 로그 파일들 포함)
 function cleanupLogFiles() {
   try {
     const files = fs.readdirSync(logsDir);
     files.forEach(file => {
-      if (file.startsWith('scheduler_') && file.endsWith('.log')) {
+      if ((file.startsWith('scheduler_') || file.startsWith('game_results_') || 
+           file.startsWith('odds_data_') || file.startsWith('bet_results_')) && 
+          file.endsWith('.log')) {
         const filePath = path.join(logsDir, file);
         const stats = fs.statSync(filePath);
         
@@ -96,11 +98,24 @@ function cleanupLogFiles() {
   }
 }
 
-// 로그 저장 함수 (최적화됨)
+// 로그 저장 함수 (최적화됨 + 타입별 분리)
 function saveUpdateLog(type, status, data = {}) {
   const now = new Date();
   const dateStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
-  const logFile = path.join(logsDir, `scheduler_${dateStr}.log`);
+  
+  // 타입별 로그 파일 분리
+  let logFileName;
+  if (type === 'results') {
+    logFileName = `game_results_${dateStr}.log`;
+  } else if (type === 'odds') {
+    logFileName = `odds_data_${dateStr}.log`;
+  } else if (type === 'bets') {
+    logFileName = `bet_results_${dateStr}.log`;
+  } else {
+    logFileName = `scheduler_${dateStr}.log`; // 기타 로그들
+  }
+  
+  const logFile = path.join(logsDir, logFileName);
   
   // init 타입 로그 최적화 - 중복 방지
   if (type === 'init' && status === 'start') {
