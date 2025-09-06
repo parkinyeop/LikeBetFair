@@ -706,13 +706,59 @@ router.get('/users/:id', verifyToken, requireAdmin(2), async (req, res) => {
 
     const totalWinnings = wonBets.reduce((sum, bet) => sum + parseFloat(bet.potentialWinnings), 0);
 
+    // 레퍼럴 정보 계산
+    let referralInfo = null;
+    if (user.referredBy) {
+      // 추천한 관리자 정보 조회
+      const referrerAdmin = await User.findByPk(user.referrerAdminId, {
+        attributes: ['id', 'username', 'adminLevel']
+      });
+      
+      // 추천코드 정보 조회
+      const referralCode = await ReferralCode.findOne({
+        where: { code: user.referredBy },
+        attributes: ['id', 'code', 'commissionRate', 'isActive', 'currentUsers', 'maxUsers', 'expiresAt']
+      });
+
+      referralInfo = {
+        referredBy: user.referredBy,
+        referrerAdmin: referrerAdmin ? {
+          id: referrerAdmin.id,
+          username: referrerAdmin.username,
+          adminLevel: referrerAdmin.adminLevel
+        } : null,
+        referralCode: referralCode ? {
+          id: referralCode.id,
+          code: referralCode.code,
+          commissionRate: parseFloat(referralCode.commissionRate),
+          isActive: referralCode.isActive,
+          currentUsers: referralCode.currentUsers,
+          maxUsers: referralCode.maxUsers,
+          expiresAt: referralCode.expiresAt
+        } : null
+      };
+    }
+
+    // 이 사용자가 추천한 사용자들 조회 (관리자인 경우)
+    let referredUsers = [];
+    if (user.isAdmin) {
+      referredUsers = await User.findAll({
+        where: { referrerAdminId: user.id },
+        attributes: ['id', 'username', 'email', 'createdAt', 'isActive'],
+        order: [['createdAt', 'DESC']],
+        limit: 10
+      });
+    }
+
     res.json({
       user,
       stats: {
         totalBets,
         totalStake: parseFloat(totalStake),
         totalWinnings
-      }
+      },
+      referralInfo,
+      referredUsers
     });
 
   } catch (error) {

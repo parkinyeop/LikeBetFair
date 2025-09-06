@@ -25,6 +25,32 @@ interface UserStats {
   totalWinnings: number;
 }
 
+interface ReferralInfo {
+  referredBy: string;
+  referrerAdmin: {
+    id: string;
+    username: string;
+    adminLevel: number;
+  } | null;
+  referralCode: {
+    id: string;
+    code: string;
+    commissionRate: number;
+    isActive: boolean;
+    currentUsers: number;
+    maxUsers: number | null;
+    expiresAt: string | null;
+  } | null;
+}
+
+interface ReferredUser {
+  id: string;
+  username: string;
+  email: string;
+  createdAt: string;
+  isActive: boolean;
+}
+
 interface UserFilters {
   search: string;
   status: 'all' | 'active' | 'inactive';
@@ -46,6 +72,8 @@ export default function AdminUsers() {
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [referralInfo, setReferralInfo] = useState<ReferralInfo | null>(null);
+  const [referredUsers, setReferredUsers] = useState<ReferredUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filters, setFilters] = useState<UserFilters>({
@@ -140,6 +168,8 @@ export default function AdminUsers() {
         const data = await response.json();
         setSelectedUser(data.user);
         setUserStats(data.stats);
+        setReferralInfo(data.referralInfo);
+        setReferredUsers(data.referredUsers || []);
         setShowUserDetail(true);
       } else {
         const errorData = await response.json();
@@ -382,6 +412,7 @@ export default function AdminUsers() {
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">잔액</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">관리자</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">레퍼럴</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">가입일</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">최근 로그인</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">액션</th>
@@ -427,6 +458,18 @@ export default function AdminUsers() {
                                   </span>
                                 ) : (
                                   <span className="text-sm text-gray-500">일반</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {user.referredBy ? (
+                                  <div className="text-sm">
+                                    <div className="font-mono text-purple-600">{user.referredBy}</div>
+                                    {user.referralCode && (
+                                      <div className="text-xs text-gray-500">코드: {user.referralCode}</div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-sm text-gray-500">없음</span>
                                 )}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -618,6 +661,100 @@ export default function AdminUsers() {
                           </div>
                         </div>
                       </div>
+
+                      {/* 레퍼럴 정보 */}
+                      {referralInfo && (
+                        <div className="mt-6">
+                          <h4 className="text-lg font-medium text-gray-900 mb-4">레퍼럴 정보</h4>
+                          <div className="bg-purple-50 p-4 rounded-lg">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-purple-600">추천인 코드</label>
+                                <p className="text-sm text-gray-900 font-mono">{referralInfo.referredBy}</p>
+                              </div>
+                              {referralInfo.referrerAdmin && (
+                                <div>
+                                  <label className="block text-sm font-medium text-purple-600">추천 관리자</label>
+                                  <p className="text-sm text-gray-900">
+                                    {referralInfo.referrerAdmin.username} (레벨 {referralInfo.referrerAdmin.adminLevel})
+                                  </p>
+                                </div>
+                              )}
+                              {referralInfo.referralCode && (
+                                <>
+                                  <div>
+                                    <label className="block text-sm font-medium text-purple-600">수수료율</label>
+                                    <p className="text-sm text-gray-900">{(referralInfo.referralCode.commissionRate * 100).toFixed(2)}%</p>
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-purple-600">코드 상태</label>
+                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                      referralInfo.referralCode.isActive 
+                                        ? 'bg-green-100 text-green-800' 
+                                        : 'bg-red-100 text-red-800'
+                                    }`}>
+                                      {referralInfo.referralCode.isActive ? '활성' : '비활성'}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-purple-600">현재 사용자 수</label>
+                                    <p className="text-sm text-gray-900">
+                                      {referralInfo.referralCode.currentUsers}명
+                                      {referralInfo.referralCode.maxUsers && ` / ${referralInfo.referralCode.maxUsers}명`}
+                                    </p>
+                                  </div>
+                                  {referralInfo.referralCode.expiresAt && (
+                                    <div>
+                                      <label className="block text-sm font-medium text-purple-600">만료일</label>
+                                      <p className="text-sm text-gray-900">
+                                        {new Date(referralInfo.referralCode.expiresAt).toLocaleDateString('ko-KR')}
+                                      </p>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 추천한 사용자들 (관리자인 경우) */}
+                      {referredUsers.length > 0 && (
+                        <div className="mt-6">
+                          <h4 className="text-lg font-medium text-gray-900 mb-4">추천한 사용자들 ({referredUsers.length}명)</h4>
+                          <div className="bg-gray-50 rounded-lg p-4">
+                            <div className="space-y-3">
+                              {referredUsers.map((referredUser) => (
+                                <div key={referredUser.id} className="flex items-center justify-between bg-white p-3 rounded border">
+                                  <div className="flex items-center space-x-3">
+                                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                      <span className="text-xs font-medium text-blue-600">
+                                        {referredUser.username.charAt(0).toUpperCase()}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <p className="text-sm font-medium text-gray-900">{referredUser.username}</p>
+                                      <p className="text-xs text-gray-500">{referredUser.email}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                      referredUser.isActive 
+                                        ? 'bg-green-100 text-green-800' 
+                                        : 'bg-red-100 text-red-800'
+                                    }`}>
+                                      {referredUser.isActive ? '활성' : '비활성'}
+                                    </span>
+                                    <span className="text-xs text-gray-500">
+                                      {new Date(referredUser.createdAt).toLocaleDateString('ko-KR')}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {/* 베팅 통계 */}
                       {userStats && (
