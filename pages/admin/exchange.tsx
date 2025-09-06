@@ -194,13 +194,6 @@ interface NavigationContext {
   };
 }
 
-interface QuickAction {
-  id: string;
-  label: string;
-  icon: string;
-  action: () => void;
-  variant: 'primary' | 'secondary' | 'danger';
-}
 
 // Phase 3: 실시간 업데이트를 위한 타입들
 interface RealtimeUpdate {
@@ -1073,64 +1066,6 @@ export default function ExchangeAdmin() {
     }
   }, [getAuthHeaders, updateBreadcrumbs]);
 
-  // Phase 2: 빠른 액션 함수들 (안전한 글로벌 관리 기능만)
-  const quickActions: QuickAction[] = useMemo(() => [
-    {
-      id: 'go-home',
-      label: '홈으로 가기',
-      icon: '🏠',
-      action: () => {
-        // 홈으로 이동
-        window.location.href = '/admin';
-      },
-      variant: 'primary'
-    },
-    {
-      id: 'view-orders',
-      label: '주문 관리',
-      icon: '📋',
-      action: () => {
-        // 주문 관리 탭으로 이동
-        handleTabChange('orders');
-      },
-      variant: 'secondary'
-    },
-    {
-      id: 'view-settlements',
-      label: '정산 관리',
-      icon: '💰',
-      action: () => {
-        // 정산 관리 탭으로 이동
-        handleTabChange('settlements');
-      },
-      variant: 'secondary'
-    },
-    {
-      id: 'view-analytics',
-      label: '통계 분석',
-      icon: '📊',
-      action: () => {
-        // 통계 분석 탭으로 이동
-        handleTabChange('analytics');
-      },
-      variant: 'secondary'
-    },
-    {
-      id: 'refresh-data',
-      label: '데이터 새로고침',
-      icon: '🔄',
-      action: () => {
-        // 데이터 새로고침
-        fetchExchangeData();
-        addNotification({
-          type: 'info',
-          title: '데이터 새로고침',
-          message: '데이터를 새로고침했습니다.'
-        });
-      },
-      variant: 'secondary'
-    }
-  ], [handleTabChange, fetchExchangeData, addNotification]);
 
   // Phase 3: 데이터 내보내기 기능
   const exportData = useCallback(async (options: ExportOptions) => {
@@ -1406,32 +1341,6 @@ export default function ExchangeAdmin() {
                 </div>
               </div>
 
-              {/* Phase 2: 빠른 액션 버튼들 */}
-              {activeTab === 'dashboard' && (
-                <div className="mb-6">
-                  <div className="bg-white p-4 rounded-lg shadow">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">빠른 액션</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {quickActions.map((action) => (
-                        <button
-                          key={action.id}
-                          onClick={action.action}
-                          className={`flex items-center space-x-2 px-4 py-3 rounded-lg font-medium transition-colors ${
-                            action.variant === 'primary' 
-                              ? 'bg-blue-600 text-white hover:bg-blue-700'
-                              : action.variant === 'danger'
-                              ? 'bg-red-600 text-white hover:bg-red-700'
-                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
-                        >
-                          <span>{action.icon}</span>
-                          <span className="text-sm">{action.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* 새로운 계층적 탭 네비게이션 */}
               <div className="mb-6">

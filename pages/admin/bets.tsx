@@ -214,13 +214,6 @@ interface BulkOperation {
   createdAt: Date;
 }
 
-interface QuickAction {
-  id: string;
-  label: string;
-  icon: string;
-  action: () => void;
-  variant: 'primary' | 'secondary' | 'danger';
-}
 
 interface NotificationItem {
   id: string;
@@ -766,50 +759,6 @@ export default function BettingAdmin() {
     setShowBetDetail(true);
   }, []);
 
-  // 빠른 액션들
-  const quickActions: QuickAction[] = useMemo(() => [
-    {
-      id: 'go-home',
-      label: '홈으로 가기',
-      icon: '🏠',
-      action: () => {
-        window.location.href = '/admin';
-      },
-      variant: 'primary'
-    },
-    {
-      id: 'view-bets',
-      label: '스포츠북 관리',
-      icon: '🎯',
-      action: () => {
-        handleTabChange('bets');
-      },
-      variant: 'secondary'
-    },
-    {
-      id: 'view-analytics',
-      label: '통계 분석',
-      icon: '📊',
-      action: () => {
-        handleTabChange('analytics');
-      },
-      variant: 'secondary'
-    },
-    {
-      id: 'refresh-data',
-      label: '데이터 새로고침',
-      icon: '🔄',
-      action: () => {
-        fetchBettingData();
-        addNotification({
-          type: 'info',
-          title: '데이터 새로고침',
-          message: '스포츠북 데이터를 새로고침했습니다.'
-        });
-      },
-      variant: 'secondary'
-    }
-  ], [handleTabChange, fetchBettingData, addNotification]);
 
   // 상태별 색상 함수
   const getStatusColor = (status: string) => {
@@ -880,32 +829,6 @@ export default function BettingAdmin() {
               </div>
 
 
-              {/* 빠른 액션 버튼들 */}
-              {activeTab === 'dashboard' && (
-                <div className="mb-6">
-                  <div className="bg-white p-4 rounded-lg shadow">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">빠른 액션</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {quickActions.map((action) => (
-                        <button
-                          key={action.id}
-                          onClick={action.action}
-                          className={`flex items-center space-x-2 px-4 py-3 rounded-lg font-medium transition-colors ${
-                            action.variant === 'primary' 
-                              ? 'bg-blue-600 text-white hover:bg-blue-700'
-                              : action.variant === 'danger'
-                              ? 'bg-red-600 text-white hover:bg-red-700'
-                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
-                        >
-                          <span>{action.icon}</span>
-                          <span className="text-sm">{action.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* 새로운 계층적 탭 네비게이션 */}
               <div className="mb-6">
