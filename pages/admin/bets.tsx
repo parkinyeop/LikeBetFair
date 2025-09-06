@@ -879,26 +879,53 @@ export default function BettingAdmin() {
                 </div>
               </div>
 
-              {/* 탭 네비게이션 */}
-              <div className="mb-8">
-                <div className="border-b border-gray-200">
-                  <nav className="-mb-px flex space-x-8">
-                    {BETTING_TABS.map((tab) => (
-                      <button
-                        key={tab.id}
-                        onClick={() => handleTabChange(tab.id)}
-                        className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                          activeTab === tab.id
-                            ? 'border-blue-500 text-blue-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                        }`}
-                      >
-                        <span className="mr-2">{tab.icon}</span>
-                        {tab.label}
-                      </button>
-                    ))}
-                  </nav>
+
+              {/* 빠른 액션 버튼들 */}
+              {activeTab === 'dashboard' && (
+                <div className="mb-6">
+                  <div className="bg-white p-4 rounded-lg shadow">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">빠른 액션</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {quickActions.map((action) => (
+                        <button
+                          key={action.id}
+                          onClick={action.action}
+                          className={`flex items-center space-x-2 px-4 py-3 rounded-lg font-medium transition-colors ${
+                            action.variant === 'primary' 
+                              ? 'bg-blue-600 text-white hover:bg-blue-700'
+                              : action.variant === 'danger'
+                              ? 'bg-red-600 text-white hover:bg-red-700'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          <span>{action.icon}</span>
+                          <span className="text-sm">{action.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
+              )}
+
+              {/* 새로운 계층적 탭 네비게이션 */}
+              <div className="mb-6">
+                <nav className="flex space-x-8">
+                  {BETTING_TABS.map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => handleTabChange(tab.id)}
+                      className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                        activeTab === tab.id
+                          ? 'bg-blue-600 text-white'
+                          : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
+                      }`}
+                      title={tab.purpose}
+                    >
+                      <span>{tab.icon}</span>
+                      <span>{tab.label}</span>
+                    </button>
+                  ))}
+                </nav>
               </div>
 
               {/* 대시보드 탭 */}
@@ -927,29 +954,6 @@ export default function BettingAdmin() {
                       </div>
                     </div>
                   )}
-
-                  {/* 빠른 액션 */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-blue-900 mb-4">⚡ 빠른 액션</h3>
-                    <div className="flex flex-wrap gap-3">
-                      {quickActions.map((action) => (
-                        <button
-                          key={action.id}
-                          onClick={action.action}
-                          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                            action.variant === 'primary'
-                              ? 'bg-blue-600 text-white hover:bg-blue-700'
-                              : action.variant === 'danger'
-                              ? 'bg-red-600 text-white hover:bg-red-700'
-                              : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                          }`}
-                        >
-                          <span className="mr-2">{action.icon}</span>
-                          {action.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
 
                   {/* 일별 베팅 현황 차트 */}
                   <div className="bg-white rounded-lg shadow">
