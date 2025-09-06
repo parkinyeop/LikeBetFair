@@ -1,0 +1,1587 @@
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { useRouter } from 'next/router';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import { Bar } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
+import Header from '../../components/Header';
+
+// 베팅 관리 탭 구조 정의
+interface BettingTabStructure {
+  id: 'dashboard' | 'bets' | 'analytics' | 'management';
+  label: string;
+  icon: string;
+  purpose: string;
+  level: 'overview' | 'management' | 'analysis';
+}
+
+interface Bet {
+  id: string;
+  userId: string;
+  stake: number;
+  selections: any[];
+  totalOdds: number;
+  potentialWinnings: number;
+  status: 'pending' | 'won' | 'lost' | 'cancelled';
+  createdAt: string;
+  updatedAt: string;
+  User: {
+    id: string;
+    username: string;
+    email: string;
+    balance?: number;
+  };
+}
+
+interface BetStats {
+  summary: {
+    totalBets: number;
+    totalStake: number;
+    totalPotentialWinnings: number;
+    actualWinnings: number;
+    netProfit: number;
+  };
+  statusBreakdown: Array<{
+    status: string;
+    count: number;
+    totalStake: number;
+    totalWinnings: number;
+  }>;
+}
+
+interface BetFilters {
+  status: 'all' | 'pending' | 'won' | 'lost' | 'cancelled';
+  userId: string;
+  startDate: string;
+  endDate: string;
+  sortBy: 'createdAt' | 'stake' | 'potentialWinnings' | 'status';
+  sortOrder: 'asc' | 'desc';
+}
+
+interface PaginationState {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  itemsPerPage: number;
+}
+
+interface AdminState {
+  global: {
+    loading: boolean;
+    error: string | null;
+    lastUpdated: Date | null;
+  };
+  tabs: {
+    dashboard: DashboardState;
+    bets: BetsState;
+    analytics: AnalyticsState;
+    management: ManagementState;
+  };
+  shared: {
+    filters: GlobalFilters;
+    selectedItems: SelectedItems;
+    modals: ModalState;
+  };
+}
+
+interface DashboardState {
+  kpis: KPIData;
+  recentActivity: ActivityItem[];
+  alerts: Alert[];
+  loading: boolean;
+}
+
+interface BetsState {
+  bets: Bet[];
+  filters: BetFilters;
+  selectedBet: Bet | null;
+  loading: boolean;
+  pagination: PaginationState;
+}
+
+interface AnalyticsState {
+  realtime: RealtimeStats;
+  daily: DailyStats[];
+  monthly: MonthlyStats[];
+  selectedPeriod: DateRange;
+  loading: boolean;
+}
+
+interface ManagementState {
+  pendingActions: PendingAction[];
+  bulkOperations: BulkOperation[];
+  loading: boolean;
+}
+
+interface GlobalFilters {
+  dateRange: DateRange;
+  status: string[];
+  searchTerm: string;
+}
+
+interface SelectedItems {
+  bets: string[];
+}
+
+interface ModalState {
+  betDetail: boolean;
+  betEdit: boolean;
+  bulkAction: boolean;
+}
+
+interface KPIData {
+  todayBets: number;
+  todayStake: number;
+  todayWinnings: number;
+  totalBets: number;
+}
+
+interface ActivityItem {
+  id: string;
+  type: 'bet' | 'settlement' | 'alert';
+  message: string;
+  timestamp: Date;
+  data: any;
+}
+
+interface Alert {
+  id: string;
+  type: 'warning' | 'error' | 'info';
+  message: string;
+  timestamp: Date;
+  action?: () => void;
+}
+
+interface RealtimeStats {
+  activeBets: number;
+  pendingBets: number;
+  totalStake: number;
+  totalWinnings: number;
+  lastUpdate: Date;
+}
+
+interface DailyStats {
+  date: string;
+  bets: number;
+  stake: number;
+  winnings: number;
+  profit: number;
+}
+
+interface MonthlyStats {
+  month: string;
+  bets: number;
+  stake: number;
+  winnings: number;
+  profit: number;
+}
+
+interface DateRange {
+  start: Date;
+  end: Date;
+}
+
+interface PendingAction {
+  id: string;
+  type: 'settlement' | 'refund' | 'adjustment';
+  description: string;
+  priority: 'high' | 'medium' | 'low';
+  createdAt: Date;
+}
+
+interface BulkOperation {
+  id: string;
+  type: 'settlement' | 'refund' | 'status_change';
+  description: string;
+  count: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  createdAt: Date;
+}
+
+interface QuickAction {
+  id: string;
+  label: string;
+  icon: string;
+  action: () => void;
+  variant: 'primary' | 'secondary' | 'danger';
+}
+
+interface NotificationItem {
+  id: string;
+  type: 'success' | 'error' | 'warning' | 'info';
+  title: string;
+  message: string;
+  timestamp: Date;
+  read: boolean;
+}
+
+// 베팅 관리 탭 정의
+const BETTING_TABS: BettingTabStructure[] = [
+  {
+    id: 'dashboard',
+    label: '대시보드',
+    icon: '📊',
+    purpose: '스포츠북 현황 파악 및 빠른 액션',
+    level: 'overview'
+  },
+  {
+    id: 'bets',
+    label: '스포츠북 관리',
+    icon: '🎯',
+    purpose: '모든 스포츠북 통합 관리',
+    level: 'management'
+  },
+  {
+    id: 'analytics',
+    label: '통계 분석',
+    icon: '📈',
+    purpose: '상세 통계 및 분석',
+    level: 'analysis'
+  },
+  {
+    id: 'management',
+    label: '관리 도구',
+    icon: '⚙️',
+    purpose: '스포츠북 결과 처리 및 관리',
+    level: 'management'
+  }
+];
+
+// 스포츠북 상태 서브탭
+const BET_SUBTABS = [
+  { id: 'all', label: '전체 스포츠북' },
+  { id: 'pending', label: '대기 중' },
+  { id: 'won', label: '당첨' },
+  { id: 'lost', label: '낙첨' },
+  { id: 'cancelled', label: '취소됨' }
+];
+
+export default function BettingAdmin() {
+  const { isLoggedIn, isAdmin, adminLevel, username } = useAuth();
+  const router = useRouter();
+  
+  // 새로운 상태 관리 구조
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'bets' | 'analytics' | 'management'>('dashboard');
+  const [activeSubTab, setActiveSubTab] = useState<string>('all');
+  
+  // 통합 상태 관리
+  const [adminState, setAdminState] = useState<AdminState>({
+    global: {
+      loading: false,
+      error: null,
+      lastUpdated: null
+    },
+    tabs: {
+      dashboard: {
+        kpis: {
+          todayBets: 0,
+          todayStake: 0,
+          todayWinnings: 0,
+          totalBets: 0
+        },
+        recentActivity: [],
+        alerts: [],
+        loading: false
+      },
+      bets: {
+        bets: [],
+        filters: {
+          status: 'all',
+          userId: '',
+          startDate: '',
+          endDate: '',
+          sortBy: 'createdAt',
+          sortOrder: 'desc'
+        },
+        selectedBet: null,
+        loading: false,
+        pagination: {
+          currentPage: 1,
+          totalPages: 1,
+          totalItems: 0,
+          itemsPerPage: 20
+        }
+      },
+      analytics: {
+        realtime: {
+          activeBets: 0,
+          pendingBets: 0,
+          totalStake: 0,
+          totalWinnings: 0,
+          lastUpdate: new Date()
+        },
+        daily: [],
+        monthly: [],
+        selectedPeriod: {
+          start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+          end: new Date()
+        },
+        loading: false
+      },
+      management: {
+        pendingActions: [],
+        bulkOperations: [],
+        loading: false
+      }
+    },
+    shared: {
+      filters: {
+        dateRange: {
+          start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+          end: new Date()
+        },
+        status: [],
+        searchTerm: ''
+      },
+      selectedItems: {
+        bets: []
+      },
+      modals: {
+        betDetail: false,
+        betEdit: false,
+        bulkAction: false
+      }
+    }
+  });
+
+  // 기존 상태들 (호환성을 위해 유지)
+  const [bets, setBets] = useState<Bet[]>([]);
+  const [selectedBet, setSelectedBet] = useState<Bet | null>(null);
+  const [betStats, setBetStats] = useState<BetStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [filters, setFilters] = useState<BetFilters>({
+    status: 'all',
+    userId: '',
+    startDate: '',
+    endDate: '',
+    sortBy: 'createdAt',
+    sortOrder: 'desc'
+  });
+  const [pagination, setPagination] = useState<PaginationState>({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    itemsPerPage: 20
+  });
+  const [showBetDetail, setShowBetDetail] = useState(false);
+  const [resultEdit, setResultEdit] = useState({ isEditing: false, newStatus: '', reason: '' });
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  
+  // 월별 필터 상태
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+
+  // 권한 체크
+  useEffect(() => {
+    if (!isLoggedIn) {
+      router.push('/');
+      return;
+    }
+    
+    if (!isAdmin || adminLevel < 1) {
+      alert('스포츠북 관리 권한이 필요합니다.');
+      router.push('/admin');
+      return;
+    }
+
+    fetchBettingData();
+  }, [isLoggedIn, isAdmin, adminLevel, router]);
+
+  // 월별 필터 변경 시 일별 통계 다시 조회
+  useEffect(() => {
+    if (isLoggedIn && isAdmin) {
+      fetchDailyStats();
+    }
+  }, [selectedYear, selectedMonth, isLoggedIn, isAdmin]);
+
+  // 인증 헤더 생성
+  const getAuthHeaders = useCallback(() => {
+    const tabId = sessionStorage.getItem('tabId');
+    const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
+    
+    if (!token) {
+      throw new Error('로그인 토큰이 없습니다.');
+    }
+
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+  }, []);
+
+  // 일별 통계 데이터
+  const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
+  const [monthlySummary, setMonthlySummary] = useState<any>(null);
+
+  // 통합 데이터 로딩
+  const fetchBettingData = useCallback(async () => {
+    try {
+      console.log('스포츠북 데이터 로딩 시작...');
+      setAdminState(prev => ({
+        ...prev,
+        global: { ...prev.global, loading: true, error: null }
+      }));
+
+      const headers = getAuthHeaders();
+      const baseUrl = 'http://localhost:5050/api/admin';
+
+      // 병렬로 모든 데이터 로딩
+      const [betsResponse, statsResponse] = await Promise.all([
+        fetch(`${baseUrl}/bets?page=1&limit=1000&status=all`, { headers }),
+        fetch(`${baseUrl}/bets/stats/summary`, { headers })
+      ]);
+
+      console.log('API 호출 완료');
+
+      if (betsResponse.ok) {
+        const betsData = await betsResponse.json();
+        console.log('스포츠북 데이터:', betsData);
+        setBets(betsData.bets || []);
+        setPagination(prev => ({
+          ...prev,
+          totalPages: betsData.pagination?.totalPages || 1,
+          totalItems: betsData.pagination?.totalItems || 0
+        }));
+        
+        // 통계 계산
+        const allBets = betsData.bets || [];
+        const totalBets = allBets.length;
+        const totalStake = allBets.reduce((sum: number, bet: Bet) => sum + parseFloat(bet.stake.toString()), 0);
+        const totalPotentialWinnings = allBets.reduce((sum: number, bet: Bet) => sum + parseFloat(bet.potentialWinnings.toString()), 0);
+        
+        const wonBets = allBets.filter((bet: Bet) => bet.status === 'won');
+        const actualWinnings = wonBets.reduce((sum: number, bet: Bet) => sum + parseFloat(bet.potentialWinnings.toString()), 0);
+        
+        const statusBreakdown = allBets.reduce((acc: any, bet: Bet) => {
+          if (!acc[bet.status]) {
+            acc[bet.status] = { count: 0, totalStake: 0, totalWinnings: 0 };
+          }
+          acc[bet.status].count++;
+          acc[bet.status].totalStake += parseFloat(bet.stake.toString());
+          acc[bet.status].totalWinnings += parseFloat(bet.potentialWinnings.toString());
+          return acc;
+        }, {});
+        
+        setBetStats({
+          summary: {
+            totalBets,
+            totalStake,
+            totalPotentialWinnings,
+            actualWinnings,
+            netProfit: totalStake - actualWinnings
+          },
+          statusBreakdown: Object.entries(statusBreakdown).map(([status, data]: [string, any]) => ({
+            status,
+            count: data.count,
+            totalStake: data.totalStake,
+            totalWinnings: data.totalWinnings
+          }))
+        });
+
+        // 일별 통계 생성 (최근 30일)
+        const dailyStatsData = generateDailyStats(allBets);
+        setDailyStats(dailyStatsData);
+
+        // 관리자 상태 업데이트
+        setAdminState(prev => ({
+          ...prev,
+          tabs: {
+            ...prev.tabs,
+            dashboard: {
+              ...prev.tabs.dashboard,
+              kpis: {
+                todayBets: totalBets,
+                todayStake: totalStake,
+                todayWinnings: actualWinnings,
+                totalBets: totalBets
+              },
+              loading: false
+            },
+            bets: {
+              ...prev.tabs.bets,
+              bets: allBets,
+              loading: false
+            }
+          },
+          global: {
+            ...prev.global,
+            loading: false,
+            lastUpdated: new Date()
+          }
+        }));
+      } else {
+        const errorData = await betsResponse.json();
+        console.error('베팅 데이터 로딩 오류:', errorData);
+        setError(errorData.message || '스포츠북 데이터를 불러올 수 없습니다.');
+      }
+
+      setLoading(false);
+    } catch (err) {
+      console.error('스포츠북 데이터 로딩 오류:', err);
+      setError('서버 연결에 실패했습니다.');
+      setLoading(false);
+    }
+  }, [getAuthHeaders]);
+
+  // 일별 통계 생성 함수
+  const generateDailyStats = (bets: Bet[]): DailyStats[] => {
+    const statsMap = new Map<string, DailyStats>();
+    const today = new Date();
+    
+    // 최근 30일 데이터 생성
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      statsMap.set(dateStr, {
+        date: dateStr,
+        bets: 0,
+        stake: 0,
+        winnings: 0,
+        profit: 0
+      });
+    }
+    
+    // 실제 베팅 데이터로 채우기
+    bets.forEach(bet => {
+      const betDate = new Date(bet.createdAt).toISOString().split('T')[0];
+      if (statsMap.has(betDate)) {
+        const stats = statsMap.get(betDate)!;
+        stats.bets += 1;
+        stats.stake += parseFloat(bet.stake.toString());
+        
+        if (bet.status === 'won') {
+          stats.winnings += parseFloat(bet.potentialWinnings.toString());
+        }
+        
+        stats.profit = stats.winnings - stats.stake;
+      }
+    });
+    
+    return Array.from(statsMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+  };
+
+  // 일별 통계 조회 함수
+  const fetchDailyStats = useCallback(async () => {
+    try {
+      console.log('일별 통계 로딩 시작...');
+      const headers = getAuthHeaders();
+      const url = `http://localhost:5050/api/admin/bets/daily-stats?year=${selectedYear}&month=${selectedMonth}`;
+      
+      const response = await fetch(url, { headers });
+      if (response.ok) {
+        const data = await response.json();
+        console.log('일별 통계 데이터:', data);
+        setDailyStats(data.dailyStats || []);
+        setMonthlySummary(data.monthlySummary || null);
+        
+        setAdminState(prev => ({
+          ...prev,
+          tabs: {
+            ...prev.tabs,
+            analytics: {
+              ...prev.tabs.analytics,
+              daily: data.dailyStats || [],
+              loading: false
+            }
+          }
+        }));
+      } else {
+        console.error('일별 통계 로딩 실패:', response.status);
+        // 폴백: 기존 베팅 데이터로 일별 통계 생성
+        const dailyStatsData = generateDailyStats(bets);
+        setDailyStats(dailyStatsData);
+        setMonthlySummary(null);
+      }
+    } catch (err) {
+      console.error('일별 통계 로딩 오류:', err);
+      // 폴백 데이터 설정
+      const dailyStatsData = generateDailyStats(bets);
+      setDailyStats(dailyStatsData);
+      setMonthlySummary(null);
+    }
+  }, [getAuthHeaders, selectedYear, selectedMonth, bets]);
+
+  // 차트 데이터 준비
+  const prepareChartData = () => {
+    const labels = dailyStats.map(stat => {
+      const date = new Date(stat.date);
+      return `${date.getMonth() + 1}/${date.getDate()}`;
+    });
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: '스포츠북 수',
+          data: dailyStats.map(stat => stat.bets),
+          backgroundColor: 'rgba(59, 130, 246, 0.5)',
+          borderColor: 'rgba(59, 130, 246, 1)',
+          borderWidth: 1,
+        },
+        {
+          label: '스포츠북 금액 (만원)',
+          data: dailyStats.map(stat => stat.stake / 10000),
+          backgroundColor: 'rgba(16, 185, 129, 0.5)',
+          borderColor: 'rgba(16, 185, 129, 1)',
+          borderWidth: 1,
+        },
+        {
+          label: '당첨 금액 (만원)',
+          data: dailyStats.map(stat => stat.winnings / 10000),
+          backgroundColor: 'rgba(245, 158, 11, 0.5)',
+          borderColor: 'rgba(245, 158, 11, 1)',
+          borderWidth: 1,
+        },
+      ],
+    };
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: true,
+        text: `${selectedYear}년 ${selectedMonth}월 일별 스포츠북 현황`,
+      },
+    },
+    scales: {
+      x: {
+        ticks: {
+          maxTicksLimit: 15
+        }
+      },
+      y: {
+        beginAtZero: true,
+      },
+    },
+  };
+
+  // 고급 통계 차트 데이터 생성
+  const generateAdvancedCharts = useCallback(() => {
+    const chartData = {
+      betsByStatus: {
+        labels: ['대기중', '당첨', '낙첨', '취소'],
+        datasets: [{
+          data: [
+            bets.filter(bet => bet.status === 'pending').length,
+            bets.filter(bet => bet.status === 'won').length,
+            bets.filter(bet => bet.status === 'lost').length,
+            bets.filter(bet => bet.status === 'cancelled').length,
+          ],
+          backgroundColor: [
+            'rgba(245, 158, 11, 0.8)',
+            'rgba(16, 185, 129, 0.8)',
+            'rgba(239, 68, 68, 0.8)',
+            'rgba(107, 114, 128, 0.8)',
+          ],
+          borderColor: [
+            'rgba(245, 158, 11, 1)',
+            'rgba(16, 185, 129, 1)',
+            'rgba(239, 68, 68, 1)',
+            'rgba(107, 114, 128, 1)',
+          ]
+        }]
+      },
+      stakeByHour: {
+        labels: Array.from({ length: 24 }, (_, i) => `${i}시`),
+        datasets: [{
+          label: '스포츠북 금액',
+          data: Array.from({ length: 24 }, (_, hour) => {
+            return bets
+              .filter(bet => new Date(bet.createdAt).getHours() === hour)
+              .reduce((sum, bet) => sum + parseFloat(bet.stake.toString()), 0) / 10000;
+          }),
+          backgroundColor: 'rgba(99, 102, 241, 0.5)',
+          borderColor: 'rgba(99, 102, 241, 1)'
+        }]
+      },
+      profitTrend: {
+        labels: dailyStats.map(stat => {
+          const date = new Date(stat.date);
+          return `${date.getMonth() + 1}/${date.getDate()}`;
+        }),
+        datasets: [{
+          label: '순수익 (만원)',
+          data: dailyStats.map(stat => stat.profit / 10000),
+          backgroundColor: 'rgba(168, 85, 247, 0.5)',
+          borderColor: 'rgba(168, 85, 247, 1)'
+        }]
+      }
+    };
+    
+    return chartData;
+  }, [bets, dailyStats]);
+
+  // 알림 추가 함수
+  const addNotification = useCallback((notification: Omit<NotificationItem, 'id' | 'timestamp' | 'read'>) => {
+    const newNotification: NotificationItem = {
+      ...notification,
+      id: Date.now().toString(),
+      timestamp: new Date(),
+      read: false
+    };
+    
+    setNotifications(prev => [newNotification, ...prev.slice(0, 9)]);
+  }, []);
+
+  // 탭 변경 핸들러
+  const handleTabChange = useCallback((tabId: 'dashboard' | 'bets' | 'analytics' | 'management') => {
+    setActiveTab(tabId);
+    setActiveSubTab('all');
+  }, []);
+
+  // 서브탭 변경 핸들러
+  const handleSubTabChange = useCallback((subTabId: string) => {
+    setActiveSubTab(subTabId);
+  }, []);
+
+  // 베팅 클릭 핸들러
+  const handleBetClick = useCallback((bet: Bet) => {
+    setSelectedBet(bet);
+    setShowBetDetail(true);
+  }, []);
+
+  // 빠른 액션들
+  const quickActions: QuickAction[] = useMemo(() => [
+    {
+      id: 'go-home',
+      label: '홈으로 가기',
+      icon: '🏠',
+      action: () => {
+        window.location.href = '/admin';
+      },
+      variant: 'primary'
+    },
+    {
+      id: 'view-bets',
+      label: '스포츠북 관리',
+      icon: '🎯',
+      action: () => {
+        handleTabChange('bets');
+      },
+      variant: 'secondary'
+    },
+    {
+      id: 'view-analytics',
+      label: '통계 분석',
+      icon: '📊',
+      action: () => {
+        handleTabChange('analytics');
+      },
+      variant: 'secondary'
+    },
+    {
+      id: 'refresh-data',
+      label: '데이터 새로고침',
+      icon: '🔄',
+      action: () => {
+        fetchBettingData();
+        addNotification({
+          type: 'info',
+          title: '데이터 새로고침',
+          message: '스포츠북 데이터를 새로고침했습니다.'
+        });
+      },
+      variant: 'secondary'
+    }
+  ], [handleTabChange, fetchBettingData, addNotification]);
+
+  // 상태별 색상 함수
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'won': return 'bg-green-100 text-green-800';
+      case 'lost': return 'bg-red-100 text-red-800';
+      case 'cancelled': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'pending': return '대기중';
+      case 'won': return '당첨';
+      case 'lost': return '낙첨';
+      case 'cancelled': return '취소';
+      default: return status;
+    }
+  };
+
+  if (!isLoggedIn || !isAdmin || adminLevel < 1) {
+    return null;
+  }
+
+  return (
+    <>
+      <style jsx global>{`
+        body {
+          margin: 0;
+          padding: 0;
+          overflow-x: hidden;
+        }
+        #__next {
+          height: 100vh;
+          overflow-x: hidden;
+        }
+        .admin-page * {
+          box-sizing: border-box;
+        }
+      `}</style>
+      
+      <div className="admin-page fixed inset-0 bg-gray-100 flex flex-col z-50">
+        <Header />
+        <div className="flex-1 bg-gray-50 overflow-y-auto">
+          <div className="p-6">
+            <div className="max-w-7xl mx-auto">
+              {/* 헤더 */}
+              <div className="mb-8">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h1 className="text-3xl font-bold text-gray-900">스포츠북 관리</h1>
+                    <p className="text-gray-600 mt-2">스포츠북 모니터링, 결과 처리, 통계 분석</p>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <div className="text-sm text-gray-500">
+                      마지막 업데이트: {lastUpdate ? lastUpdate.toLocaleTimeString('ko-KR') : '없음'}
+                    </div>
+                    <button
+                      onClick={() => router.push('/admin')}
+                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+                    >
+                      ← 어드민 홈
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 탭 네비게이션 */}
+              <div className="mb-8">
+                <div className="border-b border-gray-200">
+                  <nav className="-mb-px flex space-x-8">
+                    {BETTING_TABS.map((tab) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => handleTabChange(tab.id)}
+                        className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                          activeTab === tab.id
+                            ? 'border-blue-500 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        <span className="mr-2">{tab.icon}</span>
+                        {tab.label}
+                      </button>
+                    ))}
+                  </nav>
+                </div>
+              </div>
+
+              {/* 대시보드 탭 */}
+              {activeTab === 'dashboard' && (
+                <div className="space-y-6">
+                  {/* KPI 카드들 */}
+                  {betStats && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      <div className="bg-white p-6 rounded-lg shadow">
+                        <h3 className="text-sm font-medium text-gray-500">총 스포츠북 수</h3>
+                        <p className="text-2xl font-bold text-gray-900">{betStats.summary.totalBets}</p>
+                      </div>
+                      <div className="bg-white p-6 rounded-lg shadow">
+                        <h3 className="text-sm font-medium text-gray-500">총 스포츠북 금액</h3>
+                        <p className="text-2xl font-bold text-gray-900">₩{betStats.summary.totalStake.toLocaleString()}</p>
+                      </div>
+                      <div className="bg-white p-6 rounded-lg shadow">
+                        <h3 className="text-sm font-medium text-gray-500">총 당첨 금액</h3>
+                        <p className="text-2xl font-bold text-gray-900">₩{betStats.summary.actualWinnings.toLocaleString()}</p>
+                      </div>
+                      <div className="bg-white p-6 rounded-lg shadow">
+                        <h3 className="text-sm font-medium text-gray-500">순수익</h3>
+                        <p className={`text-2xl font-bold ${betStats.summary.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          ₩{betStats.summary.netProfit.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 빠른 액션 */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-blue-900 mb-4">⚡ 빠른 액션</h3>
+                    <div className="flex flex-wrap gap-3">
+                      {quickActions.map((action) => (
+                        <button
+                          key={action.id}
+                          onClick={action.action}
+                          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                            action.variant === 'primary'
+                              ? 'bg-blue-600 text-white hover:bg-blue-700'
+                              : action.variant === 'danger'
+                              ? 'bg-red-600 text-white hover:bg-red-700'
+                              : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span className="mr-2">{action.icon}</span>
+                          {action.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 일별 베팅 현황 차트 */}
+                  <div className="bg-white rounded-lg shadow">
+                    <div className="px-6 py-4 border-b border-gray-200">
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-medium text-gray-900">일별 스포츠북 현황</h3>
+                        
+                        {/* 월별 필터 */}
+                        <div className="flex items-center space-x-4">
+                          <div className="flex items-center space-x-2">
+                            <label className="text-sm font-medium text-gray-700">년도:</label>
+                            <select
+                              value={selectedYear}
+                              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                              className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
+                                <option key={year} value={year}>{year}년</option>
+                              ))}
+                            </select>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2">
+                            <label className="text-sm font-medium text-gray-700">월:</label>
+                            <select
+                              value={selectedMonth}
+                              onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                              className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                              {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                                <option key={month} value={month}>{month}월</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 월별 요약 통계 */}
+                      {monthlySummary && (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-blue-600">{monthlySummary.totalBets}</div>
+                            <div className="text-sm text-gray-600">총 베팅</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-green-600">{monthlySummary.wonBets}</div>
+                            <div className="text-sm text-gray-600">당첨된 베팅</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-yellow-600">{monthlySummary.pendingBets}</div>
+                            <div className="text-sm text-gray-600">대기 중인 베팅</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-purple-600">{monthlySummary.totalStake}</div>
+                            <div className="text-sm text-gray-600">총 베팅 금액</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-6">
+                      <div className="w-full h-96 relative">
+                        {dailyStats.length > 0 ? (
+                          <Bar data={prepareChartData()} options={chartOptions} />
+                        ) : (
+                          <div className="flex items-center justify-center h-full text-gray-500">
+                            <div className="text-center">
+                              <div className="text-4xl mb-2">📊</div>
+                              <div>해당 기간의 데이터가 없습니다.</div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 고급 통계 차트들 */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* 베팅 상태별 분포 */}
+                    <div className="bg-white p-6 rounded-lg shadow">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4">스포츠북 상태별 분포</h4>
+                      <div className="w-full h-64 relative">
+                        <Bar 
+                          data={generateAdvancedCharts().betsByStatus} 
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                              legend: { display: false }
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* 시간대별 베팅량 */}
+                    <div className="bg-white p-6 rounded-lg shadow">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4">시간대별 스포츠북량</h4>
+                      <div className="w-full h-64 relative">
+                        <Bar 
+                          data={generateAdvancedCharts().stakeByHour} 
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                              legend: { display: false }
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 순수익 트렌드 */}
+                  <div className="bg-white p-6 rounded-lg shadow">
+                    <h4 className="text-lg font-semibold text-gray-900 mb-4">순수익 트렌드</h4>
+                    <div className="w-full h-64 relative">
+                      <Bar 
+                        data={generateAdvancedCharts().profitTrend} 
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: { display: false }
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 최근 베팅 */}
+                  <div className="bg-white rounded-lg shadow">
+                    <div className="px-6 py-4 border-b border-gray-200">
+                        <h3 className="text-lg font-medium text-gray-900">최근 스포츠북</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">스포츠북 정보</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">사용자</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">금액</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">날짜</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {bets.slice(0, 10).map((bet) => (
+                            <tr key={bet.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">#{bet.id.substring(0, 8)}</div>
+                                <div className="text-sm text-gray-500">배당률: {bet.totalOdds}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">{bet.User.username}</div>
+                                <div className="text-sm text-gray-500">{bet.User.email}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">₩{bet.stake.toLocaleString()}</div>
+                                <div className="text-sm text-gray-500">당첨: ₩{bet.potentialWinnings.toLocaleString()}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(bet.status)}`}>
+                                  {getStatusText(bet.status)}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {new Date(bet.createdAt).toLocaleDateString('ko-KR')}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 베팅 관리 탭 */}
+              {activeTab === 'bets' && (
+                <div className="space-y-6">
+                  {/* 서브탭 */}
+                  <div className="border-b border-gray-200">
+                    <nav className="-mb-px flex space-x-8">
+                      {BET_SUBTABS.map((subTab) => (
+                        <button
+                          key={subTab.id}
+                          onClick={() => handleSubTabChange(subTab.id)}
+                          className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                            activeSubTab === subTab.id
+                              ? 'border-blue-500 text-blue-600'
+                              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                          }`}
+                        >
+                          {subTab.label}
+                        </button>
+                      ))}
+                    </nav>
+                  </div>
+
+                  {/* 필터 */}
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">상태</label>
+                        <select
+                          value={filters.status}
+                          onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value as any }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="all">전체</option>
+                          <option value="pending">대기중</option>
+                          <option value="won">당첨</option>
+                          <option value="lost">낙첨</option>
+                          <option value="cancelled">취소</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">사용자 ID</label>
+                        <input
+                          type="text"
+                          placeholder="사용자 ID"
+                          value={filters.userId}
+                          onChange={(e) => setFilters(prev => ({ ...prev, userId: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">시작일</label>
+                        <input
+                          type="date"
+                          value={filters.startDate}
+                          onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">종료일</label>
+                        <input
+                          type="date"
+                          value={filters.endDate}
+                          onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 스포츠북 목록 */}
+                  <div className="bg-white rounded-lg shadow overflow-hidden">
+                    <div className="px-6 py-4 border-b border-gray-200">
+                      <h3 className="text-lg font-medium text-gray-900">
+                        스포츠북 목록 ({pagination.totalItems}건)
+                      </h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">스포츠북 정보</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">사용자</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">스포츠북금액</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">당첨금액</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">스포츠북일</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">액션</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {bets.map((bet) => (
+                            <tr key={bet.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">#{bet.id.substring(0, 8)}</div>
+                                <div className="text-sm text-gray-500">배당률: {bet.totalOdds}</div>
+                                <div className="text-xs text-gray-400">선택: {bet.selections.length}개</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">{bet.User.username}</div>
+                                <div className="text-sm text-gray-500">{bet.User.email}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">₩{bet.stake.toLocaleString()}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">₩{bet.potentialWinnings.toLocaleString()}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(bet.status)}`}>
+                                  {getStatusText(bet.status)}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {new Date(bet.createdAt).toLocaleDateString('ko-KR')}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button
+                                  onClick={() => handleBetClick(bet)}
+                                  className="text-blue-600 hover:text-blue-900"
+                                >
+                                  상세보기
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 통계 분석 탭 */}
+              {activeTab === 'analytics' && (
+                <div className="space-y-6">
+                  {/* 종합 통계 카드 */}
+                  {betStats && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      <div className="bg-white p-6 rounded-lg shadow">
+                        <h3 className="text-sm font-medium text-gray-500">총 스포츠북 수</h3>
+                        <p className="text-2xl font-bold text-gray-900">{betStats.summary.totalBets}</p>
+                      </div>
+                      <div className="bg-white p-6 rounded-lg shadow">
+                        <h3 className="text-sm font-medium text-gray-500">총 스포츠북 금액</h3>
+                        <p className="text-2xl font-bold text-gray-900">₩{betStats.summary.totalStake.toLocaleString()}</p>
+                      </div>
+                      <div className="bg-white p-6 rounded-lg shadow">
+                        <h3 className="text-sm font-medium text-gray-500">총 당첨 금액</h3>
+                        <p className="text-2xl font-bold text-gray-900">₩{betStats.summary.actualWinnings.toLocaleString()}</p>
+                      </div>
+                      <div className="bg-white p-6 rounded-lg shadow">
+                        <h3 className="text-sm font-medium text-gray-500">순수익</h3>
+                        <p className={`text-2xl font-bold ${betStats.summary.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          ₩{betStats.summary.netProfit.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 일별 베팅 현황 차트 */}
+                  <div className="bg-white rounded-lg shadow">
+                    <div className="px-6 py-4 border-b border-gray-200">
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-medium text-gray-900">일별 스포츠북 현황</h3>
+                        
+                        {/* 월별 필터 */}
+                        <div className="flex items-center space-x-4">
+                          <div className="flex items-center space-x-2">
+                            <label className="text-sm font-medium text-gray-700">년도:</label>
+                            <select
+                              value={selectedYear}
+                              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                              className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
+                                <option key={year} value={year}>{year}년</option>
+                              ))}
+                            </select>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2">
+                            <label className="text-sm font-medium text-gray-700">월:</label>
+                            <select
+                              value={selectedMonth}
+                              onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                              className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                              {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                                <option key={month} value={month}>{month}월</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 월별 요약 통계 */}
+                      {monthlySummary && (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-blue-600">{monthlySummary.totalBets}</div>
+                            <div className="text-sm text-gray-600">총 베팅</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-green-600">{monthlySummary.wonBets}</div>
+                            <div className="text-sm text-gray-600">당첨된 베팅</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-yellow-600">{monthlySummary.pendingBets}</div>
+                            <div className="text-sm text-gray-600">대기 중인 베팅</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-purple-600">{monthlySummary.totalStake}</div>
+                            <div className="text-sm text-gray-600">총 베팅 금액</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-6">
+                      <div className="w-full h-96 relative">
+                        {dailyStats.length > 0 ? (
+                          <Bar data={prepareChartData()} options={chartOptions} />
+                        ) : (
+                          <div className="flex items-center justify-center h-full text-gray-500">
+                            <div className="text-center">
+                              <div className="text-4xl mb-2">📊</div>
+                              <div>해당 기간의 데이터가 없습니다.</div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 고급 통계 차트들 */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* 베팅 상태별 분포 */}
+                    <div className="bg-white p-6 rounded-lg shadow">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4">스포츠북 상태별 분포</h4>
+                      <div className="w-full h-64 relative">
+                        <Bar 
+                          data={generateAdvancedCharts().betsByStatus} 
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                              legend: { display: false }
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* 시간대별 베팅량 */}
+                    <div className="bg-white p-6 rounded-lg shadow">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4">시간대별 스포츠북량</h4>
+                      <div className="w-full h-64 relative">
+                        <Bar 
+                          data={generateAdvancedCharts().stakeByHour} 
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                              legend: { display: false }
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 순수익 트렌드 */}
+                  <div className="bg-white p-6 rounded-lg shadow">
+                    <h4 className="text-lg font-semibold text-gray-900 mb-4">순수익 트렌드</h4>
+                    <div className="w-full h-64 relative">
+                      <Bar 
+                        data={generateAdvancedCharts().profitTrend} 
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: { display: false }
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 상태별 상세 통계 */}
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">상태별 상세 통계</h3>
+                    {betStats && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {betStats.statusBreakdown.map((item) => (
+                          <div key={item.status} className="bg-gray-50 p-4 rounded-lg">
+                            <h4 className="font-medium text-gray-900">{getStatusText(item.status)}</h4>
+                            <p className="text-2xl font-bold text-gray-900">{item.count}건</p>
+                            <p className="text-sm text-gray-500">총 베팅: ₩{item.totalStake.toLocaleString()}</p>
+                            <p className="text-sm text-gray-500">총 당첨: ₩{item.totalWinnings.toLocaleString()}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 관리 도구 탭 */}
+              {activeTab === 'management' && (
+                <div className="space-y-6">
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">스포츠북 관리 도구</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="bg-yellow-50 p-4 rounded-lg">
+                        <h4 className="font-medium text-yellow-900">대기 중인 스포츠북</h4>
+                        <p className="text-2xl font-bold text-yellow-900">
+                          {bets.filter(bet => bet.status === 'pending').length}건
+                        </p>
+                      </div>
+                      <div className="bg-green-50 p-4 rounded-lg">
+                        <h4 className="font-medium text-green-900">당첨된 스포츠북</h4>
+                        <p className="text-2xl font-bold text-green-900">
+                          {bets.filter(bet => bet.status === 'won').length}건
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 로딩 상태 */}
+              {loading && (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                      <p className="mt-4 text-gray-600">스포츠북 데이터를 불러오는 중...</p>
+                </div>
+              )}
+
+              {/* 에러 상태 */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
+                  ❌ {error}
+                  <div className="mt-2 text-sm">
+                    <button 
+                      onClick={fetchBettingData} 
+                      className="text-red-600 underline hover:text-red-800"
+                    >
+                      다시 시도
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 베팅 상세 모달 */}
+              {showBetDetail && selectedBet && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                    <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                      <h3 className="text-lg font-medium text-gray-900">스포츠북 상세 정보</h3>
+                      <button
+                        onClick={() => setShowBetDetail(false)}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* 기본 정보 */}
+                        <div>
+                          <h4 className="text-lg font-medium text-gray-900 mb-4">스포츠북 정보</h4>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-500">스포츠북 ID</label>
+                              <p className="text-sm text-gray-900 font-mono">{selectedBet.id}</p>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-500">스포츠북 금액</label>
+                              <p className="text-sm text-gray-900">₩{selectedBet.stake.toLocaleString()}</p>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-500">총 배당률</label>
+                              <p className="text-sm text-gray-900">{selectedBet.totalOdds}</p>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-500">당첨 금액</label>
+                              <p className="text-sm text-gray-900">₩{selectedBet.potentialWinnings.toLocaleString()}</p>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-500">상태</label>
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedBet.status)}`}>
+                                {getStatusText(selectedBet.status)}
+                              </span>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-500">스포츠북일</label>
+                              <p className="text-sm text-gray-900">{new Date(selectedBet.createdAt).toLocaleString('ko-KR')}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 사용자 정보 */}
+                        <div>
+                          <h4 className="text-lg font-medium text-gray-900 mb-4">사용자 정보</h4>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-500">사용자명</label>
+                              <p className="text-sm text-gray-900">{selectedBet.User.username}</p>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-500">이메일</label>
+                              <p className="text-sm text-gray-900">{selectedBet.User.email}</p>
+                            </div>
+                            {selectedBet.User.balance !== undefined && (
+                              <div>
+                                <label className="block text-sm font-medium text-gray-500">현재 잔액</label>
+                                <p className="text-sm text-gray-900">₩{selectedBet.User.balance.toLocaleString()}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 베팅 선택 내역 */}
+                      <div className="mt-6">
+                        <h4 className="text-lg font-medium text-gray-900 mb-4">스포츠북 선택 내역</h4>
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <div className="space-y-3">
+                            {selectedBet.selections.map((selection, index) => (
+                              <div key={index} className="bg-white p-3 rounded border">
+                                <div className="flex justify-between items-start">
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium text-gray-900">{selection.desc}</p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      {selection.commence_time && new Date(selection.commence_time).toLocaleString('ko-KR')}
+                                    </p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-sm font-medium text-gray-900">{selection.odds}</p>
+                                    <p className="text-xs text-gray-500">배당률</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}

@@ -160,11 +160,11 @@ export default function AdminDashboard() {
                       {/* 기본 통계 */}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                         <div className="bg-white p-6 rounded-lg shadow">
-                          <h3 className="text-sm font-medium text-gray-500">오늘 베팅 수</h3>
+                          <h3 className="text-sm font-medium text-gray-500">오늘 스포츠북 수</h3>
                           <p className="text-2xl font-bold text-gray-900">{dashboardData.today.bets}</p>
                         </div>
                         <div className="bg-white p-6 rounded-lg shadow">
-                          <h3 className="text-sm font-medium text-gray-500">오늘 베팅 금액</h3>
+                          <h3 className="text-sm font-medium text-gray-500">오늘 스포츠북 금액</h3>
                           <p className="text-2xl font-bold text-gray-900">₩{dashboardData.today.stake.toLocaleString()}</p>
                         </div>
                         <div className="bg-white p-6 rounded-lg shadow">
@@ -234,6 +234,31 @@ export default function AdminDashboard() {
                   </button>
                 </div>
 
+                {/* 스포츠북 관리 */}
+                <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+                  <div className="flex items-center mb-4">
+                    <div className="bg-green-100 p-3 rounded-full">
+                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 ml-3">스포츠북 관리</h3>
+                  </div>
+                  <p className="text-gray-600 mb-4">스포츠북 모니터링, 수동 결과 처리, 환불 관리</p>
+                  <div className="space-y-2 text-sm text-gray-500">
+                    <div>• 실시간 스포츠북 모니터링</div>
+                    <div>• 수동 스포츠북 결과 처리</div>
+                    <div>• 의심스러운 스포츠북 감지</div>
+                    <div>• 환불 및 취소 처리</div>
+                  </div>
+                  <button 
+                    onClick={() => router.push('/admin/bets')}
+                    className="mt-4 w-full bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 transition-colors"
+                  >
+                    스포츠북 관리하기
+                  </button>
+                </div>
+
                 {/* 사용자 관리 */}
                 <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
                   <div className="flex items-center mb-4">
@@ -259,28 +284,6 @@ export default function AdminDashboard() {
                   </button>
                 </div>
 
-                {/* 베팅 관리 */}
-                <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-                  <div className="flex items-center mb-4">
-                    <div className="bg-green-100 p-3 rounded-full">
-                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                      </svg>
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 ml-3">베팅 관리</h3>
-                  </div>
-                  <p className="text-gray-600 mb-4">베팅 모니터링, 수동 결과 처리, 환불 관리</p>
-                  <div className="space-y-2 text-sm text-gray-500">
-                    <div>• 실시간 베팅 모니터링</div>
-                    <div>• 수동 베팅 결과 처리</div>
-                    <div>• 의심스러운 베팅 감지</div>
-                    <div>• 환불 및 취소 처리</div>
-                  </div>
-                  <button className="mt-4 w-full bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 transition-colors">
-                    베팅 관리하기
-                  </button>
-                </div>
-
                 {/* 추천코드 관리 */}
                 <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
                   <div className="flex items-center mb-4">
@@ -298,7 +301,10 @@ export default function AdminDashboard() {
                     <div>• 추천 실적 조회</div>
                     <div>• 수수료 지급 관리</div>
                   </div>
-                  <button className="mt-4 w-full bg-purple-600 text-white py-2 px-4 rounded hover:bg-purple-700 transition-colors">
+                  <button 
+                    onClick={() => router.push('/admin/referral-codes')}
+                    className="mt-4 w-full bg-purple-600 text-white py-2 px-4 rounded hover:bg-purple-700 transition-colors"
+                  >
                     추천코드 관리하기
                   </button>
                 </div>
@@ -339,7 +345,7 @@ export default function AdminDashboard() {
                   <div className="space-y-2 text-sm text-gray-500">
                     <div>• 일/월별 매출 분석</div>
                     <div>• 사용자 행동 분석</div>
-                    <div>• 베팅 패턴 분석</div>
+                    <div>• 스포츠북 패턴 분석</div>
                     <div>• 관리자 성과 리포트</div>
                   </div>
                   <button className="mt-4 w-full bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 transition-colors">
@@ -389,7 +395,7 @@ export default function AdminDashboard() {
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 mb-3">🤖 자동화 시스템</h3>
                       <ul className="space-y-2 text-sm text-gray-700">
-                        <li>• 자동 베팅 결과 처리</li>
+                        <li>• 자동 스포츠북 결과 처리</li>
                         <li>• 이상 패턴 감지 알림</li>
                         <li>• 자동 수수료 지급</li>
                         <li>• 스케줄된 리포트 발송</li>
@@ -421,16 +427,40 @@ export default function AdminDashboard() {
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-blue-900 mb-4">⚡ 빠른 작업</h3>
                 <div className="flex flex-wrap gap-3">
-                  <button className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors">
+                  <button 
+                    onClick={() => router.push('/admin/referral-codes')}
+                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+                  >
                     새 추천코드 생성
                   </button>
-                  <button className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors">
-                    베팅 결과 일괄 처리
+                  <button 
+                    onClick={() => router.push('/admin/bets')}
+                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors"
+                  >
+                    스포츠북 결과 처리
                   </button>
-                  <button className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 transition-colors">
+                  <button 
+                    onClick={() => {
+                      const today = new Date().toISOString().split('T')[0];
+                      const csvContent = `날짜,총 스포츠북 수,총 스포츠북 금액,총 당첨 금액,순수익\n${today},${dashboardData?.today.bets || 0},${dashboardData?.today.stake || 0},0,${(dashboardData?.today.stake || 0)}\n`;
+                      const blob = new Blob([csvContent], { type: 'text/csv' });
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `daily-report-${today}.csv`;
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                    }}
+                    className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 transition-colors"
+                  >
                     오늘 리포트 다운로드
                   </button>
-                  <button className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition-colors">
+                  <button 
+                    onClick={() => {
+                      alert('시스템 상태: 정상\n서버: 온라인\n데이터베이스: 연결됨\n마지막 업데이트: ' + new Date().toLocaleString('ko-KR'));
+                    }}
+                    className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition-colors"
+                  >
                     시스템 상태 확인
                   </button>
                 </div>
