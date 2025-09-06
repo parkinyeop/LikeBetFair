@@ -830,6 +830,22 @@ export default function BettingAdmin() {
 
 
 
+              {/* 홈으로 가기 버튼 */}
+              <div className="mb-6">
+                <div className="flex justify-between items-center">
+                  <div></div>
+                  <button
+                    onClick={() => {
+                      window.location.href = '/admin';
+                    }}
+                    className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                  >
+                    <span>🏠</span>
+                    <span>홈으로 가기</span>
+                  </button>
+                </div>
+              </div>
+
               {/* 새로운 계층적 탭 네비게이션 */}
               <div className="mb-6">
                 <nav className="flex space-x-8">
