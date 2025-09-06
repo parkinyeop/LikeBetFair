@@ -827,52 +827,158 @@ router.patch('/users/:id/status', verifyToken, requireAdmin(3), async (req, res)
 // =============================================================================
 
 // 베팅 목록 조회
-router.get('/bets', verifyToken, requireAdmin(2), async (req, res) => {
+router.get('/bets', verifyToken, requireAdmin(1), async (req, res) => {
   try {
-    const { page = 1, limit = 20, status, userId, startDate, endDate } = req.query;
-    const offset = (page - 1) * limit;
-
-    const where = {};
+    const { 
+      page = 1, 
+      limit = 20, 
+      status = 'all', 
+      userId = '', 
+      startDate = '', 
+      endDate = '',
+      sortBy = 'createdAt',
+      sortOrder = 'DESC'
+    } = req.query;
     
-    if (status) {
+    const offset = (page - 1) * limit;
+    const where = {};
+
+    // 상태 필터
+    if (status !== 'all') {
       where.status = status;
     }
     
+    // 사용자 필터
     if (userId) {
       where.userId = userId;
     }
     
+    // 날짜 필터
     if (startDate && endDate) {
       where.createdAt = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
+        [Op.gte]: new Date(startDate),
+        [Op.lte]: new Date(endDate)
       };
     }
 
-    const bets = await Bet.findAndCountAll({
+    // 정렬 설정
+    let orderClause;
+    switch (sortBy) {
+      case 'stake':
+        orderClause = [['stake', sortOrder]];
+        break;
+      case 'potentialWinnings':
+        orderClause = [['potentialWinnings', sortOrder]];
+        break;
+      case 'status':
+        orderClause = [['status', sortOrder]];
+        break;
+      default: // createdAt
+        orderClause = [['createdAt', sortOrder]];
+    }
+
+    const { count, rows: bets } = await Bet.findAndCountAll({
       where,
       limit: parseInt(limit),
       offset: parseInt(offset),
-      order: [['createdAt', 'DESC']],
+      order: orderClause,
       include: [{
         model: User,
-        attributes: ['username', 'email']
+        attributes: ['id', 'username', 'email']
       }]
     });
 
     res.json({
-      bets: bets.rows,
+      bets,
       pagination: {
-        total: bets.count,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil(bets.count / limit)
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(count / limit),
+        totalItems: count,
+        itemsPerPage: parseInt(limit)
       }
     });
 
   } catch (error) {
     console.error('Bets list error:', error);
     res.status(500).json({ message: '베팅 목록을 불러오는 중 오류가 발생했습니다.' });
+  }
+});
+
+// 베팅 상세 정보
+router.get('/bets/:id', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    const bet = await Bet.findByPk(req.params.id, {
+      include: [
+        {
+          model: User,
+          attributes: ['id', 'username', 'email', 'balance']
+        }
+      ]
+    });
+
+    if (!bet) {
+      return res.status(404).json({ message: '베팅을 찾을 수 없습니다.' });
+    }
+
+    res.json({ bet });
+  } catch (error) {
+    console.error('Bet detail error:', error);
+    res.status(500).json({ message: '베팅 정보를 불러오는 중 오류가 발생했습니다.' });
+  }
+});
+
+// 베팅 통계
+router.get('/bets/stats/summary', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    
+    const where = {};
+    if (startDate && endDate) {
+      where.createdAt = {
+        [Op.gte]: new Date(startDate),
+        [Op.lte]: new Date(endDate)
+      };
+    }
+
+    const totalBets = await Bet.count({ where });
+    const totalStake = await Bet.sum('stake', { where }) || 0;
+    const totalPotentialWinnings = await Bet.sum('potentialWinnings', { where }) || 0;
+    
+    const statusCounts = await Bet.findAll({
+      attributes: [
+        'status',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+        [sequelize.fn('SUM', sequelize.col('stake')), 'totalStake'],
+        [sequelize.fn('SUM', sequelize.col('potentialWinnings')), 'totalWinnings']
+      ],
+      where,
+      group: ['status']
+    });
+
+    const wonBets = await Bet.findAll({
+      where: { ...where, status: 'won' },
+      attributes: ['potentialWinnings']
+    });
+    const actualWinnings = wonBets.reduce((sum, bet) => sum + parseFloat(bet.potentialWinnings), 0);
+
+    res.json({
+      summary: {
+        totalBets,
+        totalStake: parseFloat(totalStake),
+        totalPotentialWinnings: parseFloat(totalPotentialWinnings),
+        actualWinnings: parseFloat(actualWinnings),
+        netProfit: parseFloat(totalStake) - parseFloat(actualWinnings)
+      },
+      statusBreakdown: statusCounts.map(item => ({
+        status: item.status,
+        count: parseInt(item.dataValues.count),
+        totalStake: parseFloat(item.dataValues.totalStake || 0),
+        totalWinnings: parseFloat(item.dataValues.totalWinnings || 0)
+      }))
+    });
+  } catch (error) {
+    console.error('Bet stats error:', error);
+    res.status(500).json({ message: '베팅 통계를 불러오는 중 오류가 발생했습니다.' });
   }
 });
 
@@ -934,24 +1040,156 @@ router.patch('/bets/:id/result', verifyToken, requireAdmin(3), async (req, res) 
 // 추천코드 목록 조회
 router.get('/referral-codes', verifyToken, requireAdmin(1), async (req, res) => {
   try {
-    // 일반 관리자는 자신의 추천코드만, 레벨 3 이상은 모든 추천코드
-    const where = req.admin.adminLevel >= 3 ? {} : { adminId: req.admin.id };
+    const { 
+      page = 1, 
+      limit = 20, 
+      status = 'all', 
+      adminId = '',
+      sortBy = 'createdAt',
+      sortOrder = 'DESC'
+    } = req.query;
+    
+    const offset = (page - 1) * limit;
+    let where = {};
 
-    const codes = await ReferralCode.findAll({
+    // 권한에 따른 필터링
+    if (req.admin.adminLevel < 3) {
+      where.adminId = req.admin.id;
+    } else if (adminId) {
+      where.adminId = adminId;
+    }
+
+    // 상태 필터
+    if (status !== 'all') {
+      where.isActive = status === 'active';
+    }
+
+    // 정렬 설정
+    let orderClause;
+    switch (sortBy) {
+      case 'code':
+        orderClause = [['code', sortOrder]];
+        break;
+      case 'commissionRate':
+        orderClause = [['commissionRate', sortOrder]];
+        break;
+      case 'currentUsers':
+        orderClause = [['currentUsers', sortOrder]];
+        break;
+      default: // createdAt
+        orderClause = [['createdAt', sortOrder]];
+    }
+
+    const { count, rows: codes } = await ReferralCode.findAndCountAll({
       where,
       include: [{
         model: User,
         as: 'admin',
-        attributes: ['username', 'email', 'adminLevel']
+        attributes: ['id', 'username', 'email', 'adminLevel']
       }],
-      order: [['createdAt', 'DESC']]
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      order: orderClause
     });
 
-    res.json({ codes });
+    res.json({
+      codes,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(count / limit),
+        totalItems: count,
+        itemsPerPage: parseInt(limit)
+      }
+    });
 
   } catch (error) {
     console.error('Referral codes list error:', error);
     res.status(500).json({ message: '추천코드 목록을 불러오는 중 오류가 발생했습니다.' });
+  }
+});
+
+// 추천코드 상세 정보
+router.get('/referral-codes/:id', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    const code = await ReferralCode.findByPk(req.params.id, {
+      include: [{
+        model: User,
+        as: 'admin',
+        attributes: ['id', 'username', 'email', 'adminLevel']
+      }]
+    });
+
+    if (!code) {
+      return res.status(404).json({ message: '추천코드를 찾을 수 없습니다.' });
+    }
+
+    // 권한 확인
+    if (code.adminId !== req.admin.id && req.admin.adminLevel < 3) {
+      return res.status(403).json({ message: '해당 추천코드를 조회할 권한이 없습니다.' });
+    }
+
+    // 이 코드로 가입한 사용자들 조회
+    const referredUsers = await User.findAll({
+      where: { referredBy: code.code },
+      attributes: ['id', 'username', 'email', 'createdAt', 'isActive'],
+      order: [['createdAt', 'DESC']],
+      limit: 20
+    });
+
+    res.json({ 
+      code,
+      referredUsers
+    });
+  } catch (error) {
+    console.error('Referral code detail error:', error);
+    res.status(500).json({ message: '추천코드 정보를 불러오는 중 오류가 발생했습니다.' });
+  }
+});
+
+// 추천코드 통계
+router.get('/referral-codes/stats/summary', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    
+    let where = {};
+    if (req.admin.adminLevel < 3) {
+      where.adminId = req.admin.id;
+    }
+    
+    if (startDate && endDate) {
+      where.createdAt = {
+        [Op.gte]: new Date(startDate),
+        [Op.lte]: new Date(endDate)
+      };
+    }
+
+    const totalCodes = await ReferralCode.count({ where });
+    const activeCodes = await ReferralCode.count({ where: { ...where, isActive: true } });
+    const totalUsers = await ReferralCode.sum('currentUsers', { where }) || 0;
+
+    // 수수료 통계
+    const commissionStats = await ReferralCode.findAll({
+      attributes: [
+        [sequelize.fn('AVG', sequelize.col('commissionRate')), 'avgCommissionRate'],
+        [sequelize.fn('MIN', sequelize.col('commissionRate')), 'minCommissionRate'],
+        [sequelize.fn('MAX', sequelize.col('commissionRate')), 'maxCommissionRate']
+      ],
+      where
+    });
+
+    res.json({
+      summary: {
+        totalCodes,
+        activeCodes,
+        totalUsers: parseInt(totalUsers),
+        avgCommissionRate: parseFloat(commissionStats[0]?.dataValues?.avgCommissionRate || 0),
+        minCommissionRate: parseFloat(commissionStats[0]?.dataValues?.minCommissionRate || 0),
+        maxCommissionRate: parseFloat(commissionStats[0]?.dataValues?.maxCommissionRate || 0)
+      }
+    });
+  } catch (error) {
+    console.error('Referral codes stats error:', error);
+    res.status(500).json({ message: '추천코드 통계를 불러오는 중 오류가 발생했습니다.' });
   }
 });
 

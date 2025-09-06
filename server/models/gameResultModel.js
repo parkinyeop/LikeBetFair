@@ -9,8 +9,7 @@ const GameResult = sequelize.define('GameResult', {
   },
   eventId: {
     type: DataTypes.STRING,
-    allowNull: true,
-    unique: true
+    allowNull: true
   },
   sportKey: {
     type: DataTypes.STRING,
@@ -63,8 +62,13 @@ const GameResult = sequelize.define('GameResult', {
   indexes: [
     {
       unique: true,
-      fields: ['eventId'],
-      name: 'unique_event_id'
+      fields: ['eventId', 'sportKey'],
+      name: 'unique_event_id_per_sport',
+      where: {
+        eventId: {
+          [sequelize.Sequelize.Op.ne]: null
+        }
+      }
     },
     {
       unique: true,

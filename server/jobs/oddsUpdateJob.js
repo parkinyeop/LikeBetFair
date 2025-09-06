@@ -174,10 +174,10 @@ cron.schedule('*/10 * * * *', async () => {
   isUpdatingResults = true;
 
   try {
-    // 8분 타임아웃 설정
+    // 3분 타임아웃 설정 (8분에서 단축)
     const updateResult = await withTimeout(
       gameResultService.fetchAndUpdateResultsForCategories(Array.from(activeCategories)),
-      8 * 60 * 1000, // 8분
+      3 * 60 * 1000, // 3분
       'Game results update'
     );
     
@@ -229,7 +229,7 @@ cron.schedule('*/10 * * * *', async () => {
         saveUpdateLog('results', 'start', { message: 'Retrying game results update', isRetry: true });
         const retryResult = await withTimeout(
           gameResultService.fetchAndUpdateResultsForCategories(Array.from(activeCategories)),
-          8 * 60 * 1000,
+          3 * 60 * 1000, // 3분으로 단축
           'Game results retry'
         );
         const betRetryResult = await withTimeout(
