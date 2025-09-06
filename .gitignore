@@ -32,3 +32,10 @@ server/logs/
 .vscode/
 .idea/
 *.swp
+
+# 8. 테스트 및 디버깅 파일
+server/archive/
+server/test-*.js
+server/debug-*.js
+server/check-*.js
+server/analyze-*.js
