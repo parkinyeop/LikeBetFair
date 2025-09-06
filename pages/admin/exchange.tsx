@@ -1548,6 +1548,49 @@ export default function ExchangeAdmin() {
                   {/* 주문 관리 탭 (통합된 주문 관리) */}
                   {activeTab === 'orders' && (
                     <div className="space-y-6">
+                      {/* 탭별 액션 버튼들 */}
+                      <div className="bg-white p-4 rounded-lg shadow">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">주문 관리 액션</h3>
+                        <div className="flex flex-wrap gap-3">
+                          <button
+                            onClick={() => {
+                              // TODO: 새 주문 생성 기능 구현
+                              alert('새 주문 생성 기능은 추후 구현 예정입니다.');
+                            }}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                          >
+                            📝 새 주문 생성
+                          </button>
+                          <button
+                            onClick={() => {
+                              // TODO: 일괄 취소 기능 구현
+                              alert('일괄 취소 기능은 추후 구현 예정입니다.');
+                            }}
+                            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                          >
+                            🗑️ 일괄 취소
+                          </button>
+                          <button
+                            onClick={() => {
+                              // TODO: 주문 내보내기 기능 구현
+                              alert('주문 내보내기 기능은 추후 구현 예정입니다.');
+                            }}
+                            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                          >
+                            📤 주문 내보내기
+                          </button>
+                          <button
+                            onClick={() => {
+                              // TODO: 주문 검증 기능 구현
+                              alert('주문 검증 기능은 추후 구현 예정입니다.');
+                            }}
+                            className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
+                          >
+                            ✅ 주문 검증
+                          </button>
+                        </div>
+                      </div>
+
                       {/* 필터 */}
                       <div className="bg-white p-4 rounded-lg shadow">
                         <div className="flex flex-col md:flex-row gap-4">
@@ -1702,6 +1745,49 @@ export default function ExchangeAdmin() {
                   {/* 통계 분석 탭 */}
                   {activeTab === 'analytics' && (
                     <div className="space-y-6">
+                      {/* 탭별 액션 버튼들 */}
+                      <div className="bg-white p-4 rounded-lg shadow">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">통계 분석 액션</h3>
+                        <div className="flex flex-wrap gap-3">
+                          <button
+                            onClick={() => {
+                              // TODO: 리포트 생성 기능 구현
+                              alert('리포트 생성 기능은 추후 구현 예정입니다.');
+                            }}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                          >
+                            📊 리포트 생성
+                          </button>
+                          <button
+                            onClick={() => {
+                              // TODO: 데이터 내보내기 기능 구현
+                              alert('데이터 내보내기 기능은 추후 구현 예정입니다.');
+                            }}
+                            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                          >
+                            📤 데이터 내보내기
+                          </button>
+                          <button
+                            onClick={() => {
+                              // TODO: 실시간 모니터링 기능 구현
+                              alert('실시간 모니터링 기능은 추후 구현 예정입니다.');
+                            }}
+                            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                          >
+                            📈 실시간 모니터링
+                          </button>
+                          <button
+                            onClick={() => {
+                              // TODO: 예측 분석 기능 구현
+                              alert('예측 분석 기능은 추후 구현 예정입니다.');
+                            }}
+                            className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+                          >
+                            🔮 예측 분석
+                          </button>
+                        </div>
+                      </div>
+
                       {/* Phase 3: 고급 통계 헤더 */}
                       <div className="bg-white p-6 rounded-lg shadow">
                         <div className="flex justify-between items-center mb-6">
@@ -1866,6 +1952,49 @@ export default function ExchangeAdmin() {
                   {/* 정산 관리 탭 */}
                   {activeTab === 'settlements' && (
                     <div className="space-y-6">
+                      {/* 탭별 액션 버튼들 */}
+                      <div className="bg-white p-4 rounded-lg shadow">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">정산 관리 액션</h3>
+                        <div className="flex flex-wrap gap-3">
+                          <button
+                            onClick={() => {
+                              // TODO: 수동 정산 처리 기능 구현
+                              alert('수동 정산 처리 기능은 추후 구현 예정입니다.');
+                            }}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                          >
+                            💰 수동 정산 처리
+                          </button>
+                          <button
+                            onClick={() => {
+                              // TODO: 정산 내역 내보내기 기능 구현
+                              alert('정산 내역 내보내기 기능은 추후 구현 예정입니다.');
+                            }}
+                            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                          >
+                            📤 정산 내역 내보내기
+                          </button>
+                          <button
+                            onClick={() => {
+                              // TODO: 정산 검증 기능 구현
+                              alert('정산 검증 기능은 추후 구현 예정입니다.');
+                            }}
+                            className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
+                          >
+                            ✅ 정산 검증
+                          </button>
+                          <button
+                            onClick={() => {
+                              // TODO: 정산 통계 기능 구현
+                              alert('정산 통계 기능은 추후 구현 예정입니다.');
+                            }}
+                            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                          >
+                            📊 정산 통계
+                          </button>
+                        </div>
+                      </div>
+
                       <div className="bg-white rounded-lg shadow overflow-hidden">
                         <div className="px-6 py-4 border-b border-gray-200">
                           <h3 className="text-lg font-medium text-gray-900">정산 내역</h3>

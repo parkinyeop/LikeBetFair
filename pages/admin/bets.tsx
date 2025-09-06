@@ -1057,6 +1057,49 @@ export default function BettingAdmin() {
               {/* 베팅 관리 탭 */}
               {activeTab === 'bets' && (
                 <div className="space-y-6">
+                  {/* 탭별 액션 버튼들 */}
+                  <div className="bg-white p-4 rounded-lg shadow">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">스포츠북 관리 액션</h3>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={() => {
+                          // TODO: 결과 처리 기능 구현
+                          alert('결과 처리 기능은 추후 구현 예정입니다.');
+                        }}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                      >
+                        ⚡ 결과 처리
+                      </button>
+                      <button
+                        onClick={() => {
+                          // TODO: 환불 처리 기능 구현
+                          alert('환불 처리 기능은 추후 구현 예정입니다.');
+                        }}
+                        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                      >
+                        💰 환불 처리
+                      </button>
+                      <button
+                        onClick={() => {
+                          // TODO: 스포츠북 내보내기 기능 구현
+                          alert('스포츠북 내보내기 기능은 추후 구현 예정입니다.');
+                        }}
+                        className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                      >
+                        📤 스포츠북 내보내기
+                      </button>
+                      <button
+                        onClick={() => {
+                          // TODO: 스포츠북 검증 기능 구현
+                          alert('스포츠북 검증 기능은 추후 구현 예정입니다.');
+                        }}
+                        className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
+                      >
+                        ✅ 스포츠북 검증
+                      </button>
+                    </div>
+                  </div>
+
                   {/* 서브탭 */}
                   <div className="border-b border-gray-200">
                     <nav className="-mb-px flex space-x-8">
@@ -1190,6 +1233,49 @@ export default function BettingAdmin() {
               {/* 통계 분석 탭 */}
               {activeTab === 'analytics' && (
                 <div className="space-y-6">
+                  {/* 탭별 액션 버튼들 */}
+                  <div className="bg-white p-4 rounded-lg shadow">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">통계 분석 액션</h3>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={() => {
+                          // TODO: 리포트 생성 기능 구현
+                          alert('리포트 생성 기능은 추후 구현 예정입니다.');
+                        }}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                      >
+                        📊 리포트 생성
+                      </button>
+                      <button
+                        onClick={() => {
+                          // TODO: 데이터 내보내기 기능 구현
+                          alert('데이터 내보내기 기능은 추후 구현 예정입니다.');
+                        }}
+                        className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                      >
+                        📤 데이터 내보내기
+                      </button>
+                      <button
+                        onClick={() => {
+                          // TODO: 실시간 모니터링 기능 구현
+                          alert('실시간 모니터링 기능은 추후 구현 예정입니다.');
+                        }}
+                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                      >
+                        📈 실시간 모니터링
+                      </button>
+                      <button
+                        onClick={() => {
+                          // TODO: 예측 분석 기능 구현
+                          alert('예측 분석 기능은 추후 구현 예정입니다.');
+                        }}
+                        className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+                      >
+                        🔮 예측 분석
+                      </button>
+                    </div>
+                  </div>
+
                   {/* 종합 통계 카드 */}
                   {betStats && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -1364,6 +1450,49 @@ export default function BettingAdmin() {
               {/* 관리 도구 탭 */}
               {activeTab === 'management' && (
                 <div className="space-y-6">
+                  {/* 탭별 액션 버튼들 */}
+                  <div className="bg-white p-4 rounded-lg shadow">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">관리 도구 액션</h3>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={() => {
+                          // TODO: 시스템 상태 확인 기능 구현
+                          alert('시스템 상태 확인 기능은 추후 구현 예정입니다.');
+                        }}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                      >
+                        🔍 시스템 상태 확인
+                      </button>
+                      <button
+                        onClick={() => {
+                          // TODO: 데이터베이스 백업 기능 구현
+                          alert('데이터베이스 백업 기능은 추후 구현 예정입니다.');
+                        }}
+                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                      >
+                        💾 데이터베이스 백업
+                      </button>
+                      <button
+                        onClick={() => {
+                          // TODO: 로그 분석 기능 구현
+                          alert('로그 분석 기능은 추후 구현 예정입니다.');
+                        }}
+                        className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                      >
+                        📋 로그 분석
+                      </button>
+                      <button
+                        onClick={() => {
+                          // TODO: 성능 최적화 기능 구현
+                          alert('성능 최적화 기능은 추후 구현 예정입니다.');
+                        }}
+                        className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+                      >
+                        ⚡ 성능 최적화
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="bg-white rounded-lg shadow p-6">
                     <h3 className="text-lg font-medium text-gray-900 mb-4">스포츠북 관리 도구</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
