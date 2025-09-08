@@ -97,11 +97,51 @@ function calculateTimeDifferenceInHours(time1, time2) {
   return Math.abs(time1.getTime() - time2.getTime()) / (1000 * 60 * 60);
 }
 
+/**
+ * API에서 받은 시간을 UTC로 변환하여 저장
+ * @param {string} apiTime - API에서 받은 시간 문자열
+ * @returns {string} UTC ISO 문자열
+ */
+function convertApiTimeToUTC(apiTime) {
+  return new Date(apiTime + 'Z').toISOString();
+}
+
+/**
+ * UTC 저장을 위한 시간 보장
+ * @param {string|Date} dateValue - 시간 값
+ * @returns {string} UTC ISO 문자열
+ */
+function ensureUTCStorage(dateValue) {
+  if (typeof dateValue === 'string' && !dateValue.endsWith('Z')) {
+    return new Date(dateValue + 'Z').toISOString();
+  }
+  if (dateValue instanceof Date) {
+    return dateValue.toISOString();
+  }
+  return dateValue;
+}
+
+/**
+ * 정산 매칭을 위한 유연한 시간 범위 생성 (9시간 차이 고려)
+ * @param {Date} targetTime - 목표 시간
+ * @param {number} hourRange - 시간 범위 (기본 12시간)
+ * @returns {Object} {start, end} 시간 범위
+ */
+function createSettlementTimeRange(targetTime, hourRange = 12) {
+  const start = new Date(targetTime.getTime() - hourRange * 60 * 60 * 1000);
+  const end = new Date(targetTime.getTime() + hourRange * 60 * 60 * 1000);
+  
+  return { start, end };
+}
+
 module.exports = {
   convertLocalToUTC,
   convertUTCToLocal,
   formatTimeWithTimezone,
   normalizeBettingTime,
   createFlexibleTimeRange,
-  calculateTimeDifferenceInHours
+  calculateTimeDifferenceInHours,
+  convertApiTimeToUTC,
+  ensureUTCStorage,
+  createSettlementTimeRange
 }; 
