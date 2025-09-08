@@ -83,13 +83,14 @@ const oddsController = {
         sevenDaysLater: sevenDaysLater.toISOString()
       });
       
-      const koreaTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+      // UTC 시간을 그대로 사용 (API에서 받은 시간이 이미 UTC)
+      const koreaTime = now;
       // 최근 7일 + 향후 7일 필터링 (과거 경기도 포함)
       const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       
       console.log(`[oddsController] 최근 7일 + 향후 7일 필터링:`, {
           currentTimeUTC: now.toISOString(),
-          currentTimeKorea: koreaTime.toISOString().replace('Z', ' KST'),
+          currentTimeKorea: koreaTime.toISOString(),
           sevenDaysAgo: sevenDaysAgo.toISOString(),
           sevenDaysLater: sevenDaysLater.toISOString(),
           sport: sport

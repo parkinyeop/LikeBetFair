@@ -155,7 +155,7 @@ export default function Exchange() {
         market: market,
         homeTeam: game.home_team,
         awayTeam: game.away_team,
-        commenceTime: game.commence_time
+        commenceTime: new Date(game.commence_time).toISOString() // UTC로 변환
       };
       console.log('🎯 새 베팅 선택할 객체:', newSelectedBet);
       setSelectedBet(newSelectedBet);
@@ -173,7 +173,7 @@ export default function Exchange() {
         odds: price,
         price: price,
         amount: 0, // 사용자가 입력할 금액
-        commenceTime: game.commence_time,
+        commenceTime: new Date(game.commence_time).toISOString(), // UTC로 변환
         sportKey: game.sport_key || 'soccer',
         desc: `${game.home_team} vs ${game.away_team}`, // 🆕 desc 필드 추가
         option: market === 'Over/Under' ? team : undefined, // 🆕 option 필드 추가
@@ -786,7 +786,7 @@ export default function Exchange() {
                                 market: '승패',
                                 selection: outcome.name,
                                 odds: outcome.price,
-                                commenceTime: game.commence_time
+                                commenceTime: new Date(game.commence_time).toISOString()
                               };
                               localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
 
@@ -891,7 +891,7 @@ export default function Exchange() {
                                       market: '총점',
                                       selection: `Over ${point}`,
                                       odds: overOdds,
-                                      commenceTime: game.commence_time
+                                      commenceTime: new Date(game.commence_time).toISOString()
                                     };
                                     localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
 
@@ -936,7 +936,7 @@ export default function Exchange() {
                                       market: '총점',
                                       selection: `Under ${point}`,
                                       odds: underOdds,
-                                      commenceTime: game.commence_time
+                                      commenceTime: new Date(game.commence_time).toISOString()
                                     };
                                     localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
 
@@ -1058,7 +1058,7 @@ export default function Exchange() {
                                         market: '핸디캡',
                                         selection: selection,
                                         odds: homeOdds,
-                                        commenceTime: game.commence_time
+                                        commenceTime: new Date(game.commence_time).toISOString()
                                       };
                                       localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
 
@@ -1106,7 +1106,7 @@ export default function Exchange() {
                                         market: '핸디캡',
                                         selection: selection,
                                         odds: awayOdds,
-                                        commenceTime: game.commence_time
+                                        commenceTime: new Date(game.commence_time).toISOString()
                                       };
                                       localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
 
@@ -1420,7 +1420,7 @@ export default function Exchange() {
                                       market: '승패',
                                       selection: outcome.name,
                                       odds: outcome.price,
-                                      commenceTime: game.commence_time
+                                      commenceTime: new Date(game.commence_time).toISOString()
                                     };
                                     localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
 
@@ -1525,7 +1525,7 @@ export default function Exchange() {
                                             market: '총점',
                                             selection: `Over ${point}`,
                                             odds: overOdds,
-                                            commenceTime: game.commence_time
+                                            commenceTime: new Date(game.commence_time).toISOString()
                                           };
                                           localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
 
@@ -1570,7 +1570,7 @@ export default function Exchange() {
                                             market: '총점',
                                             selection: `Under ${point}`,
                                             odds: underOdds,
-                                            commenceTime: game.commence_time
+                                            commenceTime: new Date(game.commence_time).toISOString()
                                           };
                                           localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
 
@@ -1647,7 +1647,7 @@ export default function Exchange() {
                                             market: '핸디캡',
                                             selection: key,
                                             odds: odds.averagePrice,
-                                            commenceTime: game.commence_time
+                                            commenceTime: new Date(game.commence_time).toISOString()
                                           };
                                           localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
 

@@ -35,6 +35,8 @@ const ExchangeOrder = sequelize.define('ExchangeOrder', {
   awayTeam: { type: DataTypes.STRING, allowNull: true },
   commenceTime: { type: DataTypes.DATE, allowNull: true },
   sportKey: { type: DataTypes.STRING, allowNull: true },
+  // ❌ DEPRECATED: gameResultId 필드 주석처리 (경기 식별자 방식으로 대체)
+  /*
   gameResultId: { 
     type: DataTypes.UUID, 
     allowNull: true,
@@ -45,6 +47,7 @@ const ExchangeOrder = sequelize.define('ExchangeOrder', {
     onUpdate: 'CASCADE',
     onDelete: 'SET NULL'
   },
+  */
   // 베팅 선택 상세 정보
   selectionDetails: { 
     type: DataTypes.JSONB, 

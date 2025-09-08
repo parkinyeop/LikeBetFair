@@ -38,7 +38,8 @@ class ExchangeGameMappingService {
     
     // 오늘~7일 후까지 범위 계산 (UTC 기준)
     const now = new Date();
-    const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    // UTC 기준으로 오늘 날짜 계산 (9시간 연산 제거)
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const weekLater = new Date(today);
     weekLater.setUTCDate(today.getUTCDate() + 7);
 
@@ -301,7 +302,8 @@ class ExchangeGameMappingService {
           mappedData.homeTeam = oddsCacheData.homeTeam;
           mappedData.awayTeam = oddsCacheData.awayTeam;
           mappedData.commenceTime = oddsCacheData.commenceTime;
-          mappedData.gameResultId = oddsCacheData.gameResultId;
+          // ❌ DEPRECATED: gameResultId 매핑 제거 (경기 식별자 방식으로 대체)
+          // mappedData.gameResultId = oddsCacheData.gameResultId;
           mappedData.sportKey = this.getSportKeyFromCategories(
             oddsCacheData.mainCategory, 
             oddsCacheData.subCategory

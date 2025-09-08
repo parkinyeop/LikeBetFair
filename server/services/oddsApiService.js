@@ -296,8 +296,8 @@ class OddsApiService {
             // 🆕 올바른 UTC 시간 처리 로직
             let commence;
             try {
-              // OddsAPI에서 받은 시간은 이미 UTC이므로 그대로 사용
-              commence = new Date(game.commence_time);
+              // OddsAPI에서 받은 시간을 UTC로 명시적 변환
+              commence = new Date(game.commence_time + 'Z');
               
               if (isNaN(commence.getTime())) {
                 return false;
@@ -333,26 +333,19 @@ class OddsApiService {
               // 🆕 강제 UTC 시간 처리 로직
               let commenceTime;
               try {
-                // OddsAPI에서 받은 시간은 이미 UTC이므로 강제로 UTC로 저장
-                const utcDate = new Date(game.commence_time);
+                // OddsAPI에서 받은 시간을 UTC로 명시적 변환
+                const utcDate = new Date(game.commence_time + 'Z'); // Z 추가로 UTC 명시
                 
                 if (isNaN(utcDate.getTime())) {
                   console.error(`[DEBUG] 유효하지 않은 시간: ${game.commence_time}`);
                   continue;
                 }
                 
-                // 🆕 강제로 UTC 시간으로 설정 (KST 변환 방지)
-                commenceTime = new Date(Date.UTC(
-                  utcDate.getUTCFullYear(),
-                  utcDate.getUTCMonth(),
-                  utcDate.getUTCDate(),
-                  utcDate.getUTCHours(),
-                  utcDate.getUTCMinutes(),
-                  utcDate.getUTCSeconds()
-                ));
+                // 🆕 UTC로 명시적 저장 (ISO 문자열로 저장)
+                commenceTime = utcDate.toISOString();
                 
                 // 🆕 디버깅: 시간 변환 결과 확인
-                console.log(`[DEBUG] 강제 UTC 변환: ${game.commence_time} → ${commenceTime.toISOString()}`);
+                console.log(`[DEBUG] 강제 UTC 변환: ${game.commence_time} → ${commenceTime}`);
                 
               } catch (timeError) {
                 console.error(`[DEBUG] 시간 변환 오류: ${timeError.message}`);
@@ -366,7 +359,7 @@ class OddsApiService {
                 sportTitle: this.getSportTitleFromSportKey(sportKey),
                 homeTeam: game.home_team,
                 awayTeam: game.away_team,
-                commenceTime: commenceTime, // 🆕 안전하게 변환된 시간 사용
+                commenceTime: commenceTime, // ✅ UTC ISO 문자열로 저장 (이미 toISOString() 적용됨)
                 odds: game.bookmakers, // odds 필드 추가
                 bookmakers: game.bookmakers,
                 market: 'h2h', // 기본값 추가
@@ -387,7 +380,7 @@ class OddsApiService {
                     subCategory,
                     homeTeam: game.home_team,  
                     awayTeam: game.away_team,
-                    commenceTime: commenceTime
+                    commenceTime: new Date(commenceTime) // UTC 문자열을 Date 객체로 변환하여 비교
                   }
                 });
                 
@@ -410,7 +403,7 @@ class OddsApiService {
                     subCategory,
                     homeTeam: game.home_team,  
                     awayTeam: game.away_team,
-                    commenceTime: commenceTime
+                    commenceTime: new Date(commenceTime) // UTC 문자열을 Date 객체로 변환하여 비교
                   },
                   defaults: upsertData
                 });
@@ -694,11 +687,9 @@ class OddsApiService {
             // 🆕 안전한 시간 변환 로직 추가
             let commence;
             try {
-              // 이미 UTC 형식인지 확인 (Z로 끝나는지)
-              if (game.commence_time && game.commence_time.endsWith('Z')) {
-                commence = new Date(game.commence_time);
-              } else if (game.commence_time) {
-                // UTC가 아니면 Z를 추가
+              // OddsAPI 시간을 UTC로 명시적 변환
+              if (game.commence_time) {
+                // 항상 Z를 추가하여 UTC로 명시
                 commence = new Date(game.commence_time + 'Z');
               } else {
                 console.error(`[야구 디버깅] ❌ commence_time이 null/undefined: ${game.commence_time}`);
@@ -777,26 +768,19 @@ class OddsApiService {
               // 🆕 강제 UTC 시간 처리 로직 (통일)
               let commenceTime;
               try {
-                // OddsAPI에서 받은 시간은 이미 UTC이므로 강제로 UTC로 저장
-                const utcDate = new Date(game.commence_time);
+                // OddsAPI에서 받은 시간을 UTC로 명시적 변환
+                const utcDate = new Date(game.commence_time + 'Z');
                 
                 if (isNaN(utcDate.getTime())) {
                   console.error(`[야구 디버깅] ❌ 유효하지 않은 시간: ${game.commence_time}`);
                   continue;
                 }
                 
-                // 🆕 강제로 UTC 시간으로 설정 (KST 변환 방지)
-                commenceTime = new Date(Date.UTC(
-                  utcDate.getUTCFullYear(),
-                  utcDate.getUTCMonth(),
-                  utcDate.getUTCDate(),
-                  utcDate.getUTCHours(),
-                  utcDate.getUTCMinutes(),
-                  utcDate.getUTCSeconds()
-                ));
+                // 🆕 UTC로 명시적 저장 (ISO 문자열로 저장)
+                commenceTime = utcDate.toISOString();
                 
                 // 🆕 디버깅: 시간 변환 결과 확인
-                console.log(`[야구 디버깅] 강제 UTC 변환: ${game.commence_time} → ${commenceTime.toISOString()}`);
+                console.log(`[야구 디버깅] 강제 UTC 변환: ${game.commence_time} → ${commenceTime}`);
                 
               } catch (timeError) {
                 console.error(`[야구 디버깅] ❌ 시간 변환 오류: ${timeError.message}`);
@@ -810,7 +794,7 @@ class OddsApiService {
                 sportTitle: this.getSportTitleFromSportKey(sportKey),
                 homeTeam: game.home_team,
                 awayTeam: game.away_team,
-                commenceTime: commenceTime, // 🆕 안전하게 변환된 시간 사용
+                commenceTime: commenceTime, // ✅ UTC ISO 문자열로 저장 (이미 toISOString() 적용됨)
                 odds: game.bookmakers,
                 bookmakers: game.bookmakers,
                 market: 'h2h',
@@ -826,7 +810,7 @@ class OddsApiService {
                 console.log(`[야구 디버깅]   sportKey: ${sportKey}`);
                 console.log(`[야구 디버깅]   homeTeam: ${game.home_team}`);
                 console.log(`[야구 디버깅]   awayTeam: ${game.away_team}`);
-                console.log(`[야구 디버깅]   commenceTime: ${commenceTime.toISOString()}`); // 🆕 안전하게 변환된 시간 사용
+                console.log(`[야구 디버깅]   commenceTime: ${commenceTime}`); // ✅ UTC ISO 문자열 (이미 toISOString() 적용됨)
               }
               
               // 변수를 상위 스코프에서 선언
@@ -844,7 +828,7 @@ class OddsApiService {
                     subCategory,
                     homeTeam: game.home_team,
                     awayTeam: game.away_team,
-                    commenceTime: commenceTime
+                    commenceTime: new Date(commenceTime) // UTC 문자열을 Date 객체로 변환하여 비교
                   }
                 });
                 
@@ -868,7 +852,7 @@ class OddsApiService {
                     subCategory,
                     homeTeam: game.home_team,
                     awayTeam: game.away_team,
-                    commenceTime: commenceTime
+                    commenceTime: new Date(commenceTime) // UTC 문자열을 Date 객체로 변환하여 비교
                   },
                   defaults: upsertData
                 });
