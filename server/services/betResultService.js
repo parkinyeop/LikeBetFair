@@ -138,7 +138,7 @@ class BetResultService {
       const awayTeam = teams[1].trim();
       let commenceTime;
       try {
-        commenceTime = new Date(selection.commence_time);
+        commenceTime = new Date(selection.commence_time + 'Z');
         if (isNaN(commenceTime.getTime())) {
           selection.result = 'pending';
           hasPending = true;
@@ -181,7 +181,7 @@ class BetResultService {
       // 스코어가 없으면 pending 유지
       if (!gameResult || !gameResult.score || !Array.isArray(gameResult.score) || gameResult.score.length === 0) {
         // 경기 시간이 지났고 스코어가 없으면 cancelled로 처리 (연기/취소 가능성)
-        const gameTime = new Date(selection.commence_time);
+        const gameTime = new Date(selection.commence_time + 'Z');
         const now = new Date();
         const hoursSinceGame = (now - gameTime) / (1000 * 60 * 60);
         

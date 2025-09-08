@@ -146,14 +146,14 @@ class SeasonStatusChecker {
       const now = new Date();
       
       const upcomingGames = games.filter(game => 
-        new Date(game.commence_time) > now
+        new Date(game.commence_time + 'Z') > now
       );
 
       // 가장 가까운 경기 날짜 찾기
       let nextGameDate = null;
       if (upcomingGames.length > 0) {
         const sortedGames = upcomingGames.sort((a, b) => 
-          new Date(a.commence_time) - new Date(b.commence_time)
+          new Date(a.commence_time + 'Z') - new Date(b.commence_time + 'Z')
         );
         nextGameDate = sortedGames[0].commence_time;
       }
@@ -366,7 +366,7 @@ class SeasonStatusChecker {
         tomorrow.setDate(today.getDate() + 1);
         
         const todayGames = hasOdds.games.filter(game => {
-          const gameTime = new Date(game.commence_time);
+          const gameTime = new Date(game.commence_time + 'Z');
           return gameTime >= today && gameTime < tomorrow;
         });
         

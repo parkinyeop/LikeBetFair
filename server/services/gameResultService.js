@@ -1030,7 +1030,7 @@ class GameResultService {
     }
 
     // 경기 시간이 미래로 너무 먼 경우 제외 (1년 이상)
-    const gameTime = new Date(game.commence_time);
+    const gameTime = new Date(game.commence_time + 'Z');
     const oneYearFromNow = new Date();
     oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
     
@@ -1049,7 +1049,7 @@ class GameResultService {
     }
     
     // 경기 시간이 지났지만 완료되지 않은 경우
-    const gameTime = new Date(game.commence_time);
+    const gameTime = new Date(game.commence_time + 'Z');
     const now = new Date();
     if (gameTime < now) {
       return 'finished'; // 시간이 지났으면 완료로 간주
@@ -1091,7 +1091,7 @@ class GameResultService {
     
     // 3. 스코어가 있지만 status가 finished가 아닌 경우 - 개선된 시간 기반 처리
     if (game.scores && Array.isArray(game.scores) && game.scores.length === 2) {
-      const gameTime = new Date(game.commence_time);
+      const gameTime = new Date(game.commence_time + 'Z');
       const now = new Date();
       const hoursSinceGame = (now - gameTime) / (1000 * 60 * 60);
       

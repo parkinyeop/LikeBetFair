@@ -161,8 +161,8 @@ class SimplifiedOddsValidation {
     try {
       console.log(`[SimplifiedValidation] 배당율 조회 시작: ${selection.desc}, 시작시간: ${selection.commence_time}`);
       
-      // commence_time 기준으로 해당 경기 찾기
-      const commenceTime = new Date(selection.commence_time);
+      // commence_time 기준으로 해당 경기 찾기 (UTC 변환)
+      const commenceTime = new Date(selection.commence_time + 'Z');
       const timeRange = 30 * 60 * 1000; // 30분 범위
       
       // 팀명으로 경기 찾기 (시간 + 팀명 모두 고려)

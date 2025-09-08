@@ -963,21 +963,53 @@ class ExchangeSettlementService {
   }
 
   /**
-   * 🆕 경기 결과를 경기 식별자로 찾기
+   * 🆕 시간대 보정 함수 (KST+09 형식과 UTC 형식 모두 처리)
+   * @param {string|Date} timeValue - 시간 값
+   * @returns {Date} UTC Date 객체
+   */
+  normalizeTimezoneToUTC(timeValue) {
+    if (!timeValue) return null;
+    
+    let dateStr = timeValue.toString();
+    
+    // KST 타임존 정보가 있는 경우 (+09:00 또는 +09)
+    if (dateStr.includes('+09')) {
+      console.log(`🔧 KST 형식 감지: ${dateStr}`);
+      // KST를 UTC로 변환 (9시간 빼기)
+      const kstDate = new Date(dateStr);
+      const utcDate = new Date(kstDate.getTime() - 9 * 60 * 60 * 1000);
+      console.log(`   → UTC 변환: ${utcDate.toISOString()}`);
+      return utcDate;
+    }
+    
+    // UTC 형식이거나 타임존 정보가 없는 경우
+    if (dateStr.endsWith('Z') || dateStr.includes('UTC')) {
+      // 이미 UTC 형식
+      return new Date(dateStr);
+    }
+    
+    // 타임존 정보가 없는 경우, 서버 타임존 해석을 방지하기 위해 UTC로 가정
+    console.log(`🔧 타임존 정보 없음, UTC로 가정: ${dateStr}`);
+    return new Date(dateStr + 'Z');
+  }
+
+  /**
+   * 🆕 경기 결과를 경기 식별자로 찾기 (시간대 보정 포함)
    * @param {string} homeTeam - 홈팀명
    * @param {string} awayTeam - 어웨이팀명
    * @param {string} commenceTime - 경기 시작 시간
    * @returns {Object|null} 매칭된 경기 결과
    */
   async findGameResultByMatch(homeTeam, awayTeam, commenceTime) {
-    const targetTime = new Date(commenceTime);
+    const targetTime = this.normalizeTimezoneToUTC(commenceTime);
     const timeRange = 12 * 60 * 60 * 1000; // ±12시간 범위
     
     const startTime = new Date(targetTime.getTime() - timeRange);
     const endTime = new Date(targetTime.getTime() + timeRange);
     
-    console.log(`🔍 경기 결과 검색: ${homeTeam} vs ${awayTeam}`);
-    console.log(`⏰ 시간 범위: ${startTime.toISOString()} ~ ${endTime.toISOString()}`);
+    console.log(`🔍 경기 결과 검색 (시간대 보정): ${homeTeam} vs ${awayTeam}`);
+    console.log(`⏰ 대상 시간 (UTC): ${targetTime.toISOString()}`);
+    console.log(`⏰ 검색 범위 (UTC): ${startTime.toISOString()} ~ ${endTime.toISOString()}`);
     
     const gameResults = await GameResult.findAll({
       where: {
@@ -994,32 +1026,100 @@ class ExchangeSettlementService {
     console.log(`📊 찾은 경기 결과: ${gameResults.length}개`);
     
     if (gameResults.length === 0) {
-      return null;
+      // 🆕 시간대 차이로 인한 매칭 실패 가능성 고려해서 더 넓은 범위로 재검색 (UTC 같은 날만)
+      console.log(`🔄 넓은 시간 범위로 재검색 시도 (UTC 같은 날 내)`);
+      
+      // UTC 기준 같은 날 범위 내에서만 검색하도록 제한
+      const targetDateUTC = new Date(targetTime.getTime());
+      targetDateUTC.setUTCHours(0, 0, 0, 0); // UTC 날짜 시작
+      const dayStartUTC = new Date(targetDateUTC);
+      const dayEndUTC = new Date(targetDateUTC.getTime() + 24 * 60 * 60 * 1000 - 1); // 23:59:59.999
+      
+      console.log(`🗓️ UTC 날짜 범위: ${dayStartUTC.toISOString()} ~ ${dayEndUTC.toISOString()}`);
+      
+      const wideStartTime = dayStartUTC;
+      const wideEndTime = dayEndUTC;
+      
+      const wideGameResults = await GameResult.findAll({
+        where: {
+          homeTeam: { [Op.iLike]: `%${this.normalizeTeamName(homeTeam)}%` },
+          awayTeam: { [Op.iLike]: `%${this.normalizeTeamName(awayTeam)}%` },
+          commenceTime: {
+            [Op.between]: [wideStartTime, wideEndTime]
+          },
+          status: 'finished'
+        },
+        order: [['commenceTime', 'ASC']]
+      });
+      
+      console.log(`📊 같은 날 넓은 범위 검색 결과: ${wideGameResults.length}개`);
+      console.log(`⏰ 검색 범위: ${wideStartTime.toISOString()} ~ ${wideEndTime.toISOString()}`);
+      
+      if (wideGameResults.length === 0) {
+        console.log(`❌ 같은 날 내에서 매칭되는 경기를 찾을 수 없습니다.`);
+        return null;
+      }
+      
+      // 시간차가 가장 적은 경기 찾기
+      let closestGame = wideGameResults[0];
+      let minTimeDiff = Math.abs(this.normalizeTimezoneToUTC(closestGame.commenceTime).getTime() - targetTime.getTime());
+      
+      for (const game of wideGameResults) {
+        const gameTime = this.normalizeTimezoneToUTC(game.commenceTime);
+        const timeDiff = Math.abs(gameTime.getTime() - targetTime.getTime());
+        if (timeDiff < minTimeDiff) {
+          minTimeDiff = timeDiff;
+          closestGame = game;
+        }
+      }
+      
+      const timeDiffHours = minTimeDiff / (1000 * 60 * 60);
+      console.log(`✅ 같은 날 범위에서 매칭된 경기: ${closestGame.homeTeam} vs ${closestGame.awayTeam}`);
+      console.log(`⏰ 시간 차이: ${timeDiffHours.toFixed(1)}시간 (같은 날 내)`);
+      
+      return closestGame;
     }
     
-    // 가장 가까운 시간의 경기 결과 반환
-    const closestGame = gameResults[0];
+    // 시간차가 가장 적은 경기 찾기
+    let closestGame = gameResults[0];
+    let minTimeDiff = Math.abs(this.normalizeTimezoneToUTC(closestGame.commenceTime).getTime() - targetTime.getTime());
+    
+    for (const game of gameResults) {
+      const gameTime = this.normalizeTimezoneToUTC(game.commenceTime);
+      const timeDiff = Math.abs(gameTime.getTime() - targetTime.getTime());
+      if (timeDiff < minTimeDiff) {
+        minTimeDiff = timeDiff;
+        closestGame = game;
+      }
+    }
+    
+    const timeDiffHours = minTimeDiff / (1000 * 60 * 60);
     console.log(`✅ 매칭된 경기: ${closestGame.homeTeam} vs ${closestGame.awayTeam}`);
-    console.log(`⏰ 경기 시간: ${closestGame.commenceTime}`);
+    console.log(`⏰ DB 시간: ${closestGame.commenceTime}`);
+    console.log(`⏰ 시간 차이: ${timeDiffHours.toFixed(1)}시간`);
     
     return closestGame;
   }
 
   /**
-   * 🆕 경기 식별자로 정산 가능한 주문 조회
+   * 🆕 경기 식별자로 정산 가능한 주문 조회 (시간대 보정 포함)
    * @param {string} homeTeam - 홈팀명
    * @param {string} awayTeam - 어웨이팀명
    * @param {string} commenceTime - 경기 시작 시간
    * @returns {Array} 정산 가능한 주문 목록
    */
   async getSettlableOrdersByMatch(homeTeam, awayTeam, commenceTime) {
-    const targetTime = new Date(commenceTime);
+    const targetTime = this.normalizeTimezoneToUTC(commenceTime);
     const timeRange = 12 * 60 * 60 * 1000; // ±12시간 범위
     
     const startTime = new Date(targetTime.getTime() - timeRange);
     const endTime = new Date(targetTime.getTime() + timeRange);
     
-    return await ExchangeOrder.findAll({
+    console.log(`🔍 정산 가능한 주문 검색 (시간대 보정): ${homeTeam} vs ${awayTeam}`);
+    console.log(`⏰ 대상 시간 (UTC): ${targetTime.toISOString()}`);
+    console.log(`⏰ 검색 범위 (UTC): ${startTime.toISOString()} ~ ${endTime.toISOString()}`);
+    
+    const orders = await ExchangeOrder.findAll({
       where: {
         homeTeam: { [Op.iLike]: `%${this.normalizeTeamName(homeTeam)}%` },
         awayTeam: { [Op.iLike]: `%${this.normalizeTeamName(awayTeam)}%` },
@@ -1031,6 +1131,23 @@ class ExchangeSettlementService {
       },
       order: [['createdAt', 'ASC']]
     });
+    
+    console.log(`📊 찾은 정산 가능 주문: ${orders.length}개`);
+    
+    // 각 주문의 시간대 정보 로깅
+    if (orders.length > 0) {
+      console.log(`📋 주문별 시간 정보:`);
+      orders.slice(0, 3).forEach((order, index) => {
+        const orderTime = this.normalizeTimezoneToUTC(order.commenceTime);
+        const timeDiff = Math.abs(orderTime.getTime() - targetTime.getTime()) / (1000 * 60 * 60);
+        console.log(`   ${index + 1}. 주문 ${order.id}: ${order.commenceTime} → ${orderTime.toISOString()} (차이: ${timeDiff.toFixed(1)}시간)`);
+      });
+      if (orders.length > 3) {
+        console.log(`   ... 외 ${orders.length - 3}개 주문`);
+      }
+    }
+    
+    return orders;
   }
 
   /**

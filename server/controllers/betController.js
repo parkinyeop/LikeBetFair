@@ -134,7 +134,7 @@ export async function placeBet(req, res) {
       if (!selection.commence_time) {
         return res.status(400).json({ message: `경기 시작 시간이 없는 경기 포함: ${selection.desc}` });
       }
-      const gameTime = new Date(selection.commence_time);
+      const gameTime = new Date(selection.commence_time + 'Z');
       if (gameTime <= new Date(now.getTime() + marginMinutes * 60000)) {
         return res.status(400).json({ message: `베팅 마감된 경기 포함(10분 전 마감): ${selection.desc}` });
       }
@@ -211,7 +211,7 @@ export async function getBetHistory(req, res) {
               if (teams.length === 2) {
                 const homeTeam = teams[0].trim();
                 const awayTeam = teams[1].trim();
-                const commenceTime = new Date(selection.commence_time);
+                const commenceTime = new Date(selection.commence_time + 'Z');
                 
                 if (!isNaN(commenceTime.getTime())) {
                   gameResult = await GameResult.findOne({
@@ -347,7 +347,7 @@ export async function cancelBet(req, res) {
     const marginMinutes = 10;
     for (const sel of bet.selections) {
       if (!sel.commence_time) continue;
-      const gameTime = new Date(sel.commence_time);
+      const gameTime = new Date(sel.commence_time + 'Z');
       if (gameTime <= new Date(now.getTime() + marginMinutes * 60000)) {
         await t.rollback();
         return res.status(400).json({ message: `경기 시작 10분 전 이후에는 취소할 수 없습니다. (${sel.desc})` });

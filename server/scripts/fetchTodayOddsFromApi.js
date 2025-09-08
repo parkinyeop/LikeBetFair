@@ -53,7 +53,7 @@ async function fetchTodayOddsFromApi() {
       const tomorrow = new Date(today);
       tomorrow.setDate(today.getDate()+1);
       const todayOdds = oddsList.filter(o => {
-        const dt = new Date(o.commence_time);
+        const dt = new Date(o.commence_time + 'Z');
         return dt >= today && dt < tomorrow;
       });
       console.log(`[${cat}] (${sportKey}) 오늘 경기수: ${todayOdds.length}`);

@@ -5,8 +5,8 @@ import Bet from '../models/betModel.js';
 import fs from 'fs';
 import path from 'path';
 
-// 우리가 배당률을 제공하는 리그만 명시
-const activeCategories = ['KBO', 'MLB', 'NBA']; // 필요시 확장
+// 우리가 배당률을 제공하는 리그만 명시 (올바른 스포츠 키 사용)
+const activeCategories = ['soccer_korea_kleague1', 'baseball_mlb', 'basketball_nba']; // 필요시 확장
 
 async function fetchAndSaveTodayOddsForOurLeagues() {
   let totalSaved = 0;
@@ -28,10 +28,10 @@ async function fetchAndSaveTodayOddsForOurLeagues() {
   // 2. activeCategories의 모든 경기(오늘/미래 경기) odds API에서 받아오기 (중복 제거)
   for (const category of activeCategories) {
     try {
-      const oddsList = await oddsApiService.fetchRecentOdds(category);
+      const oddsList = await oddsApiService.fetchOdds(category);
       for (const o of oddsList) {
         // 오늘/미래 경기만
-        if (new Date(o.commence_time) > new Date()) {
+        if (new Date(o.commence_time + 'Z') > new Date()) {
           const key = `${category}_${o.home_team}_${o.away_team}_${o.commence_time}`;
           if (!uniqueGames.has(key)) {
             uniqueGames.set(key, {
@@ -57,8 +57,8 @@ async function fetchAndSaveTodayOddsForOurLeagues() {
         return (
           o.home_team === sel.homeTeam &&
           o.away_team === sel.awayTeam &&
-          new Date(o.commence_time).getTime() === new Date(sel.commence_time).getTime() &&
-          new Date(o.commence_time) > new Date() // 미래 경기만
+          new Date(o.commence_time + 'Z').getTime() === new Date(sel.commence_time + 'Z').getTime() &&
+          new Date(o.commence_time + 'Z') > new Date() // 미래 경기만
         );
       });
       if (!targetOdds) {
@@ -73,7 +73,7 @@ async function fetchAndSaveTodayOddsForOurLeagues() {
         sportTitle: sel.category,
         homeTeam: sel.homeTeam,
         awayTeam: sel.awayTeam,
-        commenceTime: new Date(sel.commence_time),
+        commenceTime: new Date(sel.commence_time + 'Z').toISOString(),
         bookmakers: targetOdds.bookmakers,
         lastUpdated: new Date()
       };
@@ -116,9 +116,9 @@ async function fetchTodayOddsKSTToJson() {
     try {
       const oddsList = await oddsApiService.fetchRecentOdds(cat);
       const todayOdds = oddsList.filter(o => {
-        const dt = new Date(o.commence_time);
-        const dtKST = new Date(dt.getTime() + 9 * 60 * 60000);
-        return dtKST >= todayKST && dtKST < tomorrowKST;
+        const dt = new Date(o.commence_time + 'Z');
+        // API에서 받은 시간은 이미 UTC이므로 9시간을 더하지 않음
+        return dt >= todayKST && dt < tomorrowKST;
       });
       result[cat] = todayOdds;
       console.log(`[${cat}] 오늘(KST) 경기수: ${todayOdds.length}`);
@@ -145,9 +145,9 @@ async function fetchNext7DaysOddsKSTToJson() {
     try {
       const oddsList = await oddsApiService.fetchRecentOdds(cat);
       const odds7days = oddsList.filter(o => {
-        const dt = new Date(o.commence_time);
-        const dtKST = new Date(dt.getTime() + 9 * 60 * 60000);
-        return dtKST >= todayKST && dtKST < sevenDaysLaterKST;
+        const dt = new Date(o.commence_time + 'Z');
+        // API에서 받은 시간은 이미 UTC이므로 9시간을 더하지 않음
+        return dt >= todayKST && dt < sevenDaysLaterKST;
       });
       result[cat] = odds7days;
       console.log(`[${cat}] 7일간(KST) 경기수: ${odds7days.length}`);

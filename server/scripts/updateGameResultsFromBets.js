@@ -180,9 +180,9 @@ async function updateGameResultsFromBets() {
           continue;
         }
         
-        // commence_time이 있으면 사용하고, 없으면 오늘 날짜로 설정
+        // commence_time이 있으면 사용하고, 없으면 오늘 날짜로 설정 (UTC 변환)
         const commenceTime = selection.commence_time 
-          ? new Date(selection.commence_time)
+          ? new Date(selection.commence_time + 'Z')
           : new Date(); // 오늘 날짜로 설정
         
         // 고유한 경기 식별자 생성 (홈팀 + 원정팀 + 시작시간)

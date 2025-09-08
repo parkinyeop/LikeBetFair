@@ -249,8 +249,8 @@ class OddsValidationService {
    */
   async getCurrentMarketOdds(selection) {
     try {
-      // 경기 시간으로 OddsCache 검색
-      const commenceTime = new Date(selection.commence_time);
+      // 경기 시간으로 OddsCache 검색 (UTC 변환)
+      const commenceTime = new Date(selection.commence_time + 'Z');
       const timeRange = 2 * 60 * 60 * 1000; // 2시간 범위
       
       const oddsData = await OddsCache.findOne({
