@@ -26,6 +26,37 @@ class ExchangeMultibetController {
         description
       });
 
+      // 🆕 selections 데이터 상세 로그 (별도 파일로 저장)
+      if (selections && selections.length > 0) {
+        const fs = (await import('fs')).default;
+        const path = (await import('path')).default;
+        
+        const debugInfo = {
+          timestamp: new Date().toISOString(),
+          userId,
+          selectionCount: selections.length,
+          firstSelection: {
+            commenceTime: selections[0].commenceTime,
+            type: typeof selections[0].commenceTime,
+            homeTeam: selections[0].homeTeam,
+            awayTeam: selections[0].awayTeam
+          },
+          allSelections: selections.map((selection, index) => ({
+            index: index + 1,
+            commenceTime: selection.commenceTime,
+            type: typeof selection.commenceTime,
+            homeTeam: selection.homeTeam,
+            awayTeam: selection.awayTeam
+          }))
+        };
+        
+        const logFile = path.join(process.cwd(), 'logs/multibet-debug.log');
+        const logEntry = `\n🎯 ===== 멀티배팅 주문 생성 디버깅 =====\n${JSON.stringify(debugInfo, null, 2)}\n🎯 ======================================\n`;
+        
+        fs.appendFileSync(logFile, logEntry);
+        console.log('🔍 멀티배팅 디버깅 로그가 multibet-debug.log에 저장되었습니다.');
+      }
+
       // 1. 기본 데이터 검증
       if (!selections || !Array.isArray(selections) || selections.length === 0) {
         return res.status(400).json({ 
@@ -112,7 +143,7 @@ class ExchangeMultibetController {
             odds: s.odds,
             homeTeam: s.homeTeam,
             awayTeam: s.awayTeam,
-            commenceTime: s.commenceTime,
+            commenceTime: s.commenceTime || new Date().toISOString(), // 이미 UTC ISO 문자열이므로 그대로 사용
             sportKey: s.sportKey,
             desc: s.desc || `${s.homeTeam} vs ${s.awayTeam}`, // 🆕 desc 필드 추가
             option: s.option, // 🆕 option 필드 추가 (Over/Under용)
@@ -130,7 +161,9 @@ class ExchangeMultibetController {
         autoSettlement: true,
         homeTeam: selections[0]?.homeTeam || '멀티배팅',
         awayTeam: selections[0]?.awayTeam || '멀티배팅',
-        commenceTime: selections[0]?.commenceTime || new Date(),
+        commenceTime: selections[0]?.commenceTime ?
+          (selections[0].commenceTime.endsWith('Z') ? selections[0].commenceTime : selections[0].commenceTime + 'Z') :
+          new Date().toISOString(), // UTC ISO 문자열로 저장 (VARCHAR 컬럼)
         sportKey: selections[0]?.sportKey || 'multibet'
       }, { transaction });
 
