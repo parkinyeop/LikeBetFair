@@ -333,11 +333,17 @@ class OddsApiService {
               // 🆕 강제 UTC 시간 처리 로직
               let commenceTime;
               try {
-                // OddsAPI에서 받은 시간을 UTC로 명시적 변환
-                const utcDate = new Date(game.commence_time + 'Z'); // Z 추가로 UTC 명시
+                // OddsAPI에서 받은 시간이 이미 UTC 형식인지 확인
+                let timeString = game.commence_time;
+                if (!timeString.endsWith('Z') && !timeString.includes('+') && !timeString.includes('-', 10)) {
+                  // UTC 형식이 아니면 Z 추가
+                  timeString = timeString + 'Z';
+                }
+                
+                const utcDate = new Date(timeString);
                 
                 if (isNaN(utcDate.getTime())) {
-                  console.error(`[DEBUG] 유효하지 않은 시간: ${game.commence_time}`);
+                  console.error(`[DEBUG] 유효하지 않은 시간: ${game.commence_time} (변환 시도: ${timeString})`);
                   continue;
                 }
                 
@@ -689,8 +695,12 @@ class OddsApiService {
             try {
               // OddsAPI 시간을 UTC로 명시적 변환
               if (game.commence_time) {
-                // 항상 Z를 추가하여 UTC로 명시
-                commence = new Date(game.commence_time + 'Z');
+                // 이미 UTC 형식인지 확인 후 Z 추가
+                let timeString = game.commence_time;
+                if (!timeString.endsWith('Z') && !timeString.includes('+') && !timeString.includes('-', 10)) {
+                  timeString = timeString + 'Z';
+                }
+                commence = new Date(timeString);
               } else {
                 console.error(`[야구 디버깅] ❌ commence_time이 null/undefined: ${game.commence_time}`);
                 return false;
@@ -768,11 +778,16 @@ class OddsApiService {
               // 🆕 강제 UTC 시간 처리 로직 (통일)
               let commenceTime;
               try {
-                // OddsAPI에서 받은 시간을 UTC로 명시적 변환
-                const utcDate = new Date(game.commence_time + 'Z');
+                // OddsAPI에서 받은 시간이 이미 UTC 형식인지 확인
+                let timeString = game.commence_time;
+                if (!timeString.endsWith('Z') && !timeString.includes('+') && !timeString.includes('-', 10)) {
+                  timeString = timeString + 'Z';
+                }
+                
+                const utcDate = new Date(timeString);
                 
                 if (isNaN(utcDate.getTime())) {
-                  console.error(`[야구 디버깅] ❌ 유효하지 않은 시간: ${game.commence_time}`);
+                  console.error(`[야구 디버깅] ❌ 유효하지 않은 시간: ${game.commence_time} (변환 시도: ${timeString})`);
                   continue;
                 }
                 

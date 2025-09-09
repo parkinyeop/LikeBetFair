@@ -312,7 +312,7 @@ const ORDER_SUBTABS = [
   { id: 'all', label: '전체 주문' },
   { id: 'open', label: '대기 중' },
   { id: 'matched', label: '매칭됨' },
-  { id: 'settled', label: '정산됨' },
+  { id: 'settled', label: '정산완료' },
   { id: 'cancelled', label: '취소됨' }
 ];
 
@@ -985,7 +985,7 @@ export default function ExchangeAdmin() {
           borderWidth: 1,
         },
         {
-          label: '정산된 주문',
+          label: '정산완료 주문',
           data: settledOrdersData,
           backgroundColor: 'rgba(168, 85, 247, 0.8)',
           borderColor: 'rgba(168, 85, 247, 1)',
@@ -1028,19 +1028,25 @@ export default function ExchangeAdmin() {
     try {
       const headers = getAuthHeaders();
       
-      // 매치된 주문들 조회
+      // 매치된 주문들 및 경기 결과 조회
       const matchedOrdersResponse = await fetch(`http://localhost:5050/api/admin/exchange/orders/${order.id}/matches`, { headers });
       let matchedOrders = [];
+      let gameResults = {};
+      let gameResult = null;
       
       if (matchedOrdersResponse.ok) {
         const matchedData = await matchedOrdersResponse.json();
         matchedOrders = matchedData.matchedOrders || [];
+        gameResults = matchedData.gameResults || {}; // 멀티배팅용 경기 결과들
+        gameResult = matchedData.originalOrder?.gameResult || null; // 단일 경기용 경기 결과
       }
       
       // 주문 상세 정보 설정
       const orderWithMatches = {
         ...order,
-        matchedOrders: matchedOrders
+        matchedOrders: matchedOrders,
+        gameResults: gameResults, // 멀티배팅용 경기 결과들
+        gameResult: gameResult // 단일 경기용 경기 결과
       };
       
       setSelectedOrder(orderWithMatches);
@@ -1539,7 +1545,7 @@ export default function ExchangeAdmin() {
                             </div>
                             <div className="text-center">
                               <div className="text-2xl font-bold text-purple-600">{monthlySummary.settledOrders}</div>
-                              <div className="text-sm text-gray-600">정산된 주문</div>
+                              <div className="text-sm text-gray-600">정산완료 주문</div>
                             </div>
                           </div>
                         )}
@@ -1628,7 +1634,7 @@ export default function ExchangeAdmin() {
                               <option value="all">모든 상태</option>
                               <option value="open">오픈</option>
                               <option value="matched">매칭됨</option>
-                              <option value="settled">정산됨</option>
+                              <option value="settled">정산완료</option>
                               <option value="cancelled">취소됨</option>
                             </select>
                             <select
@@ -1727,10 +1733,10 @@ export default function ExchangeAdmin() {
                                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                                       order.status === 'open' ? 'bg-blue-100 text-blue-800' :
                                       order.status === 'matched' ? 'bg-green-100 text-green-800' :
-                                      order.status === 'settled' ? 'bg-gray-100 text-gray-800' :
+                                      order.status === 'settled' ? 'bg-purple-100 text-purple-800' :
                                       'bg-red-100 text-red-800'
                                     }`}>
-                                      {order.status}
+                                      {order.status === 'settled' ? '정산완료' : order.status === 'cancelled' ? '취소됨' : order.status}
                                     </span>
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -1881,7 +1887,7 @@ export default function ExchangeAdmin() {
                             </div>
                             <div className="text-center">
                               <div className="text-2xl font-bold text-purple-600">{monthlySummary.settledOrders}</div>
-                              <div className="text-sm text-gray-600">정산된 주문</div>
+                              <div className="text-sm text-gray-600">정산완료 주문</div>
                             </div>
                           </div>
                         )}
@@ -2036,7 +2042,7 @@ export default function ExchangeAdmin() {
                                       {settlement.homeTeam} vs {settlement.awayTeam}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                      정산 완료
+                                      정산완료
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                       {settlement.settledOrders}개
@@ -2147,10 +2153,10 @@ export default function ExchangeAdmin() {
                               <span className={`text-sm font-medium px-2 py-1 rounded ${
                                 selectedOrder.status === 'open' ? 'bg-blue-100 text-blue-800' :
                                 selectedOrder.status === 'matched' ? 'bg-green-100 text-green-800' :
-                                selectedOrder.status === 'settled' ? 'bg-gray-100 text-gray-800' :
+                                selectedOrder.status === 'settled' ? 'bg-purple-100 text-purple-800' :
                                 'bg-red-100 text-red-800'
                               }`}>
-                                {selectedOrder.status}
+                                {selectedOrder.status === 'settled' ? '정산완료' : selectedOrder.status === 'cancelled' ? '취소됨' : selectedOrder.status}
                               </span>
                             </div>
                           </div>
@@ -2161,34 +2167,76 @@ export default function ExchangeAdmin() {
                           <div className="bg-gray-50 p-4 rounded-lg">
                             <h4 className="text-md font-semibold text-gray-900 mb-3">선택된 경기들</h4>
                             <div className="space-y-3">
-                              {selectedOrder.selectionDetails.selections.map((selection, index) => (
-                                <div key={index} className="bg-white p-3 rounded-lg border border-gray-200">
-                                  <div className="flex justify-between items-start">
-                                    <div className="flex-1">
-                                      <div className="font-medium text-gray-900 text-sm">
-                                        {selection.homeTeam} vs {selection.awayTeam}
+                              {selectedOrder.selectionDetails.selections.map((selection, index) => {
+                                // 경기 결과 상태 결정
+                                const getGameResult = (selection) => {
+                                  if (!selectedOrder.gameResults || !selectedOrder.gameResults[selection.homeTeam + ' vs ' + selection.awayTeam]) {
+                                    return { status: 'pending', result: '경기 결과 대기중', color: 'bg-yellow-100 text-yellow-800' };
+                                  }
+                                  
+                                  const gameResult = selectedOrder.gameResults[selection.homeTeam + ' vs ' + selection.awayTeam];
+                                  const isHomeWin = gameResult.result === 'home_win';
+                                  const isAwayWin = gameResult.result === 'away_win';
+                                  const isDraw = gameResult.result === 'draw';
+                                  
+                                  // 선택한 팀이 승리했는지 확인
+                                  const selectedTeam = selection.selection;
+                                  const isWinner = (isHomeWin && selectedTeam === selection.homeTeam) || 
+                                                 (isAwayWin && selectedTeam === selection.awayTeam) ||
+                                                 (isDraw && selectedTeam === 'Draw');
+                                  
+                                  if (isWinner) {
+                                    return { 
+                                      status: 'win', 
+                                      result: `승리 (${gameResult.score})`, 
+                                      color: 'bg-green-100 text-green-800' 
+                                    };
+                                  } else {
+                                    return { 
+                                      status: 'lose', 
+                                      result: `패배 (${gameResult.score})`, 
+                                      color: 'bg-red-100 text-red-800' 
+                                    };
+                                  }
+                                };
+                                
+                                const gameResult = getGameResult(selection);
+                                
+                                return (
+                                  <div key={index} className="bg-white p-3 rounded-lg border border-gray-200">
+                                    <div className="flex justify-between items-start">
+                                      <div className="flex-1">
+                                        <div className="font-medium text-gray-900 text-sm">
+                                          {selection.homeTeam} vs {selection.awayTeam}
+                                        </div>
+                                        <div className="text-xs text-gray-600 mt-1">
+                                          <span className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs mr-1">
+                                            {selection.market}
+                                          </span>
+                                          <span className="inline-block bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
+                                            {selection.selection}
+                                          </span>
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-1">
+                                          {new Date(selection.commenceTime).toLocaleString('ko-KR')}
+                                        </div>
+                                        {/* 경기 결과 표시 */}
+                                        <div className="mt-2">
+                                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${gameResult.color}`}>
+                                            {gameResult.result}
+                                          </span>
+                                        </div>
                                       </div>
-                                      <div className="text-xs text-gray-600 mt-1">
-                                        <span className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs mr-1">
-                                          {selection.market}
-                                        </span>
-                                        <span className="inline-block bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
-                                          {selection.selection}
-                                        </span>
+                                      <div className="text-right">
+                                        <div className="text-sm font-bold text-orange-600">
+                                          {selection.odds?.toFixed(2) || 'N/A'}
+                                        </div>
+                                        <div className="text-xs text-gray-500">배당률</div>
                                       </div>
-                                      <div className="text-xs text-gray-500 mt-1">
-                                        {new Date(selection.commenceTime).toLocaleString('ko-KR')}
-                                      </div>
-                                    </div>
-                                    <div className="text-right">
-                                      <div className="text-sm font-bold text-orange-600">
-                                        {selection.odds?.toFixed(2) || 'N/A'}
-                                      </div>
-                                      <div className="text-xs text-gray-500">배당률</div>
                                     </div>
                                   </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           </div>
                         ) : !selectedOrder.isMultibet ? (
@@ -2208,11 +2256,34 @@ export default function ExchangeAdmin() {
                                 <span className="text-sm font-medium">{selectedOrder.market}</span>
                               </div>
                               <div className="flex justify-between">
+                                <span className="text-sm text-gray-600">선택:</span>
+                                <span className="text-sm font-medium">{selectedOrder.selection}</span>
+                              </div>
+                              <div className="flex justify-between">
                                 <span className="text-sm text-gray-600">경기 시간:</span>
                                 <span className="text-sm font-medium">
                                   {new Date(selectedOrder.commenceTime).toLocaleString('ko-KR')}
                                 </span>
                               </div>
+                              {/* 경기 결과 표시 */}
+                              {selectedOrder.gameResult && (
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-gray-600">경기 결과:</span>
+                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                    selectedOrder.gameResult.result === 'home_win' && selectedOrder.selection === selectedOrder.homeTeam ? 'bg-green-100 text-green-800' :
+                                    selectedOrder.gameResult.result === 'away_win' && selectedOrder.selection === selectedOrder.awayTeam ? 'bg-green-100 text-green-800' :
+                                    selectedOrder.gameResult.result === 'draw' && selectedOrder.selection === 'Draw' ? 'bg-green-100 text-green-800' :
+                                    selectedOrder.gameResult.result === 'home_win' || selectedOrder.gameResult.result === 'away_win' || selectedOrder.gameResult.result === 'draw' ? 'bg-red-100 text-red-800' :
+                                    'bg-yellow-100 text-yellow-800'
+                                  }`}>
+                                    {selectedOrder.gameResult.result === 'home_win' && selectedOrder.selection === selectedOrder.homeTeam ? `승리 (${selectedOrder.gameResult.score})` :
+                                     selectedOrder.gameResult.result === 'away_win' && selectedOrder.selection === selectedOrder.awayTeam ? `승리 (${selectedOrder.gameResult.score})` :
+                                     selectedOrder.gameResult.result === 'draw' && selectedOrder.selection === 'Draw' ? `승리 (${selectedOrder.gameResult.score})` :
+                                     selectedOrder.gameResult.result === 'home_win' || selectedOrder.gameResult.result === 'away_win' || selectedOrder.gameResult.result === 'draw' ? `패배 (${selectedOrder.gameResult.score})` :
+                                     '경기 결과 대기중'}
+                                  </span>
+                                </div>
+                              )}
                               <div className="flex justify-between">
                                 <span className="text-sm text-gray-600">주문 생성:</span>
                                 <span className="text-sm font-medium">
@@ -2273,10 +2344,10 @@ export default function ExchangeAdmin() {
                                     <td className="px-4 py-2">
                                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                                         match.status === 'matched' ? 'bg-green-100 text-green-800' :
-                                        match.status === 'settled' ? 'bg-gray-100 text-gray-800' :
+                                        match.status === 'settled' ? 'bg-purple-100 text-purple-800' :
                                         'bg-red-100 text-red-800'
                                       }`}>
-                                        {match.status}
+                                        {match.status === 'settled' ? '정산완료' : match.status === 'cancelled' ? '취소됨' : match.status}
                                       </span>
                                     </td>
                                   </tr>

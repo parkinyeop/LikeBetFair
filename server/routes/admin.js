@@ -6,6 +6,7 @@ import AdminCommission from '../models/adminCommissionModel.js';
 import Bet from '../models/betModel.js';
 import ExchangeOrder from '../models/exchangeOrderModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
+import GameResult from '../models/gameResultModel.js';
 import bcrypt from 'bcryptjs';
 import { Op } from 'sequelize';
 
@@ -562,9 +563,95 @@ router.get('/exchange/orders/:orderId/matches', verifyToken, requireAdmin(1), as
     
     matchedOrders = matchedOrders.concat(ordersMatchedToThis);
     
+    // 🆕 경기 결과 데이터 조회
+    let gameResults = {};
+    
+    if (originalOrder.isMultibet && originalOrder.selectionDetails && originalOrder.selectionDetails.selections) {
+      // 멀티배팅인 경우 - 각 경기별로 결과 조회
+      for (const selection of originalOrder.selectionDetails.selections) {
+        try {
+          const gameResult = await GameResult.findOne({
+            where: {
+              homeTeam: selection.homeTeam,
+              awayTeam: selection.awayTeam,
+              commenceTime: {
+                [Op.between]: [
+                  new Date(new Date(selection.commenceTime).getTime() - 12 * 60 * 60 * 1000), // ±12시간
+                  new Date(new Date(selection.commenceTime).getTime() + 12 * 60 * 60 * 1000)
+                ]
+              }
+            },
+            order: [['createdAt', 'DESC']]
+          });
+          
+          if (gameResult) {
+            const gameKey = `${selection.homeTeam} vs ${selection.awayTeam}`;
+            
+            // score를 문자열로 변환
+            let scoreString = 'N/A';
+            if (gameResult.score && Array.isArray(gameResult.score)) {
+              const homeScore = gameResult.score.find(s => s.name === selection.homeTeam)?.score || '0';
+              const awayScore = gameResult.score.find(s => s.name === selection.awayTeam)?.score || '0';
+              scoreString = `${homeScore}-${awayScore}`;
+            }
+            
+            gameResults[gameKey] = {
+              result: gameResult.result,
+              score: scoreString,
+              status: gameResult.status
+            };
+          }
+        } catch (error) {
+          console.error(`경기 결과 조회 오류 (${selection.homeTeam} vs ${selection.awayTeam}):`, error);
+        }
+      }
+    } else {
+      // 단일 경기인 경우
+      try {
+        const gameResult = await GameResult.findOne({
+          where: {
+            homeTeam: originalOrder.homeTeam,
+            awayTeam: originalOrder.awayTeam,
+            commenceTime: {
+              [Op.between]: [
+                new Date(new Date(originalOrder.commenceTime).getTime() - 12 * 60 * 60 * 1000), // ±12시간
+                new Date(new Date(originalOrder.commenceTime).getTime() + 12 * 60 * 60 * 1000)
+              ]
+            }
+          },
+          order: [['createdAt', 'DESC']]
+        });
+        
+        if (gameResult) {
+          // score를 문자열로 변환
+          let scoreString = 'N/A';
+          if (gameResult.score && Array.isArray(gameResult.score)) {
+            const homeScore = gameResult.score.find(s => s.name === originalOrder.homeTeam)?.score || '0';
+            const awayScore = gameResult.score.find(s => s.name === originalOrder.awayTeam)?.score || '0';
+            scoreString = `${homeScore}-${awayScore}`;
+          }
+          
+          // 단일 경기 결과를 gameResult 형태로 설정
+          originalOrder.gameResult = {
+            result: gameResult.result,
+            score: scoreString,
+            status: gameResult.status
+          };
+        }
+      } catch (error) {
+        console.error(`단일 경기 결과 조회 오류:`, error);
+      }
+    }
+    
+    // 멀티배팅인 경우 gameResults를 originalOrder에 포함
+    if (originalOrder.isMultibet) {
+      originalOrder.gameResults = gameResults;
+    }
+    
     res.json({
       originalOrder,
-      matchedOrders
+      matchedOrders,
+      gameResults // 멀티배팅용 경기 결과들
     });
   } catch (error) {
     console.error('Exchange order matches error:', error);

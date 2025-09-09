@@ -902,15 +902,16 @@ class ExchangeSettlementService {
       const settlementResults = [];
       
       // 멀티베팅 주문과 일반 주문 분리
-      const multibetOrders = orders.filter(order => order.market === 'multibet');
-      const regularOrders = orders.filter(order => order.market !== 'multibet');
+      const multibetOrders = orders.filter(order => order.isMultibet === true);
+      const regularOrders = orders.filter(order => order.isMultibet !== true);
       
       console.log(`🎯 멀티베팅 주문: ${multibetOrders.length}개, 일반 주문: ${regularOrders.length}개`);
       
-      // 멀티베팅 주문 정산
+      // 멀티베팅 주문 정산 (각 주문별로 개별 처리)
       for (const order of multibetOrders) {
         try {
-          const result = await this.settleMultibetOrder(order, gameResult, transaction);
+          // 멀티베팅 주문은 각 선택사항에 대해 개별적으로 경기 결과를 찾아야 함
+          const result = await this.settleMultibetOrder(order, null, transaction);
           settlementResults.push(result);
           settledCount += 1;
           totalWinnings += result.totalWinnings || 0;
@@ -1182,15 +1183,78 @@ class ExchangeSettlementService {
   /**
    * 🆕 멀티베팅 주문 정산
    * @param {Object} order - 멀티베팅 주문
-   * @param {Object} gameResult - 경기 결과
+   * @param {Object} gameResult - 경기 결과 (사용하지 않음, 각 선택사항별로 개별 조회)
    * @param {Object} transaction - DB 트랜잭션
    * @returns {Object} 정산 결과
    */
   async settleMultibetOrder(order, gameResult, transaction) {
     console.log(`\n🎯 멀티베팅 주문 정산: ${order.id}`);
     
-    // 멀티베팅은 현재 단순히 손실 처리 (향후 개선 필요)
-    const actualProfit = -parseFloat(order.amount);
+    if (!order.selectionDetails || !order.selectionDetails.selections) {
+      console.log(`❌ 멀티베팅 주문 ${order.id}에 선택사항이 없습니다.`);
+      return {
+        orderId: order.id,
+        userId: order.userId,
+        type: 'multibet_error',
+        totalWinnings: 0,
+        isMultibet: true
+      };
+    }
+    
+    // 각 선택사항에 대해 개별적으로 경기 결과 확인
+    let allSelectionsWon = true;
+    const selectionResults = [];
+    
+    for (const selection of order.selectionDetails.selections) {
+      console.log(`🔍 선택사항 확인: ${selection.homeTeam} vs ${selection.awayTeam} - ${selection.selection}`);
+      
+      // 해당 선택사항의 경기 결과 조회
+      const selectionGameResult = await this.findGameResultByMatch(
+        selection.homeTeam, 
+        selection.awayTeam, 
+        selection.commenceTime
+      );
+      
+      if (!selectionGameResult || selectionGameResult.status !== 'finished') {
+        console.log(`❌ 선택사항 경기 결과 없음: ${selection.homeTeam} vs ${selection.awayTeam}`);
+        allSelectionsWon = false;
+        selectionResults.push({
+          selection: selection.selection,
+          game: `${selection.homeTeam} vs ${selection.awayTeam}`,
+          result: 'no_result',
+          won: false
+        });
+        continue;
+      }
+      
+      // 승부 판정
+      const isWinner = this.determineSelectionWinner(selection, selectionGameResult);
+      selectionResults.push({
+        selection: selection.selection,
+        game: `${selection.homeTeam} vs ${selection.awayTeam}`,
+        result: selectionGameResult.result,
+        score: selectionGameResult.score,
+        won: isWinner
+      });
+      
+      if (!isWinner) {
+        allSelectionsWon = false;
+      }
+      
+      console.log(`✅ 선택사항 결과: ${isWinner ? '승리' : '패배'} (${selectionGameResult.result})`);
+    }
+    
+    // 멀티베팅 결과 계산 (모든 선택사항이 승리해야 함)
+    let actualProfit = 0;
+    if (allSelectionsWon) {
+      // 모든 선택사항이 승리한 경우 - 잠재 수익 지급
+      actualProfit = parseFloat(order.potentialWinnings || order.amount * (order.totalOdds - 1));
+      console.log(`🎉 멀티베팅 승리! 수익: ${actualProfit}원`);
+    } else {
+      // 하나라도 패배한 경우 - 원금 손실
+      actualProfit = -parseFloat(order.amount);
+      console.log(`❌ 멀티베팅 패배! 손실: ${Math.abs(actualProfit)}원`);
+    }
     
     await order.update({
       status: 'settled',
@@ -1210,7 +1274,7 @@ class ExchangeSettlementService {
         userId: order.userId,
         betId: `EXCHANGE_${order.id}`,
         amount: actualProfit,
-        memo: `Exchange 멀티베팅 정산: ${gameResult.homeTeam} vs ${gameResult.awayTeam}`,
+        memo: `Exchange 멀티베팅 정산: ${allSelectionsWon ? '승리' : '패배'} (${selectionResults.length}개 선택사항)`,
         balanceAfter: newBalance,
         paidAt: new Date()
       }, { transaction });
@@ -1219,10 +1283,52 @@ class ExchangeSettlementService {
     return {
       orderId: order.id,
       userId: order.userId,
-      type: 'multibet_loss',
+      type: allSelectionsWon ? 'multibet_win' : 'multibet_loss',
       totalWinnings: actualProfit,
-      isMultibet: true
+      isMultibet: true,
+      selectionResults: selectionResults
     };
+  }
+  
+  /**
+   * 🆕 선택사항 승부 판정
+   * @param {Object} selection - 선택사항
+   * @param {Object} gameResult - 경기 결과
+   * @returns {boolean} 승리 여부
+   */
+  determineSelectionWinner(selection, gameResult) {
+    const selectedTeam = selection.selection;
+    const homeTeam = selection.homeTeam;
+    const awayTeam = selection.awayTeam;
+    
+    // 승패 마켓의 경우
+    if (selection.market === '승패' || selection.market === 'h2h') {
+      if (gameResult.result === 'home_win' && selectedTeam === homeTeam) {
+        return true;
+      }
+      if (gameResult.result === 'away_win' && selectedTeam === awayTeam) {
+        return true;
+      }
+      if (gameResult.result === 'draw' && selectedTeam === 'Draw') {
+        return true;
+      }
+      return false;
+    }
+    
+    // 핸디캡 마켓의 경우 (향후 구현)
+    if (selection.market === '핸디캡' || selection.market === 'spreads') {
+      // TODO: 핸디캡 로직 구현
+      return false;
+    }
+    
+    // 오버/언더 마켓의 경우 (향후 구현)
+    if (selection.market === '총점' || selection.market === 'totals') {
+      // TODO: 오버/언더 로직 구현
+      return false;
+    }
+    
+    // 기본적으로 패배 처리
+    return false;
   }
 
   /**
@@ -1230,12 +1336,11 @@ class ExchangeSettlementService {
    */
   async settleOrdersWithoutGameResultId() {
     try {
-      // gameResultId가 null인 미정산 주문들 조회
+      // 미정산 주문들 조회 (gameResultId는 더 이상 사용하지 않으므로 제거)
       const unSettledOrders = await ExchangeOrder.findAll({
         where: {
-          gameResultId: null,
           status: { [Op.in]: ['matched', 'partially_matched'] },
-          settledAt: null
+          settledAt: null // 아직 정산되지 않은 주문만
         },
         order: [['createdAt', 'ASC']],
         limit: 20 // 한 번에 20개씩만 처리
