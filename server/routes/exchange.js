@@ -8,7 +8,7 @@ import exchangeWebSocketService from '../services/exchangeWebSocketService.js';
 import exchangeGameMappingService from '../services/exchangeGameMappingService.js';
 import exchangeSettlementService from '../services/exchangeSettlementService.js';
 import { Op } from 'sequelize';
-import sequelize from '../config/database.js';
+import sequelize from '../models/sequelize.js';
 
 const router = express.Router();
 
@@ -719,7 +719,7 @@ router.post('/settle', verifyToken, async (req, res) => {
   res.json({ message: '정산 완료' });
 });
 
-// 주문 취소 (부분 매칭 처리 포함)
+// 주문 취소 (Back/Lay 구분 처리)
 router.post('/cancel/:orderId', verifyToken, async (req, res) => {
   const transaction = await sequelize.transaction();
   
@@ -783,8 +783,8 @@ async function cancelBackOrderWithMatchedLays(backOrder, transaction) {
   // 3. Back 주문 취소 처리
   await cancelOriginalOrder(backOrder, transaction);
   
-  // 4. 매칭 기록 삭제
-  await deleteMatchRecords(backOrder.id, transaction);
+  // 4. 매칭 기록 상태 변경
+  await updateMatchRecordsAsCancelled(backOrder.id, transaction);
   
   console.log(`  ✅ Back 주문 취소 완료: ID ${backOrder.id}`);
 }
@@ -805,7 +805,7 @@ async function cancelLayMatchOnly(layOrder, transaction) {
   // 3. Lay 주문 취소 처리
   await cancelOriginalOrder(layOrder, transaction);
   
-  // 4. 매칭 기록을 cancelled 상태로 변경 (삭제하지 않음)
+  // 4. 매칭 기록을 cancelled 상태로 변경
   await updateMatchRecordAsCancelled(layOrder.id, transaction);
   
   console.log(`  ✅ Lay 매치 취소 완료: ID ${layOrder.id}`);
@@ -814,11 +814,25 @@ async function cancelLayMatchOnly(layOrder, transaction) {
 // 🆕 매칭된 Lay 주문들 조회
 async function findMatchedLayOrders(backOrderId, transaction) {
   const matches = await ExchangeOrderMatch.findAll({
-    where: { backOrderId: backOrderId },
+    where: { 
+      [Op.or]: [
+        { originalOrderId: backOrderId },
+        { matchingOrderId: backOrderId }
+      ]
+    },
     transaction
   });
   
-  const layOrderIds = matches.map(match => match.layOrderId);
+  const layOrderIds = [];
+  for (const match of matches) {
+    // Back 주문과 매칭된 Lay 주문들 찾기
+    if (match.originalOrderId == backOrderId && match.matchingSide === 'lay') {
+      layOrderIds.push(match.matchingOrderId);
+    } else if (match.matchingOrderId == backOrderId && match.originalSide === 'lay') {
+      layOrderIds.push(match.originalOrderId);
+    }
+  }
+  
   return await ExchangeOrder.findAll({
     where: { id: { [Op.in]: layOrderIds } },
     transaction
@@ -827,22 +841,36 @@ async function findMatchedLayOrders(backOrderId, transaction) {
 
 // 🆕 매칭된 Back 주문 조회
 async function findMatchedBackOrder(layOrderId, transaction) {
-  const match = await ExchangeOrderMatch.findOne({
-    where: { layOrderId: layOrderId },
+  const matches = await ExchangeOrderMatch.findAll({
+    where: {
+      [Op.or]: [
+        { originalOrderId: layOrderId },
+        { matchingOrderId: layOrderId }
+      ]
+    },
     transaction
   });
   
-  if (!match) return null;
+  for (const match of matches) {
+    // Lay 주문과 매칭된 Back 주문 찾기
+    if (match.originalOrderId == layOrderId && match.matchingSide === 'back') {
+      return await ExchangeOrder.findByPk(match.matchingOrderId, { transaction });
+    } else if (match.matchingOrderId == layOrderId && match.originalSide === 'back') {
+      return await ExchangeOrder.findByPk(match.originalOrderId, { transaction });
+    }
+  }
   
-  return await ExchangeOrder.findByPk(match.backOrderId, { transaction });
+  return null;
 }
 
 // 🆕 매칭된 Lay 주문 취소 처리
 async function cancelMatchedLayOrder(layOrder, transaction) {
   console.log(`    🔄 Lay 주문 취소: ID ${layOrder.id}`);
   
-  // Lay 주문 환불 (베팅금액 전체)
-  const refundAmount = layOrder.amount;
+  // Lay 주문 환불 (남은 금액만)
+  const refundableAmount = layOrder.remainingAmount || layOrder.amount;
+  const refundAmount = Math.floor((layOrder.price - 1) * refundableAmount);
+  
   const user = await User.findByPk(layOrder.userId, { transaction });
   user.balance += refundAmount;
   await user.save({ transaction });
@@ -868,12 +896,25 @@ async function cancelMatchedLayOrder(layOrder, transaction) {
 async function restoreBackOrderToOpen(backOrder, cancelledLayOrder, transaction) {
   console.log(`    🔄 Back 주문 복원: ID ${backOrder.id}`);
   
-  // 매칭된 금액만큼 remainingAmount 증가
-  const matchAmount = cancelledLayOrder.amount;
-  const newRemainingAmount = (backOrder.remainingAmount || 0) + matchAmount;
-  const newFilledAmount = (backOrder.filledAmount || 0) - matchAmount;
+  // 🚨 수정된 로직: 취소된 Lay와 매칭되었던 금액을 계산
+  const matches = await ExchangeOrderMatch.findAll({
+    where: {
+      [Op.or]: [
+        { originalOrderId: backOrder.id, matchingOrderId: cancelledLayOrder.id },
+        { originalOrderId: cancelledLayOrder.id, matchingOrderId: backOrder.id }
+      ]
+    },
+    transaction
+  });
+  
+  let restoreAmount = 0;
+  for (const match of matches) {
+    restoreAmount += match.matchedAmount;
+  }
   
   // 상태 업데이트
+  const newRemainingAmount = (backOrder.remainingAmount || 0) + restoreAmount;
+  const newFilledAmount = Math.max(0, (backOrder.filledAmount || 0) - restoreAmount);
   const newStatus = newFilledAmount > 0 ? 'partially_matched' : 'open';
   
   await backOrder.update({
@@ -883,14 +924,14 @@ async function restoreBackOrderToOpen(backOrder, cancelledLayOrder, transaction)
     partiallyFilled: newFilledAmount > 0 && newRemainingAmount > 0
   }, { transaction });
   
-  console.log(`    ✅ Back 주문 복원 완료: ID ${backOrder.id}, 상태: ${newStatus}`);
+  console.log(`    ✅ Back 주문 복원 완료: ID ${backOrder.id}, 상태: ${newStatus}, 복원금액: ${restoreAmount}원`);
 }
 
 // 🆕 원래 주문 취소 처리
 async function cancelOriginalOrder(order, transaction) {
   console.log(`    🔄 원래 주문 취소: ID ${order.id}, 타입: ${order.side}`);
   
-  // 환불 금액 계산
+  // 환불 금액 계산 (남은 금액만)
   const refundableAmount = order.remainingAmount || order.amount;
   const refundAmount = order.side === 'back' ? 
     refundableAmount : 
@@ -918,30 +959,38 @@ async function cancelOriginalOrder(order, transaction) {
   console.log(`    ✅ 원래 주문 취소 완료: ID ${order.id}, 환불: ${refundAmount}원`);
 }
 
-// 🆕 매칭 기록 삭제
-async function deleteMatchRecords(orderId, transaction) {
-  await ExchangeOrderMatch.destroy({
-    where: {
-      [Op.or]: [
-        { backOrderId: orderId },
-        { layOrderId: orderId }
-      ]
-    },
-    transaction
-  });
-  console.log(`    🗑️ 매칭 기록 삭제 완료: 주문 ID ${orderId}`);
-}
-
-// 🆕 매칭 기록을 cancelled 상태로 변경
-async function updateMatchRecordAsCancelled(layOrderId, transaction) {
+// 🆕 매칭 기록들을 cancelled 상태로 변경
+async function updateMatchRecordsAsCancelled(orderId, transaction) {
   await ExchangeOrderMatch.update(
-    { status: 'cancelled', cancelledAt: new Date() },
+    { status: 'cancelled', settledAt: new Date() },
     {
-      where: { layOrderId: layOrderId },
+      where: {
+        [Op.or]: [
+          { originalOrderId: orderId },
+          { matchingOrderId: orderId }
+        ]
+      },
       transaction
     }
   );
-  console.log(`    📝 매칭 기록 cancelled 상태로 변경: Lay 주문 ID ${layOrderId}`);
+  console.log(`    📝 매칭 기록 cancelled 상태로 변경: 주문 ID ${orderId}`);
+}
+
+// 🆕 단일 매칭 기록을 cancelled 상태로 변경
+async function updateMatchRecordAsCancelled(orderId, transaction) {
+  await ExchangeOrderMatch.update(
+    { status: 'cancelled', settledAt: new Date() },
+    {
+      where: {
+        [Op.or]: [
+          { originalOrderId: orderId },
+          { matchingOrderId: orderId }
+        ]
+      },
+      transaction
+    }
+  );
+  console.log(`    📝 매칭 기록 cancelled 상태로 변경: 주문 ID ${orderId}`);
 }
 
 // Exchange 잔고 조회 (일반 잔고 사용)
