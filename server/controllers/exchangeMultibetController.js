@@ -118,21 +118,28 @@ class ExchangeMultibetController {
         });
       }
 
-      // 5. 멀티배팅 주문 생성 (기존 ExchangeOrders 테이블 사용)
+      // 5. totalOdds 재계산 (프론트엔드와 동일한 로직)
+      const calculatedTotalOdds = selections.reduce((acc, selection) => {
+        return acc * (parseFloat(selection.odds) || 1);
+      }, 1);
+      
+      console.log(`📊 totalOdds 계산: 프론트엔드 ${totalOdds} vs 백엔드 ${calculatedTotalOdds}`);
+      
+      // 6. 멀티배팅 주문 생성 (기존 ExchangeOrders 테이블 사용)
       const multibetOrder = await ExchangeOrder.create({
         userId,
         gameId: 'multibet_' + Date.now(), // 멀티배팅용 고유 ID
         market: 'multibet',
         line: 0,
         side: 'back', // 멀티배팅은 항상 back (사용자 베팅)
-        price: totalOdds,
+        price: calculatedTotalOdds, // 계산된 totalOdds 사용
         amount: stake,
         status: 'open',
         stakeAmount: stake,
-        potentialProfit: parseFloat((stake * totalOdds - stake).toFixed(2)), // 🆕 소수점 처리
+        potentialProfit: parseFloat((stake * calculatedTotalOdds - stake).toFixed(2)), // 🆕 소수점 처리
         isMultibet: true,
-        totalOdds,
-        potentialWinnings: parseFloat((stake * totalOdds).toFixed(2)), // 🆕 소수점 처리
+        totalOdds: calculatedTotalOdds, // 계산된 totalOdds 사용
+        potentialWinnings: parseFloat((stake * calculatedTotalOdds).toFixed(2)), // 🆕 소수점 처리
         selectionCount: selections.length,
         selectionDetails: {
           selections: selections.map(s => ({

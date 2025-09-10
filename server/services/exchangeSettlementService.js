@@ -1247,8 +1247,14 @@ class ExchangeSettlementService {
     // 멀티베팅 결과 계산 (모든 선택사항이 승리해야 함)
     let actualProfit = 0;
     if (allSelectionsWon) {
-      // 모든 선택사항이 승리한 경우 - 잠재 수익 지급
-      actualProfit = parseFloat(order.potentialWinnings || order.amount * (order.totalOdds - 1));
+      // 모든 선택사항이 승리한 경우 - 순수익 계산
+      if (order.potentialWinnings) {
+        // potentialWinnings가 있으면 순수익으로 계산 (총수익 - 원금)
+        actualProfit = parseFloat(order.potentialWinnings) - parseFloat(order.amount);
+      } else {
+        // potentialWinnings가 없으면 배당률로 순수익 계산
+        actualProfit = parseFloat(order.amount) * (parseFloat(order.totalOdds) - 1);
+      }
       console.log(`🎉 멀티베팅 승리! 수익: ${actualProfit}원`);
     } else {
       // 하나라도 패배한 경우 - 원금 손실
