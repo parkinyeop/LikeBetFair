@@ -332,8 +332,11 @@ class ExchangeSettlementService {
     // 수익 계산 (부분 매칭 고려)
     const backWinAmount = isBackWin ? 
       (backStakeAmount * (backOrder.price - 1)) : -backStakeAmount;
+    
+    // Lay 수익 계산: Back이 패배하면 A의 매칭된 금액만 획득 (본인 베팅금액은 별도 환불)
     const layWinAmount = isBackWin ? 
-      -(layStakeAmount * (layOrder.price - 1)) : layStakeAmount;
+      -backStakeAmount : // Back이 승리하면 Lay는 A의 매칭된 금액만 손실
+      backStakeAmount; // Back이 패배하면 A의 매칭된 금액만 획득
     
     console.log(`  💰 수익 계산 (부분 매칭 고려):`);
     console.log(`    Back 주문: ${backWinAmount > 0 ? '+' : ''}${backWinAmount} (체결: ${backStakeAmount}원)`);
@@ -382,10 +385,7 @@ class ExchangeSettlementService {
         settlementNote: laySettlementNote
       }, { transaction });
       
-      // 🆕 남은 금액이 있다면 취소 처리
-      if (layOrder.remainingAmount > 0) {
-        await this.cancelRemainingAmount(layOrder, transaction);
-      }
+      // Lay 주문은 Back 주문의 매칭이므로 환불 없음
     } else {
       // 완전 매칭된 주문: 기존 로직
       await layOrder.update({
@@ -1245,21 +1245,26 @@ class ExchangeSettlementService {
     }
     
     // 멀티베팅 결과 계산 (모든 선택사항이 승리해야 함)
+    // 부분 매칭된 경우 실제 체결된 금액으로 계산
+    const multibetStakeAmount = order.partiallyFilled ? (order.filledAmount || 0) : order.amount;
+    
     let actualProfit = 0;
     if (allSelectionsWon) {
-      // 모든 선택사항이 승리한 경우 - 순수익 계산
+      // 모든 선택사항이 승리한 경우 - 순수익 계산 (부분 매칭 고려)
       if (order.potentialWinnings) {
-        // potentialWinnings가 있으면 순수익으로 계산 (총수익 - 원금)
-        actualProfit = parseFloat(order.potentialWinnings) - parseFloat(order.amount);
+        // potentialWinnings가 있으면 체결된 비율로 계산
+        const matchRatio = order.partiallyFilled ? (multibetStakeAmount / order.amount) : 1;
+        const adjustedPotentialWinnings = parseFloat(order.potentialWinnings) * matchRatio;
+        actualProfit = adjustedPotentialWinnings - multibetStakeAmount;
       } else {
         // potentialWinnings가 없으면 배당률로 순수익 계산
-        actualProfit = parseFloat(order.amount) * (parseFloat(order.totalOdds) - 1);
+        actualProfit = multibetStakeAmount * (parseFloat(order.totalOdds) - 1);
       }
-      console.log(`🎉 멀티베팅 승리! 수익: ${actualProfit}원`);
+      console.log(`🎉 멀티베팅 승리! 수익: ${actualProfit}원 (체결: ${multibetStakeAmount}원)`);
     } else {
-      // 하나라도 패배한 경우 - 원금 손실
-      actualProfit = -parseFloat(order.amount);
-      console.log(`❌ 멀티베팅 패배! 손실: ${Math.abs(actualProfit)}원`);
+      // 하나라도 패배한 경우 - 체결된 금액만 손실
+      actualProfit = -multibetStakeAmount;
+      console.log(`❌ 멀티베팅 패배! 손실: ${Math.abs(actualProfit)}원 (체결: ${multibetStakeAmount}원)`);
     }
     
     await order.update({
@@ -1284,6 +1289,11 @@ class ExchangeSettlementService {
         balanceAfter: newBalance,
         paidAt: new Date()
       }, { transaction });
+    }
+    
+    // 🆕 멀티베팅 부분 매칭 환불 처리
+    if (order.partiallyFilled && order.remainingAmount > 0) {
+      await this.cancelRemainingAmount(order, transaction);
     }
     
     return {
