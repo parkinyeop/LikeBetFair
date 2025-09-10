@@ -333,14 +333,17 @@ class ExchangeSettlementService {
     const backWinAmount = isBackWin ? 
       (backStakeAmount * (backOrder.price - 1)) : -backStakeAmount;
     
-    // Lay 수익 계산: Back이 패배하면 A의 매칭된 금액만 획득 (본인 베팅금액은 별도 환불)
+    // 🚨 수정된 Lay 수익 계산: 부분 매칭 비율에 따른 올바른 정산
+    const matchRatio = layOrder.partiallyFilled ? 
+      (layOrder.filledAmount || layStakeAmount) / (layOrder.originalAmount || layOrder.amount) : 1;
+    
     const layWinAmount = isBackWin ? 
-      -backStakeAmount : // Back이 승리하면 Lay는 A의 매칭된 금액만 손실
-      backStakeAmount; // Back이 패배하면 A의 매칭된 금액만 획득
+      -layStakeAmount : // Back이 승리하면 Lay는 자신의 베팅금액 손실
+      layStakeAmount + (backStakeAmount * matchRatio); // Lay 승리시: 본인 베팅 + Back 베팅의 매치비율
     
     console.log(`  💰 수익 계산 (부분 매칭 고려):`);
     console.log(`    Back 주문: ${backWinAmount > 0 ? '+' : ''}${backWinAmount} (체결: ${backStakeAmount}원)`);
-    console.log(`    Lay 주문: ${layWinAmount > 0 ? '+' : ''}${layWinAmount} (체결: ${layStakeAmount}원)`);
+    console.log(`    Lay 주문: ${layWinAmount > 0 ? '+' : ''}${layWinAmount} (체결: ${layStakeAmount}원, 매치비율: ${Math.round(matchRatio * 100)}%)`);
     
     // 사용자 잔고 업데이트
     await this.updateUserBalance(backOrder, backWinAmount, gameResult, isBackWin, transaction);
@@ -623,6 +626,9 @@ class ExchangeSettlementService {
         return;
       }
       
+      // 🚨 수정: 환불할 금액을 미리 저장
+      const refundAmount = order.remainingAmount;
+      
       // 1. 남은 금액을 0으로 설정하고 상세한 정산 메모 생성
       const detailedNote = this.generateDetailedPartialMatchingNote(order);
       await order.update({
@@ -633,16 +639,16 @@ class ExchangeSettlementService {
       // 2. 사용자 잔액에 남은 금액 환불
       const user = await User.findByPk(order.userId, { transaction });
       const currentBalance = parseFloat(user.balance);
-      const newBalance = currentBalance + order.remainingAmount;
+      const newBalance = currentBalance + refundAmount;
       
       await user.update({ balance: newBalance }, { transaction });
       
       // 3. 환불 내역 기록 (상세한 메모 포함)
-      const refundMemo = this.generateDetailedRefundMemo(order);
+      const refundMemo = this.generateDetailedRefundMemo(order, refundAmount);
       await PaymentHistory.create({
         userId: order.userId,
         betId: `EXCHANGE_${order.id}`, // Exchange 주문 ID를 betId로 사용하여 추적 가능
-        amount: order.remainingAmount,
+        amount: refundAmount,
         type: 'refund',
         memo: refundMemo,
         status: 'completed',
@@ -650,7 +656,7 @@ class ExchangeSettlementService {
         paidAt: new Date()
       }, { transaction });
       
-      console.log(`    ✅ 남은 금액 취소 완료 - 환불: ${order.remainingAmount}원, 새 잔액: ${newBalance}원`);
+      console.log(`    ✅ 남은 금액 취소 완료 - 환불: ${refundAmount}원, 새 잔액: ${newBalance}원`);
       console.log(`    📝 정산 메모: ${detailedNote}`);
       
     } catch (error) {
@@ -674,10 +680,11 @@ class ExchangeSettlementService {
   /**
    * 🆕 부분 매칭 상세 환불 메모 생성
    * @param {Object} order - 부분 매칭된 주문
+   * @param {number} refundAmount - 환불할 금액
    * @returns {string} 상세한 환불 메모
    */
-  generateDetailedRefundMemo(order) {
-    return `부분 매칭 후 남은 금액 자동 환불 - ${order.homeTeam} vs ${order.awayTeam} (${order.side} ${order.selection}) - 체결: ${(order.filledAmount || 0).toLocaleString()}원, 환불: ${(order.remainingAmount || 0).toLocaleString()}원`;
+  generateDetailedRefundMemo(order, refundAmount) {
+    return `부분 매칭 후 남은 금액 자동 환불 - ${order.homeTeam} vs ${order.awayTeam} (${order.side} ${order.selection}) - 체결: ${(order.filledAmount || 0).toLocaleString()}원, 환불: ${refundAmount.toLocaleString()}원`;
   }
 
   /**
