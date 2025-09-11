@@ -159,22 +159,15 @@ function OrderPanel() {
   // 통계 계산
   const stats = React.useMemo(() => {
     if (!userOrders || !Array.isArray(userOrders)) {
-      return { total: 0, open: 0, matched: 0, totalAmount: 0, totalPotentialProfit: 0 };
+      return { total: 0, open: 0, matched: 0, totalAmount: 0 };
     }
     
     const total = userOrders.length;
     const open = userOrders.filter(order => order.status === 'open').length;
     const matched = userOrders.filter(order => order.status === 'matched').length;
     const totalAmount = userOrders.reduce((sum, order) => sum + order.amount, 0);
-    const totalPotentialProfit = userOrders.reduce((sum, order) => {
-      if (order.side === 'back') {
-        return sum + (order.amount * (order.price - 1));
-      } else {
-        return sum + (order.amount * (order.price - 1) / order.price);
-      }
-    }, 0);
 
-    return { total, open, matched, totalAmount, totalPotentialProfit };
+    return { total, open, matched, totalAmount };
   }, [userOrders]);
 
   const handleOrder = async () => {
@@ -564,15 +557,42 @@ function OrderHistoryPanel() {
       : { text: 'Lay (레이)', color: 'text-pink-600', bg: 'bg-pink-50' };
   };
 
-  // 잠재 수익 계산
-  const calculatePotentialProfit = (order: ExchangeOrder) => {
-    // 호가 배당률 사용 (order.price)
-    const odds = order.price;
+  // 통합배당률 계산
+  const calculateTotalOdds = (order: ExchangeOrder) => {
+    if ((order as any).isMultibet && (order as any).selectionDetails && (order as any).selectionDetails.selections) {
+      // 멀티배팅인 경우: 모든 선택의 배당률을 곱함
+      const selections = (order as any).selectionDetails.selections || [];
+      return selections.reduce((total: number, selection: any) => {
+        return total * (selection.odds || 1);
+      }, 1);
+    } else {
+      // 단일 배팅인 경우: 해당 배당률 반환
+      return order.price || 1;
+    }
+  };
+
+  // 예상 수익 계산 (상세보기용) - 본인 배팅 금액 포함
+  const calculateExpectedProfit = (order: ExchangeOrder) => {
+    const totalOdds = calculateTotalOdds(order);
+    let stakeAmount = 0;
+    
+    if ((order as any).isMultibet) {
+      // 멀티배팅인 경우
+      stakeAmount = (order as any).stakeAmount;
+      if (stakeAmount && typeof stakeAmount === 'string') {
+        stakeAmount = parseFloat(stakeAmount);
+      }
+    } else {
+      // 단일 배팅인 경우
+      stakeAmount = order.amount;
+    }
     
     if (order.side === 'back') {
-      return Math.round(order.amount * (odds - 1));
+      // Back: 본인 배팅금액 + 수익 = stakeAmount + (stakeAmount * (odds - 1))
+      return Math.round(stakeAmount * totalOdds);
     } else {
-      return Math.round(order.amount * (odds - 1) / odds);
+      // Lay: 본인 배팅금액 + 수익 = stakeAmount + (stakeAmount * (odds - 1) / odds)
+      return Math.round(stakeAmount + (stakeAmount * (totalOdds - 1) / totalOdds));
     }
   };
 
@@ -655,22 +675,15 @@ function OrderHistoryPanel() {
   // 통계 계산
   const stats = React.useMemo(() => {
     if (!userOrders || !Array.isArray(userOrders)) {
-      return { total: 0, open: 0, matched: 0, totalAmount: 0, totalPotentialProfit: 0 };
+      return { total: 0, open: 0, matched: 0, totalAmount: 0 };
     }
     
     const total = userOrders.length;
     const open = userOrders.filter(order => order.status === 'open').length;
     const matched = userOrders.filter(order => order.status === 'matched').length;
     const totalAmount = userOrders.reduce((sum, order) => sum + order.amount, 0);
-    const totalPotentialProfit = userOrders.reduce((sum, order) => {
-      if (order.side === 'back') {
-        return sum + (order.amount * (order.price - 1));
-      } else {
-        return sum + (order.amount * (order.price - 1) / order.price);
-      }
-    }, 0);
 
-    return { total, open, matched, totalAmount, totalPotentialProfit };
+    return { total, open, matched, totalAmount };
   }, [userOrders]);
 
   // 🗑️ 불필요한 gameIds 추출 및 GameResults API 호출 제거
@@ -742,12 +755,6 @@ function OrderHistoryPanel() {
               <div className="text-center p-2 bg-green-50 rounded">
                 <div className="text-gray-500 mb-1">체결</div>
                 <div className="font-bold text-lg text-green-600">{stats.matched}개</div>
-              </div>
-              <div className="text-center p-2 bg-blue-50 rounded">
-                <div className="text-gray-500 mb-1">잠재 수익</div>
-                <div className={`font-bold text-lg ${stats.totalPotentialProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {stats.totalPotentialProfit >= 0 ? '+' : ''}{Math.round(stats.totalPotentialProfit).toLocaleString()}원
-            </div>
               </div>
               <div className="text-center p-2 bg-purple-50 rounded">
                 <div className="text-gray-500 mb-1">멀티배팅</div>
@@ -827,7 +834,7 @@ function OrderHistoryPanel() {
               const statusInfo = getStatusDisplay(order.status, order.commenceTime);
               const sideInfo = getSideDisplay(order.side);
               const dateInfo = formatDate(order.createdAt);
-              const potentialProfit = calculatePotentialProfit(order);
+              const totalOdds = calculateTotalOdds(order);
               
               // 경기 정보 (간소화된 2단계 Fallback)
               const bestOrder = order.gameId ? bestOrderInfoByGameId[order.gameId] : undefined;
@@ -920,7 +927,7 @@ function OrderHistoryPanel() {
                       </div>
                     )}
                     
-                    {/* 배팅금액과 수익 정보 */}
+                    {/* 배팅금액과 통합배당률 정보 */}
                     <div className="flex items-center justify-between text-sm pt-2 border-t border-gray-100">
                       <div className="flex items-center space-x-4">
                         <span className="text-gray-500">배팅금액</span>
@@ -941,9 +948,9 @@ function OrderHistoryPanel() {
                         </span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className="text-gray-500">수익</span>
-                        <span className={`text-sm font-bold ${potentialProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {potentialProfit >= 0 ? '+' : ''}{potentialProfit.toLocaleString()}원
+                        <span className="text-gray-500">배당률</span>
+                        <span className="text-sm font-bold text-blue-600">
+                          @{totalOdds.toFixed(2)}
                         </span>
                       </div>
                     </div>
@@ -1008,21 +1015,18 @@ function OrderHistoryPanel() {
                   {selectedOrderId === order.id && (
                     <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                       <div className="space-y-4">
-                        {/* 생성 시간 */}
-                        <div className="text-xs text-gray-500">
-                          {new Date(order.createdAt).toLocaleString('ko-KR')}
+                        {/* 1. 주문번호 */}
+                        <div className="bg-gray-100 p-3 rounded-lg border border-gray-200">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-gray-600">주문번호</span>
+                            <span className="text-sm font-bold text-gray-800">#{order.id}</span>
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {new Date(order.createdAt).toLocaleString('ko-KR')}
+                          </div>
                         </div>
                         
-                        {/* 매칭 정보 */}
-                        {order.matchedOrderId && (
-                          <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs text-gray-600">매칭된 주문</span>
-                              <span className="text-xs font-medium text-green-600">#{order.matchedOrderId}</span>
-                            </div>
-                          </div>
-                        )}
-                        {/* 멀티배팅 상세 정보 */}
+                        {/* 2. 멀티배팅 상세 정보 */}
                         {(order as any).isMultibet && (order as any).selectionDetails && (
                           <div className="space-y-3">
                             <h4 className="text-xs font-semibold text-gray-700 border-b border-gray-200 pb-1 flex items-center">
@@ -1073,6 +1077,26 @@ function OrderHistoryPanel() {
                                   </div>
                                 );
                               })}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* 3. 예상 수익 정보 */}
+                        <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-gray-600">예상 수익 (본금 포함)</span>
+                            <span className="text-sm font-bold text-blue-600">
+                              {calculateExpectedProfit(order).toLocaleString()}원
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {/* 4. 매칭 정보 (Lay인 경우만) */}
+                        {order.side === 'lay' && order.matchedOrderId && (
+                          <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-gray-600">매칭된 주문</span>
+                              <span className="text-xs font-medium text-green-600">#{order.matchedOrderId}</span>
                             </div>
                           </div>
                         )}
