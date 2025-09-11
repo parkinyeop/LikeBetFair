@@ -110,13 +110,13 @@ app.get('/health', (req, res) => {
 //   res.send("Server is running");
 // });
 
-// API Routes (순서 중요!)
+// API Routes (순서 중요! 구체적인 경로를 먼저 등록)
 app.use('/api/auth', authRoutes);
 app.use('/api/bet', betRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/game-results', gameResultRoutes);
-app.use('/api/exchange', exchangeRoutes);
-app.use('/api/exchange/multibet', exchangeMultibetRoutes);
+app.use('/api/exchange/multibet', exchangeMultibetRoutes); // 구체적인 경로를 먼저 등록
+app.use('/api/exchange', exchangeRoutes); // 일반적인 경로를 나중에 등록
 app.use('/api/odds', oddsRoutes);
 
 // API 라우트 디버깅
