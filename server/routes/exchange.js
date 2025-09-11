@@ -82,7 +82,16 @@ async function processPartialMatching(orderData) {
     }
     
     const newFilledAmount = (existingOrder.filledAmount || 0) + actualFilledAmount;
-    const newStatus = newRemainingAmount > 0 ? 'open' : 'matched';
+    
+    // 🆕 Back과 Lay 구분 상태 관리
+    let newStatus;
+    if (existingOrder.side === 'lay') {
+      // Lay 매치: 부분 매칭되어도 active 상태 유지 (취소 가능)
+      newStatus = 'active';
+    } else {
+      // Back 주문: 기존 로직 유지
+      newStatus = newRemainingAmount > 0 ? 'open' : 'matched';
+    }
     
     console.log(`💰 매치 금액 계산: ${existingOrder.side} 주문 #${existingOrder.id}`);
     console.log(`   매치 금액: ₩${matchAmount.toLocaleString()}`);
@@ -243,7 +252,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
       side: matchType,
       price: targetOrder.price,
       amount: actualMatchAmount,
-      status: 'matched',
+      status: matchType === 'lay' ? 'active' : 'matched', // 🆕 Lay는 active 상태로 생성
       matchedOrderId: targetOrder.id,
       homeTeam: targetOrder.homeTeam,
       awayTeam: targetOrder.awayTeam,
@@ -270,25 +279,43 @@ router.post('/match-order', verifyToken, async (req, res) => {
     // 🆕 대상 주문 상태 업데이트 (부분 매칭 처리)
     if (actualMatchAmount >= (targetOrder.remainingAmount || targetOrder.amount)) {
       // 완전 매칭
-      targetOrder.status = 'matched';
       targetOrder.originalAmount = targetOrder.originalAmount || targetOrder.amount; // 🆕 originalAmount 설정
       targetOrder.filledAmount = targetOrder.originalAmount;
       targetOrder.remainingAmount = 0;
       targetOrder.partiallyFilled = false;
+      
+      // 🆕 Back과 Lay 구분 상태 설정
+      if (targetOrder.side === 'lay') {
+        targetOrder.status = 'active'; // Lay 매치는 active 상태 유지
+      } else {
+        targetOrder.status = 'matched'; // Back 주문은 matched 상태
+      }
     } else {
       // 부분 매칭
       targetOrder.originalAmount = targetOrder.originalAmount || targetOrder.amount; // 🆕 originalAmount 설정
       targetOrder.partiallyFilled = true;
       targetOrder.filledAmount = (targetOrder.filledAmount || 0) + actualMatchAmount;
       targetOrder.remainingAmount = (targetOrder.remainingAmount || targetOrder.amount) - actualMatchAmount;
-      targetOrder.status = 'partially_matched'; // 🆕 새로운 상태 사용
+      
+      // 🆕 Back과 Lay 구분 상태 설정
+      if (targetOrder.side === 'lay') {
+        targetOrder.status = 'active'; // Lay 매치는 부분 매칭되어도 active 상태 유지
+      } else {
+        targetOrder.status = 'partially_matched'; // Back 주문은 partially_matched 상태
+      }
       
       // 🆕 소수점 문제 해결: 잔액이 100원 미만이면 0으로 처리
       if (targetOrder.remainingAmount < 100) {
         console.log('🧹 잔액 정리: remainingAmount가 100원 미만이므로 0으로 처리');
         targetOrder.remainingAmount = 0;
-        targetOrder.status = 'matched';
         targetOrder.partiallyFilled = false;
+        
+        // 🆕 Back과 Lay 구분 상태 설정
+        if (targetOrder.side === 'lay') {
+          targetOrder.status = 'active'; // Lay 매치는 active 상태 유지
+        } else {
+          targetOrder.status = 'matched'; // Back 주문은 matched 상태
+        }
       }
     }
     
@@ -526,7 +553,7 @@ router.post('/order', verifyToken, async (req, res) => {
       const matchedOrder = await ExchangeOrder.create({
         ...baseOrderData,
         amount: match.matchAmount,
-        status: 'matched',
+        status: side === 'lay' ? 'active' : 'matched', // 🆕 Lay는 active 상태로 생성
         matchedOrderId: match.existingOrder.id,
         filledAmount: filledAmount,
         originalAmount: match.matchAmount,
@@ -737,9 +764,36 @@ router.post('/cancel/:orderId', verifyToken, async (req, res) => {
       return res.status(404).json({ message: '주문을 찾을 수 없습니다.' });
     }
     
-    if (order.status !== 'open' && order.status !== 'partially_matched') {
-      await transaction.rollback();
-      return res.status(400).json({ message: '취소할 수 없는 주문 상태입니다.' });
+    // 🆕 경기 시간 10분 전 확인 함수
+    const isWithin10MinutesOfGame = (commenceTime) => {
+      if (!commenceTime) return false;
+      const gameTime = new Date(commenceTime);
+      const now = new Date();
+      const timeDiff = gameTime.getTime() - now.getTime();
+      return timeDiff <= 10 * 60 * 1000; // 10분 = 600,000ms
+    };
+
+    // 🆕 Back과 Lay 구분 취소 조건
+    if (order.side === 'lay') {
+      // Lay 매치: active 상태 + 경기 시간 10분 전까지
+      if (order.status !== 'active') {
+        await transaction.rollback();
+        return res.status(400).json({ message: '취소할 수 없는 매치 상태입니다.' });
+      }
+      if (isWithin10MinutesOfGame(order.commenceTime)) {
+        await transaction.rollback();
+        return res.status(400).json({ message: '경기 시작 10분 전 이후에는 취소할 수 없습니다.' });
+      }
+    } else {
+      // Back 주문: open/partially_matched 상태 + 경기 시간 10분 전까지
+      if (order.status !== 'open' && order.status !== 'partially_matched') {
+        await transaction.rollback();
+        return res.status(400).json({ message: '취소할 수 없는 주문 상태입니다.' });
+      }
+      if (isWithin10MinutesOfGame(order.commenceTime)) {
+        await transaction.rollback();
+        return res.status(400).json({ message: '경기 시작 10분 전 이후에는 취소할 수 없습니다.' });
+      }
     }
     
     console.log(`🔄 주문 취소 시작: ID ${orderId}, 타입: ${order.side}, 상태: ${order.status}`);
@@ -1484,7 +1538,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
         price,
         amount: matchAmount,
         selection: orderData.selection,
-        status: 'matched',
+        status: side === 'lay' ? 'active' : 'matched', // 🆕 Lay는 active 상태로 생성
         matchedOrderId: existingOrder.id,
         homeTeam: orderData.homeTeam,
         awayTeam: orderData.awayTeam,

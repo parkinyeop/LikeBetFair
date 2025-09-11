@@ -454,6 +454,11 @@ function OrderPanel() {
                   const result = await createMultiBetOrder();
                   if (result.success) {
                     alert('배팅 주문이 성공적으로 생성되었습니다!');
+                    
+                    // 🆕 멀티배팅 주문 완료 후 이벤트 발생
+                    if (typeof window !== 'undefined') {
+                      window.dispatchEvent(new Event('exchangeOrderPlaced'));
+                    }
                   } else {
                     alert(`배팅 주문 생성 실패: ${result.error}`);
                   }
@@ -517,7 +522,9 @@ function OrderHistoryPanel() {
     
     switch (status) {
       case 'open': return { text: '미체결', color: 'text-yellow-600', bg: 'bg-yellow-50' };
+      case 'partially_matched': return { text: '부분체결', color: 'text-orange-600', bg: 'bg-orange-50' };
       case 'matched': return { text: '체결', color: 'text-green-600', bg: 'bg-green-50' };
+      case 'active': return { text: '활성매치', color: 'text-purple-600', bg: 'bg-purple-50' }; // 🆕 Lay 매치 상태
       case 'settled': return { text: '정산', color: 'text-blue-600', bg: 'bg-blue-50' };
       case 'cancelled': return { text: '취소', color: 'text-red-600', bg: 'bg-red-50' };
       default: return { text: status, color: 'text-gray-600', bg: 'bg-gray-50' };
@@ -557,6 +564,11 @@ function OrderHistoryPanel() {
     try {
       await cancelOrder(orderId);
       setShowCancelConfirm(null);
+      
+      // 🆕 주문 취소 후 이벤트 발생
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('exchangeOrderPlaced'));
+      }
     } catch (error) {
       console.error('주문 취소 실패:', error);
     }
@@ -594,8 +606,9 @@ function OrderHistoryPanel() {
   //     return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
   //   });
 
-  // 기본 주문 목록 (날짜순 내림차순만)
+  // 기본 주문 목록 (취소된 주문 제외, 날짜순 내림차순)
   const filteredOrders = (userOrders || [])
+    .filter(order => order.status !== 'cancelled') // 🆕 취소된 주문 제외
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   // 정렬 방향 토글 - 주석 처리 (나중에 재활용 가능)
@@ -935,10 +948,23 @@ function OrderHistoryPanel() {
                       <span>{selectedOrderId === order.id ? '상세 숨기기' : '상세 보기'}</span>
                     </button>
                     
-                    {/* 취소 가능 조건: open 또는 partially_matched 상태이고, 경기시간 10분 전까지 */}
-                    {((order.status === 'open' || order.status === 'partially_matched') && 
-                      order.commenceTime && 
-                      new Date(order.commenceTime).getTime() - new Date().getTime() > 10 * 60 * 1000) && (
+                    {/* 🆕 취소 가능 조건: Back과 Lay 구분 + 경기시간 10분 전까지 */}
+                    {(() => {
+                      // 경기 시간 10분 전 확인
+                      const isWithin10Minutes = order.commenceTime && 
+                        new Date(order.commenceTime).getTime() - new Date().getTime() <= 10 * 60 * 1000;
+                      
+                      if (isWithin10Minutes) return false; // 경기 시간 10분 전 이후는 취소 불가
+                      
+                      // Back과 Lay 구분 취소 조건
+                      if (order.side === 'lay') {
+                        // Lay 매치: active 상태에서만 취소 가능
+                        return order.status === 'active';
+                      } else {
+                        // Back 주문: open 또는 partially_matched 상태에서 취소 가능
+                        return order.status === 'open' || order.status === 'partially_matched';
+                      }
+                    })() && (
                       <button
                         onClick={() => setShowCancelConfirm(order.id)}
                         disabled={loading}

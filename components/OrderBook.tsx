@@ -96,6 +96,11 @@ export default function OrderBook({ gameId, market, line, onOrderClick }: OrderB
       setShowCancelConfirm(null);
       // 호가창 새로고침
       loadOrderbook();
+      
+      // 🆕 주문 취소 후 이벤트 발생
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('exchangeOrderPlaced'));
+      }
     } catch (error) {
       console.error('주문 취소 실패:', error);
     }
