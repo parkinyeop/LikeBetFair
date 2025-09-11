@@ -552,12 +552,8 @@ function OrderHistoryPanel() {
     };
   };
 
-  // 주문 취소 핸들러
+  // 주문 취소 핸들러 (중복 확인창 제거)
   const handleCancelOrder = async (orderId: number) => {
-    if (!confirm('정말로 이 주문을 취소하시겠습니까?')) {
-      return;
-    }
-    
     try {
       await cancelOrder(orderId);
       setShowCancelConfirm(null);
@@ -659,6 +655,7 @@ function OrderHistoryPanel() {
     });
     return map;
   }, [userOrders]);
+
 
   return (
     <div className="h-full overflow-y-auto">
@@ -911,6 +908,19 @@ function OrderHistoryPanel() {
                         </span>
                       </div>
                     </div>
+
+                    {/* 부분 매칭 정보 표시 */}
+                    {order.status === 'partially_matched' && (order as any).partiallyFilled && (
+                      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-yellow-700 font-medium">부분 매칭</span>
+                          <div className="flex items-center space-x-3 text-yellow-600">
+                            <span>체결: {((order as any).filledAmount || 0).toLocaleString()}원</span>
+                            <span>남은: {((order as any).remainingAmount || 0).toLocaleString()}원</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* 액션 버튼 - 개선된 디자인 */}
@@ -925,7 +935,10 @@ function OrderHistoryPanel() {
                       <span>{selectedOrderId === order.id ? '상세 숨기기' : '상세 보기'}</span>
                     </button>
                     
-                    {order.status === 'open' && (
+                    {/* 취소 가능 조건: open 또는 partially_matched 상태이고, 경기시간 10분 전까지 */}
+                    {((order.status === 'open' || order.status === 'partially_matched') && 
+                      order.commenceTime && 
+                      new Date(order.commenceTime).getTime() - new Date().getTime() > 10 * 60 * 1000) && (
                       <button
                         onClick={() => setShowCancelConfirm(order.id)}
                         disabled={loading}
@@ -1023,11 +1036,26 @@ function OrderHistoryPanel() {
                         <svg className="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                         </svg>
-                        <div className="text-sm font-medium text-red-800">주문 취소 확인</div>
+                        <div className="text-sm font-medium text-red-800">
+                          {order.side === 'back' ? '주문 취소 확인' : '매치 취소 확인'}
+                        </div>
                       </div>
                       <div className="text-sm text-red-700 mb-4">
-                        정말로 이 주문을 취소하시겠습니까?<br/>
-                        취소된 주문은 복구할 수 없습니다.
+                        {order.side === 'back' ? (
+                          <>
+                            정말로 이 주문을 취소하시겠습니까?<br/>
+                            {order.status === 'partially_matched' && (
+                              <>매칭된 Lay 주문도 함께 취소됩니다.<br/></>
+                            )}
+                            취소된 주문은 복구할 수 없습니다.
+                          </>
+                        ) : (
+                          <>
+                            정말로 이 매치를 취소하시겠습니까?<br/>
+                            Back 주문은 유지되고 매치만 취소됩니다.<br/>
+                            취소된 매치는 복구할 수 없습니다.
+                          </>
+                        )}
                       </div>
                       <div className="flex space-x-3">
                         <button
