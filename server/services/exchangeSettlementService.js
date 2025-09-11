@@ -14,18 +14,28 @@ import sequelize from '../models/sequelize.js';
 class ExchangeSettlementService {
 
   /**
-   * 완료된 경기의 모든 매칭 주문 자동 정산
-   * @param {string} gameResultId - 정산할 경기 ID
+   * 🆕 경기 식별자 기반 주문 정산 (gameResultId 방식 대체)
+   * @param {string} homeTeam - 홈팀
+   * @param {string} awayTeam - 어웨이팀
+   * @param {string} commenceTime - 경기 시작 시간
    * @returns {Object} 정산 결과
    */
-  async settleGameOrders(gameResultId) {
+  async settleGameOrdersByMatch(homeTeam, awayTeam, commenceTime) {
     const transaction = await sequelize.transaction();
     
     try {
-      console.log(`🎯 경기 ${gameResultId} 자동 정산 시작...`);
+      console.log(`🎯 경기 ${homeTeam} vs ${awayTeam} 자동 정산 시작...`);
       
       // 경기 결과 조회
-      const gameResult = await GameResult.findByPk(gameResultId);
+      const gameResult = await GameResult.findOne({
+        where: {
+          homeTeam,
+          awayTeam,
+          commenceTime
+        },
+        order: [['createdAt', 'DESC']]
+      });
+      
       if (!gameResult || gameResult.status !== 'finished') {
         throw new Error('경기가 완료되지 않았거나 찾을 수 없습니다.');
       }
@@ -36,7 +46,9 @@ class ExchangeSettlementService {
       // 🆕 정산 대상 주문들 조회 (매칭된 상태 + 부분 매칭된 상태의 주문들)
       const orders = await ExchangeOrder.findAll({
         where: {
-          gameResultId: gameResultId,
+          homeTeam,
+          awayTeam,
+          commenceTime,
           status: { [Op.in]: ['matched', 'partially_matched'] },  // 🆕 부분 매칭 포함
           settledAt: null  // 아직 정산되지 않은 주문들
         },
@@ -48,7 +60,9 @@ class ExchangeSettlementService {
       // 🆕 연결된 주문들도 함께 조회 (matchedOrderId가 있는 주문들 + 부분 매칭된 주문들)
       const connectedOrders = await ExchangeOrder.findAll({
         where: {
-          gameResultId: gameResultId,
+          homeTeam,
+          awayTeam,
+          commenceTime,
           status: { [Op.in]: ['matched', 'partially_matched'] },  // 🆕 부분 매칭 포함
           settledAt: null
         },
@@ -180,7 +194,7 @@ class ExchangeSettlementService {
       await transaction.commit();
       
       const summary = {
-        gameId: gameResultId,
+        gameId: `${homeTeam}_${awayTeam}_${commenceTime}`,
         settledOrders: settledCount,
         totalWinnings,
         results: settlementResults,
@@ -602,10 +616,12 @@ class ExchangeSettlementService {
   /**
    * 🆕 특정 경기의 정산 가능한 주문 조회 (부분 매칭 포함)
    */
-  async getSettlableOrders(gameResultId) {
+  async getSettlableOrdersByMatch(homeTeam, awayTeam, commenceTime) {
     return await ExchangeOrder.findAll({
       where: {
-        gameResultId,
+        homeTeam,
+        awayTeam,
+        commenceTime,
         status: { [Op.in]: ['matched', 'partially_matched'] },  // 🆕 부분 매칭 포함
         settledAt: null
       }
@@ -805,14 +821,13 @@ class ExchangeSettlementService {
   }
 
   /**
-   * 🆕 하이브리드 방식: gameResultId 기반 + 직접 매칭 병행
+   * 🆕 경기 식별자 기반 정산 (gameResultId 방식 완전 대체)
    */
-  async settleAllFinishedGames() {
+  async settleAllFinishedGamesByMatch() {
     try {
-      console.log('🔄 하이브리드 정산 시스템 시작...');
+      console.log('🔄 경기 식별자 기반 정산 시스템 시작...');
       
-      // 1. gameResultId 기반 기존 방식
-      console.log('\n🎯 1단계: gameResultId 기반 정산');
+      // 완료된 경기들 조회
       const finishedGames = await GameResult.findAll({
         where: {
           status: 'finished',
@@ -820,11 +835,15 @@ class ExchangeSettlementService {
         }
       });
       
+      console.log(`📊 완료된 경기 수: ${finishedGames.length}개`);
+      
       const gamesWithOrders = [];
       for (const game of finishedGames) {
         const hasOrders = await ExchangeOrder.count({
           where: {
-            gameResultId: game.id,
+            homeTeam: game.homeTeam,
+            awayTeam: game.awayTeam,
+            commenceTime: game.commenceTime,
             status: { [Op.in]: ['matched', 'partially_matched'] },
             settledAt: null
           }
@@ -834,41 +853,36 @@ class ExchangeSettlementService {
         }
       }
       
-      console.log(`📊 gameResultId 기반 정산 대상: ${gamesWithOrders.length}개 경기`);
+      console.log(`📊 정산 대상 경기: ${gamesWithOrders.length}개`);
       
-      const gameResultIdResults = [];
+      const settledGames = [];
       for (const game of gamesWithOrders) {
         try {
-          const result = await this.settleGameOrders(game.id);
-          gameResultIdResults.push(result);
+          const result = await this.settleGameOrdersByMatch(
+            game.homeTeam, 
+            game.awayTeam, 
+            game.commenceTime
+          );
+          settledGames.push(result);
         } catch (error) {
-          console.error(`경기 ${game.id} 정산 실패:`, error.message);
+          console.error(`경기 ${game.homeTeam} vs ${game.awayTeam} 정산 실패:`, error.message);
         }
       }
       
-      // 2. 직접 매칭 방식 (gameResultId 없는 주문들)
-      console.log('\n🎯 2단계: 직접 매칭 정산');
-      const directResults = await this.settleOrdersWithoutGameResultId();
-      
       const totalResults = {
-        gameResultIdBased: {
-          games: gamesWithOrders.length,
-          settled: gameResultIdResults.length,
-          results: gameResultIdResults
-        },
-        directMatching: directResults,
-        totalSettled: gameResultIdResults.length + (directResults.settledOrders || 0)
+        settledGames: settledGames.length,
+        results: settledGames,
+        totalSettled: settledGames.reduce((sum, result) => sum + (result.settledOrders || 0), 0)
       };
       
-      console.log('\n🎉 하이브리드 정산 완료!');
-      console.log(`📊 gameResultId 기반: ${gameResultIdResults.length}개 경기 정산`);
-      console.log(`🎯 직접 매칭: ${directResults.settledOrders || 0}개 주문 정산`);
-      console.log(`✅ 총 정산: ${totalResults.totalSettled}개`);
+      console.log('\n🎉 경기 식별자 기반 정산 완료!');
+      console.log(`📊 정산된 경기: ${settledGames.length}개`);
+      console.log(`✅ 총 정산된 주문: ${totalResults.totalSettled}개`);
       
       return totalResults;
       
     } catch (error) {
-      console.error('❌ 하이브리드 정산 중 오류:', error);
+      console.error('❌ 경기 식별자 기반 정산 실패:', error);
       throw error;
     }
   }
@@ -1355,11 +1369,162 @@ class ExchangeSettlementService {
   }
 
   /**
-   * 🆕 gameResultId 없는 주문들을 직접 매칭으로 정산
+   * 🆕 경기 시작 후 미매칭된 오픈 주문들을 자동 환불
    */
-  async settleOrdersWithoutGameResultId() {
+  async refundUnmatchedOpenOrders() {
     try {
-      // 미정산 주문들 조회 (gameResultId는 더 이상 사용하지 않으므로 제거)
+      console.log('🔄 경기 시작 후 미매칭 오픈 주문 환불 처리 시작...');
+      
+      const now = new Date();
+      const oneHourAgo = new Date(now.getTime() - (60 * 60 * 1000)); // 1시간 전
+      
+      // 경기 시작 후 1시간 이상 지났지만 여전히 오픈 상태인 주문들 조회 (직접 SQL 사용)
+      const [sqlResults] = await sequelize.query(`
+        SELECT 
+          id, "userId", side, amount, price, status, "filledAmount", 
+          "partiallyFilled", "remainingAmount", "originalAmount", 
+          "matchedOrderId", "gameId", market, line, selection, "isMultibet", 
+          "selectionDetails", "homeTeam", "awayTeam", "commenceTime",
+          "createdAt", "updatedAt"
+        FROM "ExchangeOrders" 
+        WHERE status = 'open' 
+          AND "commenceTime" < :oneHourAgo
+          AND "filledAmount" = 0 
+          AND ("partiallyFilled" = false OR "partiallyFilled" IS NULL)
+        ORDER BY "commenceTime" ASC
+        LIMIT 50
+      `, {
+        replacements: { oneHourAgo },
+        type: sequelize.QueryTypes.SELECT
+      });
+      
+      // SQL 결과를 ExchangeOrder 인스턴스로 변환
+      const resultsArray = Array.isArray(sqlResults) ? sqlResults : [sqlResults];
+      const unmatchedOpenOrders = resultsArray.filter(result => result != null).map(row => {
+        const order = ExchangeOrder.build(row);
+        order.isNewRecord = false;
+        return order;
+      });
+      console.log(`📋 환불 대상 오픈 주문: ${unmatchedOpenOrders.length}개`);
+      
+      if (unmatchedOpenOrders.length === 0) {
+        return { refundedOrders: 0, totalRefundAmount: 0 };
+      }
+      
+      let refundedCount = 0;
+      let totalRefundAmount = 0;
+      const refundResults = [];
+      
+      for (const order of unmatchedOpenOrders) {
+        const transaction = await sequelize.transaction();
+        
+        try {
+          const gameTime = new Date(order.commenceTime);
+          const hoursSinceGame = (now.getTime() - gameTime.getTime()) / (1000 * 60 * 60);
+          
+          console.log(`\n🎯 주문 환불 처리: ID ${order.id}`);
+          console.log(`   경기: ${order.homeTeam} vs ${order.awayTeam}`);
+          console.log(`   경기 시간: ${gameTime.toISOString()}`);
+          console.log(`   경과 시간: ${hoursSinceGame.toFixed(1)}시간`);
+          console.log(`   사이드: ${order.side}, 금액: ${order.amount}원`);
+          
+          // 환불 금액 계산
+          let refundAmount;
+          if (order.side === 'back') {
+            // Back 주문: 배팅 금액 전액 환불
+            refundAmount = order.amount;
+          } else {
+            // Lay 주문: 스테이크 금액 환불
+            refundAmount = Math.floor((order.price - 1) * order.amount);
+          }
+          
+          console.log(`   환불 금액: ${refundAmount}원`);
+          
+          // 중복 환불 체크
+          const existingRefund = await PaymentHistory.findOne({
+            where: {
+              userId: order.userId,
+              betId: `EXCHANGE_${order.id}`,
+              memo: { [Op.like]: '%환불%' }
+            },
+            transaction
+          });
+          
+          if (existingRefund) {
+            console.log(`   ⚠️ 이미 환불 처리된 주문입니다: ${existingRefund.id}`);
+            await transaction.rollback();
+            continue;
+          }
+          
+          // 사용자 잔액 업데이트
+          await User.increment('balance', {
+            by: refundAmount,
+            where: { id: order.userId }
+          }, { transaction });
+          
+          // 환불 후 잔액 조회
+          const user = await User.findByPk(order.userId, { transaction });
+          
+          // 환불 내역 기록
+          await PaymentHistory.create({
+            userId: order.userId,
+            betId: `EXCHANGE_${order.id}`,
+            amount: refundAmount,
+            type: 'refund',
+            memo: `Exchange 주문 경기 시작 후 미매칭으로 인한 자동 환불 (경기: ${order.homeTeam} vs ${order.awayTeam}, 경과: ${hoursSinceGame.toFixed(1)}시간)`,
+            status: 'completed',
+            balanceAfter: user.balance,
+            paidAt: new Date()
+          }, { transaction });
+          
+          // 주문 상태 변경
+          await order.update({
+            status: 'cancelled',
+            settlementNote: `경기 시작 후 ${hoursSinceGame.toFixed(1)}시간 경과로 미매칭되어 자동 환불`,
+            settledAt: new Date()
+          }, { transaction });
+          
+          await transaction.commit();
+          
+          refundedCount++;
+          totalRefundAmount += refundAmount;
+          refundResults.push({
+            orderId: order.id,
+            refundAmount,
+            hoursSinceGame: hoursSinceGame.toFixed(1)
+          });
+          
+          console.log(`   ✅ 환불 완료: ${refundAmount}원, 새 잔액: ${user.balance}원`);
+          
+        } catch (error) {
+          await transaction.rollback();
+          console.error(`   ❌ 주문 ${order.id} 환불 실패:`, error.message);
+        }
+      }
+      
+      console.log(`\n🎉 오픈 주문 환불 처리 완료!`);
+      console.log(`📊 환불 결과:`);
+      console.log(`   - 환불된 주문: ${refundedCount}개`);
+      console.log(`   - 총 환불 금액: ${totalRefundAmount.toLocaleString()}원`);
+      
+      return {
+        refundedOrders: refundedCount,
+        totalRefundAmount,
+        results: refundResults
+      };
+      
+    } catch (error) {
+      console.error('❌ 오픈 주문 환불 처리 실패:', error);
+      return { refundedOrders: 0, totalRefundAmount: 0 };
+    }
+  }
+
+  /**
+   * 🆕 경기 식별자로 직접 매칭 정산
+   */
+  async settleOrdersByDirectMatching() {
+    try {
+      // 미정산 주문들 조회
       const unSettledOrders = await ExchangeOrder.findAll({
         where: {
           status: { [Op.in]: ['matched', 'partially_matched'] },
@@ -1423,10 +1588,13 @@ class ExchangeSettlementService {
     try {
       console.log('🎯 연결된 모든 매칭 주문 정산 시작...');
       
-      // 1. 연결된 모든 매칭 주문들 조회
+      // 1. 경기 시작 후 미매칭된 오픈 주문들 환불 처리
+      const refundResult = await this.refundUnmatchedOpenOrders();
+      
+      // 2. 연결된 모든 매칭 주문들 조회 (부분 매치 포함)
       const allMatchedOrders = await ExchangeOrder.findAll({
         where: { 
-          status: 'matched',
+          status: { [Op.in]: ['matched', 'partially_matched'] },
           settledAt: null  // 아직 정산되지 않은 주문들
         }
       });
@@ -1454,31 +1622,58 @@ class ExchangeSettlementService {
       
       // 3. 쌍들을 경기별로 그룹화
       const pairsByGame = {};
+      const pairsWithoutGameResultId = [];
+      
+      // 모든 쌍을 경기 식별자로 그룹화
       for (const pair of allPairs) {
         const [order1, order2] = pair;
-        const gameResultId = order1.gameResultId || order2.gameResultId;
         
-        if (gameResultId) {
-          if (!pairsByGame[gameResultId]) {
-            pairsByGame[gameResultId] = [];
+        // 경기 식별자 생성
+        const homeTeam = order1.homeTeam || order2.homeTeam;
+        const awayTeam = order1.awayTeam || order2.awayTeam;
+        const commenceTime = order1.commenceTime || order2.commenceTime;
+        
+        if (homeTeam && awayTeam && commenceTime) {
+          const gameKey = `${homeTeam}_${awayTeam}_${commenceTime}`;
+          if (!pairsByGame[gameKey]) {
+            pairsByGame[gameKey] = {
+              homeTeam,
+              awayTeam,
+              commenceTime,
+              pairs: []
+            };
           }
-          pairsByGame[gameResultId].push(pair);
+          pairsByGame[gameKey].pairs.push(pair);
+        } else {
+          // 경기 식별자가 없는 쌍들
+          pairsWithoutGameResultId.push(pair);
         }
       }
       
       console.log(`🎯 정산 대상 경기 수: ${Object.keys(pairsByGame).length}개`);
+      console.log(`🎯 경기 식별자 없는 쌍 수: ${pairsWithoutGameResultId.length}개`);
       
       // 4. 각 경기별로 정산 실행
       let totalSettled = 0;
       let totalWinnings = 0;
       const allSettlementResults = [];
       
-      for (const [gameResultId, pairs] of Object.entries(pairsByGame)) {
+      for (const [gameKey, gameData] of Object.entries(pairsByGame)) {
         try {
+          const { homeTeam, awayTeam, commenceTime, pairs } = gameData;
+          
           // GameResult 정보 조회
-          const gameResult = await GameResult.findByPk(gameResultId);
+          const gameResult = await GameResult.findOne({
+            where: {
+              homeTeam,
+              awayTeam,
+              commenceTime
+            },
+            order: [['createdAt', 'DESC']]
+          });
+          
           if (!gameResult) {
-            console.log(`⚠️ GameResult ${gameResultId}를 찾을 수 없습니다.`);
+            console.log(`⚠️ 경기 결과를 찾을 수 없습니다: ${homeTeam} vs ${awayTeam}`);
             continue;
           }
           
@@ -1502,18 +1697,54 @@ class ExchangeSettlementService {
           }
           
         } catch (error) {
-          console.error(`   ❌ 경기 ${gameResultId} 정산 실패:`, error.message);
+          console.error(`   ❌ 경기 ${gameKey} 정산 실패:`, error.message);
+        }
+      }
+      
+      // 5. 경기 식별자가 없는 쌍들 정산 (멀티배팅 등)
+      if (pairsWithoutGameResultId.length > 0) {
+        console.log(`\n🎯 경기 식별자 없는 쌍들 정산 시작: ${pairsWithoutGameResultId.length}개`);
+        
+        for (const pair of pairsWithoutGameResultId) {
+          try {
+            const [order1, order2] = pair;
+            console.log(`\n🔍 쌍 정산 시도: 주문 ${order1.id} ↔ ${order2.id}`);
+            
+            // 경기 식별자로 GameResult 찾기
+            const gameResult = await this.findGameResultByOrderPair(pair);
+            
+            if (gameResult) {
+              console.log(`   🏟️ 경기 찾음: ${gameResult.homeTeam} vs ${gameResult.awayTeam}`);
+              console.log(`   📊 결과: ${gameResult.result}, 스코어: ${JSON.stringify(gameResult.score)}`);
+              
+              const result = await this.settlePair(pair, gameResult, null);
+              totalSettled += 2; // back + lay 주문
+              totalWinnings += result.totalWinnings || 0;
+              allSettlementResults.push(result);
+              
+              console.log(`   ✅ 주문 쌍 정산 완료: ${result.winnerSide} 승리, 수익: ${result.totalWinnings}`);
+            } else {
+              console.log(`   ⚠️ 경기 결과를 찾을 수 없습니다.`);
+            }
+            
+          } catch (error) {
+            console.error(`   ❌ 쌍 정산 실패:`, error.message);
+          }
         }
       }
       
       // 5. 정산 결과 요약
       const summary = {
+        refundedOrders: refundResult.refundedOrders,
+        totalRefundAmount: refundResult.totalRefundAmount,
         totalSettled,
         totalWinnings,
+        refundResult,
         results: allSettlementResults
       };
       
       console.log('\n🎉 모든 연결된 주문 정산 완료!');
+      console.log(`📊 환불된 주문: ${refundResult.refundedOrders}개 (${refundResult.totalRefundAmount.toLocaleString()}원)`);
       console.log(`📊 총 정산된 주문: ${totalSettled}개`);
       console.log(`💰 총 수익: ${totalWinnings.toLocaleString()}원`);
       
@@ -1522,6 +1753,67 @@ class ExchangeSettlementService {
     } catch (error) {
       console.error('❌ 모든 연결된 주문 정산 실패:', error.message);
       throw error;
+    }
+  }
+
+  /**
+   * 🆕 주문 쌍에서 GameResult 찾기
+   * @param {Array} pair - [order1, order2] 주문 쌍
+   * @returns {Object|null} GameResult 또는 null
+   */
+  async findGameResultByOrderPair(pair) {
+    try {
+      const [order1, order2] = pair;
+      
+      // 멀티배팅인 경우
+      if (order1.isMultibet || order2.isMultibet) {
+        const multibetOrder = order1.isMultibet ? order1 : order2;
+        
+        if (multibetOrder.selectionDetails && multibetOrder.selectionDetails.selections) {
+          const selections = multibetOrder.selectionDetails.selections;
+          
+          // 모든 선택이 같은 경기인지 확인
+          if (selections.length > 0) {
+            const firstSelection = selections[0];
+            const homeTeam = firstSelection.homeTeam;
+            const awayTeam = firstSelection.awayTeam;
+            const commenceTime = firstSelection.commenceTime;
+            
+            // GameResult 찾기
+            const gameResult = await GameResult.findOne({
+              where: {
+                homeTeam,
+                awayTeam,
+                commenceTime
+              },
+              order: [['createdAt', 'DESC']]
+            });
+            
+            return gameResult;
+          }
+        }
+      } else {
+        // 단일 배팅인 경우
+        const order = order1.homeTeam ? order1 : order2;
+        
+        if (order.homeTeam && order.awayTeam) {
+          const gameResult = await GameResult.findOne({
+            where: {
+              homeTeam: order.homeTeam,
+              awayTeam: order.awayTeam,
+              commenceTime: order.commenceTime
+            },
+            order: [['createdAt', 'DESC']]
+          });
+          
+          return gameResult;
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('❌ GameResult 찾기 실패:', error.message);
+      return null;
     }
   }
 

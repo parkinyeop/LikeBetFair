@@ -258,7 +258,6 @@ router.post('/match-order', verifyToken, async (req, res) => {
       awayTeam: targetOrder.awayTeam,
       commenceTime: targetOrder.commenceTime,
       sportKey: targetOrder.sportKey,
-      gameResultId: targetOrder.gameResultId,
       selection: targetOrder.selection,
       selectionDetails: targetOrder.selectionDetails,
       isMultibet: targetOrder.isMultibet, // 🆕 멀티배팅 정보 추가
@@ -440,7 +439,6 @@ router.post('/order', verifyToken, async (req, res) => {
     });
     
     console.log('📊 매핑된 게임 데이터:', {
-      // ❌ DEPRECATED: gameResultId 제거 (경기 식별자 방식으로 대체)
       homeTeam: orderData.homeTeam,
       awayTeam: orderData.awayTeam,
       sportKey: orderData.sportKey
@@ -518,8 +516,6 @@ router.post('/order', verifyToken, async (req, res) => {
       awayTeam: orderData.awayTeam,
       commenceTime: new Date(orderData.commenceTime), // UTC로 변환하여 저장
       sportKey: orderData.sportKey,
-      // ❌ DEPRECATED: gameResultId 제거 (경기 식별자 방식으로 대체)
-      // gameResultId: orderData.gameResultId,
       selectionDetails: orderData.selectionDetails,
       autoSettlement: true,
       // 🆕 스포츠북 배당율 정보 사용
@@ -623,7 +619,7 @@ router.post('/order', verifyToken, async (req, res) => {
         homeTeam: orderData.homeTeam,
         awayTeam: orderData.awayTeam,
         sportKey: orderData.sportKey,
-        hasGameMapping: !!orderData.gameResultId
+        hasGameMapping: !!(orderData.homeTeam && orderData.awayTeam)
       }
     });
     
@@ -1558,8 +1554,6 @@ router.post('/match-order', verifyToken, async (req, res) => {
         awayTeam: orderData.awayTeam,
         commenceTime: new Date(orderData.commenceTime), // UTC로 변환하여 저장
         sportKey: orderData.sportKey,
-        // ❌ DEPRECATED: gameResultId 제거 (경기 식별자 방식으로 대체)
-        // gameResultId: orderData.gameResultId,
         selectionDetails: orderData.selectionDetails,
         stakeAmount: side === 'back' ? matchAmount : Math.floor((price - 1) * matchAmount),
         potentialProfit: side === 'back' ? Math.floor((price - 1) * matchAmount) : matchAmount,
@@ -1596,8 +1590,6 @@ router.post('/match-order', verifyToken, async (req, res) => {
         gameId, market, line, side, price, amount: remainingAmount, selection, userId
       });
       console.log(`✅ 게임 매핑 완료:`, { 
-        // ❌ DEPRECATED: gameResultId 제거 (경기 식별자 방식으로 대체)
-        // gameResultId: orderData.gameResultId, 
         sportKey: orderData.sportKey,
         homeTeam: orderData.homeTeam,
         awayTeam: orderData.awayTeam
@@ -1619,8 +1611,6 @@ router.post('/match-order', verifyToken, async (req, res) => {
         awayTeam: orderData.awayTeam,
         commenceTime: new Date(orderData.commenceTime), // UTC로 변환하여 저장
         sportKey: orderData.sportKey,
-        // ❌ DEPRECATED: gameResultId 제거 (경기 식별자 방식으로 대체)
-        // gameResultId: orderData.gameResultId,
         selectionDetails: orderData.selectionDetails,
         stakeAmount: side === 'back' ? remainingAmount : Math.floor((price - 1) * remainingAmount),
         potentialProfit: side === 'back' ? Math.floor((price - 1) * remainingAmount) : remainingAmount,
@@ -1689,13 +1679,6 @@ router.post('/settle/:homeTeam/:awayTeam/:commenceTime', verifyToken, async (req
   }
 });
 
-// ❌ DEPRECATED: gameResultId 기반 정산 API (주석처리)
-/*
-router.post('/settle/:gameResultId', verifyToken, async (req, res) => {
-  // 기존 gameResultId 기반 API는 주석처리
-  // 새로운 경기 식별자 방식 사용: /settle/:homeTeam/:awayTeam/:commenceTime
-});
-*/
 
 // 모든 완료된 경기 자동 정산 (관리자 전용)
 router.post('/settle-all', verifyToken, async (req, res) => {
@@ -1769,13 +1752,6 @@ router.get('/settleable/:homeTeam/:awayTeam/:commenceTime', verifyToken, async (
   }
 });
 
-// ❌ DEPRECATED: gameResultId 기반 정산 가능한 주문 조회 API (주석처리)
-/*
-router.get('/settleable/:gameResultId', verifyToken, async (req, res) => {
-  // 기존 gameResultId 기반 API는 주석처리
-  // 새로운 경기 식별자 방식 사용: /settleable/:homeTeam/:awayTeam/:commenceTime
-});
-*/
 
 // 🆕 부분 매칭 통계 조회 API
 router.get('/partial-matching-stats', verifyToken, async (req, res) => {

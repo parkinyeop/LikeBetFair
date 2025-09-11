@@ -154,7 +154,6 @@ class ExchangeGameMappingService {
               commenceTime: foundOddsCache.commenceTime,
               mainCategory: foundOddsCache.mainCategory,
               subCategory: foundOddsCache.subCategory,
-              gameResultId: gameResult.id,
               ...await this.extractOddsFromCache(foundOddsCache, selection, side)
             };
           }
@@ -182,7 +181,6 @@ class ExchangeGameMappingService {
         commenceTime: oddsCache.commenceTime,
         mainCategory: oddsCache.mainCategory,
         subCategory: oddsCache.subCategory,
-        gameResultId: null, // OddsCache에서 직접 가져온 경우
         ...oddsData
       };
 
@@ -302,8 +300,6 @@ class ExchangeGameMappingService {
           mappedData.homeTeam = oddsCacheData.homeTeam;
           mappedData.awayTeam = oddsCacheData.awayTeam;
           mappedData.commenceTime = oddsCacheData.commenceTime;
-          // ❌ DEPRECATED: gameResultId 매핑 제거 (경기 식별자 방식으로 대체)
-          // mappedData.gameResultId = oddsCacheData.gameResultId;
           mappedData.sportKey = this.getSportKeyFromCategories(
             oddsCacheData.mainCategory, 
             oddsCacheData.subCategory
@@ -684,21 +680,21 @@ class ExchangeGameMappingService {
   }
 
   /**
-   * 자동 정산을 위한 매칭된 주문 조회
-   * @param {string} gameResultId 
+   * 자동 정산을 위한 매칭된 주문 조회 (경기 식별자 방식)
+   * @param {string} homeTeam 
+   * @param {string} awayTeam 
+   * @param {string} commenceTime 
    * @returns {Array} 정산 대상 주문들
    */
-  async getOrdersForSettlement(gameResultId) {
+  async getOrdersForSettlementByMatch(homeTeam, awayTeam, commenceTime) {
     return await ExchangeOrder.findAll({
       where: {
-        gameResultId: gameResultId,
+        homeTeam,
+        awayTeam,
+        commenceTime,
         status: 'matched',
         autoSettlement: true
-      },
-      include: [{
-        model: GameResult,
-        as: 'gameResult'
-      }]
+      }
     });
   }
 
@@ -719,7 +715,6 @@ class ExchangeGameMappingService {
         awayTeam: mappedData.awayTeam,
         commenceTime: mappedData.commenceTime,
         sportKey: mappedData.sportKey,
-        gameResultId: mappedData.gameResultId,
         selectionDetails: mappedData.selectionDetails
       });
 
