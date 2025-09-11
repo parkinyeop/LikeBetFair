@@ -4,6 +4,7 @@ import sequelize from './sequelize.js';
 // 모델들 import
 import User from './userModel.js';
 import ExchangeOrder from './exchangeOrderModel.js';
+import ExchangeOrderMatch from './exchangeOrderMatchModel.js';
 import GameResult from './gameResultModel.js';
 import OddsCache from './oddsCacheModel.js';
 import Bet from './betModel.js';
@@ -55,6 +56,7 @@ export {
   sequelize,
   User,
   ExchangeOrder,
+  ExchangeOrderMatch,
   GameResult,
   OddsCache,
   Bet,
