@@ -343,9 +343,9 @@ class ExchangeSettlementService {
     const backStakeAmount = backOrder.partiallyFilled ? (backOrder.filledAmount || 0) : backOrder.stakeAmount;
     const layStakeAmount = layOrder.partiallyFilled ? (layOrder.filledAmount || 0) : layOrder.stakeAmount;
     
-    // 수익 계산 (부분 매칭 고려)
+    // 수익 계산 (부분 매칭 고려) - Back 주문 본금 포함
     const backWinAmount = isBackWin ? 
-      (backStakeAmount * (backOrder.price - 1)) : -backStakeAmount;
+      (backStakeAmount * backOrder.price) : -backStakeAmount;
     
     // 🚨 수정된 Lay 수익 계산: 부분 매칭 비율에 따른 올바른 정산
     const matchRatio = layOrder.partiallyFilled ? 
@@ -1271,15 +1271,14 @@ class ExchangeSettlementService {
     
     let actualProfit = 0;
     if (allSelectionsWon) {
-      // 모든 선택사항이 승리한 경우 - 순수익 계산 (부분 매칭 고려)
+      // 모든 선택사항이 승리한 경우 - 총 수익 계산 (부분 매칭 고려)
       if (order.potentialWinnings) {
-        // potentialWinnings가 있으면 체결된 비율로 계산
+        // potentialWinnings가 있으면 체결된 비율로 계산 (본금 포함)
         const matchRatio = order.partiallyFilled ? (multibetStakeAmount / order.amount) : 1;
-        const adjustedPotentialWinnings = parseFloat(order.potentialWinnings) * matchRatio;
-        actualProfit = adjustedPotentialWinnings - multibetStakeAmount;
+        actualProfit = parseFloat(order.potentialWinnings) * matchRatio;
       } else {
-        // potentialWinnings가 없으면 배당률로 순수익 계산
-        actualProfit = multibetStakeAmount * (parseFloat(order.totalOdds) - 1);
+        // potentialWinnings가 없으면 배당률로 총 수익 계산 (본금 포함)
+        actualProfit = multibetStakeAmount * parseFloat(order.totalOdds);
       }
       console.log(`🎉 멀티베팅 승리! 수익: ${actualProfit}원 (체결: ${multibetStakeAmount}원)`);
     } else {

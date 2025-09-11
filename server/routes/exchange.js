@@ -262,7 +262,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
       selectionDetails: targetOrder.selectionDetails,
       isMultibet: targetOrder.isMultibet, // 🆕 멀티배팅 정보 추가
       stakeAmount: stakeAmount, // 🆕 올바른 리스크 금액 사용
-      potentialProfit: matchType === 'back' ? Math.floor((targetOrder.price - 1) * actualMatchAmount) : actualMatchAmount,
+      potentialProfit: matchType === 'back' ? Math.floor(targetOrder.price * actualMatchAmount) : actualMatchAmount,
       autoSettlement: true,
       backOdds: targetOrder.backOdds,
       layOdds: targetOrder.layOdds,
@@ -488,7 +488,7 @@ router.post('/order', verifyToken, async (req, res) => {
       // 멀티배팅인 경우
       if (side === 'back') {
         stakeAmount = amount; // Back: 배팅 금액
-        potentialProfit = Math.floor((price - 1) * amount); // Back: 수익
+        potentialProfit = Math.floor(price * amount); // Back: 총 수익 (본금 포함)
       } else {
         stakeAmount = Math.floor((price - 1) * amount); // Lay: 스테이크 금액
         potentialProfit = amount; // Lay: 수익
@@ -496,7 +496,7 @@ router.post('/order', verifyToken, async (req, res) => {
     } else {
       // 단일 배팅인 경우
       stakeAmount = side === 'back' ? amount : Math.floor((price - 1) * amount);
-      potentialProfit = side === 'back' ? Math.floor((price - 1) * amount) : amount;
+      potentialProfit = side === 'back' ? Math.floor(price * amount) : amount;
     }
     
     // 🆕 배당율 정보 준비
@@ -569,7 +569,7 @@ router.post('/order', verifyToken, async (req, res) => {
         originalAmount: match.matchAmount,
         remainingAmount: 0,
         stakeAmount: side === 'back' ? match.matchAmount : Math.floor((match.matchPrice - 1) * match.matchAmount),
-        potentialProfit: side === 'back' ? Math.floor((match.matchPrice - 1) * match.matchAmount) : match.matchAmount
+        potentialProfit: side === 'back' ? Math.floor(match.matchPrice * match.matchAmount) : match.matchAmount
       });
       
       // 매칭 기록 업데이트 (새 주문 ID 연결)
@@ -1210,6 +1210,46 @@ router.get('/orders', verifyToken, async (req, res) => {
   }
 });
 
+// 🆕 특정 주문 정보 조회 (공개 API - 토큰 불필요)
+router.get('/order/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const order = await ExchangeOrder.findByPk(id);
+    
+    if (!order) {
+      return res.status(404).json({ message: '주문을 찾을 수 없습니다.' });
+    }
+    
+    res.json({
+      id: order.id,
+      gameId: order.gameId,
+      userId: order.userId,
+      side: order.side,
+      price: order.price,
+      amount: order.amount,
+      status: order.status,
+      createdAt: order.createdAt,
+      selection: order.selection,
+      market: order.market,
+      line: order.line,
+      homeTeam: order.homeTeam,
+      awayTeam: order.awayTeam,
+      commenceTime: order.commenceTime,
+      sportKey: order.sportKey,
+      stakeAmount: order.stakeAmount,
+      potentialProfit: order.potentialProfit,
+      originalAmount: order.originalAmount || order.amount,
+      remainingAmount: order.remainingAmount || order.amount,
+      filledAmount: order.filledAmount || 0,
+      partiallyFilled: order.partiallyFilled || false
+    });
+  } catch (error) {
+    console.error('주문 조회 오류:', error);
+    res.status(500).json({ message: '주문 조회 중 오류가 발생했습니다.' });
+  }
+});
+
 // 전체 오픈 주문 조회 (공개 API - 토큰 불필요)
 router.get('/all-orders', async (req, res) => {
   try {
@@ -1556,7 +1596,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
         sportKey: orderData.sportKey,
         selectionDetails: orderData.selectionDetails,
         stakeAmount: side === 'back' ? matchAmount : Math.floor((price - 1) * matchAmount),
-        potentialProfit: side === 'back' ? Math.floor((price - 1) * matchAmount) : matchAmount,
+        potentialProfit: side === 'back' ? Math.floor(price * matchAmount) : matchAmount,
         autoSettlement: true,
         // 🆕 스포츠북 배당율 정보 사용
         backOdds: orderData.backOdds,
@@ -1613,7 +1653,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
         sportKey: orderData.sportKey,
         selectionDetails: orderData.selectionDetails,
         stakeAmount: side === 'back' ? remainingAmount : Math.floor((price - 1) * remainingAmount),
-        potentialProfit: side === 'back' ? Math.floor((price - 1) * remainingAmount) : remainingAmount,
+        potentialProfit: side === 'back' ? Math.floor(price * remainingAmount) : remainingAmount,
         autoSettlement: true,
         // 🆕 스포츠북 배당율 정보 사용
         backOdds: orderData.backOdds,

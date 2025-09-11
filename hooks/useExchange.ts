@@ -259,8 +259,8 @@ export const useExchange = () => {
       });
       
       const url = line !== undefined 
-        ? `http://localhost:5050/api/exchange/orderbook-test?gameId=${encodedGameId}&market=${encodedMarket}&line=${encodedLine}`
-        : `http://localhost:5050/api/exchange/orderbook-test?gameId=${encodedGameId}&market=${encodedMarket}`;
+        ? `/api/exchange/orderbook-test?gameId=${encodedGameId}&market=${encodedMarket}&line=${encodedLine}`
+        : `/api/exchange/orderbook-test?gameId=${encodedGameId}&market=${encodedMarket}`;
       console.log('fetchOrderbook URL:', url);
       
       const response = await fetch(url, {

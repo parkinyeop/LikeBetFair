@@ -45,7 +45,7 @@ export default function BettingModal({ isOpen, onClose, onConfirm, selection }: 
     if (isNaN(stake) || stake <= 0) return 0;
     
     if (selection.type === 'back') {
-      return (stake * selection.price) - stake;
+      return stake * selection.price; // 본금 포함
     } else {
       return stake - (stake / selection.price);
     }

@@ -499,7 +499,7 @@ function OrderPanel() {
                       <div className="flex justify-between">
                         <span className="text-gray-700">예상 수익:</span>
                         <span className="font-bold text-green-600">
-                          {multiBetPotentialWinnings > 0 ? `+${multiBetPotentialWinnings.toLocaleString()}` : '0'} KRW
+                          {multiBetPotentialWinnings > 0 ? `${multiBetPotentialWinnings.toLocaleString()}` : '0'} KRW
                         </span>
                       </div>
                     </>
@@ -615,12 +615,91 @@ function OrderHistoryPanel() {
     }
   };
 
+  // 매칭된 주문 정보 상태
+  const [matchedOrderInfo, setMatchedOrderInfo] = useState<{[key: number]: any}>({});
+
+  // 상세 보기가 열릴 때 매칭된 주문 정보 로드
+  useEffect(() => {
+    if (selectedOrderId && userOrders) {
+      const selectedOrder = userOrders.find(order => order.id === selectedOrderId);
+      if (selectedOrder && selectedOrder.side === 'lay' && selectedOrder.matchedOrderId) {
+        // 이미 로드된 정보가 없으면 API 호출
+        if (!matchedOrderInfo[selectedOrder.matchedOrderId]) {
+          getMatchedOrderInfo(selectedOrder.matchedOrderId);
+        }
+      }
+    }
+  }, [selectedOrderId, userOrders]);
+
+  // 매칭된 주문 정보 가져오기
+  const getMatchedOrderInfo = async (matchedOrderId: number) => {
+    // 이미 가져온 정보가 있으면 반환
+    if (matchedOrderInfo[matchedOrderId]) {
+      return matchedOrderInfo[matchedOrderId];
+    }
+
+    try {
+      // 🆕 특정 주문 ID로 직접 조회
+      const response = await fetch(`/api/exchange/order/${matchedOrderId}`);
+      
+      if (response.ok) {
+        const orderData = await response.json();
+        const orderInfo = {
+          id: orderData.id,
+          amount: orderData.amount,
+          price: orderData.price,
+          status: orderData.status
+        };
+        
+        setMatchedOrderInfo(prev => ({
+          ...prev,
+          [matchedOrderId]: orderInfo
+        }));
+        
+        return orderInfo;
+      } else if (response.status === 404) {
+        // 주문을 찾을 수 없는 경우 기본 정보 반환
+        const defaultInfo = {
+          id: matchedOrderId,
+          amount: 0,
+          price: 0,
+          status: 'not_found'
+        };
+        
+        console.warn('매칭된 주문을 찾을 수 없습니다:', matchedOrderId);
+        setMatchedOrderInfo(prev => ({
+          ...prev,
+          [matchedOrderId]: defaultInfo
+        }));
+        
+        return defaultInfo;
+      } else {
+        throw new Error(`HTTP ${response.status}`);
+      }
+    } catch (error) {
+      console.error('매칭된 주문 정보 조회 실패:', error);
+      
+      // 오류 발생 시 기본 정보 반환
+      const errorInfo = {
+        id: matchedOrderId,
+        amount: 0,
+        price: 0,
+        status: 'error'
+      };
+      
+      setMatchedOrderInfo(prev => ({
+        ...prev,
+        [matchedOrderId]: errorInfo
+      }));
+      
+      return errorInfo;
+    }
+  };
+
   // 예상 수익 계산 (상세보기용) - 본인 배팅 금액 포함
   const calculateExpectedProfit = (order: ExchangeOrder) => {
-    // 매치 주문인 경우 서버에서 계산된 potentialProfit 사용
-    if ((order as any).potentialProfit !== undefined && (order as any).potentialProfit !== null) {
-      return Math.round((order as any).potentialProfit);
-    }
+    // 서버에서 전달된 potentialProfit은 기존 데이터가 순수익일 수 있으므로 
+    // 프론트엔드에서 직접 본금 포함으로 재계산
     
     // stakeAmount가 있는 경우 (매치 주문)
     if ((order as any).stakeAmount !== undefined && (order as any).stakeAmount !== null && (order as any).stakeAmount > 0) {
@@ -740,15 +819,19 @@ function OrderHistoryPanel() {
   // 통계 계산
   const stats = React.useMemo(() => {
     if (!userOrders || !Array.isArray(userOrders)) {
-      return { total: 0, open: 0, matched: 0, totalAmount: 0 };
+      return { total: 0, open: 0, matched: 0, settled: 0, totalAmount: 0, totalProfit: 0 };
     }
     
     const total = userOrders.length;
     const open = userOrders.filter(order => order.status === 'open').length;
     const matched = userOrders.filter(order => order.status === 'matched').length;
+    const settled = userOrders.filter(order => order.status === 'settled').length;
     const totalAmount = userOrders.reduce((sum, order) => sum + order.amount, 0);
+    const totalProfit = userOrders
+      .filter(order => order.status === 'settled')
+      .reduce((sum, order) => sum + parseFloat((order as any).actualProfit || 0), 0);
 
-    return { total, open, matched, totalAmount };
+    return { total, open, matched, settled, totalAmount, totalProfit };
   }, [userOrders]);
 
   // 🗑️ 불필요한 gameIds 추출 및 GameResults API 호출 제거
@@ -821,12 +904,18 @@ function OrderHistoryPanel() {
                 <div className="text-gray-500 mb-1">체결</div>
                 <div className="font-bold text-lg text-green-600">{stats.matched}개</div>
               </div>
-              <div className="text-center p-2 bg-purple-50 rounded">
-                <div className="text-gray-500 mb-1">멀티배팅</div>
-                <div className="font-bold text-lg text-purple-600">
-                {(userOrders || []).filter(order => (order as any).isMultibet).length}개
+              <div className="text-center p-2 bg-blue-50 rounded">
+                <div className="text-gray-500 mb-1">정산</div>
+                <div className="font-bold text-lg text-blue-600">{stats.settled}개</div>
               </div>
-            </div>
+              <div className="text-center p-2 bg-purple-50 rounded">
+                <div className="text-gray-500 mb-1">총 수익</div>
+                <div className={`font-bold text-lg ${
+                  stats.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {stats.totalProfit >= 0 ? '+' : ''}{stats.totalProfit.toLocaleString()}원
+                </div>
+              </div>
           </div>
         </div>
         )}
@@ -929,6 +1018,7 @@ function OrderHistoryPanel() {
                       </span>
                     </div>
                   )}
+
                   
                   {/* 핵심 정보 표시 */}
                   <div className="space-y-2">
@@ -959,6 +1049,17 @@ function OrderHistoryPanel() {
                                 </div>
                                 <div className="text-xs text-gray-400">
                                   {selection.market || '승패'}
+                                  {selection.commenceTime && (
+                                    <span className="ml-2 text-blue-600">
+                                      • {new Date(selection.commenceTime).toLocaleString('ko-KR', {
+                                        month: '2-digit',
+                                        day: '2-digit',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        hour12: false
+                                      })}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                               <div className="text-right">
@@ -984,6 +1085,17 @@ function OrderHistoryPanel() {
                         <div className="flex items-center justify-between text-sm">
                           <div className="text-xs text-gray-500">
                             {order.market || '승패'}
+                            {commenceTime && (
+                              <span className="ml-2 text-blue-600">
+                                • {new Date(commenceTime).toLocaleString('ko-KR', {
+                                  month: '2-digit',
+                                  day: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  hour12: false
+                                })}
+                              </span>
+                            )}
                           </div>
                           <div className="font-bold text-gray-800">
                             @{(typeof order.price === 'string' ? parseFloat(order.price) : order.price || 0).toFixed(2)}
@@ -1036,15 +1148,22 @@ function OrderHistoryPanel() {
 
                   {/* 액션 버튼 - 개선된 디자인 */}
                   <div className="flex justify-between items-center pt-3 mt-3 border-t border-gray-200">
-                    <button
-                      onClick={() => toggleOrderDetail(order.id)}
-                      className="flex items-center space-x-1 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                    >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <span>{selectedOrderId === order.id ? '상세 숨기기' : '상세 보기'}</span>
-                    </button>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => toggleOrderDetail(order.id)}
+                        className="flex items-center space-x-1 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>{selectedOrderId === order.id ? '상세 숨기기' : '상세 보기'}</span>
+                      </button>
+                      {order.status === 'settled' && (
+                        <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
+                          ✅ 정산완료
+                        </span>
+                      )}
+                    </div>
                     
                     {/* 🆕 취소 가능 조건: Back과 Lay 구분 + 경기시간 10분 전까지 */}
                     {(() => {
@@ -1087,30 +1206,171 @@ function OrderHistoryPanel() {
                             <span className="text-sm font-bold text-gray-800">#{order.id}</span>
                           </div>
                           <div className="text-xs text-gray-500 mt-1">
-                            {new Date(order.createdAt).toLocaleString('ko-KR')}
+                            <div>생성: {new Date(order.createdAt).toLocaleString('ko-KR')}</div>
+                            {order.status === 'settled' && (order as any).settledAt && (
+                              <div className="text-green-600 font-medium">
+                                정산: {new Date((order as any).settledAt).toLocaleString('ko-KR')}
+                              </div>
+                            )}
                           </div>
                         </div>
                         
                         
-                        {/* 2. 예상 수익 정보 */}
-                        <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                        {/* 2. 수익 정보 (정산된 경우 실제 수익, 미정산인 경우 예상 수익) */}
+                        <div className={`p-3 rounded-lg border ${
+                          order.status === 'settled' 
+                            ? 'bg-green-50 border-green-200' 
+                            : 'bg-blue-50 border-blue-200'
+                        }`}>
                           <div className="flex justify-between items-center">
-                            <span className="text-xs text-gray-600">예상 수익</span>
-                            <span className="text-sm font-bold text-blue-600">
-                              {calculateExpectedProfit(order).toLocaleString()}원
+                            <span className="text-xs text-gray-600">
+                              {order.status === 'settled' ? '실제 수익' : '예상 수익'}
+                            </span>
+                            <span className={`text-sm font-bold ${
+                              order.status === 'settled' 
+                                ? (() => {
+                                    const actualProfit = parseFloat((order as any).actualProfit || 0);
+                                    return actualProfit >= 0 ? 'text-green-600' : 'text-red-600';
+                                  })()
+                                : 'text-blue-600'
+                            }`}>
+                              {order.status === 'settled' 
+                                ? (() => {
+                                    const actualProfit = parseFloat((order as any).actualProfit || 0);
+                                    return `${actualProfit >= 0 ? '+' : ''}${actualProfit.toLocaleString()}원`;
+                                  })()
+                                : `${calculateExpectedProfit(order).toLocaleString()}원`
+                              }
                             </span>
                           </div>
+                          {order.status === 'settled' && (order as any).actualProfit !== undefined && (
+                            <div className="mt-2 text-xs text-gray-500">
+                              <div className="flex justify-between">
+                                <span>예상 수익:</span>
+                                <span>{calculateExpectedProfit(order).toLocaleString()}원</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>실제 수익:</span>
+                                <span className={(() => {
+                                  const actualProfit = parseFloat((order as any).actualProfit || 0);
+                                  return actualProfit >= 0 ? 'text-green-600' : 'text-red-600';
+                                })()}>
+                                  {(() => {
+                                    const actualProfit = parseFloat((order as any).actualProfit || 0);
+                                    return `${actualProfit >= 0 ? '+' : ''}${actualProfit.toLocaleString()}원`;
+                                  })()}
+                                </span>
+                              </div>
+                              <div className="flex justify-between font-medium">
+                                <span>차이:</span>
+                                <span className={(() => {
+                                  const actualProfit = parseFloat((order as any).actualProfit || 0);
+                                  const expectedProfit = calculateExpectedProfit(order);
+                                  const difference = actualProfit - expectedProfit;
+                                  return difference >= 0 ? 'text-green-600' : 'text-red-600';
+                                })()}>
+                                  {(() => {
+                                    const actualProfit = parseFloat((order as any).actualProfit || 0);
+                                    const expectedProfit = calculateExpectedProfit(order);
+                                    const difference = actualProfit - expectedProfit;
+                                    return `${difference >= 0 ? '+' : ''}${difference.toLocaleString()}원`;
+                                  })()}
+                                </span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                         
-                        {/* 3. 매칭 정보 (Lay인 경우만) */}
-                        {order.side === 'lay' && order.matchedOrderId && (
-                          <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs text-gray-600">매칭된 주문</span>
-                              <span className="text-xs font-medium text-green-600">#{order.matchedOrderId}</span>
+                        {/* 3. 정산 정보 (정산된 경우만) */}
+                        {order.status === 'settled' && (() => {
+                          const actualProfit = parseFloat((order as any).actualProfit || 0);
+                          const settlementNote = (order as any).settlementNote || '';
+                          const isWinner = actualProfit > 0;
+                          
+                          return (
+                            <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                              <div className="flex justify-between items-center mb-2">
+                                <span className="text-xs text-gray-600">정산 결과</span>
+                                <span className={`text-sm font-bold px-2 py-1 rounded-full ${
+                                  isWinner ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                }`}>
+                                  {isWinner ? '🎉 승리' : '😞 패배'}
+                                </span>
+                              </div>
+                              {settlementNote && (
+                                <div className="text-xs text-gray-600 mt-1">
+                                  <span className="font-medium">정산 메모:</span> {settlementNote}
+                                </div>
+                              )}
+                              <div className="text-xs text-gray-500 mt-1">
+                                {isWinner 
+                                  ? `축하합니다! ${actualProfit.toLocaleString()}원을 획득했습니다.`
+                                  : `아쉽게도 ${Math.abs(actualProfit).toLocaleString()}원을 잃었습니다.`
+                                }
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          );
+                        })()}
+
+                        {/* 4. 매칭 정보 (Lay인 경우만) */}
+                        {order.side === 'lay' && order.matchedOrderId && (() => {
+                          const matchedOrder = matchedOrderInfo[order.matchedOrderId!];
+                          return (
+                            <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                              <div className="flex justify-between items-center mb-2">
+                                <span className="text-xs text-gray-600">매칭된 주문</span>
+                                <span className="text-xs font-medium text-green-600">#{order.matchedOrderId}</span>
+                              </div>
+                              {matchedOrder ? (
+                                <div className="space-y-1">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs text-gray-500">배팅금액</span>
+                                    <span className="text-xs font-medium text-gray-700">
+                                      {matchedOrder.amount.toLocaleString()}원
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs text-gray-500">매치 비율</span>
+                                    <span className="text-xs font-medium text-gray-700">
+                                      {(() => {
+                                        // 매치 비율 계산: 매칭된 금액 / 전체 주문 금액
+                                        const matchedAmount = matchedOrder.amount || 0;
+                                        const originalAmount = order.amount || 0;
+                                        
+                                        if (originalAmount === 0) return '0%';
+                                        
+                                        const matchRatio = (matchedAmount / originalAmount) * 100;
+                                        
+                                        // 부분 매칭인 경우 실제 매칭된 금액도 표시
+                                        if (matchRatio < 100) {
+                                          return `${matchRatio.toFixed(1)}% (${matchedAmount.toLocaleString()}원)`;
+                                        } else {
+                                          return '100%';
+                                        }
+                                      })()}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs text-gray-500">상태</span>
+                                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                                      matchedOrder.status === 'matched' ? 'bg-green-100 text-green-700' :
+                                      matchedOrder.status === 'partially_matched' ? 'bg-yellow-100 text-yellow-700' :
+                                      'bg-gray-100 text-gray-700'
+                                    }`}>
+                                      {matchedOrder.status === 'matched' ? '매칭완료' :
+                                       matchedOrder.status === 'partially_matched' ? '부분매칭' :
+                                       matchedOrder.status}
+                                    </span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-xs text-gray-500">
+                                  {matchedOrder === undefined ? '매칭된 주문 정보를 로딩 중...' : '매칭된 주문 정보를 찾을 수 없습니다'}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                       </div>
                     </div>

@@ -530,7 +530,7 @@ else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; la
                       </div>
                       <div className="flex justify-between items-center">
                         <span>🏆 Estimated Profit:</span>
-                        <b className="text-black">{Math.floor(Number(bet.potentialWinnings)).toLocaleString()} KRW</b>
+                        <b className="text-black">{Math.floor(Number(bet.stake) * Number(bet.totalOdds)).toLocaleString()} KRW</b>
                       </div>
                       <div className="flex items-center justify-end pt-1">
                         {/* 배팅 취소 버튼 - 정상 조건으로 복원 */}

@@ -170,7 +170,8 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
     setMultiBetTotalOdds(totalOdds);
     
     if (multiBetStake > 0) {
-      const potentialWinnings = Math.round(multiBetStake * totalOdds - multiBetStake);
+      // Back 주문도 Lay 주문처럼 본금 포함으로 계산 (총 수익)
+      const potentialWinnings = Math.round(multiBetStake * totalOdds);
       setMultiBetPotentialWinnings(potentialWinnings);
     }
   }, [multiBetSelections, multiBetStake]);
@@ -247,7 +248,7 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
         return { success: false, error: '인증 토큰이 없습니다. 다시 로그인해주세요.' };
       }
 
-      const response = await fetch('http://localhost:5050/api/exchange/multibet', {
+      const response = await fetch('/api/exchange/multibet', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
