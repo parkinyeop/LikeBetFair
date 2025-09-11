@@ -484,8 +484,22 @@ router.post('/order', verifyToken, async (req, res) => {
     });
     
     // 거래 정보 계산
-    const stakeAmount = side === 'back' ? amount : Math.floor((price - 1) * amount);
-    const potentialProfit = side === 'back' ? Math.floor((price - 1) * amount) : amount;
+    let stakeAmount, potentialProfit;
+    
+    if (selectionDetails && selectionDetails.selections && selectionDetails.selections.length > 1) {
+      // 멀티배팅인 경우
+      if (side === 'back') {
+        stakeAmount = amount; // Back: 배팅 금액
+        potentialProfit = Math.floor((price - 1) * amount); // Back: 수익
+      } else {
+        stakeAmount = Math.floor((price - 1) * amount); // Lay: 스테이크 금액
+        potentialProfit = amount; // Lay: 수익
+      }
+    } else {
+      // 단일 배팅인 경우
+      stakeAmount = side === 'back' ? amount : Math.floor((price - 1) * amount);
+      potentialProfit = side === 'back' ? Math.floor((price - 1) * amount) : amount;
+    }
     
     // 🆕 배당율 정보 준비
     const now = new Date();
