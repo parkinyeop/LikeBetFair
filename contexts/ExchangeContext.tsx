@@ -170,7 +170,7 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
     setMultiBetTotalOdds(totalOdds);
     
     if (multiBetStake > 0) {
-      // Back 주문도 Lay 주문처럼 본금 포함으로 계산 (총 수익)
+      // ✅ 올바른 Exchange 멀티배팅 수익 계산: 본금 포함 (총 수익)
       const potentialWinnings = Math.round(multiBetStake * totalOdds);
       setMultiBetPotentialWinnings(potentialWinnings);
     }

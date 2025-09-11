@@ -343,21 +343,32 @@ class ExchangeSettlementService {
     const backStakeAmount = backOrder.partiallyFilled ? (backOrder.filledAmount || 0) : backOrder.stakeAmount;
     const layStakeAmount = layOrder.partiallyFilled ? (layOrder.filledAmount || 0) : layOrder.stakeAmount;
     
-    // 수익 계산 (부분 매칭 고려) - Back 주문 본금 포함
-    const backWinAmount = isBackWin ? 
-      (backStakeAmount * backOrder.price) : -backStakeAmount;
+    // ✅ 올바른 Exchange 정산 계산: 배당률이 아닌 실제 베팅금액 비율로 계산
     
-    // 🚨 수정된 Lay 수익 계산: 부분 매칭 비율에 따른 올바른 정산
-    const matchRatio = layOrder.partiallyFilled ? 
-      (layOrder.filledAmount || layStakeAmount) / (layOrder.originalAmount || layOrder.amount) : 1;
+    // Lay의 지분 계산: Lay 베팅금액 ÷ Back의 매치금액
+    // Back의 매치금액 = Back 배팅금액 × (배당률 - 1)
+    const backMatchAmount = backStakeAmount * (backOrder.price - 1);
+    const layShareRatio = backMatchAmount > 0 ? layStakeAmount / backMatchAmount : 0;
     
-    const layWinAmount = isBackWin ? 
-      -layStakeAmount : // Back이 승리하면 Lay는 자신의 베팅금액 손실
-      layStakeAmount + (backStakeAmount * matchRatio); // Lay 승리시: 본인 베팅 + Back 베팅의 매치비율
+    console.log(`  💰 Exchange 정산 계산:`);
+    console.log(`    Back 매치금액: ${backMatchAmount}원 (배당률 ${backOrder.price})`);
+    console.log(`    Lay 지분비율: ${(layShareRatio * 100).toFixed(1)}%`);
     
-    console.log(`  💰 수익 계산 (부분 매칭 고려):`);
-    console.log(`    Back 주문: ${backWinAmount > 0 ? '+' : ''}${backWinAmount} (체결: ${backStakeAmount}원)`);
-    console.log(`    Lay 주문: ${layWinAmount > 0 ? '+' : ''}${layWinAmount} (체결: ${layStakeAmount}원, 매치비율: ${Math.round(matchRatio * 100)}%)`);
+    let backWinAmount, layWinAmount;
+    
+    if (isBackWin) {
+      // Back 승리 시: Lay가 베팅한 금액만큼 Back이 획득
+      backWinAmount = layStakeAmount;
+      layWinAmount = -layStakeAmount;
+    } else {
+      // Lay 승리 시: Lay는 자신의 베팅금액 + Back의 배팅금액 중 지분만큼 획득
+      backWinAmount = -layStakeAmount;
+      layWinAmount = layStakeAmount + (backStakeAmount * layShareRatio);
+    }
+    
+    console.log(`  💰 수익 계산 (올바른 Exchange 로직):`);
+    console.log(`    Back 주문: ${backWinAmount > 0 ? '+' : ''}${backWinAmount}원 (체결: ${backStakeAmount}원)`);
+    console.log(`    Lay 주문: ${layWinAmount > 0 ? '+' : ''}${layWinAmount}원 (체결: ${layStakeAmount}원, 지분비율: ${(layShareRatio * 100).toFixed(1)}%)`);
     
     // 사용자 잔고 업데이트
     await this.updateUserBalance(backOrder, backWinAmount, gameResult, isBackWin, transaction);

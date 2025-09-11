@@ -720,14 +720,22 @@ router.post('/settle', verifyToken, async (req, res) => {
   for (const order of matchedOrders) {
     const matched = await ExchangeOrder.findByPk(order.matchedOrderId);
     if (!matched) continue;
-    // 예시: Back이 이기면 배당금 지급, Lay는 증거금 차감
+    // ✅ 올바른 Exchange 정산 로직
     let winner, payout;
     if ((result === 'over' && order.side === 'back') || (result === 'under' && order.side === 'lay')) {
       winner = order;
-      payout = order.price * order.amount;
+      // Back 승리: 매칭된 Lay 베팅금액만큼 획득
+      payout = order.side === 'back' ? matched.amount : order.amount;
     } else {
       winner = matched;
-      payout = matched.price * matched.amount;
+      // Lay 승리: 자신의 베팅금액 + Back의 배팅금액 중 지분만큼 획득
+      if (matched.side === 'lay') {
+        const backMatchAmount = order.amount * (order.price - 1);
+        const layShareRatio = backMatchAmount > 0 ? matched.amount / backMatchAmount : 0;
+        payout = matched.amount + (order.amount * layShareRatio);
+      } else {
+        payout = order.side === 'back' ? matched.amount : order.amount;
+      }
     }
     const winnerUser = await User.findByPk(winner.userId);
     winnerUser.balance += payout;

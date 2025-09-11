@@ -156,7 +156,7 @@ function OrderPanel() {
     return () => clearInterval(interval);
   }, [fetchOrders]);
 
-  // 매치 주문하기 실시간 예상수익 계산
+  // ✅ 올바른 Exchange 매치 주문 예상수익 계산
   const calculateMatchOrderProfit = () => {
     if (!selectedBet || !form.amount || form.amount <= 0) return 0;
     
@@ -164,11 +164,25 @@ function OrderPanel() {
     const price = selectedBet.price || 1;
     
     if (selectedBet.type === 'back') {
-      // Back: 배팅금액 * 배당률 = 총 수익 (본금 포함)
-      return Math.round(amount * price);
+      // Back: 매칭된 Lay 베팅금액만큼 획득 (Exchange 원리)
+      return Math.round(amount);
     } else {
-      // Lay: 배팅금액 + (배팅금액 * (배당률-1) / 배당률) = 총 수익 (본금 포함)
-      return Math.round(amount + (amount * (price - 1) / price));
+      // ✅ 올바른 Lay 예상 수익: 자신의 베팅금액 + (Back의 실제 배팅금액 × Lay 지분율)
+      // 
+      // Exchange 원리: 
+      // 1. getMaxMatchAmount() = Back의 실제 배팅금액 (stake)
+      // 2. Back의 매치금액 = Back의 실제 배팅금액 × (배당률 - 1)
+      // 3. Lay 지분율 = min(1, Lay 베팅금액 ÷ Back의 매치금액)
+      // 4. Lay 예상수익 = 자신의 베팅금액 + (Back의 실제 배팅금액 × Lay 지분율)
+      
+      const backActualAmount = getMaxMatchAmount(); // Back의 실제 배팅금액 (stake)
+      const backMatchAmount = backActualAmount * (price - 1); // Back의 매치금액 (liability)
+      const layShareRatio = Math.min(1, amount / backMatchAmount); // Lay 지분율 (최대 100%)
+      
+      // Lay 예상 수익 = 자신의 베팅금액 + (Back의 실제 배팅금액 × Lay 지분율)
+      const expectedProfit = amount + (backActualAmount * layShareRatio);
+      
+      return Math.round(expectedProfit);
     }
   };
 
@@ -696,27 +710,27 @@ function OrderHistoryPanel() {
     }
   };
 
-  // 예상 수익 계산 (상세보기용) - 본인 배팅 금액 포함
+  // ✅ 올바른 Exchange 예상 수익 계산 (상세보기용)
   const calculateExpectedProfit = (order: ExchangeOrder) => {
-    // 서버에서 전달된 potentialProfit은 기존 데이터가 순수익일 수 있으므로 
-    // 프론트엔드에서 직접 본금 포함으로 재계산
-    
-    // stakeAmount가 있는 경우 (매치 주문)
+    // stakeAmount가 있는 경우 (매치 주문) - Exchange 원리 적용
     if ((order as any).stakeAmount !== undefined && (order as any).stakeAmount !== null && (order as any).stakeAmount > 0) {
       const stakeAmount = typeof (order as any).stakeAmount === 'string' 
         ? parseFloat((order as any).stakeAmount) 
         : (order as any).stakeAmount;
       
       if (order.side === 'back') {
-        // Back: stakeAmount + potentialProfit = stakeAmount * odds
-        return Math.round(stakeAmount * (order.price || 1));
+        // Back: 매칭된 Lay 베팅금액만큼 획득 (Exchange 원리)
+        return Math.round(stakeAmount);
       } else {
-        // Lay: stakeAmount + potentialProfit
-        return Math.round(stakeAmount + (stakeAmount * ((order.price || 1) - 1) / (order.price || 1)));
+        // ✅ 올바른 Lay 예상 수익: 자신의 베팅금액 + (Back의 실제 배팅금액 × Lay 지분율)
+        // Lay 지분율 = Lay 베팅금액 ÷ Back의 매치금액
+        // Back의 매치금액 = Back 배팅금액 × (배당률 - 1)
+        // Lay 예상 수익 = stakeAmount × price / (price - 1)
+        return Math.round(stakeAmount * (order.price || 1) / ((order.price || 1) - 1));
       }
     }
     
-    // 일반 주문인 경우 기존 로직
+    // 일반 주문인 경우 기존 로직 (멀티배팅 등)
     const totalOdds = calculateTotalOdds(order);
     let stakeAmount = 0;
     
