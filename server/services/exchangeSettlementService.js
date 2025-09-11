@@ -1421,12 +1421,22 @@ class ExchangeSettlementService {
         try {
           const gameTime = new Date(order.commenceTime);
           const hoursSinceGame = (now.getTime() - gameTime.getTime()) / (1000 * 60 * 60);
+          const isGameStarted = now.getTime() > gameTime.getTime();
           
           console.log(`\n🎯 주문 환불 처리: ID ${order.id}`);
           console.log(`   경기: ${order.homeTeam} vs ${order.awayTeam}`);
           console.log(`   경기 시간: ${gameTime.toISOString()}`);
-          console.log(`   경과 시간: ${hoursSinceGame.toFixed(1)}시간`);
+          console.log(`   현재 시간: ${now.toISOString()}`);
+          console.log(`   경기 시작 여부: ${isGameStarted ? '시작됨' : '시작 전'}`);
+          console.log(`   경과 시간: ${Math.abs(hoursSinceGame).toFixed(1)}시간 (${isGameStarted ? '시작 후' : '시작 전'})`);
           console.log(`   사이드: ${order.side}, 금액: ${order.amount}원`);
+          
+          // 🚨 경기 시작 전 주문은 환불하지 않음 (환불 정책 위반 방지)
+          if (!isGameStarted) {
+            console.log(`   ⚠️ 경기 시작 전 주문으로 환불 제외: ${Math.abs(hoursSinceGame).toFixed(1)}시간 후 시작 예정`);
+            await transaction.rollback();
+            continue;
+          }
           
           // 환불 금액 계산
           let refundAmount;
@@ -1465,13 +1475,21 @@ class ExchangeSettlementService {
           // 환불 후 잔액 조회
           const user = await User.findByPk(order.userId, { transaction });
           
+          // 환불 사유 및 메모 생성
+          const timeDescription = isGameStarted 
+            ? `경기 시작 후 ${Math.abs(hoursSinceGame).toFixed(1)}시간 경과` 
+            : `경기 시작 전 ${Math.abs(hoursSinceGame).toFixed(1)}시간`;
+          const refundReason = isGameStarted 
+            ? '경기 시작 후 미매칭으로 인한 자동 환불' 
+            : '경기 시작 전 미매칭으로 인한 자동 환불';
+          
           // 환불 내역 기록
           await PaymentHistory.create({
             userId: order.userId,
             betId: `EXCHANGE_${order.id}`,
             amount: refundAmount,
             type: 'refund',
-            memo: `Exchange 주문 경기 시작 후 미매칭으로 인한 자동 환불 (경기: ${order.homeTeam} vs ${order.awayTeam}, 경과: ${hoursSinceGame.toFixed(1)}시간)`,
+            memo: `Exchange 주문 ${refundReason} (경기: ${order.homeTeam} vs ${order.awayTeam}, ${timeDescription})`,
             status: 'completed',
             balanceAfter: user.balance,
             paidAt: new Date()
@@ -1480,7 +1498,7 @@ class ExchangeSettlementService {
           // 주문 상태 변경
           await order.update({
             status: 'cancelled',
-            settlementNote: `경기 시작 후 ${hoursSinceGame.toFixed(1)}시간 경과로 미매칭되어 자동 환불`,
+            settlementNote: `${timeDescription}로 미매칭되어 자동 환불`,
             settledAt: new Date()
           }, { transaction });
           
@@ -1491,7 +1509,9 @@ class ExchangeSettlementService {
           refundResults.push({
             orderId: order.id,
             refundAmount,
-            hoursSinceGame: hoursSinceGame.toFixed(1)
+            hoursSinceGame: Math.abs(hoursSinceGame).toFixed(1),
+            isGameStarted,
+            timeDescription: isGameStarted ? '경기 시작 후' : '경기 시작 전'
           });
           
           console.log(`   ✅ 환불 완료: ${refundAmount}원, 새 잔액: ${user.balance}원`);
