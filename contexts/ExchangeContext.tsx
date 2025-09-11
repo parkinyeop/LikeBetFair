@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { useRouter } from 'next/router';
 import { useAuth } from './AuthContext';
 
 export interface SelectedBet {
@@ -103,6 +104,7 @@ interface ExchangeProviderProps {
 
 export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) => {
   const { token } = useAuth(); // 🆕 인증 토큰 가져오기
+  const router = useRouter();
   const [selectedBet, setSelectedBet] = useState<SelectedBet | null>(null);
   const [isMatchMode, setIsMatchMode] = useState(false);
   const [matchTargetOrder, setMatchTargetOrder] = useState<MatchTargetOrder | null>(null);
@@ -113,6 +115,41 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
   const [multiBetStake, setMultiBetStake] = useState<number>(0);
   const [multiBetTotalOdds, setMultiBetTotalOdds] = useState<number>(1);
   const [multiBetPotentialWinnings, setMultiBetPotentialWinnings] = useState<number>(0);
+
+  // 🆕 페이지 이동 시 모든 상태 초기화 (Next.js 14 호환)
+  React.useEffect(() => {
+    const handleRouteChange = () => {
+      console.log('🔄 페이지 이동 감지 - Exchange 상태 초기화');
+      setSelectedBet(null);
+      setIsMatchMode(false);
+      setMatchTargetOrder(null);
+      setMultiBetSelections([]);
+      setMultiBetStake(0);
+      setMultiBetTotalOdds(1);
+      setMultiBetPotentialWinnings(0);
+    };
+
+    // 브라우저 뒤로가기/앞으로가기 감지
+    window.addEventListener('popstate', handleRouteChange);
+    
+    // 페이지 언마운트 시에도 초기화
+    return () => {
+      window.removeEventListener('popstate', handleRouteChange);
+      handleRouteChange();
+    };
+  }, []);
+
+  // 🆕 Next.js 14 호환: pathname 변경 감지
+  React.useEffect(() => {
+    console.log('🔄 페이지 이동 감지 (pathname 변경) - Exchange 상태 초기화');
+    setSelectedBet(null);
+    setIsMatchMode(false);
+    setMatchTargetOrder(null);
+    setMultiBetSelections([]);
+    setMultiBetStake(0);
+    setMultiBetTotalOdds(1);
+    setMultiBetPotentialWinnings(0);
+  }, [router.pathname]);
 
   // selectedBet 상태 변경 로그
   React.useEffect(() => {
@@ -185,8 +222,9 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
     setMultiBetStake(stake);
   };
 
-  // 🆕 멀티배팅 초기화
+  // 🆕 멀티배팅 완전 초기화
   const clearMultiBet = () => {
+    console.log('🔄 멀티배팅 상태 완전 초기화');
     setMultiBetSelections([]);
     setMultiBetStake(0);
     setMultiBetTotalOdds(1);

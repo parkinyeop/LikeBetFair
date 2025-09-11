@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import { useExchange, ExchangeOrder, OrderForm } from '../hooks/useExchange';
 import { useAuth } from '../contexts/AuthContext';
 import { useExchangeContext } from '../contexts/ExchangeContext';
@@ -7,6 +8,7 @@ import { useExchangeContext } from '../contexts/ExchangeContext';
 // ExchangeOrder 자체에 필요한 모든 정보가 이미 포함되어 있음
 
 function OrderPanel() {
+  const router = useRouter();
   const { 
     loading, 
     error, 
@@ -51,6 +53,29 @@ function OrderPanel() {
     }
   }, [selectedBet]);
 
+  // 🆕 페이지 이동 시 폼 완전 초기화 (Next.js 14 호환)
+  useEffect(() => {
+    const handlePageChange = () => {
+      console.log('🔄 페이지 이동 감지 - ExchangeSidebar 폼 초기화');
+      setForm({ side: 'back', price: 0, amount: 0 });
+    };
+
+    // 브라우저 뒤로가기/앞으로가기 감지
+    window.addEventListener('popstate', handlePageChange);
+    
+    // 페이지 언마운트 시에도 초기화
+    return () => {
+      window.removeEventListener('popstate', handlePageChange);
+      handlePageChange();
+    };
+  }, []);
+
+  // 🆕 Next.js 14 호환: pathname 변경 감지
+  useEffect(() => {
+    console.log('🔄 페이지 이동 감지 (pathname 변경) - ExchangeSidebar 폼 초기화');
+    setForm({ side: 'back', price: 0, amount: 0 });
+  }, [router.pathname]);
+
   // 🆕 홈에서 선택된 경기 정보를 읽어와서 주문 폼에 자동으로 채우기
   useEffect(() => {
     const checkAndLoadSelectedGame = () => {
@@ -61,13 +86,12 @@ function OrderPanel() {
           
           console.log('🎯 홈에서 선택된 경기 정보 발견:', gameInfo);
           
-          // 주문 폼에 자동으로 정보 채우기
-          setForm(prev => ({
-            ...prev,
-            price: gameInfo.odds || prev.price,
-            amount: prev.amount, // 금액은 사용자가 입력하도록 유지
-            side: 'back' as const
-          }));
+          // 주문 폼에 자동으로 정보 채우기 (깨끗한 상태에서)
+          setForm({
+            side: 'back',
+            price: gameInfo.odds || 0,
+            amount: 0 // 금액은 항상 0으로 시작
+          });
           
           // selectedBet 업데이트 (더 확실하게)
           const newSelectedBet = {
@@ -98,10 +122,8 @@ function OrderPanel() {
     // 초기 체크
     checkAndLoadSelectedGame();
     
-    // 주기적으로 체크 (500ms마다 - 더 빠르게)
-    const interval = setInterval(checkAndLoadSelectedGame, 500);
-    
-    // 🆕 추가로 탭 변경 시에도 체크
+    // 🆕 주기적 체크 제거 - 한 번만 실행
+    // 탭 변경 시에만 체크
     const handleTabChange = () => {
       setTimeout(checkAndLoadSelectedGame, 100);
     };
@@ -110,7 +132,6 @@ function OrderPanel() {
     window.addEventListener('exchangeSidebarTabChange', handleTabChange);
     
     return () => {
-      clearInterval(interval);
       window.removeEventListener('exchangeSidebarTabChange', handleTabChange);
     };
   }, []); // 의존성 제거하여 매번 체크
@@ -278,11 +299,11 @@ function OrderPanel() {
         deactivateMatchMode();
       }
       
-      // 폼 초기화 (배당율은 유지)
-      setForm(prev => ({ ...prev, amount: 0 }));
+      // 🆕 폼 완전 초기화 (모든 필드 초기화)
+      setForm({ side: 'back', price: 0, amount: 0 });
       setSelectedBet(null);
       
-      // 🆕 멀티배팅 선택들도 초기화
+      // 🆕 멀티배팅 선택들도 완전 초기화
       clearMultiBet();
       
       // 주문 내역 새로고침 (useEffect에서 자동으로 처리되지만 즉시 반영을 위해)
@@ -454,6 +475,11 @@ function OrderPanel() {
                   const result = await createMultiBetOrder();
                   if (result.success) {
                     alert('배팅 주문이 성공적으로 생성되었습니다!');
+                    
+                    // 🆕 멀티배팅 주문 완료 후 완전 초기화
+                    setForm({ side: 'back', price: 0, amount: 0 });
+                    setSelectedBet(null);
+                    clearMultiBet();
                     
                     // 🆕 멀티배팅 주문 완료 후 이벤트 발생
                     if (typeof window !== 'undefined') {
