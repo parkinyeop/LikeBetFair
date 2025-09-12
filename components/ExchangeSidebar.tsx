@@ -662,7 +662,9 @@ function OrderHistoryPanel() {
           id: orderData.id,
           amount: orderData.amount,
           price: orderData.price,
-          status: orderData.status
+          status: orderData.status,
+          filledAmount: orderData.filledAmount,
+          originalAmount: orderData.originalAmount
         };
         
         setMatchedOrderInfo(prev => ({
@@ -1347,9 +1349,9 @@ function OrderHistoryPanel() {
                                     <span className="text-xs text-gray-500">매치 비율</span>
                                     <span className="text-xs font-medium text-gray-700">
                                       {(() => {
-                                        // 매치 비율 계산: 매칭된 금액 / 전체 주문 금액
-                                        const matchedAmount = matchedOrder.amount || 0;
-                                        const originalAmount = order.amount || 0;
+                                        // 매치 비율 계산: 매칭된 주문의 실제 매칭된 금액 / 매칭된 주문의 전체 금액
+                                        const matchedAmount = matchedOrder.filledAmount || matchedOrder.amount || 0;  // 매칭된 주문의 실제 매칭된 금액
+                                        const originalAmount = matchedOrder.originalAmount || matchedOrder.amount || 0;  // 매칭된 주문의 전체 금액
                                         
                                         if (originalAmount === 0) return '0%';
                                         

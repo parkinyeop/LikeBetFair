@@ -2134,9 +2134,9 @@ export default function ExchangeAdmin() {
                                 <div className="flex justify-between">
                                   <span className="text-sm text-gray-600">매치 비율:</span>
                                   <span className="text-sm font-medium text-blue-600">
-                                    {selectedOrder.filledAmount && selectedOrder.originalAmount 
-                                      ? `${((selectedOrder.filledAmount / selectedOrder.originalAmount) * 100).toFixed(1)}%`
-                                      : '100%'
+                                    {selectedOrder.filledAmount 
+                                      ? `${((selectedOrder.filledAmount / (selectedOrder.originalAmount || selectedOrder.amount)) * 100).toFixed(1)}%`
+                                      : '0%'
                                     }
                                   </span>
                                 </div>

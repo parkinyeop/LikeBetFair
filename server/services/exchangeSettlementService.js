@@ -1379,17 +1379,18 @@ class ExchangeSettlementService {
   }
 
   /**
-   * 🆕 경기 시작 후 미매칭된 오픈 주문들을 자동 환불
+   * 🆕 경기 시작 후 미매칭된 오픈 주문들과 부분 매칭된 주문들을 자동 환불
    */
   async refundUnmatchedOpenOrders() {
     try {
-      console.log('🔄 경기 시작 후 미매칭 오픈 주문 환불 처리 시작...');
+      console.log('🔄 경기 시작 후 미매칭 오픈 주문 및 부분 매칭 주문 환불 처리 시작...');
       
       const now = new Date();
       const oneHourAgo = new Date(now.getTime() - (60 * 60 * 1000)); // 1시간 전
       
-      // 경기 시작 후 1시간 이상 지났지만 여전히 오픈 상태인 주문들 조회 (직접 SQL 사용)
-      const [sqlResults] = await sequelize.query(`
+      // 🆕 수정: 오픈 주문과 부분 매칭된 주문 모두 처리
+      // 1. 완전히 미매칭된 오픈 주문들
+      const [openOrdersResults] = await sequelize.query(`
         SELECT 
           id, "userId", side, amount, price, status, "filledAmount", 
           "partiallyFilled", "remainingAmount", "originalAmount", 
@@ -1402,11 +1403,35 @@ class ExchangeSettlementService {
           AND "filledAmount" = 0 
           AND ("partiallyFilled" = false OR "partiallyFilled" IS NULL)
         ORDER BY "commenceTime" ASC
-        LIMIT 50
+        LIMIT 25
       `, {
         replacements: { oneHourAgo },
         type: sequelize.QueryTypes.SELECT
       });
+      
+      // 2. 부분 매칭된 주문들 (남은 금액이 있는 경우)
+      const [partialOrdersResults] = await sequelize.query(`
+        SELECT 
+          id, "userId", side, amount, price, status, "filledAmount", 
+          "partiallyFilled", "remainingAmount", "originalAmount", 
+          "matchedOrderId", "gameId", market, line, selection, "isMultibet", 
+          "selectionDetails", "homeTeam", "awayTeam", "commenceTime",
+          "createdAt", "updatedAt"
+        FROM "ExchangeOrders" 
+        WHERE status = 'partially_matched' 
+          AND "commenceTime" < :oneHourAgo
+          AND "remainingAmount" > 0
+        ORDER BY "commenceTime" ASC
+        LIMIT 25
+      `, {
+        replacements: { oneHourAgo },
+        type: sequelize.QueryTypes.SELECT
+      });
+      
+      // 두 결과를 합치기
+      const allResults = [...(Array.isArray(openOrdersResults) ? openOrdersResults : [openOrdersResults]), 
+                          ...(Array.isArray(partialOrdersResults) ? partialOrdersResults : [partialOrdersResults])];
+      const sqlResults = allResults.filter(result => result != null);
       
       // SQL 결과를 ExchangeOrder 인스턴스로 변환
       const resultsArray = Array.isArray(sqlResults) ? sqlResults : [sqlResults];
@@ -1448,14 +1473,22 @@ class ExchangeSettlementService {
             continue;
           }
           
-          // 환불 금액 계산
+          // 🆕 환불 금액 계산 (부분 매칭 고려)
           let refundAmount;
-          if (order.side === 'back') {
-            // Back 주문: 배팅 금액 전액 환불
-            refundAmount = order.amount;
+          if (order.status === 'partially_matched' && order.remainingAmount > 0) {
+            // 부분 매칭된 주문: 남은 금액만 환불
+            refundAmount = order.remainingAmount;
+            console.log(`   부분 매칭 주문 - 남은 금액 환불: ${refundAmount}원`);
           } else {
-            // Lay 주문: 스테이크 금액 환불
-            refundAmount = Math.floor((order.price - 1) * order.amount);
+            // 완전 미매칭 주문: 전체 금액 환불
+            if (order.side === 'back') {
+              // Back 주문: 배팅 금액 전액 환불
+              refundAmount = order.amount;
+            } else {
+              // Lay 주문: 스테이크 금액 환불
+              refundAmount = Math.floor((order.price - 1) * order.amount);
+            }
+            console.log(`   완전 미매칭 주문 - 전체 금액 환불: ${refundAmount}원`);
           }
           
           console.log(`   환불 금액: ${refundAmount}원`);
@@ -1489,9 +1522,15 @@ class ExchangeSettlementService {
           const timeDescription = isGameStarted 
             ? `경기 시작 후 ${Math.abs(hoursSinceGame).toFixed(1)}시간 경과` 
             : `경기 시작 전 ${Math.abs(hoursSinceGame).toFixed(1)}시간`;
-          const refundReason = isGameStarted 
-            ? '경기 시작 후 미매칭으로 인한 자동 환불' 
-            : '경기 시작 전 미매칭으로 인한 자동 환불';
+          
+          let refundReason;
+          if (order.status === 'partially_matched') {
+            refundReason = '경기 시작 후 부분 매칭된 주문의 남은 금액 자동 환불';
+          } else {
+            refundReason = isGameStarted 
+              ? '경기 시작 후 미매칭으로 인한 자동 환불' 
+              : '경기 시작 전 미매칭으로 인한 자동 환불';
+          }
           
           // 환불 내역 기록
           await PaymentHistory.create({
@@ -1505,12 +1544,21 @@ class ExchangeSettlementService {
             paidAt: new Date()
           }, { transaction });
           
-          // 주문 상태 변경
-          await order.update({
-            status: 'cancelled',
-            settlementNote: `${timeDescription}로 미매칭되어 자동 환불`,
+          // 🆕 주문 상태 변경 (부분 매칭 고려)
+          const updateData = {
+            settlementNote: `${timeDescription}로 ${order.status === 'partially_matched' ? '부분 매칭 후 남은 금액' : '미매칭'}되어 자동 환불`,
             settledAt: new Date()
-          }, { transaction });
+          };
+          
+          if (order.status === 'partially_matched') {
+            // 부분 매칭된 주문: 남은 금액을 0으로 설정하고 상태는 그대로 유지
+            updateData.remainingAmount = 0;
+          } else {
+            // 완전 미매칭 주문: 상태를 cancelled로 변경
+            updateData.status = 'cancelled';
+          }
+          
+          await order.update(updateData, { transaction });
           
           await transaction.commit();
           
