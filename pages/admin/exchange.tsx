@@ -173,7 +173,45 @@ interface DateRange {
   end: Date;
 }
 
-type OrderStatus = 'open' | 'matched' | 'settled' | 'cancelled';
+type OrderStatus = 'open' | 'matched' | 'partially_matched' | 'active' | 'settled' | 'cancelled';
+
+// 취소 원인 파싱 함수
+  const getCancellationReason = (settlementNote: string | null, paymentMemo?: string): string => {
+    // settlementNote 우선 확인
+    if (settlementNote) {
+      if (settlementNote.includes('자동 취소') || settlementNote.includes('만료') || settlementNote.includes('미매칭되어 자동 환불')) return '만료';
+      if (settlementNote.includes('경기 취소') || settlementNote.includes('연기')) return '경기';
+      if (settlementNote.includes('Back 주문 취소로 인한') || settlementNote.includes('원주문 취소로 인한')) return '원주문';
+      if (settlementNote.includes('사용자') || settlementNote.includes('취소 환불')) return '사용자';
+    }
+    
+    // settlementNote가 없으면 paymentMemo 확인
+    if (paymentMemo) {
+      if (paymentMemo.includes('자동 환불') || paymentMemo.includes('만료')) return '만료';
+      if (paymentMemo.includes('경기 취소') || paymentMemo.includes('연기')) return '경기';
+      if (paymentMemo.includes('Back 주문 취소로 인한') || paymentMemo.includes('원주문 취소로 인한')) return '원주문';
+      if (paymentMemo.includes('취소 환불')) return '사용자';
+    }
+    
+    // 둘 다 없으면 사유 불명
+    if (!settlementNote && !paymentMemo) return '사유 불명';
+    
+    // 나머지는 기타
+    return '기타';
+  };
+
+// 취소 상태 표시 함수
+const getCancellationDisplayText = (order: any): string => {
+  if (order.status !== 'cancelled') {
+    return order.status === 'settled' ? '정산완료' : 
+           order.status === 'partially_matched' ? '부분 매칭' :
+           order.status === 'active' ? '활성' :
+           order.status;
+  }
+  
+  const reason = getCancellationReason(order.settlementNote, order.paymentMemo);
+  return `취소 (${reason})`;
+};
 
 // Phase 2: 드릴다운 네비게이션을 위한 새로운 타입들
 interface BreadcrumbItem {
@@ -308,13 +346,21 @@ const ADMIN_TABS: AdminTabStructure[] = [
 ];
 
 // 주문 관리 서브탭
-const ORDER_SUBTABS = [
-  { id: 'all', label: '전체 주문' },
-  { id: 'open', label: '대기 중' },
-  { id: 'matched', label: '매칭됨' },
-  { id: 'settled', label: '정산완료' },
-  { id: 'cancelled', label: '취소됨' }
-];
+  const ORDER_SUBTABS = [
+    { id: 'all', label: '전체 주문' },
+    { id: 'open', label: '대기 중' },
+    { id: 'matched', label: '매칭됨' },
+    { id: 'partially_matched', label: '부분 매칭' },
+    { id: 'active', label: '활성' },
+    { id: 'settled', label: '정산완료' },
+    { id: 'cancelled', label: '취소됨' },
+    { id: 'cancelled_user', label: '취소 (사용자)' },
+    { id: 'cancelled_game', label: '취소 (경기)' },
+    { id: 'cancelled_expired', label: '취소 (만료)' },
+    { id: 'cancelled_original', label: '취소 (원주문)' },
+    { id: 'cancelled_unknown', label: '취소 (사유불명)' },
+    { id: 'cancelled_other', label: '취소 (기타)' }
+  ];
 
 export default function ExchangeAdmin() {
   const { isLoggedIn, isAdmin, adminLevel, username } = useAuth();
@@ -1116,15 +1162,17 @@ export default function ExchangeAdmin() {
   const generateAdvancedCharts = useCallback(() => {
     const chartData = {
       ordersByStatus: {
-        labels: ['오픈', '매칭됨', '정산됨', '취소됨'],
+        labels: ['오픈', '매칭됨', '부분 매칭', '활성', '정산됨', '취소됨'],
         datasets: [{
           data: [
             orders.filter(o => o.status === 'open').length,
             orders.filter(o => o.status === 'matched').length,
+            orders.filter(o => o.status === 'partially_matched').length,
+            orders.filter(o => o.status === 'active').length,
             orders.filter(o => o.status === 'settled').length,
             orders.filter(o => o.status === 'cancelled').length
           ],
-          backgroundColor: ['#3B82F6', '#10B981', '#6B7280', '#EF4444']
+          backgroundColor: ['#3B82F6', '#10B981', '#F59E0B', '#6366F1', '#6B7280', '#EF4444']
         }]
       },
       volumeByHour: {
@@ -1214,15 +1262,39 @@ export default function ExchangeAdmin() {
         order.awayTeam?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         order.gameId?.toLowerCase().includes(searchTerm.toLowerCase());
       
-      // 상태 필터
-      const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+      // 상태 필터 (취소 원인별 필터링 포함)
+      let matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+      
+      // 취소 원인별 필터링
+      if (statusFilter.startsWith('cancelled_') && order.status === 'cancelled') {
+        const reason = getCancellationReason(order.settlementNote, order.paymentMemo);
+        const filterReason = statusFilter.replace('cancelled_', '');
+        matchesStatus = (filterReason === 'user' && reason === '사용자') ||
+                       (filterReason === 'game' && reason === '경기') ||
+                       (filterReason === 'expired' && reason === '만료') ||
+                       (filterReason === 'original' && reason === '원주문') ||
+                       (filterReason === 'unknown' && reason === '사유 불명') ||
+                       (filterReason === 'other' && reason === '기타');
+      }
       
       // 멀티배팅 필터
       const matchesMultibet = adminState.tabs.orders.filters.isMultibet === undefined || 
         order.isMultibet === adminState.tabs.orders.filters.isMultibet;
       
-      // 서브탭 필터
-      const matchesSubTab = activeSubTab === 'all' || order.status === activeSubTab;
+      // 서브탭 필터 (취소 원인별 필터링 포함)
+      let matchesSubTab = activeSubTab === 'all' || order.status === activeSubTab;
+      
+      // 취소 원인별 서브탭 필터링
+      if (activeSubTab.startsWith('cancelled_') && order.status === 'cancelled') {
+        const reason = getCancellationReason(order.settlementNote, order.paymentMemo);
+        const tabReason = activeSubTab.replace('cancelled_', '');
+        matchesSubTab = (tabReason === 'user' && reason === '사용자') ||
+                       (tabReason === 'game' && reason === '경기') ||
+                       (tabReason === 'expired' && reason === '만료') ||
+                       (tabReason === 'original' && reason === '원주문') ||
+                       (tabReason === 'unknown' && reason === '사유 불명') ||
+                       (tabReason === 'other' && reason === '기타');
+      }
       
       return matchesSearch && matchesStatus && matchesMultibet && matchesSubTab;
     });
@@ -1631,11 +1703,19 @@ export default function ExchangeAdmin() {
                               onChange={(e) => setStatusFilter(e.target.value)}
                               className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                             >
-                              <option value="all">모든 상태</option>
-                              <option value="open">오픈</option>
-                              <option value="matched">매칭됨</option>
-                              <option value="settled">정산완료</option>
-                              <option value="cancelled">취소됨</option>
+                <option value="all">모든 상태</option>
+                <option value="open">오픈</option>
+                <option value="matched">매칭됨</option>
+                <option value="partially_matched">부분 매칭</option>
+                <option value="active">활성</option>
+                <option value="settled">정산완료</option>
+                <option value="cancelled">취소됨</option>
+                <option value="cancelled_user">취소 (사용자)</option>
+                <option value="cancelled_game">취소 (경기)</option>
+                <option value="cancelled_expired">취소 (만료)</option>
+                <option value="cancelled_original">취소 (원주문)</option>
+                <option value="cancelled_unknown">취소 (사유불명)</option>
+                <option value="cancelled_other">취소 (기타)</option>
                             </select>
                             <select
                               value={adminState.tabs.orders.filters.isMultibet === undefined ? 'all' : adminState.tabs.orders.filters.isMultibet ? 'multibet' : 'single'}
@@ -1733,17 +1813,19 @@ export default function ExchangeAdmin() {
                                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                                       order.status === 'open' ? 'bg-blue-100 text-blue-800' :
                                       order.status === 'matched' ? 'bg-green-100 text-green-800' :
+                                      order.status === 'partially_matched' ? 'bg-yellow-100 text-yellow-800' :
+                                      order.status === 'active' ? 'bg-indigo-100 text-indigo-800' :
                                       order.status === 'settled' ? 'bg-purple-100 text-purple-800' :
                                       'bg-red-100 text-red-800'
                                     }`}>
-                                      {order.status === 'settled' ? '정산완료' : order.status === 'cancelled' ? '취소됨' : order.status}
+                                      {getCancellationDisplayText(order)}
                                     </span>
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     {new Date(order.createdAt).toLocaleDateString('ko-KR')}
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                    {order.status === 'open' && (
+                                    {(order.status === 'open' || order.status === 'partially_matched' || order.status === 'active') && (
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -2153,10 +2235,12 @@ export default function ExchangeAdmin() {
                               <span className={`text-sm font-medium px-2 py-1 rounded ${
                                 selectedOrder.status === 'open' ? 'bg-blue-100 text-blue-800' :
                                 selectedOrder.status === 'matched' ? 'bg-green-100 text-green-800' :
+                                selectedOrder.status === 'partially_matched' ? 'bg-yellow-100 text-yellow-800' :
+                                selectedOrder.status === 'active' ? 'bg-indigo-100 text-indigo-800' :
                                 selectedOrder.status === 'settled' ? 'bg-purple-100 text-purple-800' :
                                 'bg-red-100 text-red-800'
                               }`}>
-                                {selectedOrder.status === 'settled' ? '정산완료' : selectedOrder.status === 'cancelled' ? '취소됨' : selectedOrder.status}
+                                {getCancellationDisplayText(selectedOrder)}
                               </span>
                             </div>
                           </div>
@@ -2344,10 +2428,12 @@ export default function ExchangeAdmin() {
                                     <td className="px-4 py-2">
                                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                                         match.status === 'matched' ? 'bg-green-100 text-green-800' :
+                                        match.status === 'partially_matched' ? 'bg-yellow-100 text-yellow-800' :
+                                        match.status === 'active' ? 'bg-indigo-100 text-indigo-800' :
                                         match.status === 'settled' ? 'bg-purple-100 text-purple-800' :
                                         'bg-red-100 text-red-800'
                                       }`}>
-                                        {match.status === 'settled' ? '정산완료' : match.status === 'cancelled' ? '취소됨' : match.status}
+                                        {getCancellationDisplayText(match)}
                                       </span>
                                     </td>
                                   </tr>

@@ -401,8 +401,34 @@ router.get('/exchange/orders', verifyToken, requireAdmin(1), async (req, res) =>
 
     const totalCount = await ExchangeOrder.count({ where: whereCondition });
 
+    // paymentMemo 추가 - 취소 관련 PaymentHistory 조회
+    const orderIds = orders.map(order => order.id);
+    const paymentHistories = await PaymentHistory.findAll({
+      where: {
+        betId: { [Op.like]: 'EXCHANGE_%' },
+        memo: { [Op.like]: '%취소%' }
+      },
+      attributes: ['betId', 'memo'],
+      order: [['createdAt', 'DESC']]
+    });
+
+    // orderId별로 paymentMemo 매핑
+    const paymentMemoMap = {};
+    paymentHistories.forEach(payment => {
+      const orderId = payment.betId.replace('EXCHANGE_', '');
+      if (!paymentMemoMap[orderId]) {
+        paymentMemoMap[orderId] = payment.memo;
+      }
+    });
+
+    const ordersWithPaymentMemo = orders.map(order => {
+      const orderData = order.toJSON();
+      orderData.paymentMemo = paymentMemoMap[order.id] || null;
+      return orderData;
+    });
+
     res.json({
-      orders: orders,
+      orders: ordersWithPaymentMemo,
       totalCount: totalCount,
       page: parseInt(page),
       totalPages: Math.ceil(totalCount / limit)

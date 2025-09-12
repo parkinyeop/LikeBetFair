@@ -1,4 +1,4 @@
-import { DataTypes } from 'sequelize';
+import { DataTypes, Op } from 'sequelize';
 import sequelize from './sequelize.js';
 
 const ExchangeOrder = sequelize.define('ExchangeOrder', {
@@ -136,6 +136,18 @@ import('./userModel.js').then(({ default: User }) => {
 
 import('./gameResultModel.js').then(({ default: GameResult }) => {
   ExchangeOrder.belongsTo(GameResult, { foreignKey: 'gameResultId', as: 'gameResult' });
+});
+
+import('./paymentHistoryModel.js').then(({ default: PaymentHistory }) => {
+  ExchangeOrder.hasMany(PaymentHistory, { 
+    foreignKey: 'betId', 
+    sourceKey: 'id',
+    as: 'paymentHistories',
+    scope: {
+      betId: { [Op.like]: 'EXCHANGE_%' }
+    },
+    foreignKeyConstraint: false // betId는 문자열이므로 외래키 제약조건 비활성화
+  });
 });
 
 export default ExchangeOrder; 
