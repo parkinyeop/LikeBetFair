@@ -1551,8 +1551,8 @@ class ExchangeSettlementService {
           };
           
           if (order.status === 'partially_matched') {
-            // 부분 매칭된 주문: 남은 금액을 0으로 설정하고 상태는 그대로 유지
-            updateData.remainingAmount = 0;
+            // 부분 매칭된 주문: remainingAmount는 그대로 유지하고 정산만 처리
+            // updateData.remainingAmount = 0; // 🚨 제거: 부분 매칭된 주문의 잔액을 0으로 만들면 안됨
           } else {
             // 완전 미매칭 주문: 상태를 cancelled로 변경
             updateData.status = 'cancelled';
