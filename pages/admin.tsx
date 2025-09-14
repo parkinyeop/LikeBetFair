@@ -326,7 +326,10 @@ export default function AdminDashboard() {
                     <div>• 리그 활성화 관리</div>
                     <div>• 경기 결과 확인</div>
                   </div>
-                  <button className="mt-4 w-full bg-orange-600 text-white py-2 px-4 rounded hover:bg-orange-700 transition-colors">
+                  <button 
+                    onClick={() => router.push('/admin/games')}
+                    className="mt-4 w-full bg-orange-600 text-white py-2 px-4 rounded hover:bg-orange-700 transition-colors"
+                  >
                     경기 관리하기
                   </button>
                 </div>
@@ -348,7 +351,10 @@ export default function AdminDashboard() {
                     <div>• 스포츠북 패턴 분석</div>
                     <div>• 관리자 성과 리포트</div>
                   </div>
-                  <button className="mt-4 w-full bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 transition-colors">
+                  <button 
+                    onClick={() => router.push('/admin/analytics')}
+                    className="mt-4 w-full bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 transition-colors"
+                  >
                     통계 보기
                   </button>
                 </div>
@@ -371,7 +377,10 @@ export default function AdminDashboard() {
                     <div>• 시스템 모니터링</div>
                     <div>• 백업 및 복구</div>
                   </div>
-                  <button className="mt-4 w-full bg-gray-600 text-white py-2 px-4 rounded hover:bg-gray-700 transition-colors">
+                  <button 
+                    onClick={() => router.push('/admin/settings')}
+                    className="mt-4 w-full bg-gray-600 text-white py-2 px-4 rounded hover:bg-gray-700 transition-colors"
+                  >
                     시스템 설정
                   </button>
                 </div>

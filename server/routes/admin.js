@@ -7,6 +7,7 @@ import Bet from '../models/betModel.js';
 import ExchangeOrder from '../models/exchangeOrderModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
 import GameResult from '../models/gameResultModel.js';
+import OddsCache from '../models/oddsCacheModel.js';
 import bcrypt from 'bcryptjs';
 import { Op } from 'sequelize';
 
@@ -1398,6 +1399,823 @@ router.post('/manual-odds-update', async (req, res) => {
       message: '수동 배당 데이터 수집 중 오류가 발생했습니다.',
       error: error.message
     });
+  }
+});
+
+// =============================================================================
+// 경기 데이터 관리
+// =============================================================================
+
+// 경기 목록 조회
+router.get('/games', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    const { sport_key, status, search, page = 1, limit = 50 } = req.query;
+    
+    const whereCondition = {};
+    
+    if (sport_key && sport_key !== 'all') {
+      whereCondition.sport_key = sport_key;
+    }
+    
+    if (status && status !== 'all') {
+      const now = new Date();
+      switch (status) {
+        case 'upcoming':
+          whereCondition.commence_time = { [Op.gt]: now };
+          break;
+        case 'live':
+          whereCondition.commence_time = { [Op.lte]: now };
+          whereCondition.status = 'live';
+          break;
+        case 'completed':
+          whereCondition.status = 'completed';
+          break;
+      }
+    }
+    
+    if (search) {
+      whereCondition[Op.or] = [
+        { home_team: { [Op.iLike]: `%${search}%` } },
+        { away_team: { [Op.iLike]: `%${search}%` } }
+      ];
+    }
+
+    const offset = (Number(page) - 1) * Number(limit);
+    
+    const games = await OddsCache.findAll({
+      where: whereCondition,
+      order: [['commence_time', 'DESC']],
+      limit: Number(limit),
+      offset: offset
+    });
+
+    const totalCount = await OddsCache.count({ where: whereCondition });
+
+    res.json({
+      games: games.map(game => ({
+        id: game.id,
+        sport_key: game.sport_key,
+        sport_title: game.sport_title,
+        commence_time: game.commence_time,
+        home_team: game.home_team,
+        away_team: game.away_team,
+        home_team_odds: game.home_team_odds,
+        away_team_odds: game.away_team_odds,
+        draw_odds: game.draw_odds,
+        status: game.status || 'upcoming',
+        is_active: game.is_active !== false,
+        created_at: game.createdAt,
+        updated_at: game.updatedAt
+      })),
+      totalCount,
+      page: Number(page),
+      totalPages: Math.ceil(totalCount / Number(limit))
+    });
+  } catch (error) {
+    console.error('경기 데이터 조회 실패:', error);
+    res.status(500).json({ error: '경기 데이터 조회에 실패했습니다.' });
+  }
+});
+
+// 경기 추가
+router.post('/games', verifyToken, requireAdmin(2), async (req, res) => {
+  try {
+    const {
+      sport_key,
+      sport_title,
+      commence_time,
+      home_team,
+      away_team,
+      home_team_odds,
+      away_team_odds,
+      draw_odds,
+      is_active = true
+    } = req.body;
+
+    const newGame = await OddsCache.create({
+      sport_key,
+      sport_title,
+      commence_time: new Date(commence_time),
+      home_team,
+      away_team,
+      home_team_odds: parseFloat(home_team_odds),
+      away_team_odds: parseFloat(away_team_odds),
+      draw_odds: draw_odds ? parseFloat(draw_odds) : null,
+      is_active,
+      status: 'upcoming'
+    });
+
+    res.status(201).json({ 
+      message: '경기가 성공적으로 추가되었습니다.',
+      game: newGame 
+    });
+  } catch (error) {
+    console.error('경기 추가 실패:', error);
+    res.status(500).json({ error: '경기 추가에 실패했습니다.' });
+  }
+});
+
+// 경기 수정
+router.put('/games/:id', verifyToken, requireAdmin(2), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      commence_time,
+      home_team,
+      away_team,
+      home_team_odds,
+      away_team_odds,
+      draw_odds,
+      is_active,
+      status
+    } = req.body;
+
+    const game = await OddsCache.findByPk(Number(id));
+    
+    if (!game) {
+      return res.status(404).json({ error: '경기를 찾을 수 없습니다.' });
+    }
+
+    const updateData = {};
+    
+    if (commence_time !== undefined) updateData.commence_time = new Date(commence_time);
+    if (home_team !== undefined) updateData.home_team = home_team;
+    if (away_team !== undefined) updateData.away_team = away_team;
+    if (home_team_odds !== undefined) updateData.home_team_odds = parseFloat(home_team_odds);
+    if (away_team_odds !== undefined) updateData.away_team_odds = parseFloat(away_team_odds);
+    if (draw_odds !== undefined) updateData.draw_odds = draw_odds ? parseFloat(draw_odds) : null;
+    if (is_active !== undefined) updateData.is_active = is_active;
+    if (status !== undefined) updateData.status = status;
+
+    await game.update(updateData);
+
+    res.json({ 
+      message: '경기가 성공적으로 수정되었습니다.',
+      game: game 
+    });
+  } catch (error) {
+    console.error('경기 수정 실패:', error);
+    res.status(500).json({ error: '경기 수정에 실패했습니다.' });
+  }
+});
+
+// 리그 목록 조회
+router.get('/leagues', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    const leagues = await OddsCache.findAll({
+      attributes: [
+        'sport_key',
+        'sport_title',
+        'is_active',
+        [OddsCache.sequelize.fn('COUNT', OddsCache.sequelize.col('id')), 'game_count']
+      ],
+      group: ['sport_key', 'sport_title', 'is_active'],
+      order: [['sport_title', 'ASC']]
+    });
+
+    const leagueMap = new Map();
+    
+    leagues.forEach((league) => {
+      const key = league.sport_key;
+      const data = leagueMap.get(key) || {
+        sport_key: league.sport_key,
+        sport_title: league.sport_title,
+        is_active: league.is_active,
+        game_count: 0
+      };
+      
+      data.game_count += parseInt(league.dataValues.game_count);
+      leagueMap.set(key, data);
+    });
+
+    const result = Array.from(leagueMap.values());
+
+    res.json({ leagues: result });
+  } catch (error) {
+    console.error('리그 데이터 조회 실패:', error);
+    res.status(500).json({ error: '리그 데이터 조회에 실패했습니다.' });
+  }
+});
+
+// 리그 상태 변경
+router.put('/leagues', verifyToken, requireAdmin(2), async (req, res) => {
+  try {
+    const { sport_key, is_active } = req.body;
+
+    if (!sport_key) {
+      return res.status(400).json({ error: 'sport_key가 필요합니다.' });
+    }
+
+    const [affectedRows] = await OddsCache.update(
+      { is_active },
+      { where: { sport_key } }
+    );
+
+    res.json({ 
+      message: `리그가 ${is_active ? '활성화' : '비활성화'}되었습니다.`,
+      affectedRows 
+    });
+  } catch (error) {
+    console.error('리그 상태 변경 실패:', error);
+    res.status(500).json({ error: '리그 상태 변경에 실패했습니다.' });
+  }
+});
+
+// =============================================================================
+// 통계 및 리포트
+// =============================================================================
+
+// 매출 분석 데이터
+router.get('/analytics/sales', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    const { range = '30d' } = req.query;
+    
+    const now = new Date();
+    let startDate;
+    
+    switch (range) {
+      case '7d':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '30d':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case '90d':
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+      case '1y':
+        startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    }
+
+    const salesData = await Bet.findAll({
+      attributes: [
+        [Bet.sequelize.fn('DATE', Bet.sequelize.col('createdAt')), 'date'],
+        [Bet.sequelize.fn('COUNT', Bet.sequelize.col('Bet.id')), 'total_bets'],
+        [Bet.sequelize.fn('SUM', Bet.sequelize.col('amount')), 'total_sales'],
+        [Bet.sequelize.fn('COUNT', Bet.sequelize.fn('DISTINCT', Bet.sequelize.col('userId'))), 'total_users']
+      ],
+      where: {
+        createdAt: {
+          [Op.gte]: startDate,
+          [Op.lte]: now
+        }
+      },
+      group: [Bet.sequelize.fn('DATE', Bet.sequelize.col('createdAt'))],
+      order: [[Bet.sequelize.fn('DATE', Bet.sequelize.col('createdAt')), 'ASC']],
+      raw: true
+    });
+
+    const refundData = await PaymentHistory.findAll({
+      attributes: [
+        [PaymentHistory.sequelize.fn('DATE', PaymentHistory.sequelize.col('createdAt')), 'date'],
+        [PaymentHistory.sequelize.fn('SUM', PaymentHistory.sequelize.col('amount')), 'total_refunds']
+      ],
+      where: {
+        type: 'refund',
+        createdAt: {
+          [Op.gte]: startDate,
+          [Op.lte]: now
+        }
+      },
+      group: [PaymentHistory.sequelize.fn('DATE', PaymentHistory.sequelize.col('createdAt'))],
+      raw: true
+    });
+
+    const payoutData = await PaymentHistory.findAll({
+      attributes: [
+        [PaymentHistory.sequelize.fn('DATE', PaymentHistory.sequelize.col('createdAt')), 'date'],
+        [PaymentHistory.sequelize.fn('SUM', PaymentHistory.sequelize.col('amount')), 'total_payouts']
+      ],
+      where: {
+        type: 'payout',
+        createdAt: {
+          [Op.gte]: startDate,
+          [Op.lte]: now
+        }
+      },
+      group: [PaymentHistory.sequelize.fn('DATE', PaymentHistory.sequelize.col('createdAt'))],
+      raw: true
+    });
+
+    const refundMap = new Map();
+    refundData.forEach((item) => {
+      refundMap.set(item.date, parseFloat(item.total_refunds) || 0);
+    });
+
+    const payoutMap = new Map();
+    payoutData.forEach((item) => {
+      payoutMap.set(item.date, parseFloat(item.total_payouts) || 0);
+    });
+
+    const result = salesData.map((item) => {
+      const date = item.date;
+      const totalSales = parseFloat(item.total_sales) || 0;
+      const totalRefunds = refundMap.get(date) || 0;
+      const totalPayouts = payoutMap.get(date) || 0;
+      const profit = totalSales - totalRefunds - totalPayouts;
+
+      return {
+        date,
+        total_sales: totalSales,
+        total_bets: parseInt(item.total_bets) || 0,
+        total_users: parseInt(item.total_users) || 0,
+        profit: Math.max(0, profit)
+      };
+    });
+
+    res.json({ data: result });
+  } catch (error) {
+    console.error('매출 분석 데이터 조회 실패:', error);
+    res.status(500).json({ error: '매출 분석 데이터 조회에 실패했습니다.' });
+  }
+});
+
+// 사용자 분석 데이터
+router.get('/analytics/users', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    const { range = '30d' } = req.query;
+    
+    const now = new Date();
+    let startDate;
+    
+    switch (range) {
+      case '7d':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '30d':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case '90d':
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+      case '1y':
+        startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    }
+
+    const newUsersData = await User.findAll({
+      attributes: [
+        [User.sequelize.fn('DATE', User.sequelize.col('createdAt')), 'date'],
+        [User.sequelize.fn('COUNT', User.sequelize.col('User.id')), 'new_users']
+      ],
+      where: {
+        createdAt: {
+          [Op.gte]: startDate,
+          [Op.lte]: now
+        }
+      },
+      group: [User.sequelize.fn('DATE', User.sequelize.col('createdAt'))],
+      order: [[User.sequelize.fn('DATE', User.sequelize.col('createdAt')), 'ASC']],
+      raw: true
+    });
+
+    const activeUsersData = await Bet.findAll({
+      attributes: [
+        [Bet.sequelize.fn('DATE', Bet.sequelize.col('createdAt')), 'date'],
+        [Bet.sequelize.fn('COUNT', Bet.sequelize.fn('DISTINCT', Bet.sequelize.col('userId'))), 'active_users'],
+        [Bet.sequelize.fn('COUNT', Bet.sequelize.col('Bet.id')), 'total_bets'],
+        [Bet.sequelize.fn('AVG', Bet.sequelize.col('amount')), 'avg_bet_amount']
+      ],
+      where: {
+        createdAt: {
+          [Op.gte]: startDate,
+          [Op.lte]: now
+        }
+      },
+      group: [Bet.sequelize.fn('DATE', Bet.sequelize.col('createdAt'))],
+      order: [[Bet.sequelize.fn('DATE', Bet.sequelize.col('createdAt')), 'ASC']],
+      raw: true
+    });
+
+    const newUsersMap = new Map();
+    newUsersData.forEach((item) => {
+      newUsersMap.set(item.date, parseInt(item.new_users) || 0);
+    });
+
+    const result = activeUsersData.map((item) => {
+      const date = item.date;
+      const newUsers = newUsersMap.get(date) || 0;
+
+      return {
+        date,
+        new_users: newUsers,
+        active_users: parseInt(item.active_users) || 0,
+        total_bets: parseInt(item.total_bets) || 0,
+        avg_bet_amount: parseFloat(item.avg_bet_amount) || 0
+      };
+    });
+
+    res.json({ data: result });
+  } catch (error) {
+    console.error('사용자 분석 데이터 조회 실패:', error);
+    res.status(500).json({ error: '사용자 분석 데이터 조회에 실패했습니다.' });
+  }
+});
+
+// 스포츠북 패턴 분석 데이터
+router.get('/analytics/sportsbook', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    const { range = '30d' } = req.query;
+    
+    const now = new Date();
+    let startDate;
+    
+    switch (range) {
+      case '7d':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '30d':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case '90d':
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+      case '1y':
+        startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    }
+
+    const sportsbookData = await Bet.findAll({
+      attributes: [
+        'sport_key',
+        [Bet.sequelize.fn('COUNT', Bet.sequelize.col('Bet.id')), 'total_bets'],
+        [Bet.sequelize.fn('SUM', Bet.sequelize.col('amount')), 'total_amount'],
+        [Bet.sequelize.fn('AVG', Bet.sequelize.col('odds')), 'avg_odds']
+      ],
+      where: {
+        createdAt: {
+          [Op.gte]: startDate,
+          [Op.lte]: now
+        }
+      },
+      group: ['sport_key'],
+      order: [[Bet.sequelize.fn('SUM', Bet.sequelize.col('amount')), 'DESC']],
+      raw: true
+    });
+
+    const sportTitles = await OddsCache.findAll({
+      attributes: ['sport_key', 'sport_title'],
+      where: {
+        sport_key: {
+          [Op.in]: sportsbookData.map((item) => item.sport_key)
+        }
+      },
+      group: ['sport_key', 'sport_title'],
+      raw: true
+    });
+
+    const sportTitleMap = new Map();
+    sportTitles.forEach((item) => {
+      sportTitleMap.set(item.sport_key, item.sport_title);
+    });
+
+    const winningBets = await Bet.findAll({
+      attributes: [
+        'sport_key',
+        [Bet.sequelize.fn('COUNT', Bet.sequelize.col('Bet.id')), 'winning_bets']
+      ],
+      where: {
+        result: 'win',
+        createdAt: {
+          [Op.gte]: startDate,
+          [Op.lte]: now
+        }
+      },
+      group: ['sport_key'],
+      raw: true
+    });
+
+    const winningBetsMap = new Map();
+    winningBets.forEach((item) => {
+      winningBetsMap.set(item.sport_key, parseInt(item.winning_bets) || 0);
+    });
+
+    const result = sportsbookData.map((item) => {
+      const sportKey = item.sport_key;
+      const totalBets = parseInt(item.total_bets) || 0;
+      const winningBets = winningBetsMap.get(sportKey) || 0;
+      const winRate = totalBets > 0 ? winningBets / totalBets : 0;
+
+      return {
+        sport_key: sportKey,
+        sport_title: sportTitleMap.get(sportKey) || sportKey,
+        total_bets: totalBets,
+        total_amount: parseFloat(item.total_amount) || 0,
+        avg_odds: parseFloat(item.avg_odds) || 0,
+        win_rate: winRate
+      };
+    });
+
+    res.json({ data: result });
+  } catch (error) {
+    console.error('스포츠북 패턴 분석 데이터 조회 실패:', error);
+    res.status(500).json({ error: '스포츠북 패턴 분석 데이터 조회에 실패했습니다.' });
+  }
+});
+
+// 관리자 성과 분석 데이터
+router.get('/analytics/admin', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    const { range = '30d' } = req.query;
+    
+    const now = new Date();
+    let startDate;
+    
+    switch (range) {
+      case '7d':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '30d':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case '90d':
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+      case '1y':
+        startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    }
+
+    const admins = await User.findAll({
+      where: {
+        isAdmin: true
+      },
+      attributes: ['id', 'username', 'email', 'lastLoginAt'],
+      raw: true
+    });
+
+    const adminPerformance = await Promise.all(admins.map(async (admin) => {
+      const betActions = await Bet.findAll({
+        attributes: [
+          [Bet.sequelize.fn('COUNT', Bet.sequelize.col('Bet.id')), 'total_actions'],
+          [Bet.sequelize.fn('COUNT', Bet.sequelize.literal('CASE WHEN result IS NOT NULL THEN 1 END')), 'successful_actions']
+        ],
+        where: {
+          createdAt: {
+            [Op.gte]: startDate,
+            [Op.lte]: now
+          }
+        },
+        raw: true
+      });
+
+      const exchangeActions = await ExchangeOrder.findAll({
+        attributes: [
+          [ExchangeOrder.sequelize.fn('COUNT', ExchangeOrder.sequelize.col('ExchangeOrder.id')), 'total_actions'],
+          [ExchangeOrder.sequelize.fn('COUNT', ExchangeOrder.sequelize.literal('CASE WHEN status IN (\'settled\', \'cancelled\') THEN 1 END')), 'successful_actions']
+        ],
+        where: {
+          createdAt: {
+            [Op.gte]: startDate,
+            [Op.lte]: now
+          }
+        },
+        raw: true
+      });
+
+      const betData = betActions[0] || { total_actions: 0, successful_actions: 0 };
+      const exchangeData = exchangeActions[0] || { total_actions: 0, successful_actions: 0 };
+
+      const totalActions = parseInt(betData.total_actions) + parseInt(exchangeData.total_actions);
+      const successfulActions = parseInt(betData.successful_actions) + parseInt(exchangeData.successful_actions);
+      const errorRate = totalActions > 0 ? (totalActions - successfulActions) / totalActions : 0;
+
+      return {
+        admin_id: admin.id,
+        admin_name: admin.username || admin.email,
+        total_actions: totalActions,
+        successful_actions: successfulActions,
+        error_rate: errorRate,
+        last_activity: admin.lastLoginAt || admin.createdAt
+      };
+    }));
+
+    adminPerformance.sort((a, b) => b.total_actions - a.total_actions);
+
+    res.json({ data: adminPerformance });
+  } catch (error) {
+    console.error('관리자 성과 분석 데이터 조회 실패:', error);
+    res.status(500).json({ error: '관리자 성과 분석 데이터 조회에 실패했습니다.' });
+  }
+});
+
+// =============================================================================
+// 시스템 설정
+// =============================================================================
+
+// 시스템 설정 조회
+router.get('/settings', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    // 임시 설정 데이터 (실제로는 데이터베이스에서 조회)
+    const settings = {
+      site_name: 'LikeBetFair',
+      site_description: '스포츠 베팅 플랫폼',
+      maintenance_mode: false,
+      max_bet_amount: 1000000,
+      min_bet_amount: 1000,
+      commission_rate: 0.05,
+      auto_settlement_enabled: true,
+      odds_update_interval: 30,
+      email_notifications: true,
+      sms_notifications: false
+    };
+
+    res.json({ settings });
+  } catch (error) {
+    console.error('설정 조회 실패:', error);
+    res.status(500).json({ error: '설정 조회에 실패했습니다.' });
+  }
+});
+
+// 시스템 설정 업데이트
+router.put('/settings', verifyToken, requireAdmin(2), async (req, res) => {
+  try {
+    const updatedSettings = req.body;
+    
+    // 실제 환경에서는 데이터베이스에 저장
+    // await SettingsModel.upsert(updatedSettings);
+    
+    res.json({ 
+      message: '설정이 성공적으로 저장되었습니다.',
+      settings: updatedSettings 
+    });
+  } catch (error) {
+    console.error('설정 저장 실패:', error);
+    res.status(500).json({ error: '설정 저장에 실패했습니다.' });
+  }
+});
+
+// 관리자 목록 조회
+router.get('/settings/admins', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    const admins = await User.findAll({
+      where: { isAdmin: true },
+      attributes: ['id', 'username', 'email', 'isActive', 'lastLoginAt', 'createdAt'],
+      order: [['createdAt', 'DESC']]
+    });
+
+    res.json({ admins });
+  } catch (error) {
+    console.error('관리자 목록 조회 실패:', error);
+    res.status(500).json({ error: '관리자 목록 조회에 실패했습니다.' });
+  }
+});
+
+// 관리자 추가
+router.post('/settings/admins', verifyToken, requireAdmin(2), async (req, res) => {
+  try {
+    const { username, email, password } = req.body;
+
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: '모든 필드를 입력해주세요.' });
+    }
+
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({ error: '이미 존재하는 이메일입니다.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newAdmin = await User.create({
+      username,
+      email,
+      password: hashedPassword,
+      isAdmin: true,
+      isActive: true
+    });
+
+    res.status(201).json({ 
+      message: '관리자가 성공적으로 추가되었습니다.',
+      admin: {
+        id: newAdmin.id,
+        username: newAdmin.username,
+        email: newAdmin.email,
+        isActive: newAdmin.isActive
+      }
+    });
+  } catch (error) {
+    console.error('관리자 추가 실패:', error);
+    res.status(500).json({ error: '관리자 추가에 실패했습니다.' });
+  }
+});
+
+// 관리자 상태 변경
+router.put('/settings/admins/:id', verifyToken, requireAdmin(2), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isActive } = req.body;
+
+    const admin = await User.findByPk(Number(id));
+    
+    if (!admin) {
+      return res.status(404).json({ error: '관리자를 찾을 수 없습니다.' });
+    }
+
+    if (!admin.isAdmin) {
+      return res.status(400).json({ error: '관리자가 아닌 사용자입니다.' });
+    }
+
+    await admin.update({ isActive });
+
+    res.json({ 
+      message: `관리자가 ${isActive ? '활성화' : '비활성화'}되었습니다.`,
+      admin: {
+        id: admin.id,
+        username: admin.username,
+        email: admin.email,
+        isActive: admin.isActive
+      }
+    });
+  } catch (error) {
+    console.error('관리자 상태 변경 실패:', error);
+    res.status(500).json({ error: '관리자 상태 변경에 실패했습니다.' });
+  }
+});
+
+// 시스템 로그 조회
+router.get('/settings/logs', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    // 임시 로그 데이터 (실제로는 로그 파일이나 데이터베이스에서 조회)
+    const logs = [];
+    const levels = ['info', 'warn', 'error'];
+    const sources = ['auth', 'bet', 'exchange', 'payment', 'system'];
+    const messages = [
+      '사용자 로그인 성공',
+      '베팅 처리 완료',
+      'Exchange 주문 생성',
+      '결제 처리 중 오류 발생',
+      '시스템 시작',
+      '데이터베이스 연결 실패',
+      '배당 업데이트 완료',
+      '자동 정산 실행',
+      '백업 생성 완료',
+      '관리자 권한 변경'
+    ];
+
+    for (let i = 0; i < 50; i++) {
+      const level = levels[Math.floor(Math.random() * levels.length)];
+      const source = sources[Math.floor(Math.random() * sources.length)];
+      const message = messages[Math.floor(Math.random() * messages.length)];
+      const timestamp = new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000);
+
+      logs.push({
+        id: i + 1,
+        level,
+        message,
+        timestamp: timestamp.toISOString(),
+        source
+      });
+    }
+
+    res.json({ logs: logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()) });
+  } catch (error) {
+    console.error('로그 조회 실패:', error);
+    res.status(500).json({ error: '로그 조회에 실패했습니다.' });
+  }
+});
+
+// 백업 상태 조회
+router.get('/settings/backup', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    // 임시 백업 상태 (실제로는 데이터베이스에서 조회)
+    const status = {
+      last_backup: null,
+      backup_size: 0,
+      is_backing_up: false
+    };
+
+    res.json({ status });
+  } catch (error) {
+    console.error('백업 상태 조회 실패:', error);
+    res.status(500).json({ error: '백업 상태 조회에 실패했습니다.' });
+  }
+});
+
+// 백업 생성
+router.post('/settings/backup', verifyToken, requireAdmin(2), async (req, res) => {
+  try {
+    // 백업 생성 시뮬레이션
+    res.json({ 
+      message: '백업이 시작되었습니다.',
+      status: {
+        last_backup: new Date().toISOString(),
+        backup_size: Math.floor(Math.random() * 100000000),
+        is_backing_up: true
+      }
+    });
+  } catch (error) {
+    console.error('백업 생성 실패:', error);
+    res.status(500).json({ error: '백업 생성에 실패했습니다.' });
   }
 });
 
