@@ -899,6 +899,75 @@ class ExchangeSettlementService {
   }
 
   /**
+   * 🆕 경기 식별자 기반 정산 (점수 입력 방식)
+   * @param {string} homeTeam - 홈팀명
+   * @param {string} awayTeam - 어웨이팀명  
+   * @param {Date} commenceTime - 경기 시작 시간
+   * @param {string} result - 정산 결과 (home_win, away_win, draw)
+   * @param {Object} score - 점수 정보 { homeScore, awayScore }
+   * @returns {Object} 정산 결과
+   */
+  async settleGameOrdersByMatchWithResult(homeTeam, awayTeam, commenceTime, result, score) {
+    const transaction = await sequelize.transaction();
+    
+    try {
+      console.log(`🎯 점수 기반 정산 시작: ${homeTeam} vs ${awayTeam}`);
+      console.log(`📊 점수: ${score.homeScore}:${score.awayScore}, 결과: ${result}`);
+      
+      // 정산 대상 주문들 조회
+      const orders = await this.getSettlableOrdersByMatch(homeTeam, awayTeam, commenceTime);
+      console.log(`📋 정산 대상 주문 수: ${orders.length}`);
+      
+      if (orders.length === 0) {
+        await transaction.commit();
+        return { settledOrders: 0, results: [] };
+      }
+      
+      let settledCount = 0;
+      const results = [];
+      
+      // 각 주문별로 정산 처리
+      for (const order of orders) {
+        try {
+          const settlementResult = await this.settleSingleOrder(order, result, transaction);
+          if (settlementResult.success) {
+            settledCount++;
+            results.push(settlementResult);
+          }
+        } catch (orderError) {
+          console.error(`❌ 주문 ${order.id} 정산 실패:`, orderError);
+          results.push({
+            orderId: order.id,
+            success: false,
+            error: orderError.message
+          });
+        }
+      }
+      
+      await transaction.commit();
+      
+      console.log(`✅ 정산 완료: ${settledCount}개 주문 정산됨`);
+      
+      return {
+        settledOrders: settledCount,
+        results,
+        gameResult: {
+          homeTeam,
+          awayTeam,
+          homeScore: score.homeScore,
+          awayScore: score.awayScore,
+          result
+        }
+      };
+      
+    } catch (error) {
+      await transaction.rollback();
+      console.error('❌ 점수 기반 정산 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
    * 🆕 경기 식별자 기반 정산 (homeTeam, awayTeam, commenceTime)
    * @param {string} homeTeam - 홈팀명
    * @param {string} awayTeam - 어웨이팀명  
@@ -1003,27 +1072,10 @@ class ExchangeSettlementService {
   normalizeTimezoneToUTC(timeValue) {
     if (!timeValue) return null;
     
-    let dateStr = timeValue.toString();
-    
-    // KST 타임존 정보가 있는 경우 (+09:00 또는 +09)
-    if (dateStr.includes('+09')) {
-      console.log(`🔧 KST 형식 감지: ${dateStr}`);
-      // KST를 UTC로 변환 (9시간 빼기)
-      const kstDate = new Date(dateStr);
-      const utcDate = new Date(kstDate.getTime() - 9 * 60 * 60 * 1000);
-      console.log(`   → UTC 변환: ${utcDate.toISOString()}`);
-      return utcDate;
-    }
-    
-    // UTC 형식이거나 타임존 정보가 없는 경우
-    if (dateStr.endsWith('Z') || dateStr.includes('UTC')) {
-      // 이미 UTC 형식
-      return new Date(dateStr);
-    }
-    
-    // 타임존 정보가 없는 경우, 서버 타임존 해석을 방지하기 위해 UTC로 가정
-    console.log(`🔧 타임존 정보 없음, UTC로 가정: ${dateStr}`);
-    return new Date(dateStr + 'Z');
+    // 모든 시간을 UTC로 처리 (단순화)
+    const date = new Date(timeValue);
+    console.log(`🔧 시간 정규화: ${timeValue} → ${date.toISOString()}`);
+    return date;
   }
 
   /**
@@ -1143,7 +1195,7 @@ class ExchangeSettlementService {
    */
   async getSettlableOrdersByMatch(homeTeam, awayTeam, commenceTime) {
     const targetTime = this.normalizeTimezoneToUTC(commenceTime);
-    const timeRange = 12 * 60 * 60 * 1000; // ±12시간 범위
+    const timeRange = 30 * 60 * 1000; // ±30분 범위로 축소 (정확한 경기만 정산)
     
     const startTime = new Date(targetTime.getTime() - timeRange);
     const endTime = new Date(targetTime.getTime() + timeRange);

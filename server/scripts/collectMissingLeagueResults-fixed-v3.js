@@ -209,7 +209,7 @@ async function collectMissingLeagueResults() {
               commenceTime = new Date(event.strTimestamp); // UTC 시간 사용
             } else if (event.dateEvent && event.strTime) {
               const timeStr = event.strTime || '00:00:00';
-              commenceTime = new Date(`${event.dateEvent}T${timeStr}`); // fallback
+              commenceTime = new Date(`${event.dateEvent}T${timeStr}Z`); // fallback (UTC 기준)
             } else {
               console.log(`    ⚠️ 시간 정보 없음: ${event.strHomeTeam} vs ${event.strAwayTeam}`);
               continue;

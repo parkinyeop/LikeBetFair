@@ -76,9 +76,9 @@ async function collectMissingLeagueResults() {
             const status = mapStatus(event.strStatus);
             const result = getResult(homeScore, awayScore);
             
-            // 경기 시간 파싱 (기본값: 00:00:00)
+            // 경기 시간 파싱 (기본값: 00:00:00, UTC 기준)
             const timeStr = event.strTime || '00:00:00';
-            const commenceTime = new Date(`${event.dateEvent}T${timeStr}`);
+            const commenceTime = new Date(`${event.dateEvent}T${timeStr}Z`);
             
             // GameResult에 upsert
             await GameResult.upsert({

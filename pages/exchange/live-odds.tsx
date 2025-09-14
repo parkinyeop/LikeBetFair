@@ -3,7 +3,7 @@ import { useExchange, ExchangeOrder } from '../../hooks/useExchange';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
 import { useExchangeContext, MultiBetSelection } from '../../contexts/ExchangeContext';
-import { convertUTCToKST } from '../../utils/timeUtils';
+import { formatToLocalDateTime } from '../../utils/timeUtils';
 import { getButtonStyle } from '../../utils/buttonStyles';
 
 // 렌더링을 위한 그룹화된 멀티배팅 주문 타입 정의
@@ -556,7 +556,7 @@ export default function LiveOddsPage() {
                           {getLeagueFromSportKey(selection.sportKey || '')}
                         </div>
                         <div className="text-white mb-2">
-                          {selection.commenceTime ? convertUTCToKST(selection.commenceTime) : '시간 미정'}
+                          {selection.commenceTime ? formatToLocalDateTime(selection.commenceTime) : '시간 미정'}
                         </div>
                         <div className="text-gray-300 text-sm mb-3">
                           {selection.selection} • {selection.side === 'back' ? '🎯 Back' : '📉 Lay'} • {selection.odds?.toFixed(2)}배당
@@ -758,7 +758,7 @@ export default function LiveOddsPage() {
                     
                     <div className="mb-4">
                       <div className="text-white">
-                        {order.commenceTime ? convertUTCToKST(order.commenceTime) : '시간 미정'}
+                        {order.commenceTime ? formatToLocalDateTime(order.commenceTime) : '시간 미정'}
                       </div>
                     </div>
                     

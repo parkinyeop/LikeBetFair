@@ -1694,10 +1694,11 @@ router.post('/match-order', verifyToken, async (req, res) => {
   }
 });
 
-// 🆕 경기 식별자 기반 정산 (관리자 전용)
+// 🆕 경기 식별자 기반 정산 (관리자 전용) - 점수 입력 방식
 router.post('/settle/:homeTeam/:awayTeam/:commenceTime', verifyToken, async (req, res) => {
   try {
     const { homeTeam, awayTeam, commenceTime } = req.params;
+    const { homeScore, awayScore } = req.body;
     
     // 관리자 권한 확인
     const user = await User.findByPk(req.user.userId);
@@ -1705,17 +1706,47 @@ router.post('/settle/:homeTeam/:awayTeam/:commenceTime', verifyToken, async (req
       return res.status(403).json({ message: '관리자 권한이 필요합니다.' });
     }
     
-    console.log(`🎯 관리자 ${user.username}이 경기 정산 요청: ${homeTeam} vs ${awayTeam}`);
+    // 점수 유효성 검사
+    if (homeScore === undefined || awayScore === undefined) {
+      return res.status(400).json({ message: '홈팀과 어웨이팀 점수를 모두 입력해주세요.' });
+    }
     
-    const result = await exchangeSettlementService.settleGameOrdersByMatch(
+    if (isNaN(homeScore) || isNaN(awayScore) || homeScore < 0 || awayScore < 0) {
+      return res.status(400).json({ message: '올바른 점수를 입력해주세요. (0 이상의 정수)' });
+    }
+    
+    console.log(`🎯 관리자 ${user.username}이 경기 정산 요청: ${homeTeam} vs ${awayTeam} (${homeScore}:${awayScore})`);
+    
+    // 점수를 기반으로 정산 결과 결정
+    let result;
+    if (homeScore > awayScore) {
+      result = 'home_win';
+    } else if (homeScore < awayScore) {
+      result = 'away_win';
+    } else {
+      result = 'draw';
+    }
+    
+    console.log(`📊 정산 결과: ${result} (${homeScore}:${awayScore})`);
+    
+    const settlementResult = await exchangeSettlementService.settleGameOrdersByMatchWithResult(
       homeTeam, 
       awayTeam, 
-      new Date(commenceTime)
+      new Date(commenceTime),
+      result,
+      { homeScore: parseInt(homeScore), awayScore: parseInt(awayScore) }
     );
     
     res.json({
       message: '정산이 완료되었습니다.',
-      result
+      result: settlementResult,
+      gameResult: {
+        homeTeam,
+        awayTeam,
+        homeScore: parseInt(homeScore),
+        awayScore: parseInt(awayScore),
+        result
+      }
     });
     
   } catch (error) {
@@ -2215,6 +2246,199 @@ router.get('/unified-settlement-report', verifyToken, async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: '통합 정산 리포트 생성 중 오류가 발생했습니다.' 
+    });
+  }
+});
+
+// 정산 가능한 경기 목록 조회 (관리자 전용)
+router.get('/settlable-games', verifyToken, async (req, res) => {
+  try {
+    // 관리자 권한 확인
+    const user = await User.findByPk(req.user.userId);
+    if (!user.isAdmin) {
+      return res.status(403).json({ message: '관리자 권한이 필요합니다.' });
+    }
+
+    // 정산 가능한 주문들이 있는 경기들 조회
+    const settlableOrders = await ExchangeOrder.findAll({
+      where: {
+        status: { [Op.in]: ['matched', 'partially_matched'] },
+        settledAt: null
+      },
+      attributes: ['homeTeam', 'awayTeam', 'commenceTime'],
+      order: [['homeTeam', 'ASC'], ['awayTeam', 'ASC'], ['commenceTime', 'ASC']],
+      raw: true
+    });
+
+    // 중복 제거를 위한 Map 사용 (팀명 + 시간으로 고유 키 생성)
+    const uniqueGames = new Map();
+    settlableOrders.forEach(order => {
+      const key = `${order.homeTeam}|${order.awayTeam}|${order.commenceTime}`;
+      if (!uniqueGames.has(key)) {
+        uniqueGames.set(key, {
+          homeTeam: order.homeTeam,
+          awayTeam: order.awayTeam,
+          commenceTime: order.commenceTime
+        });
+      }
+    });
+
+    // Map을 배열로 변환
+    const games = Array.from(uniqueGames.values());
+
+    res.json({
+      games,
+      total: games.length
+    });
+
+  } catch (error) {
+    console.error('정산 가능한 경기 조회 오류:', error);
+    res.status(500).json({ 
+      message: '정산 가능한 경기 조회 중 오류가 발생했습니다.',
+      error: error.message 
+    });
+  }
+});
+
+// 정산 내역 내보내기 (CSV) - 관리자 전용
+router.get('/settlements/export', verifyToken, async (req, res) => {
+  try {
+    // 관리자 권한 확인
+    const user = await User.findByPk(req.user.userId);
+    if (!user.isAdmin) {
+      return res.status(403).json({ message: '관리자 권한이 필요합니다.' });
+    }
+
+    const { startDate, endDate } = req.query;
+    
+    // 정산된 주문들 조회
+    const whereClause = { 
+      status: 'settled',
+      settledAt: { [Op.not]: null }
+    };
+    
+    if (startDate && endDate) {
+      whereClause.settledAt = {
+        [Op.between]: [new Date(startDate), new Date(endDate)]
+      };
+    }
+
+    const settledOrders = await ExchangeOrder.findAll({
+      where: whereClause,
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['username', 'email']
+      }],
+      order: [['settledAt', 'DESC']]
+    });
+
+    // CSV 헤더
+    const csvHeader = '경기,시장,선택지,사이드,금액,배당,실제수익,사용자,정산일\n';
+    
+    // CSV 데이터 생성
+    const csvData = settledOrders.map(order => {
+      const game = `${order.homeTeam} vs ${order.awayTeam}`;
+      const user = order.user ? order.user.username : 'Unknown';
+      const settledAt = order.settledAt ? new Date(order.settledAt).toISOString() : '';
+      
+      return [
+        `"${game}"`,
+        `"${order.market || ''}"`,
+        `"${order.selection || ''}"`,
+        `"${order.side || ''}"`,
+        order.amount || 0,
+        order.price || 0,
+        order.actualProfit || 0,
+        `"${user}"`,
+        `"${settledAt}"`
+      ].join(',');
+    }).join('\n');
+
+    const csv = csvHeader + csvData;
+
+    // CSV 파일로 응답
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=settlements_${new Date().toISOString().split('T')[0]}.csv`);
+    res.send(csv);
+
+  } catch (error) {
+    console.error('정산 내역 내보내기 오류:', error);
+    res.status(500).json({ 
+      message: '정산 내역 내보내기 중 오류가 발생했습니다.',
+      error: error.message 
+    });
+  }
+});
+
+// 정산 검증 - 관리자 전용
+router.get('/settlements/verify', verifyToken, async (req, res) => {
+  try {
+    // 관리자 권한 확인
+    const user = await User.findByPk(req.user.userId);
+    if (!user.isAdmin) {
+      return res.status(403).json({ message: '관리자 권한이 필요합니다.' });
+    }
+
+    // 정산된 주문들 조회
+    const settledOrders = await ExchangeOrder.findAll({
+      where: {
+        status: 'settled',
+        settledAt: { [Op.not]: null }
+      },
+      include: [{
+        model: PaymentHistory,
+        as: 'paymentHistories',
+        where: {
+          betId: { [Op.like]: 'EXCHANGE_%' }
+        },
+        required: false
+      }]
+    });
+
+    let verified = 0;
+    const errors = [];
+
+    // 각 정산 주문 검증
+    for (const order of settledOrders) {
+      // 1. 실제 수익과 PaymentHistory 일치 확인
+      const expectedProfit = order.actualProfit || 0;
+      const actualPayments = order.paymentHistories.reduce((sum, payment) => sum + payment.amount, 0);
+      
+      if (expectedProfit !== actualPayments) {
+        errors.push({
+          orderId: order.id,
+          game: `${order.homeTeam} vs ${order.awayTeam}`,
+          issue: '실제수익과 결제내역 불일치',
+          expected: expectedProfit,
+          actual: actualPayments
+        });
+      } else {
+        verified++;
+      }
+
+      // 2. 정산 시간 확인
+      if (!order.settledAt) {
+        errors.push({
+          orderId: order.id,
+          game: `${order.homeTeam} vs ${order.awayTeam}`,
+          issue: '정산 시간 누락'
+        });
+      }
+    }
+
+    res.json({
+      verified,
+      total: settledOrders.length,
+      errors,
+      errorCount: errors.length
+    });
+
+  } catch (error) {
+    console.error('정산 검증 오류:', error);
+    res.status(500).json({ 
+      message: '정산 검증 중 오류가 발생했습니다.',
+      error: error.message 
     });
   }
 });

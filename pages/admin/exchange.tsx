@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
+import { formatToLocalDateTime } from '../../utils/timeUtils';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -477,6 +478,19 @@ export default function ExchangeAdmin() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // 정산 관리 모달 상태
+  const [showManualSettlementModal, setShowManualSettlementModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [showStatsModal, setShowStatsModal] = useState(false);
+  
+  // 수동 정산 상태
+  const [selectedGame, setSelectedGame] = useState<any>(null);
+  const [availableGames, setAvailableGames] = useState<any[]>([]);
+  const [homeScore, setHomeScore] = useState<string>('');
+  const [awayScore, setAwayScore] = useState<string>('');
+  const [isProcessingSettlement, setIsProcessingSettlement] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<ExchangeOrder | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -517,6 +531,129 @@ export default function ExchangeAdmin() {
       'Content-Type': 'application/json'
     };
   }, []);
+
+  // 정산 가능한 경기 목록 조회
+  const fetchAvailableGames = useCallback(async () => {
+    try {
+      const headers = getAuthHeaders();
+      const response = await fetch('http://localhost:5050/api/exchange/settlable-games', {
+        headers
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableGames(data.games || []);
+      }
+    } catch (error) {
+      console.error('정산 가능한 경기 조회 오류:', error);
+    }
+  }, [getAuthHeaders]);
+
+  // 수동 정산 처리
+  const handleManualSettlement = useCallback(async () => {
+    if (!selectedGame || !homeScore || !awayScore) {
+      alert('경기와 양 팀의 점수를 모두 입력해주세요.');
+      return;
+    }
+
+    // 점수 유효성 검사
+    const homeScoreNum = parseInt(homeScore);
+    const awayScoreNum = parseInt(awayScore);
+    
+    if (isNaN(homeScoreNum) || isNaN(awayScoreNum) || homeScoreNum < 0 || awayScoreNum < 0) {
+      alert('올바른 점수를 입력해주세요. (0 이상의 정수)');
+      return;
+    }
+
+    setIsProcessingSettlement(true);
+    try {
+      const headers = getAuthHeaders();
+      const response = await fetch(
+        `http://localhost:5050/api/exchange/settle/${selectedGame.homeTeam}/${selectedGame.awayTeam}/${selectedGame.commenceTime}`,
+        {
+          method: 'POST',
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            homeScore: homeScoreNum,
+            awayScore: awayScoreNum
+          })
+        }
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(`정산이 완료되었습니다. ${result.result.settledOrders}개 주문이 정산되었습니다.`);
+        setShowManualSettlementModal(false);
+        setSelectedGame(null);
+        setHomeScore('');
+        setAwayScore('');
+        // 데이터 새로고침을 위해 페이지 리로드
+        window.location.reload();
+      } else {
+        const error = await response.json();
+        alert(`정산 실패: ${error.message}`);
+      }
+    } catch (error) {
+      console.error('정산 처리 오류:', error);
+      alert('정산 처리 중 오류가 발생했습니다.');
+    } finally {
+      setIsProcessingSettlement(false);
+    }
+  }, [selectedGame, homeScore, awayScore, getAuthHeaders]);
+
+  // 정산 내역 내보내기
+  const handleExportSettlements = useCallback(async () => {
+    try {
+      const headers = getAuthHeaders();
+      const response = await fetch('http://localhost:5050/api/exchange/settlements/export', {
+        headers
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `settlements_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        alert('정산 내역이 다운로드되었습니다.');
+      } else {
+        alert('내보내기 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('내보내기 오류:', error);
+      alert('내보내기 중 오류가 발생했습니다.');
+    }
+  }, [getAuthHeaders]);
+
+  // 정산 검증
+  const handleSettlementVerification = useCallback(async () => {
+    try {
+      const headers = getAuthHeaders();
+      const response = await fetch('http://localhost:5050/api/exchange/settlements/verify', {
+        headers
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(`검증 완료: ${result.verified}개 정산 검증됨, ${result.errors.length}개 오류 발견`);
+        if (result.errors.length > 0) {
+          console.log('검증 오류:', result.errors);
+        }
+      } else {
+        alert('검증 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('검증 오류:', error);
+      alert('검증 중 오류가 발생했습니다.');
+    }
+  }, [getAuthHeaders]);
 
   // Phase 1: API 호출 최적화 - 병렬 로딩
   const fetchExchangeData = useCallback(async () => {
@@ -1657,15 +1794,6 @@ export default function ExchangeAdmin() {
                           </button>
                           <button
                             onClick={() => {
-                              // TODO: 일괄 취소 기능 구현
-                              alert('일괄 취소 기능은 추후 구현 예정입니다.');
-                            }}
-                            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-                          >
-                            🗑️ 일괄 취소
-                          </button>
-                          <button
-                            onClick={() => {
                               // TODO: 주문 내보내기 기능 구현
                               alert('주문 내보내기 기능은 추후 구현 예정입니다.');
                             }}
@@ -2061,37 +2189,25 @@ export default function ExchangeAdmin() {
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">정산 관리 액션</h3>
                         <div className="flex flex-wrap gap-3">
                           <button
-                            onClick={() => {
-                              // TODO: 수동 정산 처리 기능 구현
-                              alert('수동 정산 처리 기능은 추후 구현 예정입니다.');
-                            }}
+                            onClick={() => setShowManualSettlementModal(true)}
                             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                           >
                             💰 수동 정산 처리
                           </button>
                           <button
-                            onClick={() => {
-                              // TODO: 정산 내역 내보내기 기능 구현
-                              alert('정산 내역 내보내기 기능은 추후 구현 예정입니다.');
-                            }}
+                            onClick={handleExportSettlements}
                             className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
                           >
                             📤 정산 내역 내보내기
                           </button>
                           <button
-                            onClick={() => {
-                              // TODO: 정산 검증 기능 구현
-                              alert('정산 검증 기능은 추후 구현 예정입니다.');
-                            }}
+                            onClick={handleSettlementVerification}
                             className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
                           >
                             ✅ 정산 검증
                           </button>
                           <button
-                            onClick={() => {
-                              // TODO: 정산 통계 기능 구현
-                              alert('정산 통계 기능은 추후 구현 예정입니다.');
-                            }}
+                            onClick={() => setShowStatsModal(true)}
                             className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
                           >
                             📊 정산 통계
@@ -2302,7 +2418,7 @@ export default function ExchangeAdmin() {
                                           </span>
                                         </div>
                                         <div className="text-xs text-gray-500 mt-1">
-                                          {new Date(selection.commenceTime).toLocaleString('ko-KR')}
+                                          {formatToLocalDateTime(selection.commenceTime)}
                                         </div>
                                         {/* 경기 결과 표시 */}
                                         <div className="mt-2">
@@ -2346,7 +2462,7 @@ export default function ExchangeAdmin() {
                               <div className="flex justify-between">
                                 <span className="text-sm text-gray-600">경기 시간:</span>
                                 <span className="text-sm font-medium">
-                                  {new Date(selectedOrder.commenceTime).toLocaleString('ko-KR')}
+                                  {formatToLocalDateTime(selectedOrder.commenceTime)}
                                 </span>
                               </div>
                               {/* 경기 결과 표시 */}
@@ -2371,14 +2487,14 @@ export default function ExchangeAdmin() {
                               <div className="flex justify-between">
                                 <span className="text-sm text-gray-600">주문 생성:</span>
                                 <span className="text-sm font-medium">
-                                  {new Date(selectedOrder.createdAt).toLocaleString('ko-KR')}
+                                  {formatToLocalDateTime(selectedOrder.createdAt)}
                                 </span>
                               </div>
                               {selectedOrder.settledAt && (
                                 <div className="flex justify-between">
                                   <span className="text-sm text-gray-600">정산 시간:</span>
                                   <span className="text-sm font-medium">
-                                    {new Date(selectedOrder.settledAt).toLocaleString('ko-KR')}
+                                    {formatToLocalDateTime(selectedOrder.settledAt)}
                                   </span>
                                 </div>
                               )}
@@ -2423,7 +2539,7 @@ export default function ExchangeAdmin() {
                                       </div>
                                     </td>
                                     <td className="px-4 py-2 text-sm text-gray-900">
-                                      {new Date(match.createdAt).toLocaleString('ko-KR')}
+                                      {formatToLocalDateTime(match.createdAt)}
                                     </td>
                                     <td className="px-4 py-2">
                                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -2491,6 +2607,219 @@ export default function ExchangeAdmin() {
           </div>
         </div>
       </div>
+
+      {/* 수동 정산 모달 */}
+      {showManualSettlementModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg mx-4">
+            <h3 className="text-lg font-semibold mb-4">수동 정산 처리</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  정산할 경기 선택
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={fetchAvailableGames}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-left bg-white hover:bg-gray-50"
+                  >
+                    {selectedGame 
+                      ? `${selectedGame.homeTeam} vs ${selectedGame.awayTeam} (${formatToLocalDateTime(selectedGame.commenceTime)})`
+                      : '경기 목록 불러오기'
+                    }
+                  </button>
+                  {selectedGame && (
+                    <button
+                      onClick={() => {
+                        setSelectedGame(null);
+                        setHomeScore('');
+                        setAwayScore('');
+                      }}
+                      className="px-3 py-2 bg-red-100 text-red-600 border border-red-300 rounded-md hover:bg-red-200"
+                    >
+                      선택 해제
+                    </button>
+                  )}
+                </div>
+                {availableGames.length > 0 && (
+                  <div className="mt-2 max-h-60 overflow-y-auto border border-gray-200 rounded-md">
+                    {availableGames.map((game, index) => {
+                      const gameKey = `${game.homeTeam}|${game.awayTeam}|${game.commenceTime}`;
+                      const selectedKey = selectedGame ? `${selectedGame.homeTeam}|${selectedGame.awayTeam}|${selectedGame.commenceTime}` : '';
+                      const isSelected = selectedKey === gameKey;
+                      
+                      return (
+                        <label
+                          key={gameKey}
+                          className={`flex items-center w-full px-3 py-3 text-left hover:bg-gray-50 cursor-pointer border-b border-gray-100 ${
+                            isSelected ? 'bg-blue-50 border-blue-200' : ''
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="selectedGame"
+                            value={gameKey}
+                            checked={isSelected}
+                            onChange={() => setSelectedGame(game)}
+                            className="mr-3 text-blue-600 focus:ring-blue-500"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">
+                              {game.homeTeam} vs {game.awayTeam}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {formatToLocalDateTime(game.commenceTime)}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              ID: {gameKey.split('|').pop()?.slice(0, 19)}...
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* 선택된 경기 정보 표시 */}
+              {selectedGame && (
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                  <h4 className="text-sm font-medium text-blue-900 mb-2">선택된 경기</h4>
+                  <div className="text-sm text-blue-800">
+                    <div className="font-medium">{selectedGame.homeTeam} vs {selectedGame.awayTeam}</div>
+                    <div className="text-blue-600 mt-1">
+                      경기 시간: {formatToLocalDateTime(selectedGame.commenceTime)}
+                    </div>
+                    <div className="text-blue-600">
+                      고유 ID: {`${selectedGame.homeTeam}|${selectedGame.awayTeam}|${selectedGame.commenceTime}`.slice(0, 50)}...
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  경기 결과 (점수 입력)
+                </label>
+                <div className="grid grid-cols-3 gap-4 items-center">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      {selectedGame ? selectedGame.homeTeam : '홈팀'} 점수
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={homeScore}
+                      onChange={(e) => setHomeScore(e.target.value)}
+                      placeholder="0"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="text-center">
+                    <span className="text-2xl font-bold text-gray-400">vs</span>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      {selectedGame ? selectedGame.awayTeam : '어웨이팀'} 점수
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={awayScore}
+                      onChange={(e) => setAwayScore(e.target.value)}
+                      placeholder="0"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                {homeScore && awayScore && (
+                  <div className="mt-2 text-center">
+                    <span className="text-sm text-gray-600">
+                      최종 결과: {homeScore} : {awayScore}
+                      {parseInt(homeScore) > parseInt(awayScore) && ' (홈팀 승리)'}
+                      {parseInt(homeScore) < parseInt(awayScore) && ' (어웨이팀 승리)'}
+                      {parseInt(homeScore) === parseInt(awayScore) && ' (무승부)'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowManualSettlementModal(false);
+                  setSelectedGame(null);
+                  setHomeScore('');
+                  setAwayScore('');
+                }}
+                className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleManualSettlement}
+                disabled={!selectedGame || !homeScore || !awayScore || isProcessingSettlement}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400"
+              >
+                {isProcessingSettlement ? '처리 중...' : '정산 처리'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 정산 통계 모달 */}
+      {showStatsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4">정산 통계</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h4 className="text-sm font-medium text-blue-700">총 정산 경기</h4>
+                <p className="text-2xl font-bold text-blue-900">{settlements.length}</p>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg">
+                <h4 className="text-sm font-medium text-green-700">총 정산 주문</h4>
+                <p className="text-2xl font-bold text-green-900">
+                  {settlements.reduce((sum, s) => sum + s.settledOrders, 0)}
+                </p>
+              </div>
+              <div className="bg-purple-50 p-4 rounded-lg">
+                <h4 className="text-sm font-medium text-purple-700">총 거래량</h4>
+                <p className="text-2xl font-bold text-purple-900">
+                  ₩{settlements.reduce((sum, s) => sum + s.totalVolume, 0).toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">최근 정산 내역</h4>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {settlements.slice(0, 10).map((settlement, index) => (
+                  <div key={index} className="flex justify-between items-center p-2 bg-white rounded">
+                    <span className="text-sm">{settlement.homeTeam} vs {settlement.awayTeam}</span>
+                    <span className="text-sm text-gray-600">
+                      {settlement.settledOrders}개 주문 • ₩{settlement.totalVolume.toLocaleString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setShowStatsModal(false)}
+                className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

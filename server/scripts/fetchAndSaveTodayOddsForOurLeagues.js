@@ -103,61 +103,59 @@ async function fetchAndSaveTodayOddsForOurLeagues() {
   process.exit(0);
 }
 
-async function fetchTodayOddsKSTToJson() {
+async function fetchTodayOddsUTCToJson() {
   const result = {};
   const now = new Date();
-  const kstOffset = 9 * 60; // KST는 UTC+9
-  const todayKST = new Date(now.getTime() + (kstOffset - now.getTimezoneOffset()) * 60000);
-  todayKST.setHours(0, 0, 0, 0);
-  const tomorrowKST = new Date(todayKST);
-  tomorrowKST.setDate(todayKST.getDate() + 1);
+  // UTC 기준으로 오늘 날짜 설정
+  const todayUTC = new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const tomorrowUTC = new Date(todayUTC);
+  tomorrowUTC.setUTCDate(todayUTC.getUTCDate() + 1);
 
   for (const [cat, sportKey] of Object.entries(clientSportKeyMap)) {
     try {
       const oddsList = await oddsApiService.fetchRecentOdds(cat);
       const todayOdds = oddsList.filter(o => {
         const dt = new Date(o.commence_time + 'Z');
-        // API에서 받은 시간은 이미 UTC이므로 9시간을 더하지 않음
-        return dt >= todayKST && dt < tomorrowKST;
+        // API에서 받은 시간은 UTC 기준
+        return dt >= todayUTC && dt < tomorrowUTC;
       });
       result[cat] = todayOdds;
-      console.log(`[${cat}] 오늘(KST) 경기수: ${todayOdds.length}`);
+      console.log(`[${cat}] 오늘(UTC) 경기수: ${todayOdds.length}`);
     } catch (e) {
       console.error(`[${cat}] (${sportKey}) 에러:`, e.message);
       result[cat] = [];
     }
   }
-  fs.writeFileSync('today_odds_dump_kst.json', JSON.stringify(result, null, 2));
-  console.log('오늘자(KST) oddsAPI 데이터가 today_odds_dump_kst.json에 저장되었습니다.');
+  fs.writeFileSync('today_odds_dump_utc.json', JSON.stringify(result, null, 2));
+  console.log('오늘자(UTC) oddsAPI 데이터가 today_odds_dump_utc.json에 저장되었습니다.');
   process.exit(0);
 }
 
-async function fetchNext7DaysOddsKSTToJson() {
+async function fetchNext7DaysOddsUTCToJson() {
   const result = {};
   const now = new Date();
-  const kstOffset = 9 * 60; // KST는 UTC+9
-  const todayKST = new Date(now.getTime() + (kstOffset - now.getTimezoneOffset()) * 60000);
-  todayKST.setHours(0, 0, 0, 0);
-  const sevenDaysLaterKST = new Date(todayKST);
-  sevenDaysLaterKST.setDate(todayKST.getDate() + 7);
+  // UTC 기준으로 오늘 날짜 설정
+  const todayUTC = new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const sevenDaysLaterUTC = new Date(todayUTC);
+  sevenDaysLaterUTC.setUTCDate(todayUTC.getUTCDate() + 7);
 
   for (const [cat, sportKey] of Object.entries(clientSportKeyMap)) {
     try {
       const oddsList = await oddsApiService.fetchRecentOdds(cat);
       const odds7days = oddsList.filter(o => {
         const dt = new Date(o.commence_time + 'Z');
-        // API에서 받은 시간은 이미 UTC이므로 9시간을 더하지 않음
-        return dt >= todayKST && dt < sevenDaysLaterKST;
+        // API에서 받은 시간은 UTC 기준
+        return dt >= todayUTC && dt < sevenDaysLaterUTC;
       });
       result[cat] = odds7days;
-      console.log(`[${cat}] 7일간(KST) 경기수: ${odds7days.length}`);
+      console.log(`[${cat}] 7일간(UTC) 경기수: ${odds7days.length}`);
     } catch (e) {
       console.error(`[${cat}] (${sportKey}) 에러:`, e.message);
       result[cat] = [];
     }
   }
-  fs.writeFileSync('today_odds_dump_kst_7days.json', JSON.stringify(result, null, 2));
-  console.log('7일간(KST) oddsAPI 데이터가 today_odds_dump_kst_7days.json에 저장되었습니다.');
+  fs.writeFileSync('today_odds_dump_utc_7days.json', JSON.stringify(result, null, 2));
+  console.log('7일간(UTC) oddsAPI 데이터가 today_odds_dump_utc_7days.json에 저장되었습니다.');
   process.exit(0);
 }
 

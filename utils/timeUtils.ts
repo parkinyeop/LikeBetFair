@@ -495,14 +495,14 @@ export function getTimezoneDebugInfo(time: string | Date) {
 } 
 
 /**
- * UTC 시간을 KST(한국 시간)로 변환
+ * UTC 시간을 브라우저 지역 시간으로 변환
  * @param utcTime UTC 시간 (Date 객체 또는 ISO 문자열)
- * @returns KST 시간 문자열
+ * @returns 지역 시간 문자열
  */
-export function convertUTCToKST(utcTime: Date | string): string {
+export function formatToLocalDateTime(utcTime: Date | string): string {
   const date = new Date(utcTime);
+  // timeZone 옵션을 생략하여 브라우저의 기본 시간대 사용
   return date.toLocaleString('ko-KR', {
-    timeZone: 'Asia/Seoul',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -513,7 +513,14 @@ export function convertUTCToKST(utcTime: Date | string): string {
 }
 
 /**
- * UTC 시간을 KST로 변환하여 상대적 시간 표시 (예: "3시간 후", "1일 전")
+ * @deprecated formatToLocalDateTime을 사용하세요. 호환성을 위해 유지됨.
+ */
+export function convertUTCToKST(utcTime: Date | string): string {
+  return formatToLocalDateTime(utcTime);
+}
+
+/**
+ * UTC 시간을 브라우저 지역 시간으로 변환하여 상대적 시간 표시 (예: "3시간 후", "1일 전")
  * @param utcTime UTC 시간 (Date 객체 또는 ISO 문자열)
  * @returns 상대적 시간 문자열
  */
@@ -538,7 +545,7 @@ export function getRelativeTimeKST(utcTime: Date | string): string {
 }
 
 /**
- * UTC 시간을 KST로 변환하여 경기 시작까지 남은 시간 계산
+ * UTC 시간을 브라우저 지역 시간으로 변환하여 경기 시작까지 남은 시간 계산
  * @param utcTime UTC 시간 (Date 객체 또는 ISO 문자열)
  * @returns 남은 시간 정보 객체
  */

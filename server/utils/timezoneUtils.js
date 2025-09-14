@@ -13,7 +13,7 @@
  * @param {string} timezone - 시간대 (예: 'Asia/Seoul')
  * @returns {Date} UTC 시간
  */
-function convertLocalToUTC(localTime, timezone = 'Asia/Seoul') {
+function convertLocalToUTC(localTime, timezone = 'UTC') {
   const date = new Date(localTime);
   
   // 로컬 시간을 UTC로 변환
@@ -30,7 +30,7 @@ function convertLocalToUTC(localTime, timezone = 'Asia/Seoul') {
  * @param {string} timezone - 시간대 (예: 'Asia/Seoul')
  * @returns {Date} 로컬 시간
  */
-function convertUTCToLocal(utcTime, timezone = 'Asia/Seoul') {
+function convertUTCToLocal(utcTime, timezone = 'UTC') {
   const date = new Date(utcTime);
   return new Date(date.toLocaleString('en-US', { timeZone: timezone }));
 }
@@ -41,7 +41,7 @@ function convertUTCToLocal(utcTime, timezone = 'Asia/Seoul') {
  * @param {string} timezone - 시간대 (예: 'Asia/Seoul')
  * @returns {string} 포맷된 시간 문자열
  */
-function formatTimeWithTimezone(date, timezone = 'Asia/Seoul') {
+function formatTimeWithTimezone(date, timezone = 'UTC') {
   const options = {
     timeZone: timezone,
     year: 'numeric',
@@ -62,7 +62,7 @@ function formatTimeWithTimezone(date, timezone = 'Asia/Seoul') {
  * @param {string} clientTimezone - 클라이언트 시간대
  * @returns {Date} 정규화된 UTC 시간
  */
-function normalizeBettingTime(clientTime, clientTimezone = 'Asia/Seoul') {
+function normalizeBettingTime(clientTime, clientTimezone = 'UTC') {
   const date = new Date(clientTime);
   
   // 이미 UTC인 경우 그대로 반환

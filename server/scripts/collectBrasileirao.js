@@ -47,8 +47,8 @@ async function collectBrasileirao() {
         const homeTeam = normalizeTeamName(event.strHomeTeam);
         const awayTeam = normalizeTeamName(event.strAwayTeam);
         
-        // 경기 날짜 파싱
-        const commenceTime = new Date(event.dateEvent + 'T' + (event.strTime || '00:00:00'));
+        // 경기 날짜 파싱 (UTC 기준)
+        const commenceTime = new Date(event.dateEvent + 'T' + (event.strTime || '00:00:00') + 'Z');
         
         // 스코어 및 결과 파싱
         let score = null;

@@ -241,7 +241,7 @@ class GameResultService {
         }
         
         // 시간까지 정확히 비교가 필요한 경우만 Date 객체 생성
-        const eventDateTime = new Date(eventDateStr + ' ' + event.strTime);
+        const eventDateTime = new Date(`${eventDateStr}T${event.strTime}Z`);
         const isInRange = eventDateTime >= cutoffDate && eventDateTime <= futureDate;
         
         // 🆕 디버깅 로그 추가
@@ -385,7 +385,7 @@ class GameResultService {
         }
         
         // 시간까지 정확히 비교가 필요한 경우만 Date 객체 생성
-        const eventDateTime = new Date(eventDateStr + ' ' + event.strTime);
+        const eventDateTime = new Date(`${eventDateStr}T${event.strTime}Z`);
         return eventDateTime >= cutoffDate && eventDateTime <= now;
       });
       

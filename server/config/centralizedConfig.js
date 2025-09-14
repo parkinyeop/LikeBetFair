@@ -36,9 +36,9 @@ export const API_CONFIG = {
 
 // ===== 시간 설정 =====
 export const TIME_CONFIG = {
-  // 시간대 설정
-  DEFAULT_TIMEZONE: 'Asia/Seoul',
-  UTC_OFFSET: 9, // KST = UTC+9
+  // 시간대 설정 (UTC 기준으로 통일)
+  DEFAULT_TIMEZONE: 'UTC',
+  UTC_OFFSET: 0, // UTC 기준
   
   // 베팅 관련 시간 설정
   BETTING_CUTOFF_MINUTES: 10,  // 경기 시작 10분 전 베팅 마감
