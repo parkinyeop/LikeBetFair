@@ -4,6 +4,7 @@ import User from '../models/userModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
 import { Op } from 'sequelize';
 import sequelize from '../models/sequelize.js';
+import multibetSettlementService from './multibetSettlementService.js';
 
 /**
  * Exchange Orders 자동 정산 서비스
@@ -56,6 +57,28 @@ class ExchangeSettlementService {
       });
       
       console.log(`📋 정산 대상 주문 수: ${orders.length}`);
+      
+      // 🆕 멀티배팅 주문과 일반 주문 분리
+      const multibetOrders = orders.filter(order => order.isMultibet);
+      const regularOrders = orders.filter(order => !order.isMultibet);
+      
+      console.log(`🎯 멀티배팅 주문: ${multibetOrders.length}개, 일반 주문: ${regularOrders.length}개`);
+      
+      // 🆕 멀티배팅 주문들은 별도 처리
+      if (multibetOrders.length > 0) {
+        console.log(`🔄 멀티배팅 주문들 별도 정산 처리 시작...`);
+        for (const multibetOrder of multibetOrders) {
+          try {
+            await multibetSettlementService.settleMultibetOrder(multibetOrder);
+            console.log(`✅ 멀티배팅 주문 ${multibetOrder.id} 정산 완료`);
+          } catch (error) {
+            console.error(`❌ 멀티배팅 주문 ${multibetOrder.id} 정산 실패:`, error.message);
+          }
+        }
+      }
+      
+      // 일반 주문들만 기존 로직으로 처리
+      orders = regularOrders;
       
       // 🆕 연결된 주문들도 함께 조회 (matchedOrderId가 있는 주문들 + 부분 매칭된 주문들)
       const connectedOrders = await ExchangeOrder.findAll({
@@ -146,8 +169,11 @@ class ExchangeSettlementService {
       }
       
       // 🆕 부분 매칭된 주문들 개별 정산 (matchedOrderId가 null인 경우)
-      const partialMatchedOrders = allOrders.filter(order => 
-        order.status === 'partially_matched' && order.matchedOrderId === null
+      // ❌ 멀티배팅은 개별 정산 하지 않음 - 그룹 정산만 허용
+      const partialMatchedOrders = allOrders.filter(order =>
+        order.status === 'partially_matched' &&
+        order.matchedOrderId === null &&
+        !order.isMultibet  // 멀티배팅 완전 제외
       );
       
       console.log(`\n🔄 부분 매칭 주문 개별 정산 시작: ${partialMatchedOrders.length}개`);
@@ -155,37 +181,57 @@ class ExchangeSettlementService {
       for (const partialOrder of partialMatchedOrders) {
         try {
           console.log(`🔄 부분 매칭 주문 ${partialOrder.id} 개별 정산 시작`);
-          
-          if (partialOrder.market === 'multibet') {
-            // 멀티베팅 부분 매칭 처리 - 기본적으로 베팅액 손실
-            const actualProfit = -parseFloat(partialOrder.amount);
-            
-            await partialOrder.update({
-              status: 'settled',
-              actualProfit: actualProfit,
-              settledAt: new Date(),
-              profitLoss: actualProfit
-            }, { transaction });
-            
-            // 사용자 잔액 업데이트 (이미 차감된 상태이므로 추가 차감 없음)
-            // 멀티베팅은 이미 생성 시 잔액이 차감되었으므로 여기서는 잔액 변경 없음
-            
-            const result = {
-              orderId: partialOrder.id,
-              userId: partialOrder.userId,
-              side: partialOrder.side,
-              isWin: false,
-              totalWinnings: actualProfit,
-              isPartialMatched: true,
-              isMultibet: true
-            };
-            
-            settlementResults.push(result);
-            settledCount += 1;
-            totalWinnings += actualProfit;
-            
-            console.log(`✅ 부분 매칭 멀티베팅 정산 완료: ${partialOrder.id}, 손실: ${actualProfit}`);
+
+          // 일반배팅만 처리 (멀티배팅은 이미 필터에서 제외됨)
+          const gameWinResult = this.determineWinResult(partialOrder.selection, gameResult);
+          let actualProfit = 0;
+          let profitLoss = 0;
+
+          if (gameWinResult) {
+            if (partialOrder.side === 'back') {
+              actualProfit = (parseFloat(partialOrder.odds) - 1) * parseFloat(partialOrder.filledAmount || partialOrder.amount);
+              profitLoss = actualProfit;
+            } else {
+              actualProfit = -parseFloat(partialOrder.filledAmount || partialOrder.amount);
+              profitLoss = actualProfit;
+            }
+          } else {
+            if (partialOrder.side === 'back') {
+              actualProfit = -parseFloat(partialOrder.filledAmount || partialOrder.amount);
+              profitLoss = actualProfit;
+            } else {
+              actualProfit = parseFloat(partialOrder.filledAmount || partialOrder.amount);
+              profitLoss = actualProfit;
+            }
           }
+
+          await partialOrder.update({
+            status: 'settled',
+            actualProfit: actualProfit,
+            settledAt: new Date(),
+            profitLoss: profitLoss
+          }, { transaction });
+
+          const user = await User.findByPk(partialOrder.userId, { transaction });
+          if (user && actualProfit > 0) {
+            user.balance += actualProfit;
+            await user.save({ transaction });
+          }
+
+          const result = {
+            orderId: partialOrder.id,
+            userId: partialOrder.userId,
+            side: partialOrder.side,
+            isWin: gameWinResult,
+            totalWinnings: actualProfit,
+            isPartialMatched: true
+          };
+
+          settlementResults.push(result);
+          settledCount += 1;
+          totalWinnings += actualProfit;
+
+          console.log(`✅ 부분 매칭 일반배팅 정산 완료: ${partialOrder.id}, 수익: ${actualProfit}`);
         } catch (error) {
           console.error(`❌ 부분 매칭 주문 ${partialOrder.id} 정산 실패:`, error);
         }
