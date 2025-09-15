@@ -1,7 +1,7 @@
 import axios from 'axios';
 import fs from 'fs';
 
-const API_KEY = '116108';
+const API_KEY = process.env.THESPORTSDB_API_KEY || '116108';
 const BASE_URL = 'https://www.thesportsdb.com/api/v1/json';
 const LEAGUE_ID = '4830'; // KBO
 const DATE = '2025-06-20';
