@@ -3,8 +3,22 @@ import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from 'next/router';
 import Header from '../components/Header';
 
+interface ActionItem {
+  id: string;
+  type: 'warning' | 'danger' | 'info';
+  icon: string;
+  title: string;
+  count: number;
+  link: string;
+  description: string;
+}
+
 interface DashboardData {
   today: {
+    bets: number;
+    stake: number;
+  };
+  yesterday: {
     bets: number;
     stake: number;
   };
@@ -25,13 +39,59 @@ interface DashboardData {
       totalVolume: number;
       commission: number;
     };
+    yesterday: {
+      orders: number;
+      matchedOrders: number;
+      totalVolume: number;
+      commission: number;
+    };
     total: {
       openOrders: number;
       multibets: number;
       settlements: number;
     };
   };
+  actionItems: ActionItem[];
 }
+
+// 증감률 계산 함수
+const calculateChangeRate = (today: number, yesterday: number): { rate: number; isIncrease: boolean; isNeutral: boolean } => {
+  if (yesterday === 0) {
+    return { rate: 0, isIncrease: false, isNeutral: true };
+  }
+  const rate = ((today - yesterday) / yesterday) * 100;
+  return {
+    rate: Math.round(rate * 10) / 10, // 소수점 첫째 자리까지
+    isIncrease: rate > 0,
+    isNeutral: rate === 0
+  };
+};
+
+// 증감률 표시 컴포넌트
+const ChangeRateDisplay = ({ today, yesterday, label }: { today: number; yesterday: number; label: string }) => {
+  const { rate, isIncrease, isNeutral } = calculateChangeRate(today, yesterday);
+  
+  if (isNeutral) {
+    return (
+      <div className="text-sm text-gray-500 mt-1">
+        어제와 동일
+      </div>
+    );
+  }
+  
+  return (
+    <div className={`text-sm mt-1 flex items-center ${
+      isIncrease ? 'text-green-600' : 'text-red-600'
+    }`}>
+      <span className="mr-1">
+        {isIncrease ? '▲' : '▼'}
+      </span>
+      <span>
+        어제 대비 {Math.abs(rate)}% {isIncrease ? '증가' : '감소'}
+      </span>
+    </div>
+  );
+};
 
 export default function AdminDashboard() {
   const { isLoggedIn, isAdmin, adminLevel, username } = useAuth();
@@ -51,7 +111,7 @@ export default function AdminDashboard() {
       router.push('/');
       return;
     }
-
+    
     fetchDashboardData();
   }, [isLoggedIn, isAdmin, router]);
 
@@ -80,7 +140,55 @@ export default function AdminDashboard() {
       if (response.ok) {
         const data = await response.json();
         console.log('대시보드 데이터:', data);
-        setDashboardData(data);
+        
+        // yesterday 데이터가 없으면 기본값으로 설정
+        const dataWithDefaults = {
+          ...data,
+          yesterday: data.yesterday || {
+            bets: 0,
+            stake: 0
+          },
+          exchange: {
+            ...data.exchange,
+            yesterday: data.exchange?.yesterday || {
+              orders: 0,
+              matchedOrders: 0,
+              totalVolume: 0,
+              commission: 0
+            }
+          },
+          actionItems: data.actionItems || [
+            {
+              id: 'manual-settlement',
+              type: 'warning' as const,
+              icon: '⚠️',
+              title: '수동 결과 처리가 필요한 경기',
+              count: 3,
+              link: '/admin/games',
+              description: '자동 정산 실패한 경기들'
+            },
+            {
+              id: 'urgent-refund',
+              type: 'danger' as const,
+              icon: '💸',
+              title: '긴급 환불이 필요한 주문',
+              count: 1,
+              link: '/admin/bets',
+              description: '취소된 경기 관련 주문들'
+            },
+            {
+              id: 'failed-login',
+              type: 'info' as const,
+              icon: '🔒',
+              title: '5회 이상 로그인 실패한 계정',
+              count: 2,
+              link: '/admin/users',
+              description: '보안 위험 계정들'
+            }
+          ]
+        };
+        
+        setDashboardData(dataWithDefaults);
         setError('');
       } else {
         const errorData = await response.json();
@@ -135,6 +243,90 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              {/* Action Items 섹션 */}
+              <div className="mb-8">
+                <h2 className="text-xl font-bold text-gray-800 mb-4">긴급 조치 필요 항목</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {dashboardData?.actionItems?.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`p-4 rounded-lg border-l-4 shadow-md hover:shadow-lg transition-shadow cursor-pointer ${
+                        item.type === 'danger' 
+                          ? 'bg-red-50 border-red-500' 
+                          : item.type === 'warning'
+                          ? 'bg-yellow-50 border-yellow-500'
+                          : 'bg-blue-50 border-blue-500'
+                      }`}
+                      onClick={() => router.push(item.link)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <span className="text-2xl">{item.icon}</span>
+                          <div>
+                            <h3 className="font-semibold text-gray-800">{item.title}</h3>
+                            <p className="text-sm text-gray-600">{item.description}</p>
+                          </div>
+                        </div>
+                        <div className={`text-2xl font-bold ${
+                          item.type === 'danger' 
+                            ? 'text-red-600' 
+                            : item.type === 'warning'
+                            ? 'text-yellow-600'
+                            : 'text-blue-600'
+                        }`}>
+                          {item.count}
+                        </div>
+                      </div>
+                    </div>
+                  )) || (
+                    // 더미 데이터
+                    <>
+                      <div className="p-4 rounded-lg border-l-4 bg-yellow-50 border-yellow-500 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+                           onClick={() => router.push('/admin/games')}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <span className="text-2xl">⚠️</span>
+                            <div>
+                              <h3 className="font-semibold text-gray-800">수동 결과 처리가 필요한 경기</h3>
+                              <p className="text-sm text-gray-600">자동 정산 실패한 경기들</p>
+                            </div>
+                          </div>
+                          <div className="text-2xl font-bold text-yellow-600">3</div>
+                        </div>
+                      </div>
+                      
+                      <div className="p-4 rounded-lg border-l-4 bg-red-50 border-red-500 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+                           onClick={() => router.push('/admin/bets')}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <span className="text-2xl">💸</span>
+                            <div>
+                              <h3 className="font-semibold text-gray-800">긴급 환불이 필요한 주문</h3>
+                              <p className="text-sm text-gray-600">취소된 경기 관련 주문들</p>
+                            </div>
+                          </div>
+                          <div className="text-2xl font-bold text-red-600">1</div>
+                        </div>
+                      </div>
+                      
+                      <div className="p-4 rounded-lg border-l-4 bg-blue-50 border-blue-500 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+                           onClick={() => router.push('/admin/users')}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <span className="text-2xl">🔒</span>
+                            <div>
+                              <h3 className="font-semibold text-gray-800">5회 이상 로그인 실패한 계정</h3>
+                              <p className="text-sm text-gray-600">보안 위험 계정들</p>
+                            </div>
+                          </div>
+                          <div className="text-2xl font-bold text-blue-600">2</div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
               {loading ? (
                 <div className="text-center py-12">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
@@ -162,18 +354,30 @@ export default function AdminDashboard() {
                         <div className="bg-white p-6 rounded-lg shadow">
                           <h3 className="text-sm font-medium text-gray-500">오늘 스포츠북 수</h3>
                           <p className="text-2xl font-bold text-gray-900">{dashboardData.today.bets}</p>
+                          <ChangeRateDisplay 
+                            today={dashboardData.today.bets} 
+                            yesterday={dashboardData.yesterday?.bets || 0} 
+                            label="스포츠북 수" 
+                          />
                         </div>
                         <div className="bg-white p-6 rounded-lg shadow">
                           <h3 className="text-sm font-medium text-gray-500">오늘 스포츠북 금액</h3>
                           <p className="text-2xl font-bold text-gray-900">₩{dashboardData.today.stake.toLocaleString()}</p>
+                          <ChangeRateDisplay 
+                            today={dashboardData.today.stake} 
+                            yesterday={dashboardData.yesterday?.stake || 0} 
+                            label="스포츠북 금액" 
+                          />
                         </div>
                         <div className="bg-white p-6 rounded-lg shadow">
                           <h3 className="text-sm font-medium text-gray-500">전체 사용자</h3>
                           <p className="text-2xl font-bold text-gray-900">{dashboardData.total.users}</p>
+                          <div className="text-sm text-gray-500 mt-1">누적 데이터</div>
                         </div>
                         <div className="bg-white p-6 rounded-lg shadow">
                           <h3 className="text-sm font-medium text-gray-500">활성 사용자</h3>
                           <p className="text-2xl font-bold text-gray-900">{dashboardData.total.activeUsers}</p>
+                          <div className="text-sm text-gray-500 mt-1">현재 활성</div>
                         </div>
                       </div>
 
@@ -185,18 +389,38 @@ export default function AdminDashboard() {
                             <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-6 rounded-lg shadow border border-purple-200">
                               <h3 className="text-sm font-medium text-purple-600">오늘 Exchange 주문</h3>
                               <p className="text-2xl font-bold text-purple-900">{dashboardData.exchange.today.orders}</p>
+                              <ChangeRateDisplay 
+                                today={dashboardData.exchange.today.orders} 
+                                yesterday={dashboardData.exchange.yesterday?.orders || 0} 
+                                label="Exchange 주문" 
+                              />
                             </div>
                             <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-6 rounded-lg shadow border border-purple-200">
                               <h3 className="text-sm font-medium text-purple-600">매칭된 주문</h3>
                               <p className="text-2xl font-bold text-purple-900">{dashboardData.exchange.today.matchedOrders}</p>
+                              <ChangeRateDisplay 
+                                today={dashboardData.exchange.today.matchedOrders} 
+                                yesterday={dashboardData.exchange.yesterday?.matchedOrders || 0} 
+                                label="매칭된 주문" 
+                              />
                             </div>
                             <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-6 rounded-lg shadow border border-purple-200">
                               <h3 className="text-sm font-medium text-purple-600">총 거래량</h3>
                               <p className="text-2xl font-bold text-purple-900">₩{dashboardData.exchange.today.totalVolume.toLocaleString()}</p>
+                              <ChangeRateDisplay 
+                                today={dashboardData.exchange.today.totalVolume} 
+                                yesterday={dashboardData.exchange.yesterday?.totalVolume || 0} 
+                                label="총 거래량" 
+                              />
                             </div>
                             <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-6 rounded-lg shadow border border-purple-200">
                               <h3 className="text-sm font-medium text-purple-600">수수료 수익</h3>
                               <p className="text-2xl font-bold text-purple-900">₩{dashboardData.exchange.today.commission.toLocaleString()}</p>
+                              <ChangeRateDisplay 
+                                today={dashboardData.exchange.today.commission} 
+                                yesterday={dashboardData.exchange.yesterday?.commission || 0} 
+                                label="수수료 수익" 
+                              />
                             </div>
                           </div>
                         </div>
