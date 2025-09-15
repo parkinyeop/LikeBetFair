@@ -2443,4 +2443,84 @@ router.get('/settlements/verify', verifyToken, async (req, res) => {
   }
 });
 
+// 🆕 정산 상세 조회 API (PaymentHistory 기반)
+router.get('/settlements/:gameKey', verifyToken, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.userId);
+    if (!user.isAdmin) {
+      return res.status(403).json({ message: '관리자 권한이 필요합니다.' });
+    }
+
+    const { gameKey } = req.params;
+    // URL 인코딩된 gameKey를 디코딩하고 '|'를 기준으로 분리
+    const [homeTeam, awayTeam, commenceTime] = decodeURIComponent(gameKey).split('|');
+
+    console.log('정산 상세 정보 조회:', { homeTeam, awayTeam, commenceTime });
+
+    if (!homeTeam || !awayTeam || !commenceTime) {
+      return res.status(400).json({ message: '잘못된 게임 식별자입니다.' });
+    }
+
+    // PaymentHistories 테이블에서 정산 데이터 조회 (환불 제외)
+    const searchConditions = {
+      memo: {
+        [Op.like]: `%${homeTeam}%${awayTeam}%`
+      },
+      memo: {
+        [Op.notLike]: '%환불%'
+      },
+      memo: {
+        [Op.notLike]: '%취소%'
+      }
+    };
+
+    console.log('검색 조건:', JSON.stringify(searchConditions, null, 2));
+
+    const settledOrders = await PaymentHistory.findAll({
+      where: searchConditions,
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['id', 'username', 'email']
+      }],
+      order: [['createdAt', 'DESC']]
+    });
+
+    console.log(`조회된 정산 주문 수: ${settledOrders.length}`);
+
+    if (settledOrders.length === 0) {
+      console.log('정산 내역 없음 - 404 반환');
+      return res.status(404).json({ message: '해당 경기에 대한 정산 내역을 찾을 수 없습니다.' });
+    }
+
+    // 정산 상세 정보 구성
+    const settlementDetail = {
+      gameInfo: {
+        homeTeam,
+        awayTeam,
+        commenceTime: new Date(commenceTime).toISOString()
+      },
+      totalSettledOrders: settledOrders.length,
+      totalVolume: settledOrders.reduce((sum, order) => sum + (order.amount || 0), 0),
+      orders: settledOrders.map(order => ({
+        id: order.id,
+        orderId: order.betId,
+        username: order.user?.username || 'N/A',
+        amount: order.amount || 0,
+        balance: order.balanceAfter || 0,
+        settledAt: order.paidAt,
+        description: order.memo || 'N/A',
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt
+      }))
+    };
+
+    res.json(settlementDetail);
+
+  } catch (error) {
+    console.error('정산 상세 내역 조회 오류:', error);
+    res.status(500).json({ message: '정산 상세 내역 조회 중 오류가 발생했습니다.' });
+  }
+});
+
 export default router; 
