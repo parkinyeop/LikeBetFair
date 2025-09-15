@@ -2,7 +2,7 @@ import axios from 'axios';
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName } from '../normalizeUtils.js';
 
-const THESPORTSDB_API_KEY = '123'; // 테스트 키
+const THESPORTSDB_API_KEY = process.env.THESPORTSDB_API_KEY || '123'; // 테스트 키
 const LEAGUE_ID = '4331'; // 독일 분데스리가
 
 // 분데스리가 팀명 매핑 (2024-25 시즌 18개 팀)

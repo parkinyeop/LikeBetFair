@@ -3,7 +3,7 @@ import { normalizeTeamName } from '../normalizeUtils.js';
 import axios from 'axios';
 
 const CSL_LEAGUE_ID = '4359';  // 중국 슈퍼리그 TheSportsDB ID
-const API_KEY = '116108';      // TheSportsDB API 키
+const API_KEY = process.env.THESPORTSDB_API_KEY || '116108';      // TheSportsDB API 키
 
 async function collectCSLData() {
   console.log('🇨🇳 중국 슈퍼리그 데이터 수집 시작...');

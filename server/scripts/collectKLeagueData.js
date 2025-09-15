@@ -21,7 +21,7 @@ async function collectKLeagueData() {
   console.log('=== K리그 1 데이터 수집 시작 ===\n');
   
   try {
-    const API_KEY = '116108'; // 프리미엄 키
+    const API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // 프리미엄 키
     const LEAGUE_ID = '4689'; // K리그 1 리그 ID
     
     // 최근 30일간의 데이터 수집

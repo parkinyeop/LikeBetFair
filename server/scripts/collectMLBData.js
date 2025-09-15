@@ -3,7 +3,7 @@ import { Op } from 'sequelize';
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName, normalizeCategoryPair } from '../normalizeUtils.js';
 
-const API_KEY = '116108'; // TheSportsDB 프리미엄 키
+const API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // TheSportsDB 프리미엄 키
 const BASE_URL = 'https://www.thesportsdb.com/api/v1/json';
 const MLB_LEAGUE_ID = '4424'; // MLB 리그 ID
 

@@ -29,7 +29,7 @@ class SeasonValidationService {
       'basketball_nba': '4387',
       'basketball_kbl': '5124',
       'baseball_mlb': '4424',
-      'baseball_kbo': '4578',
+      'baseball_kbo': '4830', // KBO 리그 ID (정확한 ID)
       'americanfootball_nfl': '4391'
     };
     

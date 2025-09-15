@@ -2,7 +2,7 @@ import axios from 'axios';
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName } from '../normalizeUtils.js';
 
-const THESPORTSDB_API_KEY = '116108'; // 프리미엄 키
+const THESPORTSDB_API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // 프리미엄 키
 const NBA_LEAGUE_ID = '4387'; // NBA 리그 ID
 
 // NBA 팀명 세트 (정규화된 공식 팀명으로 검증)

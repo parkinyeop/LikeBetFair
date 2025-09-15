@@ -58,7 +58,7 @@ const sportsDbLeagueMap = {
   'basketball_kbl': '5124',             // KBL
   // 야구
   'baseball_mlb': '4424',               // MLB
-  'baseball_kbo': '4830',               // KBO
+  'baseball_kbo': '4830',               // KBO (정확한 ID)
   // 미식축구
   'americanfootball_nfl': '4391'        // NFL
 };

@@ -75,7 +75,7 @@ const GameResult = sequelize.define('GameResult', {
   tableName: 'GameResults'
 });
 
-const API_KEY = '116108'; // SportsDB API 키
+const API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // SportsDB API 키
 const BASE_URL = 'https://www.thesportsdb.com/api/v1/json';
 
 // 누락된 리그들의 SportsDB 리그 ID 매핑

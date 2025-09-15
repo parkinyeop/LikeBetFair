@@ -2,7 +2,7 @@ import axios from 'axios';
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName } from '../normalizeUtils.js';
 
-const API_KEY = '116108'; // TheSportsDB 프리미엄 키
+const API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // TheSportsDB 프리미엄 키
 const NFL_LEAGUE_ID = '4391'; // NFL 리그 ID
 
 // NFL 팀명 세트 (정규화된 공식 팀명으로 검증)
