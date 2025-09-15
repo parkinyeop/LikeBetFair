@@ -16,6 +16,7 @@ dotenv.config();
 process.env.ODDS_API_KEY = 'b1a67915235b9dd963dcb5be603853ea';
 process.env.THE_ODDS_API_KEY = 'b1a67915235b9dd963dcb5be603853ea';
 console.log('[환경변수] 새로운 API 키 설정됨:', process.env.ODDS_API_KEY.substring(0, 8) + '...');
+console.log('[환경변수] JWT_SECRET 설정됨:', process.env.JWT_SECRET ? '설정됨' : '미설정');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
