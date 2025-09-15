@@ -54,8 +54,10 @@ interface DashboardData {
   actionItems: ActionItem[];
 }
 
-  // 증감률 계산 함수 (메모이제이션)
-  const calculateChangeRate = useCallback((today: number, yesterday: number): { rate: number; isIncrease: boolean; isNeutral: boolean } => {
+// 증감률 표시 컴포넌트 (메모이제이션)
+const ChangeRateDisplay = React.memo(({ today, yesterday, label }: { today: number; yesterday: number; label: string }) => {
+  // 증감률 계산 함수
+  const calculateChangeRate = (today: number, yesterday: number): { rate: number; isIncrease: boolean; isNeutral: boolean } => {
     if (yesterday === 0) {
       return { rate: 0, isIncrease: false, isNeutral: true };
     }
@@ -65,10 +67,8 @@ interface DashboardData {
       isIncrease: rate > 0,
       isNeutral: rate === 0
     };
-  }, []);
+  };
 
-// 증감률 표시 컴포넌트 (메모이제이션)
-const ChangeRateDisplay = React.memo(({ today, yesterday, label }: { today: number; yesterday: number; label: string }) => {
   const { rate, isIncrease, isNeutral } = calculateChangeRate(today, yesterday);
   
   if (isNeutral) {
@@ -99,21 +99,6 @@ export default function AdminDashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (!isLoggedIn) {
-      router.push('/');
-      return;
-    }
-    
-    if (!isAdmin) {
-      alert('관리자 권한이 필요합니다.');
-      router.push('/');
-      return;
-    }
-    
-    fetchDashboardData();
-  }, [isLoggedIn, isAdmin, router, fetchDashboardData]);
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -202,6 +187,21 @@ export default function AdminDashboard() {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      router.push('/');
+      return;
+    }
+    
+    if (!isAdmin) {
+      alert('관리자 권한이 필요합니다.');
+      router.push('/');
+      return;
+    }
+    
+    fetchDashboardData();
+  }, [isLoggedIn, isAdmin, router, fetchDashboardData]);
 
   if (!isLoggedIn || !isAdmin) {
     return null;
