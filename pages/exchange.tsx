@@ -761,9 +761,6 @@ export default function Exchange() {
                 <div className="mb-4 p-3 bg-gray-700 rounded-lg border border-gray-600">
                   <div className="text-sm font-medium text-white mb-2">🏆 승/패 (Win/Loss)</div>
                   <div className="flex items-center gap-2">
-                    <div className="w-16 text-base font-bold text-gray-300 text-center">
-                      승/패
-                    </div>
                     {outcomes.map((outcome, idx) => {
                       let label = outcome.name;
                       if (outcome.name.toLowerCase() === 'draw') label = 'Draw';
@@ -1395,9 +1392,6 @@ export default function Exchange() {
                       <div className="mb-4 p-3 bg-gray-700 rounded-lg border border-gray-600">
                         <div className="text-sm font-medium text-white mb-2">🏆 승/패 (Win/Loss)</div>
                         <div className="flex items-center gap-2">
-                          <div className="w-16 text-base font-bold text-gray-300 text-center">
-                            승/패
-                          </div>
                           {outcomes.map((outcome, idx) => {
                             let label = outcome.name;
                             if (outcome.name.toLowerCase() === 'draw') label = 'Draw';
