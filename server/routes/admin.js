@@ -463,72 +463,79 @@ router.get('/exchange/multibets', verifyToken, requireAdmin(1), async (req, res)
 // Exchange 정산 내역 조회
 router.get('/exchange/settlements', verifyToken, requireAdmin(1), async (req, res) => {
   try {
-    // Exchange 관련 정산된 주문들 조회
-    const settledOrders = await ExchangeOrder.findAll({
+    // PaymentHistory에서 Exchange 관련 실제 정산 데이터 조회 (환불 제외)
+    const paymentHistory = await PaymentHistory.findAll({
       where: {
-        status: 'settled',
-        settledAt: { [Op.not]: null }
+        [Op.and]: [
+          { memo: { [Op.like]: '%Exchange%' } },
+          { memo: { [Op.notLike]: '%자동 환불%' } },
+          { memo: { [Op.notLike]: '%취소%' } },
+          {
+            [Op.or]: [
+              { memo: { [Op.like]: '%완전 매칭%' } },
+              { memo: { [Op.like]: '%매칭 배팅 체결%' } }
+            ]
+          }
+        ]
       },
       include: [{
         model: User,
         as: 'user',
         attributes: ['id', 'username', 'email']
       }],
-      order: [['settledAt', 'DESC']],
-      limit: 100
-    });
-
-    // PaymentHistory에서 Exchange 관련 결제 내역 조회
-    const paymentHistory = await PaymentHistory.findAll({
-      where: {
-        memo: { [Op.like]: '%Exchange%' }
-      },
       order: [['createdAt', 'DESC']],
       limit: 100
     });
 
-    // 정산 내역을 경기별로 그룹화
-    const settlementsByGame = {};
+    // 정산 내역을 실제 PaymentHistory 데이터 기반으로 매핑
+    const settlements = [];
     
-    settledOrders.forEach(order => {
-      const gameKey = `${order.homeTeam} vs ${order.awayTeam}`;
-      if (!settlementsByGame[gameKey]) {
-        settlementsByGame[gameKey] = {
-          gameKey,
-          homeTeam: order.homeTeam,
-          awayTeam: order.awayTeam,
-          settledAt: order.settledAt,
-          settledOrders: 0,
-          totalVolume: 0,        // 총 거래량 (양쪽 베팅 금액 합계)
-          totalCommission: 0,    // 총 수수료 (Exchange 수익)
-          winningAmount: 0,      // 승리한 베터들의 총 수익
-          losingAmount: 0,       // 패배한 베터들의 총 손실
-          orders: []
-        };
-      }
+    for (const payment of paymentHistory) {
+      // betId에서 주문 ID 추출 (예: "EXCHANGE_198")
+      const orderIdMatch = payment.betId?.match(/EXCHANGE_(\d+)/);
+      if (!orderIdMatch) continue;
       
-      settlementsByGame[gameKey].settledOrders++;
+      const orderId = parseInt(orderIdMatch[1]);
       
-      // Exchange는 제로섬 게임이므로 실제 수익/손실을 분리해서 계산
-      const profit = parseFloat(order.actualProfit || 0);
-      if (profit > 0) {
-        settlementsByGame[gameKey].winningAmount += profit;
-      } else if (profit < 0) {
-        settlementsByGame[gameKey].losingAmount += Math.abs(profit);
-      }
+      // 해당 주문 정보 조회
+      const order = await ExchangeOrder.findByPk(orderId, {
+        include: [{
+          model: User,
+          as: 'user',
+          attributes: ['id', 'username', 'email']
+        }]
+      });
       
-      // 총 거래량 (베팅 금액의 절댓값 합계)
-      settlementsByGame[gameKey].totalVolume += Math.abs(profit) + Math.abs(order.stakeAmount || 0);
+      if (!order) continue;
       
-      settlementsByGame[gameKey].orders.push(order);
-    });
-
-    const settlements = Object.values(settlementsByGame);
+      const gameKey = `${order.homeTeam}|${order.awayTeam}|${order.commenceTime}`;
+      
+      settlements.push({
+        orderId: order.id,
+        gameKey,
+        homeTeam: order.homeTeam,
+        awayTeam: order.awayTeam,
+        commenceTime: order.commenceTime,
+        settledAt: payment.createdAt,
+        userId: order.userId,
+        username: order.user?.username || 'Unknown',
+        email: order.user?.email || '',
+        side: order.side,
+        stakeAmount: order.stakeAmount,
+        odds: order.price,
+        actualProfit: payment.amount, // PaymentHistory의 실제 정산 금액
+        isWinner: payment.amount > 0,
+        isLoser: payment.amount < 0,
+        gameInfo: `${order.homeTeam} vs ${order.awayTeam}`,
+        settlementTime: payment.createdAt,
+        paymentMemo: payment.memo
+      });
+    }
 
     res.json({ 
       settlements,
       paymentHistory,
-      totalSettledOrders: settledOrders.length,
+      totalSettledOrders: settlements.length,
       totalPaymentRecords: paymentHistory.length
     });
   } catch (error) {

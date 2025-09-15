@@ -146,4 +146,20 @@ User.prototype.canViewUser = function(targetUserId) {
   return this.hasPermission('view_own_referrals');
 };
 
+// ExchangeOrder와의 관계 설정
+import('./exchangeOrderModel.js').then(({ default: ExchangeOrder }) => {
+  User.hasMany(ExchangeOrder, {
+    foreignKey: 'userId',
+    as: 'exchangeOrders'
+  });
+});
+
+// PaymentHistory와의 관계 설정
+import('./paymentHistoryModel.js').then(({ default: PaymentHistory }) => {
+  User.hasMany(PaymentHistory, {
+    foreignKey: 'userId',
+    as: 'paymentHistories'
+  });
+});
+
 export default User; 

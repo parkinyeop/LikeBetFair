@@ -484,6 +484,7 @@ export default function ExchangeAdmin() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
+  const [showSettlementDetailModal, setShowSettlementDetailModal] = useState(false);
   
   // 수동 정산 상태
   const [selectedGame, setSelectedGame] = useState<any>(null);
@@ -491,6 +492,11 @@ export default function ExchangeAdmin() {
   const [homeScore, setHomeScore] = useState<string>('');
   const [awayScore, setAwayScore] = useState<string>('');
   const [isProcessingSettlement, setIsProcessingSettlement] = useState(false);
+  
+  // 정산 상세 정보 상태
+  const [selectedSettlement, setSelectedSettlement] = useState<any>(null);
+  const [settlementDetail, setSettlementDetail] = useState<any>(null);
+  const [loadingSettlementDetail, setLoadingSettlementDetail] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<ExchangeOrder | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -629,6 +635,76 @@ export default function ExchangeAdmin() {
     } catch (error) {
       console.error('내보내기 오류:', error);
       alert('내보내기 중 오류가 발생했습니다.');
+    }
+  }, [getAuthHeaders]);
+
+  // 정산 상세 정보 조회
+  const handleSettlementDetailClick = useCallback(async (settlement: any) => {
+    try {
+      setSelectedSettlement(settlement);
+      setLoadingSettlementDetail(true);
+      
+      const headers = getAuthHeaders();
+      
+      // commenceTime이 없으면 기본값 설정
+      const commenceTime = settlement.commenceTime || new Date().toISOString();
+      const gameKey = `${settlement.homeTeam}|${settlement.awayTeam}|${commenceTime}`;
+      
+      console.log('정산 상세 조회:', { settlement, gameKey });
+      
+      const response = await fetch(`http://localhost:5050/api/exchange/settlements/${encodeURIComponent(gameKey)}`, {
+        headers
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('API 응답 데이터:', data);
+        // 새로운 API 응답 구조에 맞게 데이터 변환
+        const transformedData = {
+          // 기본 경기 정보
+          homeTeam: data.gameInfo.homeTeam,
+          awayTeam: data.gameInfo.awayTeam,
+          commenceTime: data.gameInfo.commenceTime,
+          settledAt: data.settlements.length > 0 ? data.settlements[0].settledAt : null,
+          // 통계 정보
+          totalOrders: data.settlements.length,
+          totalBackVolume: data.settlements.filter(s => s.side === 'back').reduce((sum, s) => sum + (s.stakeAmount || 0), 0),
+          totalLayVolume: data.settlements.filter(s => s.side === 'lay').reduce((sum, s) => sum + (s.stakeAmount || 0), 0),
+          totalWinners: data.settlements.filter(s => s.actualProfit && s.actualProfit > 0).length,
+          totalLosers: data.settlements.filter(s => s.actualProfit && s.actualProfit < 0).length,
+          totalWinningAmount: data.settlements.filter(s => s.actualProfit && s.actualProfit > 0).reduce((sum, s) => sum + (s.actualProfit || 0), 0),
+          totalLosingAmount: Math.abs(data.settlements.filter(s => s.actualProfit && s.actualProfit < 0).reduce((sum, s) => sum + (s.actualProfit || 0), 0)),
+          // 매칭 정보 (간단한 버전에서는 0으로 설정)
+          fullMatches: 0,
+          partialMatches: 0,
+          // 주문 상세 정보
+          orders: data.settlements.map(s => ({
+            id: s.orderId,
+            userId: s.userId,
+            username: s.username,
+            email: s.email,
+            side: s.side,
+            stakeAmount: s.stakeAmount,
+            odds: s.price,
+            actualProfit: s.actualProfit,
+            isWinner: s.actualProfit && s.actualProfit > 0,
+            isLoser: s.actualProfit && s.actualProfit < 0,
+            settledAt: s.settledAt,
+            matches: [] // 간단한 버전에서는 매칭 정보 제외
+          }))
+        };
+        setSettlementDetail(transformedData);
+        setShowSettlementDetailModal(true);
+      } else {
+        const errorData = await response.json();
+        console.error('정산 상세 조회 실패:', errorData);
+        alert(`정산 상세 정보를 불러오는데 실패했습니다: ${errorData.message || '알 수 없는 오류'}`);
+      }
+    } catch (error) {
+      console.error('정산 상세 정보 조회 오류:', error);
+      alert('정산 상세 정보 조회 중 오류가 발생했습니다.');
+    } finally {
+      setLoadingSettlementDetail(false);
     }
   }, [getAuthHeaders]);
 
@@ -1690,15 +1766,15 @@ export default function ExchangeAdmin() {
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="bg-white p-6 rounded-lg shadow">
                           <h3 className="text-sm font-medium text-gray-500">오픈 주문</h3>
-                          <p className="text-2xl font-bold text-gray-900">{exchangeStats.total.openOrders}</p>
+                          <p className="text-2xl font-bold text-gray-900">{exchangeStats?.total?.openOrders || 0}</p>
                         </div>
                         <div className="bg-white p-6 rounded-lg shadow">
                           <h3 className="text-sm font-medium text-gray-500">멀티배팅</h3>
-                          <p className="text-2xl font-bold text-gray-900">{exchangeStats.total.multibets}</p>
+                          <p className="text-2xl font-bold text-gray-900">{exchangeStats?.total?.multibets || 0}</p>
                         </div>
                         <div className="bg-white p-6 rounded-lg shadow">
                           <h3 className="text-sm font-medium text-gray-500">정산 완료</h3>
-                          <p className="text-2xl font-bold text-gray-900">{exchangeStats.total.settlements}</p>
+                          <p className="text-2xl font-bold text-gray-900">{exchangeStats?.total?.settlements || 0}</p>
                         </div>
                       </div>
 
@@ -2224,41 +2300,71 @@ export default function ExchangeAdmin() {
                           <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                               <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">주문번호</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">사용자</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">경기</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">결과</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">정산 주문 수</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">총 거래량</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">승리 수익</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">사이드</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">배당</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">베팅금액</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">실제수익</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">정산일</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">액션</th>
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
                               {settlements.length > 0 ? (
                                 settlements.map((settlement, index) => (
-                                  <tr key={settlement.gameKey || index} className="hover:bg-gray-50">
+                                  <tr key={`settlement-${index}-${settlement.orderId || settlement.id || 'unknown'}`} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                      {settlement.homeTeam} vs {settlement.awayTeam}
+                                      #{settlement.orderId}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                      정산완료
+                                      {settlement.username}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                      {settlement.settledOrders}개
+                                      {settlement.gameInfo}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                        settlement.side === 'back' 
+                                          ? 'bg-blue-100 text-blue-800' 
+                                          : 'bg-red-100 text-red-800'
+                                      }`}>
+                                        {settlement.side === 'back' ? '백' : '레이'}
+                                      </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                      ₩{settlement.totalVolume.toLocaleString()}
+                                      {settlement.odds?.toFixed(2)}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
-                                      ₩{settlement.winningAmount.toLocaleString()}
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                      ₩{settlement.stakeAmount?.toLocaleString() || 0}
+                                    </td>
+                                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${
+                                      settlement.actualProfit > 0 
+                                        ? 'text-green-600' 
+                                        : settlement.actualProfit < 0 
+                                        ? 'text-red-600' 
+                                        : 'text-gray-900'
+                                    }`}>
+                                      {settlement.actualProfit > 0 ? '+' : ''}₩{settlement.actualProfit?.toLocaleString() || 0}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                      {settlement.settledAt ? new Date(settlement.settledAt).toLocaleDateString('ko-KR') : 'N/A'}
+                                      {settlement.settlementTime ? formatToLocalDateTime(settlement.settlementTime) : 'N/A'}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                      <button
+                                        onClick={() => handleSettlementDetailClick(settlement)}
+                                        className="text-blue-600 hover:text-blue-900"
+                                        disabled={loadingSettlementDetail}
+                                      >
+                                        {loadingSettlementDetail ? '로딩...' : '상세보기'}
+                                      </button>
                                     </td>
                                   </tr>
                                 ))
                               ) : (
                                 <tr>
-                                  <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
+                                  <td colSpan={9} className="px-6 py-4 text-center text-sm text-gray-500">
                                     정산된 경기가 없습니다.
                                   </td>
                                 </tr>
@@ -2799,11 +2905,18 @@ export default function ExchangeAdmin() {
               <h4 className="text-sm font-medium text-gray-700 mb-2">최근 정산 내역</h4>
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {settlements.slice(0, 10).map((settlement, index) => (
-                  <div key={index} className="flex justify-between items-center p-2 bg-white rounded">
+                  <div 
+                    key={index} 
+                    className="flex justify-between items-center p-2 bg-white rounded hover:bg-gray-50 cursor-pointer"
+                    onClick={() => handleSettlementDetailClick(settlement)}
+                  >
                     <span className="text-sm">{settlement.homeTeam} vs {settlement.awayTeam}</span>
-                    <span className="text-sm text-gray-600">
-                      {settlement.settledOrders}개 주문 • ₩{settlement.totalVolume.toLocaleString()}
-                    </span>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-gray-600">
+                        {settlement.settledOrders}개 주문 • ₩{settlement.totalVolume.toLocaleString()}
+                      </span>
+                      <span className="text-xs text-blue-600">클릭하여 상세보기</span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -2816,6 +2929,233 @@ export default function ExchangeAdmin() {
               >
                 닫기
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 정산 상세 정보 모달 */}
+      {showSettlementDetailModal && settlementDetail && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  정산 상세 정보
+                </h2>
+                <button
+                  onClick={() => setShowSettlementDetailModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* 경기 기본 정보 */}
+              <div className="bg-blue-50 p-4 rounded-lg mb-6">
+                <h3 className="text-lg font-semibold text-blue-900 mb-2">경기 정보</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium text-blue-700">경기:</span>
+                    <div className="text-blue-800">{settlementDetail.homeTeam} vs {settlementDetail.awayTeam}</div>
+                  </div>
+                  <div>
+                    <span className="font-medium text-blue-700">경기 시간:</span>
+                    <div className="text-blue-800">{formatToLocalDateTime(settlementDetail.commenceTime)}</div>
+                  </div>
+                  <div>
+                    <span className="font-medium text-blue-700">정산 시간:</span>
+                    <div className="text-blue-800">{formatToLocalDateTime(settlementDetail.settledAt)}</div>
+                  </div>
+                  <div>
+                    <span className="font-medium text-blue-700">총 주문 수:</span>
+                    <div className="text-blue-800">{settlementDetail.totalOrders}개</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 정산 통계 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <h4 className="text-sm font-medium text-green-700">백 배팅 거래량</h4>
+                  <p className="text-2xl font-bold text-green-800">₩{settlementDetail.totalBackVolume?.toLocaleString() || 0}</p>
+                </div>
+                <div className="bg-red-50 p-4 rounded-lg">
+                  <h4 className="text-sm font-medium text-red-700">레이 매칭 거래량</h4>
+                  <p className="text-2xl font-bold text-red-800">₩{settlementDetail.totalLayVolume?.toLocaleString() || 0}</p>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <h4 className="text-sm font-medium text-green-700">승리자 수익</h4>
+                  <p className="text-2xl font-bold text-green-800">₩{settlementDetail.totalWinningAmount?.toLocaleString() || 0}</p>
+                </div>
+                <div className="bg-red-50 p-4 rounded-lg">
+                  <h4 className="text-sm font-medium text-red-700">패배자 손실</h4>
+                  <p className="text-2xl font-bold text-red-800">₩{settlementDetail.totalLosingAmount?.toLocaleString() || 0}</p>
+                </div>
+              </div>
+
+              {/* 매칭 통계 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h4 className="text-sm font-medium text-blue-700">완전 매칭</h4>
+                  <p className="text-2xl font-bold text-blue-800">{settlementDetail.fullMatches || 0}개</p>
+                </div>
+                <div className="bg-yellow-50 p-4 rounded-lg">
+                  <h4 className="text-sm font-medium text-yellow-700">부분 매칭</h4>
+                  <p className="text-2xl font-bold text-yellow-800">{settlementDetail.partialMatches || 0}개</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="text-sm font-medium text-gray-700">승리자 수</h4>
+                  <p className="text-2xl font-bold text-gray-800">{settlementDetail.totalWinners || 0}명</p>
+                </div>
+              </div>
+
+              {/* 주문 상세 목록 */}
+              <div className="bg-white border rounded-lg">
+                <div className="px-6 py-4 border-b">
+                  <h3 className="text-lg font-semibold text-gray-900">주문 상세 내역</h3>
+                  <p className="text-sm text-gray-600">각 주문의 매칭 정보와 수익/손실</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">주문자</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">타입</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">배당</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">금액</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">결과</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">매칭</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">수익/손실</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {settlementDetail.orders?.map((order: any, index: number) => (
+                        <tr key={order.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{order.username}</div>
+                            <div className="text-sm text-gray-500">{order.email}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              order.side === 'back' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            }`}>
+                              {order.side === 'back' ? '백 배팅' : '레이 매칭'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {order.odds?.toFixed(2)}배
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            ₩{order.stakeAmount?.toLocaleString() || 0}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {order.isWinner && (
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                승리
+                              </span>
+                            )}
+                            {order.isLoser && (
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                                패배
+                              </span>
+                            )}
+                            {!order.isWinner && !order.isLoser && (
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                                대기
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {order.isPartialMatch ? (
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                부분매칭
+                              </span>
+                            ) : (
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                풀매칭
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            {order.actualProfit > 0 ? (
+                              <span className="text-green-600">+₩{order.actualProfit.toLocaleString()}</span>
+                            ) : order.actualProfit < 0 ? (
+                              <span className="text-red-600">₩{order.actualProfit.toLocaleString()}</span>
+                            ) : (
+                              <span className="text-gray-600">₩0</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* 매칭 상세 정보 */}
+              {settlementDetail.orders?.some((order: any) => order.matches?.length > 0) && (
+                <div className="mt-6 bg-white border rounded-lg">
+                  <div className="px-6 py-4 border-b">
+                    <h3 className="text-lg font-semibold text-gray-900">매칭 상세 정보</h3>
+                    <p className="text-sm text-gray-600">각 주문의 매칭 상대 정보</p>
+                  </div>
+                  <div className="p-6">
+                    {settlementDetail.orders?.map((order: any) => (
+                      order.matches?.length > 0 && (
+                        <div key={order.id} className="mb-6 border rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="font-medium text-gray-900">
+                              주문 #{order.id} - {order.username} ({order.side === 'back' ? '백 배팅' : '레이 매칭'})
+                            </h4>
+                            <span className="text-sm text-gray-500">
+                              {order.isPartialMatch ? '부분매칭' : '풀매칭'}
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {order.matches.map((match: any) => (
+                              <div key={match.id} className="bg-gray-50 p-3 rounded flex justify-between items-center">
+                                <div>
+                                  <span className="font-medium text-gray-700">{match.matchedUsername}</span>
+                                  <span className="text-sm text-gray-500 ml-2">({match.matchedSide === 'back' ? '백 배팅' : '레이 매칭'})</span>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-sm font-medium">
+                                    ₩{match.matchedStakeAmount?.toLocaleString() || 0}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {match.matchedOdds?.toFixed(2)}배
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  {match.isMatchedWinner ? (
+                                    <span className="text-green-600 font-medium">+₩{match.matchedProfit?.toLocaleString() || 0}</span>
+                                  ) : match.isMatchedLoser ? (
+                                    <span className="text-red-600 font-medium">₩{match.matchedProfit?.toLocaleString() || 0}</span>
+                                  ) : (
+                                    <span className="text-gray-600">₩0</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end mt-6">
+                <button
+                  onClick={() => setShowSettlementDetailModal(false)}
+                  className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+                >
+                  닫기
+                </button>
+              </div>
             </div>
           </div>
         </div>

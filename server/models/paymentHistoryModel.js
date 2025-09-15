@@ -35,4 +35,9 @@ const PaymentHistory = sequelize.define('PaymentHistory', {
   timestamps: true
 });
 
+// User 모델과의 연관관계 설정
+import('./userModel.js').then(({ default: User }) => {
+  PaymentHistory.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+});
+
 export default PaymentHistory; 
