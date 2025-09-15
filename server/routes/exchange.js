@@ -2392,7 +2392,10 @@ router.get('/settlements/verify', verifyToken, async (req, res) => {
         where: {
           betId: { [Op.like]: 'EXCHANGE_%' }
         },
-        required: false
+        required: false,
+        on: {
+          betId: require('sequelize').literal(`'EXCHANGE_' || "ExchangeOrder"."id"`)
+        }
       }]
     });
 

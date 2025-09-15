@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
 import { formatToLocalDateTime } from '../../utils/timeUtils';
+import { toast } from 'react-hot-toast';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -346,21 +347,21 @@ const ADMIN_TABS: AdminTabStructure[] = [
   }
 ];
 
-// 주문 관리 서브탭
+// 주문 관리 서브탭 - 드롭다운용으로 그룹화
   const ORDER_SUBTABS = [
-    { id: 'all', label: '전체 주문' },
-    { id: 'open', label: '대기 중' },
-    { id: 'matched', label: '매칭됨' },
-    { id: 'partially_matched', label: '부분 매칭' },
-    { id: 'active', label: '활성' },
-    { id: 'settled', label: '정산완료' },
-    { id: 'cancelled', label: '취소됨' },
-    { id: 'cancelled_user', label: '취소 (사용자)' },
-    { id: 'cancelled_game', label: '취소 (경기)' },
-    { id: 'cancelled_expired', label: '취소 (만료)' },
-    { id: 'cancelled_original', label: '취소 (원주문)' },
-    { id: 'cancelled_unknown', label: '취소 (사유불명)' },
-    { id: 'cancelled_other', label: '취소 (기타)' }
+    { id: 'all', label: '전체 주문', group: 'main' },
+    { id: 'open', label: '대기 중', group: 'main' },
+    { id: 'matched', label: '매칭됨', group: 'main' },
+    { id: 'partially_matched', label: '부분 매칭', group: 'main' },
+    { id: 'active', label: '활성', group: 'main' },
+    { id: 'settled', label: '정산완료', group: 'main' },
+    { id: 'cancelled', label: '취소됨', group: 'cancelled' },
+    { id: 'cancelled_user', label: '취소 (사용자)', group: 'cancelled' },
+    { id: 'cancelled_game', label: '취소 (경기)', group: 'cancelled' },
+    { id: 'cancelled_expired', label: '취소 (만료)', group: 'cancelled' },
+    { id: 'cancelled_original', label: '취소 (원주문)', group: 'cancelled' },
+    { id: 'cancelled_unknown', label: '취소 (사유불명)', group: 'cancelled' },
+    { id: 'cancelled_other', label: '취소 (기타)', group: 'cancelled' }
   ];
 
 export default function ExchangeAdmin() {
@@ -475,7 +476,8 @@ export default function ExchangeAdmin() {
   const [monthlySummary, setMonthlySummary] = useState<MonthlySummary | null>(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-  const [loading, setLoading] = useState(true);
+  // 통합된 로딩 상태 (기존 loading 제거)
+  // const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -500,6 +502,27 @@ export default function ExchangeAdmin() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<ExchangeOrder | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
+  
+  // 드롭다운 상태 관리
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  // 드롭다운 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.dropdown-container')) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDropdownOpen]);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -508,7 +531,7 @@ export default function ExchangeAdmin() {
     }
     
     if (!isAdmin || adminLevel < 1) {
-      alert('관리자 권한이 필요합니다.');
+      toast.error('관리자 권한이 필요합니다.');
       router.push('/');
       return;
     }
@@ -558,7 +581,7 @@ export default function ExchangeAdmin() {
   // 수동 정산 처리
   const handleManualSettlement = useCallback(async () => {
     if (!selectedGame || !homeScore || !awayScore) {
-      alert('경기와 양 팀의 점수를 모두 입력해주세요.');
+      toast.error('경기와 양 팀의 점수를 모두 입력해주세요.');
       return;
     }
 
@@ -567,7 +590,7 @@ export default function ExchangeAdmin() {
     const awayScoreNum = parseInt(awayScore);
     
     if (isNaN(homeScoreNum) || isNaN(awayScoreNum) || homeScoreNum < 0 || awayScoreNum < 0) {
-      alert('올바른 점수를 입력해주세요. (0 이상의 정수)');
+      toast.error('올바른 점수를 입력해주세요. (0 이상의 정수)');
       return;
     }
 
@@ -591,7 +614,7 @@ export default function ExchangeAdmin() {
 
       if (response.ok) {
         const result = await response.json();
-        alert(`정산이 완료되었습니다. ${result.result.settledOrders}개 주문이 정산되었습니다.`);
+        toast.success(`정산이 완료되었습니다. ${result.result.settledOrders}개 주문이 정산되었습니다.`);
         setShowManualSettlementModal(false);
         setSelectedGame(null);
         setHomeScore('');
@@ -600,11 +623,11 @@ export default function ExchangeAdmin() {
         window.location.reload();
       } else {
         const error = await response.json();
-        alert(`정산 실패: ${error.message}`);
+        toast.error(`정산 실패: ${error.message}`);
       }
     } catch (error) {
       console.error('정산 처리 오류:', error);
-      alert('정산 처리 중 오류가 발생했습니다.');
+      toast.error('정산 처리 중 오류가 발생했습니다.');
     } finally {
       setIsProcessingSettlement(false);
     }
@@ -628,13 +651,13 @@ export default function ExchangeAdmin() {
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
-        alert('정산 내역이 다운로드되었습니다.');
+        toast.success('정산 내역이 다운로드되었습니다.');
       } else {
-        alert('내보내기 실패했습니다.');
+        toast.error('내보내기 실패했습니다.');
       }
     } catch (error) {
       console.error('내보내기 오류:', error);
-      alert('내보내기 중 오류가 발생했습니다.');
+      toast.error('내보내기 중 오류가 발생했습니다.');
     }
   }, [getAuthHeaders]);
 
@@ -650,7 +673,9 @@ export default function ExchangeAdmin() {
       const commenceTime = settlement.commenceTime || new Date().toISOString();
       const gameKey = `${settlement.homeTeam}|${settlement.awayTeam}|${commenceTime}`;
       
-      console.log('정산 상세 조회:', { settlement, gameKey });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('정산 상세 조회:', { settlement, gameKey });
+      }
       
       const response = await fetch(`http://localhost:5050/api/exchange/settlements/${encodeURIComponent(gameKey)}`, {
         headers
@@ -658,7 +683,9 @@ export default function ExchangeAdmin() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('API 응답 데이터:', data);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('API 응답 데이터:', data);
+        }
         // 새로운 API 응답 구조에 맞게 데이터 변환
         const transformedData = {
           // 기본 경기 정보
@@ -698,11 +725,11 @@ export default function ExchangeAdmin() {
       } else {
         const errorData = await response.json();
         console.error('정산 상세 조회 실패:', errorData);
-        alert(`정산 상세 정보를 불러오는데 실패했습니다: ${errorData.message || '알 수 없는 오류'}`);
+        toast.error(`정산 상세 정보를 불러오는데 실패했습니다: ${errorData.message || '알 수 없는 오류'}`);
       }
     } catch (error) {
       console.error('정산 상세 정보 조회 오류:', error);
-      alert('정산 상세 정보 조회 중 오류가 발생했습니다.');
+      toast.error('정산 상세 정보 조회 중 오류가 발생했습니다.');
     } finally {
       setLoadingSettlementDetail(false);
     }
@@ -718,23 +745,27 @@ export default function ExchangeAdmin() {
 
       if (response.ok) {
         const result = await response.json();
-        alert(`검증 완료: ${result.verified}개 정산 검증됨, ${result.errors.length}개 오류 발견`);
+        toast.success(`검증 완료: ${result.verified}개 정산 검증됨, ${result.errors.length}개 오류 발견`);
         if (result.errors.length > 0) {
-          console.log('검증 오류:', result.errors);
+          if (process.env.NODE_ENV === 'development') {
+            console.log('검증 오류:', result.errors);
+          }
         }
       } else {
-        alert('검증 실패했습니다.');
+        toast.error('검증 실패했습니다.');
       }
     } catch (error) {
       console.error('검증 오류:', error);
-      alert('검증 중 오류가 발생했습니다.');
+      toast.error('검증 중 오류가 발생했습니다.');
     }
   }, [getAuthHeaders]);
 
   // Phase 1: API 호출 최적화 - 병렬 로딩
   const fetchExchangeData = useCallback(async () => {
     try {
-      console.log('Exchange 데이터 로딩 시작...');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Exchange 데이터 로딩 시작...');
+      }
       setAdminState(prev => ({
         ...prev,
         global: { ...prev.global, loading: true, error: null }
@@ -743,7 +774,9 @@ export default function ExchangeAdmin() {
       const headers = getAuthHeaders();
       const baseUrl = 'http://localhost:5050/api/admin/exchange';
 
-      console.log('API 호출 시작:', baseUrl);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('API 호출 시작:', baseUrl);
+      }
 
       // 병렬로 모든 데이터 로딩
       const [statsResponse, ordersResponse, settlementsResponse] = await Promise.all([
@@ -752,11 +785,13 @@ export default function ExchangeAdmin() {
         fetch(`${baseUrl}/settlements`, { headers })
       ]);
 
-      console.log('API 응답 상태:', {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('API 응답 상태:', {
         stats: statsResponse.status,
         orders: ordersResponse.status,
         settlements: settlementsResponse.status
-      });
+        });
+      }
 
       // 응답 처리
       const [statsData, ordersData, settlementsData] = await Promise.all([
@@ -765,7 +800,9 @@ export default function ExchangeAdmin() {
         settlementsResponse.ok ? settlementsResponse.json() : null
       ]);
 
-      console.log('API 응답 데이터:', { statsData, ordersData, settlementsData });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('API 응답 데이터:', { statsData, ordersData, settlementsData });
+      }
 
       // 상태 업데이트
       if (statsData) {
@@ -882,16 +919,17 @@ export default function ExchangeAdmin() {
         }
       }));
 
-      // 기존 loading 상태도 false로 설정
-      setLoading(false);
+      // 통합된 로딩 상태 사용 (setLoading 제거)
 
-      console.log('Exchange 데이터 로딩 완료');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Exchange 데이터 로딩 완료');
+      }
 
     } catch (err) {
       console.error('Exchange 데이터 로딩 오류:', err);
       const errorMessage = err instanceof Error ? err.message : '데이터를 불러오는 중 오류가 발생했습니다.';
       
-      setError(errorMessage);
+      // 통합된 에러 처리
       setAdminState(prev => ({
         ...prev,
         global: { 
@@ -901,22 +939,26 @@ export default function ExchangeAdmin() {
         }
       }));
       
-      // 기존 상태도 업데이트하여 로딩 상태 해제
-      setLoading(false);
+      // 사용자에게 에러 알림
+      toast.error(`데이터 로딩 실패: ${errorMessage}`);
     }
   }, [getAuthHeaders]);
 
   // 기존 fetchDailyStats 함수는 유지하되 최적화
   const fetchDailyStats = useCallback(async () => {
     try {
-      console.log('일별 통계 로딩 시작...');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('일별 통계 로딩 시작...');
+      }
       const headers = getAuthHeaders();
       const url = `http://localhost:5050/api/admin/exchange/daily-stats?year=${selectedYear}&month=${selectedMonth}`;
       
       const response = await fetch(url, { headers });
       if (response.ok) {
         const data = await response.json();
-        console.log('일별 통계 데이터:', data);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('일별 통계 데이터:', data);
+        }
         setDailyStats(data.dailyStats || []);
         setMonthlySummary(data.monthlySummary || null);
         
@@ -931,7 +973,9 @@ export default function ExchangeAdmin() {
             }
           }
         }));
-        console.log('일별 통계 로딩 완료');
+        if (process.env.NODE_ENV === 'development') {
+          console.log('일별 통계 로딩 완료');
+        }
       } else {
         console.warn('일별 통계 API 응답 실패:', response.status);
         // 폴백 데이터 설정
@@ -940,9 +984,14 @@ export default function ExchangeAdmin() {
       }
     } catch (err) {
       console.error('일별 통계 로딩 오류:', err);
+      const errorMessage = err instanceof Error ? err.message : '일별 통계를 불러오는 중 오류가 발생했습니다.';
+      
       // 폴백 데이터 설정
       setDailyStats([]);
       setMonthlySummary(null);
+      
+      // 사용자에게 에러 알림
+      toast.error(`일별 통계 로딩 실패: ${errorMessage}`);
     }
   }, [getAuthHeaders, selectedYear, selectedMonth]);
 
@@ -1075,7 +1124,9 @@ export default function ExchangeAdmin() {
       ws = new WebSocket(wsUrl);
       
       ws.onopen = () => {
-        console.log('WebSocket 연결됨');
+        if (process.env.NODE_ENV === 'development') {
+          console.log('WebSocket 연결됨');
+        }
         setIsRealtimeConnected(true);
         
         // 인증 토큰 전송
@@ -1096,14 +1147,18 @@ export default function ExchangeAdmin() {
       };
       
       ws.onclose = () => {
-        console.log('WebSocket 연결 종료');
+        if (process.env.NODE_ENV === 'development') {
+          console.log('WebSocket 연결 종료');
+        }
         setIsRealtimeConnected(false);
         
         // 재연결 시도 (5초 후)
         setTimeout(() => {
           if (isLoggedIn && isAdmin) {
             // 재연결은 useEffect가 다시 실행되도록 함
-            console.log('WebSocket 재연결 시도');
+            if (process.env.NODE_ENV === 'development') {
+              console.log('WebSocket 재연결 시도');
+            }
           }
         }, 5000);
       };
@@ -1429,13 +1484,13 @@ export default function ExchangeAdmin() {
 
       if (response.ok) {
         await fetchExchangeData(); // 데이터 새로고침
-        alert('주문 상태가 변경되었습니다.');
+        toast.success('주문 상태가 변경되었습니다.');
       } else {
-        alert('주문 상태 변경에 실패했습니다.');
+        toast.error('주문 상태 변경에 실패했습니다.');
       }
     } catch (err) {
       console.error('주문 상태 변경 오류:', err);
-      alert('주문 상태 변경 중 오류가 발생했습니다.');
+      toast.error('주문 상태 변경 중 오류가 발생했습니다.');
     }
   };
 
@@ -1456,13 +1511,13 @@ export default function ExchangeAdmin() {
 
       if (response.ok) {
         await fetchExchangeData(); // 데이터 새로고침
-        alert('경기 정산이 완료되었습니다.');
+        toast.success('경기 정산이 완료되었습니다.');
       } else {
-        alert('경기 정산에 실패했습니다.');
+        toast.error('경기 정산에 실패했습니다.');
       }
     } catch (err) {
       console.error('경기 정산 오류:', err);
-      alert('경기 정산 중 오류가 발생했습니다.');
+      toast.error('경기 정산 중 오류가 발생했습니다.');
     }
   };
 
@@ -1614,7 +1669,7 @@ export default function ExchangeAdmin() {
                           <button
                             onClick={() => {
                               // 알림 패널 토글
-                              alert('알림 패널을 표시합니다.');
+                              toast('알림 패널을 표시합니다.', { icon: 'ℹ️' });
                             }}
                             className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg"
                           >
@@ -1669,36 +1724,89 @@ export default function ExchangeAdmin() {
                   ))}
                 </nav>
                 
-                {/* 주문 관리 서브탭 */}
+                {/* 주문 관리 서브탭 - 드롭다운 방식 */}
                 {activeTab === 'orders' && (
                   <div className="mt-4">
-                    <nav className="flex space-x-4">
-                      {ORDER_SUBTABS.map(subTab => (
-                        <button
-                          key={subTab.id}
-                          onClick={() => handleSubTabChange(subTab.id)}
-                          className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                            activeSubTab === subTab.id
-                              ? 'bg-purple-100 text-purple-700 border border-purple-300'
-                              : 'text-gray-600 hover:text-purple-600 hover:bg-purple-50'
-                          }`}
+                    <div className="relative dropdown-container">
+                      <button
+                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                        className="flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-lg border border-purple-200 hover:bg-purple-200 transition-colors"
+                      >
+                        <span>{ORDER_SUBTABS.find(tab => tab.id === activeSubTab)?.label || '전체 주문'}</span>
+                        <svg 
+                          className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} 
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
                         >
-                          {subTab.label}
-                        </button>
-                      ))}
-                    </nav>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      
+                      {isDropdownOpen && (
+                        <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                          <div className="py-1">
+                            {/* 주요 상태 그룹 */}
+                            <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                              주요 상태
+                            </div>
+                            {ORDER_SUBTABS.filter(tab => tab.group === 'main').map(subTab => (
+                              <button
+                                key={subTab.id}
+                                onClick={() => {
+                                  handleSubTabChange(subTab.id);
+                                  setIsDropdownOpen(false);
+                                }}
+                                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${
+                                  activeSubTab === subTab.id
+                                    ? 'bg-purple-50 text-purple-700 font-medium'
+                                    : 'text-gray-700'
+                                }`}
+                              >
+                                {subTab.label}
+                              </button>
+                            ))}
+                            
+                            {/* 구분선 */}
+                            <div className="border-t border-gray-100 my-1"></div>
+                            
+                            {/* 취소 관련 그룹 */}
+                            <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                              취소 사유
+                            </div>
+                            {ORDER_SUBTABS.filter(tab => tab.group === 'cancelled').map(subTab => (
+                              <button
+                                key={subTab.id}
+                                onClick={() => {
+                                  handleSubTabChange(subTab.id);
+                                  setIsDropdownOpen(false);
+                                }}
+                                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${
+                                  activeSubTab === subTab.id
+                                    ? 'bg-purple-50 text-purple-700 font-medium'
+                                    : 'text-gray-700'
+                                }`}
+                              >
+                                {subTab.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
 
-              {(loading || adminState.global.loading) ? (
+              {adminState.global.loading ? (
                 <div className="text-center py-12">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
                   <p className="mt-4 text-gray-600">데이터를 불러오는 중...</p>
                   <p className="mt-2 text-sm text-gray-500">API 서버에 연결 중...</p>
-                  <p className="mt-1 text-xs text-gray-400">
-                    로딩 상태: loading={loading.toString()}, global.loading={adminState.global.loading.toString()}
-                  </p>
+                  <div className="flex items-center justify-center space-x-2 mt-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div>
+                    <span className="text-sm text-gray-600">데이터를 불러오는 중...</span>
+                  </div>
                 </div>
               ) : (error || adminState.global.error) ? (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
@@ -1736,7 +1844,7 @@ export default function ExchangeAdmin() {
                             {adminState.tabs.dashboard.loading ? (
                               <div className="animate-pulse bg-gray-200 h-8 w-20 rounded"></div>
                             ) : (
-                              `₩${adminState.tabs.dashboard.kpis.todayVolume.toLocaleString()}`
+                              `₩${(adminState.tabs.dashboard.kpis.todayVolume || 0).toLocaleString()}`
                             )}
                           </p>
                         </div>
@@ -1746,7 +1854,7 @@ export default function ExchangeAdmin() {
                             {adminState.tabs.dashboard.loading ? (
                               <div className="animate-pulse bg-gray-200 h-8 w-20 rounded"></div>
                             ) : (
-                              `₩${adminState.tabs.dashboard.kpis.todayCommission.toLocaleString()}`
+                              `₩${(adminState.tabs.dashboard.kpis.todayCommission || 0).toLocaleString()}`
                             )}
                           </p>
                         </div>
@@ -1861,30 +1969,12 @@ export default function ExchangeAdmin() {
                         <div className="flex flex-wrap gap-3">
                           <button
                             onClick={() => {
-                              // TODO: 새 주문 생성 기능 구현
-                              alert('새 주문 생성 기능은 추후 구현 예정입니다.');
-                            }}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                          >
-                            📝 새 주문 생성
-                          </button>
-                          <button
-                            onClick={() => {
                               // TODO: 주문 내보내기 기능 구현
-                              alert('주문 내보내기 기능은 추후 구현 예정입니다.');
+                              toast('주문 내보내기 기능은 추후 구현 예정입니다.', { icon: 'ℹ️' });
                             }}
                             className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
                           >
                             📤 주문 내보내기
-                          </button>
-                          <button
-                            onClick={() => {
-                              // TODO: 주문 검증 기능 구현
-                              alert('주문 검증 기능은 추후 구현 예정입니다.');
-                            }}
-                            className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
-                          >
-                            ✅ 주문 검증
                           </button>
                         </div>
                       </div>
@@ -2011,7 +2101,7 @@ export default function ExchangeAdmin() {
                                     {order.price.toFixed(2)}
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    ₩{order.amount.toLocaleString()}
+                                    ₩{(order.amount || 0).toLocaleString()}
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap">
                                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -2060,7 +2150,7 @@ export default function ExchangeAdmin() {
                           <button
                             onClick={() => {
                               // TODO: 리포트 생성 기능 구현
-                              alert('리포트 생성 기능은 추후 구현 예정입니다.');
+                              toast('리포트 생성 기능은 추후 구현 예정입니다.', { icon: 'ℹ️' });
                             }}
                             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                           >
@@ -2069,7 +2159,7 @@ export default function ExchangeAdmin() {
                           <button
                             onClick={() => {
                               // TODO: 데이터 내보내기 기능 구현
-                              alert('데이터 내보내기 기능은 추후 구현 예정입니다.');
+                              toast('데이터 내보내기 기능은 추후 구현 예정입니다.', { icon: 'ℹ️' });
                             }}
                             className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
                           >
@@ -2078,7 +2168,7 @@ export default function ExchangeAdmin() {
                           <button
                             onClick={() => {
                               // TODO: 실시간 모니터링 기능 구현
-                              alert('실시간 모니터링 기능은 추후 구현 예정입니다.');
+                              toast('실시간 모니터링 기능은 추후 구현 예정입니다.', { icon: 'ℹ️' });
                             }}
                             className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
                           >
@@ -2087,7 +2177,7 @@ export default function ExchangeAdmin() {
                           <button
                             onClick={() => {
                               // TODO: 예측 분석 기능 구현
-                              alert('예측 분석 기능은 추후 구현 예정입니다.');
+                              toast('예측 분석 기능은 추후 구현 예정입니다.', { icon: 'ℹ️' });
                             }}
                             className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
                           >
@@ -2427,13 +2517,13 @@ export default function ExchangeAdmin() {
                             </div>
                             <div className="flex justify-between">
                               <span className="text-sm text-gray-600">주문 금액:</span>
-                              <span className="text-sm font-medium">₩{selectedOrder.amount.toLocaleString()}</span>
+                              <span className="text-sm font-medium">₩{(selectedOrder.amount || 0).toLocaleString()}</span>
                             </div>
                             {selectedOrder.status === 'matched' && (
                               <>
                                 <div className="flex justify-between">
                                   <span className="text-sm text-gray-600">체결 금액:</span>
-                                  <span className="text-sm font-medium text-green-600">₩{selectedOrder.filledAmount?.toLocaleString() || selectedOrder.amount.toLocaleString()}</span>
+                                  <span className="text-sm font-medium text-green-600">₩{(selectedOrder.filledAmount || selectedOrder.amount || 0).toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span className="text-sm text-gray-600">매치 비율:</span>
@@ -2447,7 +2537,7 @@ export default function ExchangeAdmin() {
                                 {selectedOrder.remainingAmount > 0 && (
                                   <div className="flex justify-between">
                                     <span className="text-sm text-gray-600">남은 금액:</span>
-                                    <span className="text-sm font-medium text-orange-600">₩{selectedOrder.remainingAmount.toLocaleString()}</span>
+                                    <span className="text-sm font-medium text-orange-600">₩{(selectedOrder.remainingAmount || 0).toLocaleString()}</span>
                                   </div>
                                 )}
                               </>
@@ -2677,7 +2767,7 @@ export default function ExchangeAdmin() {
                                 // 매칭 정보로 드릴다운
                                 updateBreadcrumbs(['orders', 'order-detail', 'matches'], { selectedOrder });
                                 // 매칭 정보 섹션으로 스크롤하거나 별도 뷰 표시
-                                alert('매칭 정보를 상세히 보여줍니다.');
+                                toast('매칭 정보를 상세히 보여줍니다.', { icon: 'ℹ️' });
                               }}
                               className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors"
                             >
@@ -2687,7 +2777,7 @@ export default function ExchangeAdmin() {
                           <button
                             onClick={() => {
                               // 사용자 프로필로 이동
-                              alert('사용자 프로필을 보여줍니다.');
+                              toast('사용자 프로필을 보여줍니다.', { icon: 'ℹ️' });
                             }}
                             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
                           >
@@ -2896,7 +2986,7 @@ export default function ExchangeAdmin() {
               <div className="bg-purple-50 p-4 rounded-lg">
                 <h4 className="text-sm font-medium text-purple-700">총 거래량</h4>
                 <p className="text-2xl font-bold text-purple-900">
-                  ₩{settlements.reduce((sum, s) => sum + s.totalVolume, 0).toLocaleString()}
+                  ₩{settlements.reduce((sum, s) => sum + (s.totalVolume || 0), 0).toLocaleString()}
                 </p>
               </div>
             </div>
@@ -2913,7 +3003,7 @@ export default function ExchangeAdmin() {
                     <span className="text-sm">{settlement.homeTeam} vs {settlement.awayTeam}</span>
                     <div className="flex items-center space-x-2">
                       <span className="text-sm text-gray-600">
-                        {settlement.settledOrders}개 주문 • ₩{settlement.totalVolume.toLocaleString()}
+                        {settlement.settledOrders || 0}개 주문 • ₩{(settlement.totalVolume || 0).toLocaleString()}
                       </span>
                       <span className="text-xs text-blue-600">클릭하여 상세보기</span>
                     </div>
