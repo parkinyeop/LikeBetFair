@@ -1613,81 +1613,170 @@ export default function Exchange() {
                         <div className="text-sm font-medium text-white mb-2">🎯 핸디캡 (Handicap)</div>
                         {(() => {
                           const spreadsOdds = game.officialOdds?.spreads || game.officialOdds?.handicap || {};
-                          const spreadKeys = Object.keys(spreadsOdds);
+                          const spreadEntries = Object.entries(spreadsOdds);
                           
-                          if (spreadKeys.length > 0) {
+                          if (spreadEntries.length === 0) {
                             return (
-                              <div className="flex items-center gap-2">
-                                <div className="w-16 text-base font-bold text-gray-300 text-center">
-                                  핸디캡
-                                </div>
-                                {spreadKeys.map((key, idx) => {
-                                  const odds = spreadsOdds[key];
-                                  if (!odds || !odds.averagePrice) return null;
-                                  
-                                  let label = key;
-                                  if (key.includes(game.home_team)) label = '홈팀';
-                                  else if (key.includes(game.away_team)) label = '원정팀';
-                                  
-                                  return (
-                                    <button
-                                      key={idx}
-                                      onClick={() => {
-                                        // 🎯 버튼 선택 상태 토글
-                                        const wasSelected = isButtonSelected(game.id, `핸디캡_${key}`);
-                                        handleButtonClick(game, key, odds.averagePrice, '핸디캡');
-                                        
-                                        // 선택 해제된 경우가 아니라면 사이드바로 이동
-                                        if (!wasSelected && game.isBettable && odds.averagePrice) {
-                                          const gameInfo = {
-                                            gameId: game.id,
-                                            homeTeam: game.home_team,
-                                            awayTeam: game.away_team,
-                                            sportKey: game.sport_key,
-                                            market: '핸디캡',
-                                            selection: key,
-                                            odds: odds.averagePrice,
-                                            commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString()
-                                          };
-                                          localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
+                              <div className="text-center text-gray-400 py-3">
+                                핸디캡 배당 정보가 없습니다.
+                              </div>
+                            );
+                          }
+                          
+                          // Home/Away 쌍으로 그룹화 (팀명 기반 매칭)
+                          const groupedSpreads: { [absPoint: string]: { home?: { oddsData: any, handicap: number }, away?: { oddsData: any, handicap: number } } } = {};
+                          
+                          spreadEntries.forEach(([outcomeName, oddsData]) => {
+                            // "Team Point" 형식에서 팀명과 핸디캡 분리
+                            const parts = outcomeName.split(' ');
+                            const point = parts[parts.length - 1]; // 마지막 부분이 핸디캡
+                            const teamName = parts.slice(0, -1).join(' '); // 나머지가 팀명
+                            
+                            const handicapValue = parseFloat(point); // -1.5 또는 +1.5
+                            const absPoint = Math.abs(handicapValue).toString(); // "1.5"로 통일
+                            
+                            if (!groupedSpreads[absPoint]) {
+                              groupedSpreads[absPoint] = {};
+                            }
+                            
+                            if (teamName === game.home_team) {
+                              groupedSpreads[absPoint].home = { oddsData, handicap: handicapValue };
+                            } else if (teamName === game.away_team) {
+                              groupedSpreads[absPoint].away = { oddsData, handicap: handicapValue };
+                            }
+                          });
+                          
+                          // 0.5 단위 핸디캡만 필터링 (-1.5, -1, -0.5, 0.5, 1, 1.5 등)
+                          const filteredSpreads = Object.entries(groupedSpreads).filter(([absPoint, oddsPair]) => {
+                            const pointValue = Math.abs(parseFloat(absPoint));
+                            return pointValue % 0.5 === 0;
+                          });
+                          
+                          if (filteredSpreads.length === 0) {
+                            return (
+                              <div className="text-center text-gray-400 py-3">
+                                핸디캡 배당 정보 없음
+                              </div>
+                            );
+                          }
+                          
+                          return (
+                            <div className="space-y-2">
+                              {filteredSpreads.map(([absPoint, oddsPair]) => {
+                                const homeData = oddsPair.home;
+                                const awayData = oddsPair.away;
+                                
+                                const homeOdds = homeData?.oddsData?.averagePrice;
+                                const awayOdds = awayData?.oddsData?.averagePrice;
+                                const pointValue = parseFloat(absPoint);
+                                // 스프레드 베팅에서는 하나의 핸디캡 값으로 양팀이 반대 방향을 가짐
+                                const homeHandicap = pointValue;
+                                const awayHandicap = -pointValue;
+                                
+                                return (
+                                  <div key={absPoint} className="flex items-center gap-2">
+                                    {homeOdds != null && (
+                                      <button
+                                        onClick={() => {
+                                          // 🎯 버튼 선택 상태 토글
+                                          const selection = `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`;
+                                          const wasSelected = isButtonSelected(game.id, `핸디캡_${selection}`);
+                                          handleButtonClick(game, selection, homeOdds, '핸디캡');
+                                          
+                                          // 선택 해제된 경우가 아니라면 사이드바로 이동
+                                          if (!wasSelected && game.isBettable && homeOdds) {
+                                            const gameInfo = {
+                                              gameId: game.id,
+                                              homeTeam: game.home_team,
+                                              awayTeam: game.away_team,
+                                              sportKey: game.sport_key,
+                                              market: '핸디캡',
+                                              selection: selection,
+                                              odds: homeOdds,
+                                              commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString()
+                                            };
+                                            localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
 
-                                          setTimeout(() => {
-                                            window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
-                                              detail: { tab: 'order' }
-                                            }));
                                             setTimeout(() => {
                                               window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
                                                 detail: { tab: 'order' }
                                               }));
-                                            }, 200);
-                                          }, 100);
+                                              setTimeout(() => {
+                                                window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                                  detail: { tab: 'order' }
+                                                }));
+                                              }, 200);
+                                            }, 100);
 
-                                          console.log('🎯 핸디캡 마켓 배당율 카드 클릭됨:', gameInfo);
-                                        }
-                                      }}
-                                      className={`flex-1 p-2 rounded-lg text-center transition-colors ${
-                                        isButtonSelected(game.id, `핸디캡_${key}`)
-                                          ? 'bg-yellow-500 hover:bg-yellow-600'
-                                          : game.isBettable && odds.averagePrice ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
-                                      } text-white text-sm`}
-                                      disabled={!game.isBettable || !odds.averagePrice}
-                                      title={game.isBettable && odds.averagePrice ? `클릭하여 ${key} 주문하기` : '베팅 마감됨'}
-                                    >
-                                      <div className="font-bold">{label}</div>
-                                      <div className="text-sm">{odds.averagePrice ? odds.averagePrice.toFixed(2) : 'N/A'}</div>
-                                      {!game.isBettable && <div className="text-xs text-red-400 mt-1">Betting Closed</div>}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            );
-                          } else {
-                            return (
-                              <div className="text-center text-gray-400 py-4">
-                                핸디캡 마켓 배당 정보가 없습니다.
-                              </div>
-                            );
-                          }
+                                            console.log('🎯 홈팀 핸디캡 배당율 카드 클릭됨:', gameInfo);
+                                          }
+                                        }}
+                                        className={`flex-1 p-2 rounded-lg text-center transition-colors ${
+                                          isButtonSelected(game.id, `핸디캡_${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`)
+                                            ? 'bg-yellow-500 hover:bg-yellow-600'
+                                            : game.isBettable && homeOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                        } text-white text-sm`}
+                                        disabled={!game.isBettable || !homeOdds}
+                                        title={game.isBettable && homeOdds ? `클릭하여 ${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap} 주문하기` : '베팅 마감됨'}
+                                      >
+                                        <div className="font-medium">{game.home_team} {homeHandicap > 0 ? '+' : ''}{homeHandicap}</div>
+                                        <div className="text-xs">{homeOdds.toFixed(2)}</div>
+                                      </button>
+                                    )}
+                                    <div className="w-12 text-sm font-medium text-blue-400 text-center">{pointValue}</div>
+                                    {awayOdds != null && (
+                                      <button
+                                        onClick={() => {
+                                          // 🎯 버튼 선택 상태 토글
+                                          const selection = `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`;
+                                          const wasSelected = isButtonSelected(game.id, `핸디캡_${selection}`);
+                                          handleButtonClick(game, selection, awayOdds, '핸디캡');
+                                          
+                                          // 선택 해제된 경우가 아니라면 사이드바로 이동
+                                          if (!wasSelected && game.isBettable && awayOdds) {
+                                            const gameInfo = {
+                                              gameId: game.id,
+                                              homeTeam: game.home_team,
+                                              awayTeam: game.away_team,
+                                              sportKey: game.sport_key,
+                                              market: '핸디캡',
+                                              selection: selection,
+                                              odds: awayOdds,
+                                              commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString()
+                                            };
+                                            localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
+
+                                            setTimeout(() => {
+                                              window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                                detail: { tab: 'order' }
+                                              }));
+                                              setTimeout(() => {
+                                                window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                                  detail: { tab: 'order' }
+                                                }));
+                                              }, 200);
+                                            }, 100);
+
+                                            console.log('🎯 어웨이팀 핸디캡 배당율 카드 클릭됨:', gameInfo);
+                                          }
+                                        }}
+                                        className={`flex-1 p-2 rounded-lg text-center transition-colors ${
+                                          isButtonSelected(game.id, `핸디캡_${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`)
+                                            ? 'bg-yellow-500 hover:bg-yellow-600'
+                                            : game.isBettable && awayOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                        } text-white text-sm`}
+                                        disabled={!game.isBettable || !awayOdds}
+                                        title={game.isBettable && awayOdds ? `클릭하여 ${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap} 주문하기` : '베팅 마감됨'}
+                                      >
+                                        <div className="font-medium">{game.away_team} {awayHandicap > 0 ? '+' : ''}{awayHandicap}</div>
+                                        <div className="text-xs">{awayOdds.toFixed(2)}</div>
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
                         })()}
                       </div>
                     )}
