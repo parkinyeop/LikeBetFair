@@ -63,7 +63,7 @@ const sportsDbLeagueMap = {
   'americanfootball_nfl': '4391'        // NFL
 };
 
-const API_KEY = process.env.THESPORTSDB_API_KEY || '123';
+const API_KEY = process.env.THESPORTSDB_API_KEY || '116108';
 
 // 표준화된 카테고리 매핑 (영문으로 통일)
 const standardizedCategoryMap = {
@@ -114,7 +114,7 @@ const apiResultCache = {};
 class GameResultService {
   constructor() {
     // The Odds API는 배당률 전용으로만 사용
-    this.oddsApiKey = process.env.ODDS_API_KEY || process.env.THE_ODDS_API_KEY || '123';
+    this.oddsApiKey = process.env.ODDS_API_KEY || process.env.THE_ODDS_API_KEY || 'b1a67915235b9dd963dcb5be603853ea';
     this.oddsBaseUrl = 'https://api.the-odds-api.com/v4/sports';
     
     // TheSportsDB API는 게임 결과 전용

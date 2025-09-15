@@ -2,7 +2,7 @@ import axios from 'axios';
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName } from '../normalizeUtils.js';
 
-const THESPORTSDB_API_KEY = process.env.THESPORTSDB_API_KEY || '123'; // 테스트 키
+const THESPORTSDB_API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // 기본 키
 const LEAGUE_ID = '4335'; // 스페인 라리가
 
 // 라리가 팀명 매핑 (2024-25 시즌 20개 팀)
