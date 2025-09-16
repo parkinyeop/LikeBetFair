@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from 'next/router';
+import { useActionItems } from '../hooks/useActionItems';
 import Header from '../components/Header';
 
 interface ActionItem {
@@ -100,6 +101,20 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // 실제 액션 아이템 데이터 사용
+  const {
+    actionItems: realActionItems,
+    loading: actionItemsLoading,
+    error: actionItemsError,
+    lastUpdated: actionItemsLastUpdated,
+    refetch: refetchActionItems,
+    isWebSocketConnected
+  } = useActionItems();
+
+  // 브라우저 알림 상태
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+
   const fetchDashboardData = useCallback(async () => {
     try {
       // AuthContext와 동일한 방식으로 토큰 가져오기
@@ -142,35 +157,7 @@ export default function AdminDashboard() {
               commission: 0
             }
           },
-          actionItems: data.actionItems || [
-            {
-              id: 'manual-settlement',
-              type: 'warning' as const,
-              icon: '⚠️',
-              title: '수동 결과 처리가 필요한 경기',
-              count: 3,
-              link: '/admin/games',
-              description: '자동 정산 실패한 경기들'
-            },
-            {
-              id: 'urgent-refund',
-              type: 'danger' as const,
-              icon: '💸',
-              title: '긴급 환불이 필요한 주문',
-              count: 1,
-              link: '/admin/bets',
-              description: '취소된 경기 관련 주문들'
-            },
-            {
-              id: 'failed-login',
-              type: 'info' as const,
-              icon: '🔒',
-              title: '5회 이상 로그인 실패한 계정',
-              count: 2,
-              link: '/admin/users',
-              description: '보안 위험 계정들'
-            }
-          ]
+          actionItems: realActionItems || []
         };
         
         setDashboardData(dataWithDefaults);
@@ -202,6 +189,96 @@ export default function AdminDashboard() {
     
     fetchDashboardData();
   }, [isLoggedIn, isAdmin, router, fetchDashboardData]);
+
+  // 브라우저 알림 권한 요청
+  const requestNotificationPermission = useCallback(async () => {
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      setNotificationsEnabled(permission === 'granted');
+
+      if (permission === 'granted') {
+        new Notification('LikeBetFair 관리자', {
+          body: '알림이 활성화되었습니다. 긴급 상황 발생 시 알림을 받을 수 있습니다.',
+          icon: '/favicon.ico'
+        });
+      }
+    }
+  }, []);
+
+  // 액션 아이템 알림 전송
+  const sendActionItemNotification = useCallback((title: string, body: string, type: 'danger' | 'warning' | 'info') => {
+    if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
+      const notification = new Notification(`🚨 ${title}`, {
+        body,
+        icon: '/favicon.ico',
+        badge: '/favicon.ico',
+        tag: `action-item-${type}`,
+        requireInteraction: type === 'danger',
+        data: { type, timestamp: new Date() }
+      });
+
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+      };
+
+      if (!notification.requireInteraction) {
+        setTimeout(() => notification.close(), type === 'danger' ? 10000 : 5000);
+      }
+    }
+  }, [notificationsEnabled]);
+
+  // 이전 액션 아이템 상태 추적
+  const [previousActionItems, setPreviousActionItems] = useState<ActionItem[]>([]);
+
+  // 액션 아이템 변화 감지 및 알림
+  useEffect(() => {
+    if (!realActionItems || !notificationsEnabled) return;
+
+    if (previousActionItems.length === 0) {
+      setPreviousActionItems(realActionItems);
+      return;
+    }
+
+    const newDangerItems = realActionItems.filter(item =>
+      item.type === 'danger' &&
+      !previousActionItems.some(prev => prev.id === item.id && prev.count === item.count)
+    );
+
+    const newWarningItems = realActionItems.filter(item =>
+      item.type === 'warning' &&
+      item.count > (previousActionItems.find(prev => prev.id === item.id)?.count || 0)
+    );
+
+    newDangerItems.forEach(item => {
+      sendActionItemNotification(
+        '긴급 조치 필요!',
+        `${item.title}: ${item.count}건의 문제가 발견되었습니다.`,
+        'danger'
+      );
+    });
+
+    newWarningItems.forEach(item => {
+      if (item.count >= 5) {
+        sendActionItemNotification(
+          '주의 필요',
+          `${item.title}: ${item.count}건`,
+          'warning'
+        );
+      }
+    });
+
+    setPreviousActionItems(realActionItems);
+  }, [realActionItems, notificationsEnabled, previousActionItems, sendActionItemNotification]);
+
+  // 브라우저 알림 권한 확인
+  useEffect(() => {
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission);
+      setNotificationsEnabled(Notification.permission === 'granted');
+    }
+  }, []);
 
   if (!isLoggedIn || !isAdmin) {
     return null;
@@ -283,86 +360,123 @@ export default function AdminDashboard() {
 
               {/* Action Items 섹션 */}
               <div className="mb-6">
-                <h2 className="text-lg font-bold text-gray-800 mb-3">긴급 조치 필요 항목</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {dashboardData?.actionItems?.map((item) => (
-                    <div
-                      key={item.id}
-                      className={`p-3 rounded-lg border-l-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${
-                        item.type === 'danger' 
-                          ? 'bg-red-50 border-red-500' 
-                          : item.type === 'warning'
-                          ? 'bg-yellow-50 border-yellow-500'
-                          : 'bg-blue-50 border-blue-500'
-                      }`}
-                      onClick={() => router.push(item.link)}
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-lg font-bold text-gray-800">긴급 조치 필요 항목</h2>
+                  <div className="flex items-center space-x-3">
+                    {actionItemsError && (
+                      <span className="text-xs text-red-600">
+                        ⚠️ {actionItemsError}
+                      </span>
+                    )}
+                    <div className="flex items-center space-x-2 text-xs">
+                      {/* WebSocket 연결 상태 */}
+                      <span className={`flex items-center ${isWebSocketConnected ? 'text-green-600' : 'text-gray-500'}`}>
+                        <span className={`w-2 h-2 rounded-full mr-1 ${isWebSocketConnected ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                        {isWebSocketConnected ? '실시간' : '폴링'}
+                      </span>
+
+                      {actionItemsLastUpdated && (
+                        <span className="text-gray-500">
+                          최종 업데이트: {actionItemsLastUpdated.toLocaleTimeString('ko-KR')}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* 브라우저 알림 설정 */}
+                    {'Notification' in window && (
+                      <div className="flex items-center space-x-2">
+                        {notificationPermission === 'default' && (
+                          <button
+                            onClick={requestNotificationPermission}
+                            className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 transition-colors"
+                          >
+                            🔔 알림 설정
+                          </button>
+                        )}
+                        {notificationPermission === 'granted' && (
+                          <span className="text-xs text-green-600 flex items-center">
+                            🔔 알림 활성화
+                          </span>
+                        )}
+                        {notificationPermission === 'denied' && (
+                          <span className="text-xs text-gray-500">
+                            🔕 알림 차단됨
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={refetchActionItems}
+                      disabled={actionItemsLoading}
+                      className="text-blue-600 hover:text-blue-800 text-sm disabled:opacity-50"
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-lg">{item.icon}</span>
-                          <div>
-                            <h3 className="font-medium text-gray-800 text-sm">{item.title}</h3>
-                            <p className="text-xs text-gray-600">{item.description}</p>
-                          </div>
-                        </div>
-                        <div className={`text-lg font-bold ${
-                          item.type === 'danger' 
-                            ? 'text-red-600' 
-                            : item.type === 'warning'
-                            ? 'text-yellow-600'
-                            : 'text-blue-600'
-                        }`}>
-                          {item.count}
-                        </div>
+                      🔄 {actionItemsLoading ? '조회 중...' : '새로고침'}
+                    </button>
+                  </div>
+                </div>
+
+                {actionItemsLoading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="p-3 rounded-lg bg-gray-200 animate-pulse">
+                        <div className="h-16 bg-gray-300 rounded"></div>
+                      </div>
+                    ))}
+                  </div>
+                ) : realActionItems.length === 0 ? (
+                  <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded-lg">
+                    <div className="flex items-center">
+                      <span className="text-2xl mr-3">✅</span>
+                      <div>
+                        <h3 className="font-medium text-green-800">모든 시스템이 정상입니다</h3>
+                        <p className="text-sm text-green-600">긴급 조치가 필요한 항목이 없습니다.</p>
                       </div>
                     </div>
-                  )) || (
-                    // 더미 데이터
-                    <>
-                      <div className="p-3 rounded-lg border-l-4 bg-yellow-50 border-yellow-500 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                           onClick={() => router.push('/admin/games')}>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {realActionItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`p-3 rounded-lg border-l-4 shadow-sm hover:shadow-md transition-all cursor-pointer group ${
+                          item.type === 'danger'
+                            ? 'bg-red-50 border-red-500 hover:bg-red-100'
+                            : item.type === 'warning'
+                            ? 'bg-yellow-50 border-yellow-500 hover:bg-yellow-100'
+                            : 'bg-blue-50 border-blue-500 hover:bg-blue-100'
+                        }`}
+                        onClick={() => router.push(item.link)}
+                      >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
-                            <span className="text-lg">⚠️</span>
+                            <span className="text-lg group-hover:scale-110 transition-transform">{item.icon}</span>
                             <div>
-                              <h3 className="font-medium text-gray-800 text-sm">수동 결과 처리가 필요한 경기</h3>
-                              <p className="text-xs text-gray-600">자동 정산 실패한 경기들</p>
+                              <h3 className="font-medium text-gray-800 text-sm">{item.title}</h3>
+                              <p className="text-xs text-gray-600">{item.description}</p>
                             </div>
                           </div>
-                          <div className="text-lg font-bold text-yellow-600">3</div>
-                        </div>
-                      </div>
-                      
-                      <div className="p-3 rounded-lg border-l-4 bg-red-50 border-red-500 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                           onClick={() => router.push('/admin/bets')}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-lg">💸</span>
-                            <div>
-                              <h3 className="font-medium text-gray-800 text-sm">긴급 환불이 필요한 주문</h3>
-                              <p className="text-xs text-gray-600">취소된 경기 관련 주문들</p>
-                            </div>
+                          <div className={`text-lg font-bold ${
+                            item.type === 'danger'
+                              ? 'text-red-600'
+                              : item.type === 'warning'
+                              ? 'text-yellow-600'
+                              : 'text-blue-600'
+                          }`}>
+                            {item.count}
                           </div>
-                          <div className="text-lg font-bold text-red-600">1</div>
                         </div>
-                      </div>
-                      
-                      <div className="p-3 rounded-lg border-l-4 bg-blue-50 border-blue-500 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                           onClick={() => router.push('/admin/users')}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-lg">🔒</span>
-                            <div>
-                              <h3 className="font-medium text-gray-800 text-sm">5회 이상 로그인 실패한 계정</h3>
-                              <p className="text-xs text-gray-600">보안 위험 계정들</p>
-                            </div>
+
+                        {/* 심각도에 따른 추가 표시 */}
+                        {item.type === 'danger' && item.count > 0 && (
+                          <div className="mt-2 text-xs text-red-600 font-medium">
+                            ⚠️ 즉시 조치 필요
                           </div>
-                          <div className="text-lg font-bold text-blue-600">2</div>
-                        </div>
+                        )}
                       </div>
-                    </>
-                  )}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {loading ? (
