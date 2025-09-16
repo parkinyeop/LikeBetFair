@@ -239,10 +239,10 @@ async function collectMLBData() {
           result = event.strStatus.toLowerCase();
         }
         // 2. TheSportsDB 상태 매핑 - 명시적으로 finished인 경우
-        else if (event.strStatus === 'Match Finished' || event.intHomeScore !== null) {
+        else if (event.strStatus === 'FT' || event.strStatus === 'Match Finished' || event.intHomeScore !== null) {
           status = 'finished';
           
-          if (event.intHomeScore !== null && event.intAwayScore !== null) {
+          if (event.intHomeScore && event.intAwayScore) {
             score = JSON.stringify([
               { name: event.strHomeTeam, score: event.intHomeScore.toString() },
               { name: event.strAwayTeam, score: event.intAwayScore.toString() }
@@ -261,7 +261,7 @@ async function collectMLBData() {
           }
         }
         // 3. 스코어가 있지만 status가 finished가 아닌 경우 - 보수적 시간 기반 처리
-        else if (event.intHomeScore !== null && event.intAwayScore !== null) {
+        else if (event.intHomeScore && event.intAwayScore) {
           const gameTime = new Date(commenceTime);
           const now = new Date();
           const hoursSinceGame = (now - gameTime) / (1000 * 60 * 60);

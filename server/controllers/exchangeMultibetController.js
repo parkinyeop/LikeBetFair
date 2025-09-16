@@ -150,7 +150,7 @@ class ExchangeMultibetController {
             odds: s.odds,
             homeTeam: s.homeTeam,
             awayTeam: s.awayTeam,
-            commenceTime: s.commenceTime || new Date().toISOString(), // 이미 UTC ISO 문자열이므로 그대로 사용
+            commenceTime: s.commenceTime ? new Date(s.commenceTime).toISOString() : new Date().toISOString(), // UTC로 정규화
             sportKey: s.sportKey,
             desc: s.desc || `${s.homeTeam} vs ${s.awayTeam}`, // 🆕 desc 필드 추가
             option: s.option, // 🆕 option 필드 추가 (Over/Under용)

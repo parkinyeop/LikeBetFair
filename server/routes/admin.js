@@ -8,6 +8,7 @@ import ExchangeOrder from '../models/exchangeOrderModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
 import GameResult from '../models/gameResultModel.js';
 import OddsCache from '../models/oddsCacheModel.js';
+import actionItemService from '../services/actionItemService.js';
 import bcrypt from 'bcryptjs';
 import { Op } from 'sequelize';
 
@@ -40,6 +41,52 @@ const requireAdmin = (minLevel = 1) => {
 // =============================================================================
 // 대시보드 & 통계
 // =============================================================================
+
+// 긴급 조치 필요 항목 조회
+router.get('/action-items', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    console.log('🔍 액션 아이템 조회 요청:', req.admin.username);
+
+    const actionItems = await actionItemService.getAllActionItems();
+
+    res.json({
+      success: true,
+      actionItems,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ 액션 아이템 조회 실패:', error);
+    res.status(500).json({
+      success: false,
+      message: '긴급 조치 항목 조회 중 오류가 발생했습니다.',
+      error: error.message
+    });
+  }
+});
+
+// 특정 액션 아이템 상세 정보 조회
+router.get('/action-items/:itemId/details', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    console.log(`🔍 액션 아이템 상세 조회: ${itemId}`);
+
+    const details = await actionItemService.getActionItemDetails(itemId);
+
+    res.json({
+      success: true,
+      itemId,
+      details,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error(`❌ 액션 아이템 ${req.params.itemId} 상세 조회 실패:`, error);
+    res.status(500).json({
+      success: false,
+      message: '액션 아이템 상세 정보 조회 중 오류가 발생했습니다.',
+      error: error.message
+    });
+  }
+});
 
 // 관리자 대시보드 데이터
 router.get('/dashboard', verifyToken, requireAdmin(1), async (req, res) => {
@@ -244,6 +291,12 @@ router.get('/exchange/stats', verifyToken, requireAdmin(1), async (req, res) => 
       where: { status: 'settled' }
     });
 
+    const totalCancelledOrders = await ExchangeOrder.count({
+      where: { status: 'cancelled' }
+    });
+
+    const totalOrders = await ExchangeOrder.count();
+
     res.json({
       today: {
         orders: todayOrders,
@@ -254,7 +307,9 @@ router.get('/exchange/stats', verifyToken, requireAdmin(1), async (req, res) => 
       total: {
         openOrders: totalOpenOrders,
         multibets: totalMultibets,
-        settlements: totalSettlements
+        settlements: totalSettlements,
+        cancelledOrders: totalCancelledOrders,
+        totalOrders: totalOrders
       }
     });
   } catch (error) {
@@ -307,6 +362,7 @@ router.get('/exchange/daily-stats', verifyToken, requireAdmin(1), async (req, re
         matchedOrders: 0,
         openOrders: 0,
         settledOrders: 0,
+        cancelledOrders: 0,
         multibets: 0,
         volume: 0
       };
@@ -334,6 +390,9 @@ router.get('/exchange/daily-stats', verifyToken, requireAdmin(1), async (req, re
             break;
           case 'settled':
             dailyStats[dateKey].settledOrders++;
+            break;
+          case 'cancelled':
+            dailyStats[dateKey].cancelledOrders++;
             break;
         }
       }

@@ -2,14 +2,83 @@
 
 /**
  * 팀명 정규화: 영문/숫자/한글만 남기고, 공백 및 특수문자 제거, 소문자 변환
+ * 아르헨티나 프리메라 디비시온 팀명을 고려한 개선된 정규화
  */
 function normalizeTeamName(team) {
   if (!team) return '';
-  return team
+  
+  let normalized = team
     .toLowerCase()
     .replace(/[^a-z0-9가-힣]/g, '')
     .replace(/\s+/g, '')
     .trim();
+  
+  // 아르헨티나 프리메라 디비시온 특별 처리
+  if (normalized.includes('belgrano') && normalized.includes('cordoba')) {
+    normalized = 'belgrano';
+  }
+  if (normalized.includes('sanmartin') && normalized.includes('sanjuan')) {
+    normalized = 'sanmartndesanjuan';
+  }
+  if (normalized.includes('vlez') && normalized.includes('sarsfield')) {
+    normalized = 'vlezsarsfield';
+  }
+  if (normalized.includes('rosario') && normalized.includes('central')) {
+    normalized = 'rosariocentral';
+  }
+  if (normalized.includes('defensa') && normalized.includes('justicia')) {
+    normalized = 'defensayjusticia';
+  }
+  if (normalized.includes('lanus') || normalized.includes('lans')) {
+    normalized = 'lans';
+  }
+  if (normalized.includes('deportivo') && normalized.includes('riestra')) {
+    normalized = 'deportivoriestra';
+  }
+  if (normalized.includes('estudiantes') && normalized.includes('plata')) {
+    normalized = 'estudiantesdelaplata';
+  }
+  if (normalized.includes('gimnasia') && normalized.includes('esgrima')) {
+    normalized = 'gimnasiayesgrimadelaplata';
+  }
+  if (normalized.includes('river') && normalized.includes('plate')) {
+    normalized = 'riverplate';
+  }
+  if (normalized.includes('boca') && normalized.includes('juniors')) {
+    normalized = 'bocajuniors';
+  }
+  if (normalized.includes('central') && normalized.includes('cordoba')) {
+    normalized = 'centralcrdobadesantiagodelestero';
+  }
+  if (normalized.includes('newells') && normalized.includes('oldboys')) {
+    normalized = 'newellsoldboys';
+  }
+  if (normalized.includes('independiente') && normalized.includes('rivadavia')) {
+    normalized = 'independienterivadavia';
+  }
+  if (normalized.includes('barracas') && normalized.includes('central')) {
+    normalized = 'barracascentral';
+  }
+  if (normalized.includes('racing') && normalized.includes('club')) {
+    normalized = 'racingclub';
+  }
+  if (normalized.includes('talleres') && normalized.includes('cordoba')) {
+    normalized = 'talleresdecrdoba';
+  }
+  if (normalized.includes('union')) {
+    normalized = 'unin';
+  }
+  if (normalized.includes('argentinos') && normalized.includes('juniors')) {
+    normalized = 'argentinosjuniors';
+  }
+  if (normalized.includes('atletico') && normalized.includes('tucuman')) {
+    normalized = 'atltcotucumn';
+  }
+  if (normalized.includes('san') && normalized.includes('lorenzo')) {
+    normalized = 'sanlorenzo';
+  }
+  
+  return normalized;
 }
 
 /**
@@ -220,6 +289,40 @@ const globalTeamMapping = {
   'wolverhamptonwanderers': 'wolverhampton',
   'wolves': 'wolverhampton',
   'wolverhampton': 'wolverhampton',
+
+  // === 아르헨티나 프리메라 디비시온 ===
+  'belgranodecordoba': 'belgrano',
+  'belgrano': 'belgrano',
+  'sanmartindesanjuan': 'sanmartndesanjuan',
+  'sanmartndesanjuan': 'sanmartndesanjuan',
+  'vlezsarsfield': 'vlezsarsfield',
+  'rosariocentral': 'rosariocentral',
+  'defensayjusticia': 'defensayjusticia',
+  'lans': 'lans',
+  'deportivoriestra': 'deportivoriestra',
+  'independiente': 'independiente',
+  'sarmiento': 'sarmiento',
+  'huracn': 'huracn',
+  'atltcotucumn': 'atltcotucumn',
+  'sanlorenzo': 'sanlorenzo',
+  'estudiantesdelaplata': 'estudiantesdelaplata',
+  'instituto': 'instituto',
+  'gimnasiayesgrimadelaplata': 'gimnasiayesgrimadelaplata',
+  'platense': 'platense',
+  'riverplate': 'riverplate',
+  'bocajuniors': 'bocajuniors',
+  'centralcrdobadesantiagodelestero': 'centralcrdobadesantiagodelestero',
+  'aldosivi': 'aldosivi',
+  'tigre': 'tigre',
+  'godoycruz': 'godoycruz',
+  'newellsoldboys': 'newellsoldboys',
+  'independienterivadavia': 'independienterivadavia',
+  'banfield': 'banfield',
+  'barracascentral': 'barracascentral',
+  'racingclub': 'racingclub',
+  'talleresdecrdoba': 'talleresdecrdoba',
+  'unin': 'unin',
+  'argentinosjuniors': 'argentinosjuniors',
 
   // === 기타 리그들 ===
   // EPL, 라리가, 분데스리가, 세리에A, J리그 등은 필요시 추가

@@ -54,6 +54,7 @@ import betRoutes from './routes/bet.js';
 import adminRoutes from './routes/admin.js';
 import exchangeRoutes from './routes/exchange.js';
 import exchangeMultibetRoutes from './routes/exchangeMultibetRoutes.js';
+import manualGameResultRoutes from './routes/manualGameResult.js';
 
 
 
@@ -115,6 +116,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/bet', betRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin', manualGameResultRoutes);
 app.use('/api/game-results', gameResultRoutes);
 app.use('/api/exchange/multibet', exchangeMultibetRoutes); // 구체적인 경로를 먼저 등록
 app.use('/api/exchange', exchangeRoutes); // 일반적인 경로를 나중에 등록
@@ -160,6 +162,9 @@ import { setupSeasonStatusScheduler } from './services/seasonStatusUpdater.js';
 
 // Exchange WebSocket 서비스 import
 import exchangeWebSocketService from './services/exchangeWebSocketService.js';
+
+// 액션 아이템 모니터링 Job import
+import actionItemMonitorJob from './jobs/actionItemMonitorJob.js';
 
 // 데이터베이스 연결 및 서버 시작
 const PORT = process.env.PORT || (() => {
@@ -304,6 +309,12 @@ async function startServer() {
       console.log('[시작] Exchange WebSocket 서비스 초기화...');
       exchangeWebSocketService.initialize(server);
       console.log('✅ Exchange WebSocket 서비스 초기화 완료');
+
+      // 액션 아이템 모니터링 시스템 초기화
+      console.log('[시작] 액션 아이템 모니터링 시스템 초기화...');
+      actionItemMonitorJob.setWebSocketService(exchangeWebSocketService);
+      actionItemMonitorJob.start();
+      console.log('✅ 액션 아이템 모니터링 시스템 초기화 완료');
       
       // 기본 계정 생성 (비동기로 처리)
       if (process.env.NODE_ENV === 'production') {
