@@ -1396,12 +1396,14 @@ export default function ExchangeAdmin() {
       let matchedOrders = [];
       let gameResults = {};
       let gameResult = null;
-      
+      let refundInfo = [];
+
       if (matchedOrdersResponse.ok) {
         const matchedData = await matchedOrdersResponse.json();
         matchedOrders = matchedData.matchedOrders || [];
         gameResults = matchedData.gameResults || {}; // 멀티배팅용 경기 결과들
         gameResult = matchedData.originalOrder?.gameResult || null; // 단일 경기용 경기 결과
+        refundInfo = matchedData.refundInfo || []; // 환불 정보
       }
       
       // 주문 상세 정보 설정
@@ -1409,7 +1411,8 @@ export default function ExchangeAdmin() {
         ...order,
         matchedOrders: matchedOrders,
         gameResults: gameResults, // 멀티배팅용 경기 결과들
-        gameResult: gameResult // 단일 경기용 경기 결과
+        gameResult: gameResult, // 단일 경기용 경기 결과
+        refundInfo: refundInfo // 환불 정보
       };
       
       setSelectedOrder(orderWithMatches);
@@ -2598,6 +2601,28 @@ export default function ExchangeAdmin() {
                                 {getCancellationDisplayText(selectedOrder)}
                               </span>
                             </div>
+                            {/* 환불 정보 표시 */}
+                            {selectedOrder.refundInfo && selectedOrder.refundInfo.length > 0 && (
+                              <div className="flex justify-between">
+                                <span className="text-sm text-gray-600">환불:</span>
+                                <div className="text-right">
+                                  {selectedOrder.refundInfo.map((refund, index) => (
+                                    <div key={index} className="text-sm font-medium text-orange-600">
+                                      ₩{refund.amount.toLocaleString()}
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        {new Date(refund.refundedAt).toLocaleDateString('ko-KR', {
+                                          year: 'numeric',
+                                          month: 'short',
+                                          day: 'numeric',
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        })}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
 

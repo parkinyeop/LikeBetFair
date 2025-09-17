@@ -656,6 +656,27 @@ router.get('/exchange/orders/:orderId/matches', verifyToken, requireAdmin(1), as
     
     matchedOrders = matchedOrders.concat(ordersMatchedToThis);
     
+    // 🆕 환불 정보 조회 (다중 환불 지원)
+    let refundInfo = [];
+    try {
+      const refundHistories = await PaymentHistory.findAll({
+        where: {
+          betId: `EXCHANGE_${orderId}`,
+          memo: { [Op.like]: '%환불%' }
+        },
+        order: [['createdAt', 'DESC']]
+      });
+
+      refundInfo = refundHistories.map(refund => ({
+        amount: parseFloat(refund.amount),
+        refundedAt: refund.paidAt,
+        memo: refund.memo,
+        balanceAfter: parseFloat(refund.balanceAfter)
+      }));
+    } catch (error) {
+      console.error('환불 정보 조회 오류:', error);
+    }
+
     // 🆕 경기 결과 데이터 조회
     let gameResults = {};
     
@@ -756,7 +777,8 @@ router.get('/exchange/orders/:orderId/matches', verifyToken, requireAdmin(1), as
     res.json({
       originalOrder,
       matchedOrders,
-      gameResults // 멀티배팅용 경기 결과들
+      gameResults, // 멀티배팅용 경기 결과들
+      refundInfo // 환불 정보 추가
     });
   } catch (error) {
     console.error('Exchange order matches error:', error);
