@@ -7,8 +7,6 @@ interface SystemSettings {
   site_name: string;
   site_description: string;
   maintenance_mode: boolean;
-  max_bet_amount: number;
-  min_bet_amount: number;
   commission_rate: number;
   auto_settlement_enabled: boolean;
   odds_update_interval: number;
@@ -46,14 +44,22 @@ export default function SystemSettings() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'general' | 'permissions' | 'monitoring' | 'backup'>('general');
   const [loading, setLoading] = useState(true);
+
+  // 숫자 포맷팅 함수
+  const formatNumber = (num: number): string => {
+    return new Intl.NumberFormat('ko-KR').format(num);
+  };
+
+  // 포맷된 숫자를 숫자로 변환
+  const parseFormattedNumber = (str: string): number => {
+    return parseInt(str.replace(/,/g, '')) || 0;
+  };
   
   // 설정 상태
   const [settings, setSettings] = useState<SystemSettings>({
     site_name: '',
     site_description: '',
     maintenance_mode: false,
-    max_bet_amount: 1000000,
-    min_bet_amount: 1000,
     commission_rate: 0.05,
     auto_settlement_enabled: true,
     odds_update_interval: 30,
@@ -358,24 +364,6 @@ export default function SystemSettings() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">최대 베팅 금액</label>
-                  <input
-                    type="number"
-                    value={settings.max_bet_amount}
-                    onChange={(e) => setSettings({...settings, max_bet_amount: parseInt(e.target.value)})}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">최소 베팅 금액</label>
-                  <input
-                    type="number"
-                    value={settings.min_bet_amount}
-                    onChange={(e) => setSettings({...settings, min_bet_amount: parseInt(e.target.value)})}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  />
-                </div>
-                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">수수료율 (%)</label>
                   <input
                     type="number"
@@ -459,30 +447,36 @@ export default function SystemSettings() {
                   <h4 className="text-md font-medium text-gray-800 mb-3">스포츠북 베팅 금액</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">최소 베팅 금액 (원)</label>
-                      <input
-                        type="number"
-                        value={bettingSettings.sportsbook_min_bet_amount}
-                        onChange={(e) => setBettingSettings({
-                          ...bettingSettings, 
-                          sportsbook_min_bet_amount: parseInt(e.target.value) || 0
-                        })}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2"
-                        min="0"
-                      />
+                      <label className="block text-sm font-medium text-gray-700 mb-1">최소 베팅 금액</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={formatNumber(bettingSettings.sportsbook_min_bet_amount)}
+                          onChange={(e) => setBettingSettings({
+                            ...bettingSettings, 
+                            sportsbook_min_bet_amount: parseFormattedNumber(e.target.value)
+                          })}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 pr-16"
+                          placeholder="1,000"
+                        />
+                        <span className="absolute right-3 top-2 text-sm text-gray-500">KRW</span>
+                      </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">최대 베팅 금액 (원)</label>
-                      <input
-                        type="number"
-                        value={bettingSettings.sportsbook_max_bet_amount}
-                        onChange={(e) => setBettingSettings({
-                          ...bettingSettings, 
-                          sportsbook_max_bet_amount: parseInt(e.target.value) || 0
-                        })}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2"
-                        min="0"
-                      />
+                      <label className="block text-sm font-medium text-gray-700 mb-1">최대 베팅 금액</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={formatNumber(bettingSettings.sportsbook_max_bet_amount)}
+                          onChange={(e) => setBettingSettings({
+                            ...bettingSettings, 
+                            sportsbook_max_bet_amount: parseFormattedNumber(e.target.value)
+                          })}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 pr-16"
+                          placeholder="1,000,000"
+                        />
+                        <span className="absolute right-3 top-2 text-sm text-gray-500">KRW</span>
+                      </div>
                     </div>
                   </div>
                   <div className="mt-3">
@@ -500,30 +494,36 @@ export default function SystemSettings() {
                   <h4 className="text-md font-medium text-gray-800 mb-3">익스체인지 베팅 금액</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">최소 베팅 금액 (원)</label>
-                      <input
-                        type="number"
-                        value={bettingSettings.exchange_min_bet_amount}
-                        onChange={(e) => setBettingSettings({
-                          ...bettingSettings, 
-                          exchange_min_bet_amount: parseInt(e.target.value) || 0
-                        })}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2"
-                        min="0"
-                      />
+                      <label className="block text-sm font-medium text-gray-700 mb-1">최소 베팅 금액</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={formatNumber(bettingSettings.exchange_min_bet_amount)}
+                          onChange={(e) => setBettingSettings({
+                            ...bettingSettings, 
+                            exchange_min_bet_amount: parseFormattedNumber(e.target.value)
+                          })}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 pr-16"
+                          placeholder="5,000"
+                        />
+                        <span className="absolute right-3 top-2 text-sm text-gray-500">KRW</span>
+                      </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">최대 베팅 금액 (원)</label>
-                      <input
-                        type="number"
-                        value={bettingSettings.exchange_max_bet_amount}
-                        onChange={(e) => setBettingSettings({
-                          ...bettingSettings, 
-                          exchange_max_bet_amount: parseInt(e.target.value) || 0
-                        })}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2"
-                        min="0"
-                      />
+                      <label className="block text-sm font-medium text-gray-700 mb-1">최대 베팅 금액</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={formatNumber(bettingSettings.exchange_max_bet_amount)}
+                          onChange={(e) => setBettingSettings({
+                            ...bettingSettings, 
+                            exchange_max_bet_amount: parseFormattedNumber(e.target.value)
+                          })}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 pr-16"
+                          placeholder="5,000,000"
+                        />
+                        <span className="absolute right-3 top-2 text-sm text-gray-500">KRW</span>
+                      </div>
                     </div>
                   </div>
                   <div className="mt-3">
