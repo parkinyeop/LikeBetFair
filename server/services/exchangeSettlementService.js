@@ -1416,6 +1416,7 @@ class ExchangeSettlementService {
     
     // 각 선택사항에 대해 개별적으로 경기 결과 확인
     let allSelectionsWon = true;
+    let allSelectionsHaveResults = true; // 🆕 모든 선택사항이 경기 결과를 가지고 있는지 확인
     const selectionResults = [];
     
     for (const selection of order.selectionDetails.selections) {
@@ -1431,6 +1432,7 @@ class ExchangeSettlementService {
       if (!selectionGameResult || selectionGameResult.status !== 'finished') {
         console.log(`❌ 선택사항 경기 결과 없음: ${selection.homeTeam} vs ${selection.awayTeam}`);
         allSelectionsWon = false;
+        allSelectionsHaveResults = false; // 🆕 경기 결과가 없으면 정산 불가
         selectionResults.push({
           selection: selection.selection,
           game: `${selection.homeTeam} vs ${selection.awayTeam}`,
@@ -1455,6 +1457,20 @@ class ExchangeSettlementService {
       }
       
       console.log(`✅ 선택사항 결과: ${isWinner ? '승리' : '패배'} (${selectionGameResult.result})`);
+    }
+    
+    // 🆕 모든 선택사항의 경기 결과가 없으면 정산하지 않음
+    if (!allSelectionsHaveResults) {
+      console.log(`⚠️ 멀티베팅 주문 ${order.id}: 일부 경기 결과가 없어 정산하지 않습니다.`);
+      return {
+        orderId: order.id,
+        userId: order.userId,
+        type: 'multibet_pending',
+        totalWinnings: 0,
+        isMultibet: true,
+        selectionResults: selectionResults,
+        message: '일부 경기 결과가 없어 정산 대기 중'
+      };
     }
     
     // 멀티베팅 결과 계산 (모든 선택사항이 승리해야 함)

@@ -33,8 +33,16 @@ class MultibetSettlementService {
         throw new Error('선택된 경기가 없습니다.');
       }
 
-      // 부분 매칭 여부와 관계없이 그룹으로 처리
-      console.log(`📋 선택된 경기: ${order.selectionDetails.selections.length}개 (그룹 정산)`);
+      // 🆕 매치 여부 확인
+      const hasMatches = await this.checkOrderMatches(order.id);
+      if (!hasMatches) {
+        console.log(`⚠️ 매치되지 않은 주문: ${order.id} - 만료 취소 처리`);
+        await this.processUnmatchedOrderCancellation(order, transaction);
+        await transaction.commit();
+        return { message: 'Unmatched order cancelled', orderId: order.id };
+      }
+
+      console.log(`📋 선택된 경기: ${order.selectionDetails.selections.length}개 (매치된 주문 정산)`);
 
       // 이미 정산된 경우 스킵
       if (order.status === 'settled') {
@@ -65,6 +73,64 @@ class MultibetSettlementService {
       console.error(`❌ 멀티배팅 정산 실패: 주문 ${order.id}`, error);
       throw error;
     }
+  }
+  
+  /**
+   * 주문의 매치 여부 확인
+   * @param {number} orderId - 주문 ID
+   * @returns {boolean} 매치 여부
+   */
+  async checkOrderMatches(orderId) {
+    const matches = await ExchangeOrderMatch.findAll({
+      where: {
+        [Op.or]: [
+          { originalOrderId: orderId },
+          { matchingOrderId: orderId }
+        ],
+        status: 'active'
+      }
+    });
+    
+    console.log(`🔍 주문 ${orderId} 매치 확인: ${matches.length}개 매치`);
+    return matches.length > 0;
+  }
+  
+  /**
+   * 매치되지 않은 주문 취소 처리
+   * @param {Object} order - 주문
+   * @param {Object} transaction - 트랜잭션
+   */
+  async processUnmatchedOrderCancellation(order, transaction) {
+    console.log(`🔄 매치되지 않은 주문 취소 처리: ${order.id}`);
+    
+    // 1. 주문 상태를 cancelled로 변경
+    await order.update({
+      status: 'cancelled',
+      settlementNote: '매치되지 않아 만료 취소',
+      settledAt: new Date()
+    }, { transaction });
+    
+    // 2. 사용자 잔액 환불
+    const user = await User.findByPk(order.userId, { transaction });
+    const refundAmount = order.stakeAmount || order.amount;
+    const currentBalance = parseFloat(user.balance) || 0;
+    const newBalance = currentBalance + refundAmount;
+    
+    await user.update({ balance: newBalance }, { transaction });
+    
+    // 3. 환불 내역 기록
+    await PaymentHistory.create({
+      userId: order.userId,
+      betId: `EXCHANGE_${order.id}`,
+      amount: refundAmount,
+      type: 'refund',
+      memo: `Exchange 멀티배팅 주문 만료로 인한 자동 환불 (매치되지 않음)`,
+      status: 'completed',
+      balanceAfter: newBalance,
+      paidAt: new Date()
+    }, { transaction });
+    
+    console.log(`✅ 매치되지 않은 주문 취소 완료: ${order.id} - 환불: ${refundAmount}원`);
   }
   
   /**
