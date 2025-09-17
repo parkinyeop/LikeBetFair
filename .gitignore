@@ -38,4 +38,4 @@ server/archive/
 server/test-*.js
 server/debug-*.js
 server/check-*.js
-server/analyze-*.js
+server/analyze-*.jsbackup_*.sql
