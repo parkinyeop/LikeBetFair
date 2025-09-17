@@ -351,21 +351,25 @@ const ADMIN_TABS: AdminTabStructure[] = [
   }
 ];
 
-// 주문 관리 서브탭 - 드롭다운용으로 그룹화
-  const ORDER_SUBTABS = [
-    { id: 'all', label: '전체 주문', group: 'main' },
-    { id: 'open', label: '대기 중', group: 'main' },
-    { id: 'matched', label: '매칭됨', group: 'main' },
-    { id: 'partially_matched', label: '부분 매칭', group: 'main' },
-    { id: 'active', label: '활성', group: 'main' },
-    { id: 'settled', label: '정산완료', group: 'main' },
-    { id: 'cancelled', label: '취소됨', group: 'cancelled' },
-    { id: 'cancelled_user', label: '취소 (사용자)', group: 'cancelled' },
-    { id: 'cancelled_game', label: '취소 (경기)', group: 'cancelled' },
-    { id: 'cancelled_expired', label: '취소 (만료)', group: 'cancelled' },
-    { id: 'cancelled_original', label: '취소 (원주문)', group: 'cancelled' },
-    { id: 'cancelled_unknown', label: '취소 (사유불명)', group: 'cancelled' },
-    { id: 'cancelled_other', label: '취소 (기타)', group: 'cancelled' }
+// 주문 상태별 필터 (활성 주문 관리용)
+  const ORDER_STATUS_TABS = [
+    { id: 'all', label: '전체 주문' },
+    { id: 'open', label: '대기 중' },
+    { id: 'matched', label: '매칭됨' },
+    { id: 'partially_matched', label: '부분 매칭' },
+    { id: 'active', label: '활성' },
+    { id: 'settled', label: '정산완료' }
+  ];
+
+// 취소 사유별 필터 (취소 주문 분석용)
+  const CANCELLED_REASON_TABS = [
+    { id: 'cancelled', label: '전체 취소' },
+    { id: 'cancelled_user', label: '사용자 취소' },
+    { id: 'cancelled_game', label: '경기 취소' },
+    { id: 'cancelled_expired', label: '만료 취소' },
+    { id: 'cancelled_original', label: '원주문 취소' },
+    { id: 'cancelled_unknown', label: '사유불명' },
+    { id: 'cancelled_other', label: '기타 취소' }
   ];
 
 export default function ExchangeAdmin() {
@@ -497,6 +501,7 @@ export default function ExchangeAdmin() {
   
   // 드롭다운 상태 관리
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isCancelledDropdownOpen, setIsCancelledDropdownOpen] = useState(false);
 
   // 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
@@ -504,17 +509,18 @@ export default function ExchangeAdmin() {
       const target = event.target as HTMLElement;
       if (!target.closest('.dropdown-container')) {
         setIsDropdownOpen(false);
+        setIsCancelledDropdownOpen(false);
       }
     };
 
-    if (isDropdownOpen) {
+    if (isDropdownOpen || isCancelledDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isDropdownOpen]);
+  }, [isDropdownOpen, isCancelledDropdownOpen]);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -767,23 +773,36 @@ export default function ExchangeAdmin() {
       });
     }
     
-    // 낮은 정산율 경고
-    const settledOrders = exchangeStats?.total?.settlements || 0;
-    const settlementRate = totalOrders > 0 ? (settledOrders / totalOrders) * 100 : 0;
+    // 경기 시간이 지났는데 결과가 없는 주문
+    const now = new Date();
+    const overdueOrders = orders.filter(order => {
+      // 경기 시간이 지났는지 확인
+      const gameTime = new Date(order.commenceTime);
+      const isOverdue = gameTime < now;
+      
+      // 정산되지 않은 상태인지 확인
+      const isNotSettled = order.status !== 'settled' && order.status !== 'cancelled';
+      
+      return isOverdue && isNotSettled;
+    });
     
     if (process.env.NODE_ENV === 'development') {
-      console.log('정산율 체크:', { totalOrders, settledOrders, settlementRate, shouldShow: settlementRate < 50 && totalOrders > 10 });
+      console.log('경과된 주문 체크:', { 
+        totalOrders: orders.length, 
+        overdueOrders: overdueOrders.length,
+        shouldShow: overdueOrders.length > 0 
+      });
     }
     
-    if (settlementRate < 50 && totalOrders > 10) {
+    if (overdueOrders.length > 0) {
       items.push({
-        id: 'low-settlement-rate',
-        title: '낮은 정산율 경고',
-        description: `현재 정산율이 ${Math.round(settlementRate)}%입니다`,
-        priority: 'medium',
-        icon: '📊',
-        link: '#analytics',
-        count: Math.round(settlementRate)
+        id: 'overdue-games',
+        title: '경기 시간 경과 미정산 주문',
+        description: `${overdueOrders.length}개 주문의 경기 시간이 지났지만 결과가 없습니다`,
+        priority: 'high',
+        icon: '⏰',
+        link: '#orders',
+        count: overdueOrders.length
       });
     }
     
@@ -1776,15 +1795,16 @@ export default function ExchangeAdmin() {
                   ))}
                 </nav>
                 
-                {/* 주문 관리 서브탭 - 드롭다운 방식 */}
+                {/* 주문 관리 필터 - 2개 드롭다운으로 분리 */}
                 {activeTab === 'orders' && (
-                  <div className="mt-4">
+                  <div className="mt-4 flex gap-4">
+                    {/* 주문 상태 필터 */}
                     <div className="relative dropdown-container">
                       <button
                         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                        className="flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-lg border border-purple-200 hover:bg-purple-200 transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg border border-blue-200 hover:bg-blue-200 transition-colors"
                       >
-                        <span>{ORDER_SUBTABS.find(tab => tab.id === activeSubTab)?.label || '전체 주문'}</span>
+                        <span>📊 {ORDER_STATUS_TABS.find(tab => tab.id === activeSubTab)?.label || '주문 상태'}</span>
                         <svg 
                           className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} 
                           fill="none" 
@@ -1796,13 +1816,12 @@ export default function ExchangeAdmin() {
                       </button>
                       
                       {isDropdownOpen && (
-                        <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                        <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
                           <div className="py-1">
-                            {/* 주요 상태 그룹 */}
                             <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                              주요 상태
+                              주문 상태
                             </div>
-                            {ORDER_SUBTABS.filter(tab => tab.group === 'main').map(subTab => (
+                            {ORDER_STATUS_TABS.map(subTab => (
                               <button
                                 key={subTab.id}
                                 onClick={() => {
@@ -1811,31 +1830,51 @@ export default function ExchangeAdmin() {
                                 }}
                                 className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${
                                   activeSubTab === subTab.id
-                                    ? 'bg-purple-50 text-purple-700 font-medium'
+                                    ? 'bg-blue-50 text-blue-700 font-medium'
                                     : 'text-gray-700'
                                 }`}
                               >
                                 {subTab.label}
                               </button>
                             ))}
-                            
-                            {/* 구분선 */}
-                            <div className="border-t border-gray-100 my-1"></div>
-                            
-                            {/* 취소 관련 그룹 */}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 취소 사유 필터 */}
+                    <div className="relative dropdown-container">
+                      <button
+                        onClick={() => setIsCancelledDropdownOpen(!isCancelledDropdownOpen)}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-lg border border-red-200 hover:bg-red-200 transition-colors"
+                      >
+                        <span>❌ {CANCELLED_REASON_TABS.find(tab => tab.id === activeSubTab)?.label || '취소 사유'}</span>
+                        <svg 
+                          className={`w-4 h-4 transition-transform ${isCancelledDropdownOpen ? 'rotate-180' : ''}`} 
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      
+                      {isCancelledDropdownOpen && (
+                        <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                          <div className="py-1">
                             <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                               취소 사유
                             </div>
-                            {ORDER_SUBTABS.filter(tab => tab.group === 'cancelled').map(subTab => (
+                            {CANCELLED_REASON_TABS.map(subTab => (
                               <button
                                 key={subTab.id}
                                 onClick={() => {
                                   handleSubTabChange(subTab.id);
-                                  setIsDropdownOpen(false);
+                                  setIsCancelledDropdownOpen(false);
                                 }}
                                 className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${
                                   activeSubTab === subTab.id
-                                    ? 'bg-purple-50 text-purple-700 font-medium'
+                                    ? 'bg-red-50 text-red-700 font-medium'
                                     : 'text-gray-700'
                                 }`}
                               >
