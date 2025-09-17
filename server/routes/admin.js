@@ -682,10 +682,16 @@ router.get('/exchange/orders/:orderId/matches', verifyToken, requireAdmin(1), as
             
             // score를 문자열로 변환
             let scoreString = 'N/A';
-            if (gameResult.score && Array.isArray(gameResult.score)) {
-              const homeScore = gameResult.score.find(s => s.name === selection.homeTeam)?.score || '0';
-              const awayScore = gameResult.score.find(s => s.name === selection.awayTeam)?.score || '0';
-              scoreString = `${homeScore}-${awayScore}`;
+            if (gameResult.score) {
+              if (Array.isArray(gameResult.score)) {
+                // JSONB 배열 형태인 경우
+                const homeScore = gameResult.score.find(s => s.name === selection.homeTeam)?.score || '0';
+                const awayScore = gameResult.score.find(s => s.name === selection.awayTeam)?.score || '0';
+                scoreString = `${homeScore}-${awayScore}`;
+              } else if (typeof gameResult.score === 'string') {
+                // 문자열 형태인 경우 (예: "5-0")
+                scoreString = gameResult.score;
+              }
             }
             
             gameResults[gameKey] = {
@@ -718,10 +724,16 @@ router.get('/exchange/orders/:orderId/matches', verifyToken, requireAdmin(1), as
         if (gameResult) {
           // score를 문자열로 변환
           let scoreString = 'N/A';
-          if (gameResult.score && Array.isArray(gameResult.score)) {
-            const homeScore = gameResult.score.find(s => s.name === originalOrder.homeTeam)?.score || '0';
-            const awayScore = gameResult.score.find(s => s.name === originalOrder.awayTeam)?.score || '0';
-            scoreString = `${homeScore}-${awayScore}`;
+          if (gameResult.score) {
+            if (Array.isArray(gameResult.score)) {
+              // JSONB 배열 형태인 경우
+              const homeScore = gameResult.score.find(s => s.name === originalOrder.homeTeam)?.score || '0';
+              const awayScore = gameResult.score.find(s => s.name === originalOrder.awayTeam)?.score || '0';
+              scoreString = `${homeScore}-${awayScore}`;
+            } else if (typeof gameResult.score === 'string') {
+              // 문자열 형태인 경우 (예: "5-0")
+              scoreString = gameResult.score;
+            }
           }
           
           // 단일 경기 결과를 gameResult 형태로 설정
