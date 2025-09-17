@@ -814,16 +814,8 @@ export default function BettingAdmin() {
                     <h1 className="text-3xl font-bold text-gray-900">스포츠북 관리</h1>
                     <p className="text-gray-600 mt-2">스포츠북 모니터링, 결과 처리, 통계 분석</p>
                   </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="text-sm text-gray-500">
-                      마지막 업데이트: {lastUpdate ? lastUpdate.toLocaleTimeString('ko-KR') : '없음'}
-                    </div>
-                    <button
-                      onClick={() => router.push('/admin')}
-                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
-                    >
-                      ← 어드민 홈
-                    </button>
+                  <div className="text-sm text-gray-500">
+                    마지막 업데이트: {lastUpdate ? lastUpdate.toLocaleTimeString('ko-KR') : '없음'}
                   </div>
                 </div>
               </div>
@@ -841,7 +833,7 @@ export default function BettingAdmin() {
                     className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                   >
                     <span>🏠</span>
-                    <span>홈으로 가기</span>
+                    <span>관리자홈</span>
                   </button>
                 </div>
               </div>

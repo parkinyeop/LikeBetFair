@@ -1770,7 +1770,7 @@ export default function ExchangeAdmin() {
                     className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                   >
                     <span>🏠</span>
-                    <span>홈으로 가기</span>
+                    <span>관리자홈</span>
                   </button>
                 </div>
               </div>
