@@ -1,4 +1,5 @@
 import { BETTING_CONFIG } from '../config/centralizedConfig.js';
+import BettingAmountSettingsService from './bettingAmountSettingsService.js';
 
 /**
  * 익스체인지 멀티배팅 검증 서비스
@@ -46,12 +47,32 @@ class ExchangeMultibetValidationService {
         };
       }
 
-      // 3. 베팅 금액 검증 (스포츠북과 동일: 최소 1000원, 최대는 잔액 한도)
-      if (stake < BETTING_CONFIG.MIN_BET_AMOUNT) {
-        return { 
-          isValid: false, 
-          reason: `최소 베팅 금액은 ${BETTING_CONFIG.MIN_BET_AMOUNT.toLocaleString()}원입니다.` 
-        };
+      // 3. 베팅 금액 검증 (동적 설정 사용)
+      try {
+        const bettingSettings = await BettingAmountSettingsService.getPlatformBettingSettings('exchange');
+        
+        if (bettingSettings.minBetAmount && stake < bettingSettings.minBetAmount) {
+          return { 
+            isValid: false, 
+            reason: `최소 베팅 금액은 ${bettingSettings.minBetAmount.toLocaleString()}원입니다.` 
+          };
+        }
+        
+        if (bettingSettings.maxBetAmount && stake > bettingSettings.maxBetAmount) {
+          return { 
+            isValid: false, 
+            reason: `최대 베팅 금액은 ${bettingSettings.maxBetAmount.toLocaleString()}원입니다.` 
+          };
+        }
+      } catch (settingsError) {
+        console.error('❌ [ExchangeMultibetValidation] 베팅 설정 조회 오류:', settingsError);
+        // 설정 조회 실패 시 기본값 사용
+        if (stake < BETTING_CONFIG.MIN_BET_AMOUNT) {
+          return { 
+            isValid: false, 
+            reason: `최소 베팅 금액은 ${BETTING_CONFIG.MIN_BET_AMOUNT.toLocaleString()}원입니다.` 
+          };
+        }
       }
 
       // 4. 개별 선택 검증

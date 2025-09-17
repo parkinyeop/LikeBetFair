@@ -10,6 +10,7 @@ import GameResult from '../models/gameResultModel.js';
 import OddsCache from '../models/oddsCacheModel.js';
 import Settings from '../models/settingsModel.js';
 import actionItemService from '../services/actionItemService.js';
+import BettingAmountSettingsService from '../services/bettingAmountSettingsService.js';
 import bcrypt from 'bcryptjs';
 import { Op } from 'sequelize';
 
@@ -2208,6 +2209,115 @@ router.put('/settings', verifyToken, requireAdmin(2), async (req, res) => {
   } catch (error) {
     console.error('설정 저장 실패:', error);
     res.status(500).json({ error: '설정 저장에 실패했습니다.' });
+  }
+});
+
+// =============================================================================
+// 베팅 금액 설정 관리
+// =============================================================================
+
+// 베팅 금액 설정 조회
+router.get('/settings/betting-amounts', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    console.log('🔍 베팅 금액 설정 조회 요청:', req.admin.username);
+    
+    const settings = await BettingAmountSettingsService.getBettingAmountSettings();
+    
+    res.json({
+      success: true,
+      data: settings
+    });
+  } catch (error) {
+    console.error('베팅 금액 설정 조회 실패:', error);
+    res.status(500).json({ 
+      success: false,
+      error: '베팅 금액 설정 조회에 실패했습니다.' 
+    });
+  }
+});
+
+// 특정 플랫폼 베팅 금액 설정 조회
+router.get('/settings/betting-amounts/:platform', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    const { platform } = req.params;
+    
+    if (!['sportsbook', 'exchange'].includes(platform)) {
+      return res.status(400).json({
+        success: false,
+        error: '지원하지 않는 플랫폼입니다. (sportsbook, exchange만 지원)'
+      });
+    }
+    
+    console.log(`🔍 ${platform} 베팅 금액 설정 조회 요청:`, req.admin.username);
+    
+    const settings = await BettingAmountSettingsService.getPlatformBettingSettings(platform);
+    
+    res.json({
+      success: true,
+      data: settings
+    });
+  } catch (error) {
+    console.error(`${req.params.platform} 베팅 금액 설정 조회 실패:`, error);
+    res.status(500).json({ 
+      success: false,
+      error: '베팅 금액 설정 조회에 실패했습니다.' 
+    });
+  }
+});
+
+// 베팅 금액 설정 업데이트
+router.put('/settings/betting-amounts/:platform', verifyToken, requireAdmin(3), async (req, res) => {
+  try {
+    const { platform } = req.params;
+    const { minBetAmount, maxBetAmount } = req.body;
+    
+    if (!['sportsbook', 'exchange'].includes(platform)) {
+      return res.status(400).json({
+        success: false,
+        error: '지원하지 않는 플랫폼입니다. (sportsbook, exchange만 지원)'
+      });
+    }
+    
+    // 입력값 검증
+    if (minBetAmount !== undefined && (isNaN(minBetAmount) || minBetAmount < 0)) {
+      return res.status(400).json({
+        success: false,
+        error: '최소 베팅 금액은 0 이상의 숫자여야 합니다.'
+      });
+    }
+    
+    if (maxBetAmount !== undefined && (isNaN(maxBetAmount) || maxBetAmount < 0)) {
+      return res.status(400).json({
+        success: false,
+        error: '최대 베팅 금액은 0 이상의 숫자여야 합니다.'
+      });
+    }
+    
+    if (minBetAmount !== undefined && maxBetAmount !== undefined && minBetAmount > maxBetAmount) {
+      return res.status(400).json({
+        success: false,
+        error: '최소 베팅 금액은 최대 베팅 금액보다 작아야 합니다.'
+      });
+    }
+    
+    console.log(`🔧 ${platform} 베팅 금액 설정 업데이트 요청:`, req.admin.username, { minBetAmount, maxBetAmount });
+    
+    const updatedSettings = await BettingAmountSettingsService.updateBettingAmountSettings(platform, {
+      minBetAmount,
+      maxBetAmount
+    });
+    
+    res.json({
+      success: true,
+      message: `${platform} 베팅 금액 설정이 성공적으로 업데이트되었습니다.`,
+      data: updatedSettings
+    });
+  } catch (error) {
+    console.error(`${req.params.platform} 베팅 금액 설정 업데이트 실패:`, error);
+    res.status(500).json({ 
+      success: false,
+      error: '베팅 금액 설정 업데이트에 실패했습니다.' 
+    });
   }
 });
 

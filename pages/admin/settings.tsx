@@ -16,6 +16,13 @@ interface SystemSettings {
   sms_notifications: boolean;
 }
 
+interface BettingAmountSettings {
+  sportsbook_min_bet_amount: number;
+  sportsbook_max_bet_amount: number;
+  exchange_min_bet_amount: number;
+  exchange_max_bet_amount: number;
+}
+
 interface AdminUser {
   id: number;
   username: string;
@@ -52,6 +59,14 @@ export default function SystemSettings() {
     odds_update_interval: 30,
     email_notifications: true,
     sms_notifications: false
+  });
+
+  // 베팅 금액 설정 상태
+  const [bettingSettings, setBettingSettings] = useState<BettingAmountSettings>({
+    sportsbook_min_bet_amount: 1000,
+    sportsbook_max_bet_amount: 1000000,
+    exchange_min_bet_amount: 5000,
+    exchange_max_bet_amount: 5000000,
   });
 
   // 관리자 사용자 목록
@@ -98,24 +113,30 @@ export default function SystemSettings() {
         'Content-Type': 'application/json'
       };
 
-      const [settingsRes, adminsRes, logsRes, backupRes] = await Promise.all([
+      const [settingsRes, adminsRes, logsRes, backupRes, bettingRes] = await Promise.all([
         fetch('http://localhost:5050/api/admin/settings', { headers }),
         fetch('http://localhost:5050/api/admin/settings/admins', { headers }),
         fetch('http://localhost:5050/api/admin/settings/logs', { headers }),
-        fetch('http://localhost:5050/api/admin/settings/backup', { headers })
+        fetch('http://localhost:5050/api/admin/settings/backup', { headers }),
+        fetch('http://localhost:5050/api/admin/settings/betting-amounts', { headers })
       ]);
 
-      const [settingsData, adminsData, logsData, backupData] = await Promise.all([
+      const [settingsData, adminsData, logsData, backupData, bettingData] = await Promise.all([
         settingsRes.json(),
         adminsRes.json(),
         logsRes.json(),
-        backupRes.json()
+        backupRes.json(),
+        bettingRes.json()
       ]);
 
       setSettings(settingsData.settings || settings);
       setAdminUsers(adminsData.admins || []);
       setSystemLogs(logsData.logs || []);
       setBackupStatus(backupData.status || backupStatus);
+      
+      if (bettingData.success && bettingData.data) {
+        setBettingSettings(bettingData.data);
+      }
     } catch (error) {
       console.error('시스템 데이터 로딩 실패:', error);
     } finally {
@@ -142,6 +163,37 @@ export default function SystemSettings() {
     } catch (error) {
       console.error('설정 저장 실패:', error);
       alert('설정 저장에 실패했습니다.');
+    }
+  };
+
+  const handleSaveBettingSettings = async (platform: 'sportsbook' | 'exchange') => {
+    try {
+      const tabId = sessionStorage.getItem('tabId');
+      const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
+      
+      const payload = {
+        minBetAmount: bettingSettings[`${platform}_min_bet_amount` as keyof BettingAmountSettings],
+        maxBetAmount: bettingSettings[`${platform}_max_bet_amount` as keyof BettingAmountSettings]
+      };
+
+      const response = await fetch(`http://localhost:5050/api/admin/settings/betting-amounts/${platform}`, {
+        method: 'PUT',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+      if (response.ok && result.success) {
+        alert(`${platform === 'sportsbook' ? '스포츠북' : '익스체인지'} 베팅 금액 설정이 저장되었습니다.`);
+      } else {
+        alert(result.error || '설정 저장에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('베팅 설정 저장 실패:', error);
+      alert('베팅 설정 저장에 실패했습니다.');
     }
   };
 
@@ -395,6 +447,93 @@ export default function SystemSettings() {
                   <label htmlFor="sms_notifications" className="ml-2 block text-sm text-gray-900">
                     SMS 알림
                   </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">베팅 금액 설정</h3>
+              <div className="space-y-6">
+                {/* 스포츠북 베팅 금액 설정 */}
+                <div>
+                  <h4 className="text-md font-medium text-gray-800 mb-3">스포츠북 베팅 금액</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">최소 베팅 금액 (원)</label>
+                      <input
+                        type="number"
+                        value={bettingSettings.sportsbook_min_bet_amount}
+                        onChange={(e) => setBettingSettings({
+                          ...bettingSettings, 
+                          sportsbook_min_bet_amount: parseInt(e.target.value) || 0
+                        })}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2"
+                        min="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">최대 베팅 금액 (원)</label>
+                      <input
+                        type="number"
+                        value={bettingSettings.sportsbook_max_bet_amount}
+                        onChange={(e) => setBettingSettings({
+                          ...bettingSettings, 
+                          sportsbook_max_bet_amount: parseInt(e.target.value) || 0
+                        })}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2"
+                        min="0"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <button
+                      onClick={() => handleSaveBettingSettings('sportsbook')}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm"
+                    >
+                      스포츠북 설정 저장
+                    </button>
+                  </div>
+                </div>
+
+                {/* 익스체인지 베팅 금액 설정 */}
+                <div>
+                  <h4 className="text-md font-medium text-gray-800 mb-3">익스체인지 베팅 금액</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">최소 베팅 금액 (원)</label>
+                      <input
+                        type="number"
+                        value={bettingSettings.exchange_min_bet_amount}
+                        onChange={(e) => setBettingSettings({
+                          ...bettingSettings, 
+                          exchange_min_bet_amount: parseInt(e.target.value) || 0
+                        })}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2"
+                        min="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">최대 베팅 금액 (원)</label>
+                      <input
+                        type="number"
+                        value={bettingSettings.exchange_max_bet_amount}
+                        onChange={(e) => setBettingSettings({
+                          ...bettingSettings, 
+                          exchange_max_bet_amount: parseInt(e.target.value) || 0
+                        })}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2"
+                        min="0"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <button
+                      onClick={() => handleSaveBettingSettings('exchange')}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm"
+                    >
+                      익스체인지 설정 저장
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

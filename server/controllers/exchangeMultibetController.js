@@ -1,5 +1,6 @@
 import { ExchangeOrder, User } from '../models/index.js';
 import { ExchangeMultibetValidationService } from '../services/exchangeMultibetValidation.js';
+import BettingAmountSettingsService from '../services/bettingAmountSettingsService.js';
 import sequelize from '../models/sequelize.js';
 
 /**
@@ -88,12 +89,41 @@ class ExchangeMultibetController {
         });
       }
 
-      // 3. 베팅 금액 검증 (스포츠북과 동일: 최소 1000원, 최대는 잔액 한도)
-      if (stake < 1000) {
-        return res.status(400).json({ 
-          success: false, 
-          message: '최소 베팅 금액은 1,000원입니다.' 
-        });
+      // 3. 베팅 금액 검증 (동적 설정 사용)
+      try {
+        const bettingSettings = await BettingAmountSettingsService.getPlatformBettingSettings('exchange');
+        console.log('🎯 [ExchangeMultibet] 익스체인지 베팅 설정:', bettingSettings);
+        
+        if (bettingSettings.minBetAmount && stake < bettingSettings.minBetAmount) {
+          console.log('❌ [ExchangeMultibet] 최소 베팅 금액 미달:', { 
+            stake, 
+            minBetAmount: bettingSettings.minBetAmount 
+          });
+          return res.status(400).json({ 
+            success: false,
+            message: `최소 베팅 금액은 ${bettingSettings.minBetAmount.toLocaleString()}원입니다.` 
+          });
+        }
+        
+        if (bettingSettings.maxBetAmount && stake > bettingSettings.maxBetAmount) {
+          console.log('❌ [ExchangeMultibet] 최대 베팅 금액 초과:', { 
+            stake, 
+            maxBetAmount: bettingSettings.maxBetAmount 
+          });
+          return res.status(400).json({ 
+            success: false,
+            message: `최대 베팅 금액은 ${bettingSettings.maxBetAmount.toLocaleString()}원입니다.` 
+          });
+        }
+      } catch (settingsError) {
+        console.error('❌ [ExchangeMultibet] 베팅 설정 조회 오류:', settingsError);
+        // 설정 조회 실패 시 기본값 사용 (기존 동작 유지)
+        if (stake < 1000) {
+          return res.status(400).json({ 
+            success: false, 
+            message: '최소 베팅 금액은 1,000원입니다.' 
+          });
+        }
       }
 
       if (stake > user.balance) {

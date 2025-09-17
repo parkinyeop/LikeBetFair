@@ -7,6 +7,7 @@ import PaymentHistory from '../models/paymentHistoryModel.js';
 import GameResult from '../models/gameResultModel.js';
 import sequelize from '../models/sequelize.js';
 import { Op } from 'sequelize';
+import BettingAmountSettingsService from '../services/bettingAmountSettingsService.js';
 
 export async function placeBet(req, res) {
   try {
@@ -148,6 +149,38 @@ export async function placeBet(req, res) {
     if (!user) {
       console.log('❌ [PlaceBet] 사용자 없음:', userId);
       return res.status(404).json({ message: 'User not found' });
+    }
+
+    // 베팅 금액 제한 검증 (동적 설정 사용)
+    try {
+      const bettingSettings = await BettingAmountSettingsService.getPlatformBettingSettings('sportsbook');
+      console.log('🎯 [PlaceBet] 스포츠북 베팅 설정:', bettingSettings);
+      
+      if (bettingSettings.minBetAmount && stake < bettingSettings.minBetAmount) {
+        console.log('❌ [PlaceBet] 최소 베팅 금액 미달:', { 
+          stake, 
+          minBetAmount: bettingSettings.minBetAmount 
+        });
+        return res.status(400).json({ 
+          message: `최소 베팅 금액은 ${bettingSettings.minBetAmount.toLocaleString()}원입니다.` 
+        });
+      }
+      
+      if (bettingSettings.maxBetAmount && stake > bettingSettings.maxBetAmount) {
+        console.log('❌ [PlaceBet] 최대 베팅 금액 초과:', { 
+          stake, 
+          maxBetAmount: bettingSettings.maxBetAmount 
+        });
+        return res.status(400).json({ 
+          message: `최대 베팅 금액은 ${bettingSettings.maxBetAmount.toLocaleString()}원입니다.` 
+        });
+      }
+    } catch (settingsError) {
+      console.error('❌ [PlaceBet] 베팅 설정 조회 오류:', settingsError);
+      // 설정 조회 실패 시 기본값 사용 (기존 동작 유지)
+      if (stake < 1000) {
+        return res.status(400).json({ message: '최소 베팅 금액은 1,000원입니다.' });
+      }
     }
 
     console.log('💰 [PlaceBet] 잔액 확인:', { userBalance: user.balance, betStake: stake });
