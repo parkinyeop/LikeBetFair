@@ -168,9 +168,7 @@ class ExchangeMultibetController {
         autoSettlement: true,
         homeTeam: selections[0]?.homeTeam || '멀티배팅',
         awayTeam: selections[0]?.awayTeam || '멀티배팅',
-        commenceTime: selections[0]?.commenceTime ?
-          (selections[0].commenceTime.endsWith('Z') ? selections[0].commenceTime : selections[0].commenceTime + 'Z') :
-          new Date().toISOString(), // UTC ISO 문자열로 저장 (VARCHAR 컬럼)
+        commenceTime: selections[0]?.commenceTime ? new Date(selections[0].commenceTime) : new Date(), // UTC로 변환하여 저장
         sportKey: selections[0]?.sportKey || 'multibet'
       }, { transaction });
 

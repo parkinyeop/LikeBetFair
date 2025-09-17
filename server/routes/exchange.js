@@ -164,6 +164,9 @@ router.post('/match-order', verifyToken, async (req, res) => {
       return res.status(404).json({ success: false, message: '대상 주문을 찾을 수 없습니다.' });
     }
     
+    console.log('🔍 targetOrder.commenceTime 타입:', typeof targetOrder.commenceTime);
+    console.log('🔍 targetOrder.commenceTime 값:', targetOrder.commenceTime);
+    
     // 주문 상태 확인 (부분 매칭된 주문도 허용)
     if (targetOrder.status !== 'open' && targetOrder.status !== 'partially_matched') {
       return res.status(400).json({ success: false, message: '이미 완전히 체결되었거나 취소된 주문입니다.' });
@@ -256,7 +259,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
       matchedOrderId: targetOrder.id,
       homeTeam: targetOrder.homeTeam,
       awayTeam: targetOrder.awayTeam,
-      commenceTime: targetOrder.commenceTime,
+      commenceTime: new Date(targetOrder.commenceTime),
       sportKey: targetOrder.sportKey,
       selection: targetOrder.selection,
       selectionDetails: targetOrder.selectionDetails,

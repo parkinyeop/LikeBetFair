@@ -33,7 +33,7 @@ const ExchangeOrder = sequelize.define('ExchangeOrder', {
   // 게임 연동 필드들
   homeTeam: { type: DataTypes.STRING, allowNull: true },
   awayTeam: { type: DataTypes.STRING, allowNull: true },
-  commenceTime: { type: DataTypes.STRING, allowNull: true }, // UTC ISO 문자열로 저장
+  commenceTime: { type: DataTypes.DATE, allowNull: true }, // UTC로 저장
   sportKey: { type: DataTypes.STRING, allowNull: true },
   // ❌ DEPRECATED: gameResultId 필드 주석처리 (경기 식별자 방식으로 대체)
   /*
