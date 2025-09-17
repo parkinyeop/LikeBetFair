@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Header';
 
 interface SystemSettings {
@@ -21,7 +22,7 @@ interface AdminUser {
   email: string;
   isAdmin: boolean;
   isActive: boolean;
-  lastLoginAt: string;
+  lastLogin: string;
   createdAt: string;
 }
 
@@ -34,6 +35,7 @@ interface SystemLog {
 }
 
 export default function SystemSettings() {
+  const { isLoggedIn, isAdmin, adminLevel } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'general' | 'permissions' | 'monitoring' | 'backup'>('general');
   const [loading, setLoading] = useState(true);
@@ -72,13 +74,25 @@ export default function SystemSettings() {
   });
 
   useEffect(() => {
+    if (!isLoggedIn) {
+      router.push('/');
+      return;
+    }
+    
+    if (!isAdmin || adminLevel < 2) {
+      alert('시스템 설정 권한이 필요합니다.');
+      router.push('/admin');
+      return;
+    }
+
     fetchSystemData();
-  }, []);
+  }, [isLoggedIn, isAdmin, adminLevel, router]);
 
   const fetchSystemData = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
+      const tabId = sessionStorage.getItem('tabId');
+      const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
       const headers = {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -111,7 +125,8 @@ export default function SystemSettings() {
 
   const handleSaveSettings = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const tabId = sessionStorage.getItem('tabId');
+      const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
       const response = await fetch('http://localhost:5050/api/admin/settings', {
         method: 'PUT',
         headers: { 
@@ -133,7 +148,8 @@ export default function SystemSettings() {
   const handleAddAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
+      const tabId = sessionStorage.getItem('tabId');
+      const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
       const response = await fetch('http://localhost:5050/api/admin/settings/admins', {
         method: 'POST',
         headers: { 
@@ -156,7 +172,8 @@ export default function SystemSettings() {
 
   const handleToggleAdmin = async (adminId: number, isActive: boolean) => {
     try {
-      const token = localStorage.getItem('token');
+      const tabId = sessionStorage.getItem('tabId');
+      const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
       const response = await fetch(`http://localhost:5050/api/admin/settings/admins/${adminId}`, {
         method: 'PUT',
         headers: { 
@@ -178,7 +195,8 @@ export default function SystemSettings() {
     try {
       setBackupStatus(prev => ({ ...prev, is_backing_up: true }));
       
-      const token = localStorage.getItem('token');
+      const tabId = sessionStorage.getItem('tabId');
+      const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
       const response = await fetch('http://localhost:5050/api/admin/settings/backup', {
         method: 'POST',
         headers: { 
@@ -473,7 +491,7 @@ export default function SystemSettings() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {admin.lastLoginAt ? new Date(admin.lastLoginAt).toLocaleString('ko-KR') : '없음'}
+                          {admin.lastLogin ? new Date(admin.lastLogin).toLocaleString('ko-KR') : '없음'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <button

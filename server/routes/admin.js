@@ -8,6 +8,7 @@ import ExchangeOrder from '../models/exchangeOrderModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
 import GameResult from '../models/gameResultModel.js';
 import OddsCache from '../models/oddsCacheModel.js';
+import Settings from '../models/settingsModel.js';
 import actionItemService from '../services/actionItemService.js';
 import bcrypt from 'bcryptjs';
 import { Op } from 'sequelize';
@@ -2049,7 +2050,7 @@ router.get('/analytics/admin', verifyToken, requireAdmin(1), async (req, res) =>
       where: {
         isAdmin: true
       },
-      attributes: ['id', 'username', 'email', 'lastLoginAt'],
+      attributes: ['id', 'username', 'email', 'lastLogin'],
       raw: true
     });
 
@@ -2095,7 +2096,7 @@ router.get('/analytics/admin', verifyToken, requireAdmin(1), async (req, res) =>
         total_actions: totalActions,
         successful_actions: successfulActions,
         error_rate: errorRate,
-        last_activity: admin.lastLoginAt || admin.createdAt
+        last_activity: admin.lastLogin || admin.createdAt
       };
     }));
 
@@ -2112,11 +2113,43 @@ router.get('/analytics/admin', verifyToken, requireAdmin(1), async (req, res) =>
 // 시스템 설정
 // =============================================================================
 
+// 공개 설정 조회 (인증 불필요)
+router.get('/public-settings', async (req, res) => {
+  try {
+    // 기본 설정값들
+    const defaultSettings = {
+      site_name: 'LikeBetFair',
+      site_description: '스포츠 베팅 플랫폼',
+      maintenance_mode: false
+    };
+
+    // 데이터베이스에서 설정 조회
+    const dbSettings = await Settings.findAll();
+    const settings = { ...defaultSettings };
+
+    // 데이터베이스에 저장된 설정으로 덮어쓰기
+    dbSettings.forEach(setting => {
+      if (setting.key in settings) {
+        let value = setting.value;
+        if (typeof defaultSettings[setting.key] === 'boolean') {
+          value = value === 'true';
+        }
+        settings[setting.key] = value;
+      }
+    });
+
+    res.json({ settings });
+  } catch (error) {
+    console.error('공개 설정 조회 실패:', error);
+    res.status(500).json({ error: '설정 조회에 실패했습니다.' });
+  }
+});
+
 // 시스템 설정 조회
 router.get('/settings', verifyToken, requireAdmin(1), async (req, res) => {
   try {
-    // 임시 설정 데이터 (실제로는 데이터베이스에서 조회)
-    const settings = {
+    // 기본 설정값들
+    const defaultSettings = {
       site_name: 'LikeBetFair',
       site_description: '스포츠 베팅 플랫폼',
       maintenance_mode: false,
@@ -2128,6 +2161,24 @@ router.get('/settings', verifyToken, requireAdmin(1), async (req, res) => {
       email_notifications: true,
       sms_notifications: false
     };
+
+    // 데이터베이스에서 설정 조회
+    const dbSettings = await Settings.findAll();
+    const settings = { ...defaultSettings };
+
+    // 데이터베이스에 저장된 설정으로 덮어쓰기
+    dbSettings.forEach(setting => {
+      if (setting.key in settings) {
+        // 타입에 따라 적절히 변환
+        let value = setting.value;
+        if (typeof defaultSettings[setting.key] === 'boolean') {
+          value = value === 'true';
+        } else if (typeof defaultSettings[setting.key] === 'number') {
+          value = parseFloat(value);
+        }
+        settings[setting.key] = value;
+      }
+    });
 
     res.json({ settings });
   } catch (error) {
@@ -2141,8 +2192,14 @@ router.put('/settings', verifyToken, requireAdmin(2), async (req, res) => {
   try {
     const updatedSettings = req.body;
     
-    // 실제 환경에서는 데이터베이스에 저장
-    // await SettingsModel.upsert(updatedSettings);
+    // 각 설정을 데이터베이스에 저장
+    for (const [key, value] of Object.entries(updatedSettings)) {
+      await Settings.upsert({
+        key: key,
+        value: String(value),
+        category: 'general'
+      });
+    }
     
     res.json({ 
       message: '설정이 성공적으로 저장되었습니다.',
@@ -2159,7 +2216,7 @@ router.get('/settings/admins', verifyToken, requireAdmin(1), async (req, res) =>
   try {
     const admins = await User.findAll({
       where: { isAdmin: true },
-      attributes: ['id', 'username', 'email', 'isActive', 'lastLoginAt', 'createdAt'],
+      attributes: ['id', 'username', 'email', 'isActive', 'lastLogin', 'createdAt'],
       order: [['createdAt', 'DESC']]
     });
 

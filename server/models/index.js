@@ -9,6 +9,7 @@ import GameResult from './gameResultModel.js';
 import OddsCache from './oddsCacheModel.js';
 import Bet from './betModel.js';
 import PaymentHistory from './paymentHistoryModel.js';
+import Settings from './settingsModel.js';
 
 // 모델 간 관계 설정
 const setupAssociations = async () => {
@@ -61,6 +62,7 @@ export {
   OddsCache,
   Bet,
   PaymentHistory,
+  Settings,
   setupAssociations,
   syncDatabase
 };

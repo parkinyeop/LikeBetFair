@@ -38,6 +38,7 @@ export default function Home() {
   const [todayFlatGames, setTodayFlatGames] = useState<any[]>([]);
   const router = useRouter();
 
+
   useEffect(() => {
     const fetchTodayGames = async () => {
       if (viewMode !== 'today') return;
@@ -1335,9 +1336,7 @@ export default function Home() {
 
   return (
     <div className="p-6">
-
-      
-      <h1 className="text-2xl font-bold mb-6">Sports Betting</h1>
+      <h2 className="text-2xl font-bold mb-6">Sports Betting</h2>
       
       <div className="mb-6 flex gap-2">
         <button

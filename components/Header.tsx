@@ -1,17 +1,43 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import JoinForm from './JoinForm';
 import LoginForm from './LoginForm';
 import { useAuth } from '../contexts/AuthContext';
 
-const FRONTEND_VERSION = '25062301'; // YYYYMMDD + 2-digit sequence
 
 export default function Header() {
   const [selectedCategory, setSelectedCategory] = useState("Sportsbook");
   const [showJoin, setShowJoin] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showSoon, setShowSoon] = useState(false);
+  const [siteName, setSiteName] = useState("Lbetfair"); // 기본값
+  const [siteDescription, setSiteDescription] = useState("스포츠 베팅 플랫폼"); // 기본값
   const { isLoggedIn, username, logout, isAdmin, adminLevel } = useAuth();
+
+  // 설정값 로드
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const response = await fetch('http://localhost:5050/api/admin/public-settings');
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Header 설정 로드 성공:', data);
+          if (data.settings?.site_name) {
+            setSiteName(data.settings.site_name);
+            console.log('사이트명 업데이트:', data.settings.site_name);
+          }
+          if (data.settings?.site_description) {
+            setSiteDescription(data.settings.site_description);
+            console.log('사이트 설명 업데이트:', data.settings.site_description);
+          }
+        }
+      } catch (error) {
+        console.log('설정 로드 실패, 기본값 사용:', error);
+      }
+    };
+    
+    loadSettings();
+  }, []);
 
   const handleMenuClick = (category: string) => {
     if (["Casino", "Poker", "Ladder"].includes(category)) {
@@ -31,12 +57,12 @@ export default function Header() {
   return (
     <header className="w-full bg-blue-600 text-white shadow h-16 flex items-center">
       <div className="w-full flex items-center justify-between h-full px-4">
-        {/* Left: Lbetfair + version */}
+        {/* Left: 사이트명 + 설명 */}
         <div className="flex items-center gap-2 min-w-[180px] h-full">
           <Link href="/">
-            <span className="font-bold text-xl">Lbetfair</span>
+            <span className="font-bold text-xl">{siteName}</span>
           </Link>
-          <span className="ml-2 text-xs bg-white text-blue-600 rounded px-2 py-0.5 font-mono">v{FRONTEND_VERSION}</span>
+          <span className="ml-2 text-xs bg-white text-blue-600 rounded px-2 py-0.5">{siteDescription}</span>
         </div>
         {/* Center: Menu */}
         <nav className="flex-1 flex items-center justify-center h-full">

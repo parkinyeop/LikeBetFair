@@ -208,6 +208,11 @@ async function startServer() {
     
     // 데이터베이스 동기화 및 초기화
     console.log('[시작] 데이터베이스 테이블 동기화...');
+    
+    // 모든 모델 import (테이블 생성을 위해)
+    const Settings = (await import('./models/settingsModel.js')).default;
+    console.log('✅ Settings 모델 로드됨:', Settings.name);
+    
     await sequelize.sync({ alter: true });
     console.log('✅ Database tables synchronized successfully.');
     
@@ -364,6 +369,7 @@ async function startServer() {
 async function createDefaultAccounts() {
   try {
     const User = (await import('./models/userModel.js')).default;
+    const Settings = (await import('./models/settingsModel.js')).default;
     const bcrypt = await import('bcryptjs');
     
     // 관리자 계정 확인 및 생성
