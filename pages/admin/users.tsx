@@ -303,9 +303,9 @@ export default function AdminUsers() {
                   </div>
                   <button
                     onClick={() => router.push('/admin')}
-                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+                    className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors"
                   >
-                    ← 어드민 홈
+                    관리자홈
                   </button>
                 </div>
               </div>

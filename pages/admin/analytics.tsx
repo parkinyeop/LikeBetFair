@@ -156,10 +156,10 @@ export default function Analytics() {
               <option value="1y">최근 1년</option>
             </select>
             <button
-              onClick={() => router.back()}
+              onClick={() => router.push('/admin')}
               className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors"
             >
-              뒤로가기
+              관리자홈
             </button>
           </div>
         </div>

@@ -248,10 +248,10 @@ export default function SystemSettings() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-gray-900">시스템 설정</h1>
           <button
-            onClick={() => router.back()}
+            onClick={() => router.push('/admin')}
             className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors"
           >
-            뒤로가기
+            관리자홈
           </button>
         </div>
 
