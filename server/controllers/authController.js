@@ -72,7 +72,11 @@ const authController = {
     try {
       console.log('[Register] 요청 시작');
       console.log('[Register] 요청 헤더:', req.headers);
-      console.log('[Register] 요청 바디:', req.body);
+      console.log('[Register] 요청 바디 구조:', {
+        hasBody: !!req.body,
+        bodyKeys: req.body ? Object.keys(req.body) : [],
+        timestamp: new Date().toISOString()
+      });
       
       const { username, email, password } = req.body;
 
@@ -288,36 +292,55 @@ const authController = {
 
   login: async (req, res) => {
     try {
-      const { email, password } = req.body;
+      const { email, username, password } = req.body;
+      
+      console.log('[Login] 요청 데이터:', { 
+        hasEmail: !!email, 
+        hasUsername: !!username, 
+        hasPassword: !!password 
+      });
 
+      // Use email if provided, otherwise use username
+      const loginField = email || username;
+      
+      if (!loginField) {
+        return res.status(400).json({ message: '이메일 또는 사용자명을 입력해주세요' });
+      }
+
+      console.log('[Login] 사용자 조회 시작:', loginField);
+      
       // Check if user exists by email first, then by username
       let user = await User.findOne({
-        where: { email: email }
+        where: { email: loginField }
       });
+
+      console.log('[Login] 이메일로 조회 결과:', user ? '찾음' : '없음');
 
       // If not found by email, try username
       if (!user) {
         user = await User.findOne({
-          where: { username: email }
+          where: { username: loginField }
         });
+        console.log('[Login] 사용자명으로 조회 결과:', user ? '찾음' : '없음');
       }
       
       if (!user) {
+        console.log('[Login] 사용자를 찾을 수 없음');
         return res.status(400).json({ message: 'Invalid credentials' });
       }
 
+      console.log('[Login] 사용자 찾음:', user.id);
+      
       // Check password
       const isMatch = await bcrypt.compare(password, user.password);
+      console.log('[Login] 비밀번호 검증:', isMatch ? '성공' : '실패');
+      
       if (!isMatch) {
         return res.status(400).json({ message: 'Invalid credentials' });
       }
 
-      // 로그인 시 pending 베팅 결과 판정
-      await checkAndUpdatePendingBets(user.id);
-
-      // Update last login time
-      await user.update({ lastLogin: new Date() });
-
+      console.log('[Login] 로그인 성공 처리 시작');
+      
       // Create token
       const token = jwt.sign(
         { userId: user.id },
@@ -325,15 +348,27 @@ const authController = {
         { expiresIn: process.env.JWT_EXPIRES_IN }
       );
 
-      // username, email, balance, 관리자 정보도 함께 반환
+      // Send response immediately
       res.json({ 
         token, 
-        userId: user.id, // userId 직접 포함
+        userId: user.id,
         username: user.username, 
         email: user.email, 
         balance: Number(user.balance),
         isAdmin: user.isAdmin,
         adminLevel: user.adminLevel
+      });
+      
+      console.log('[Login] 응답 전송 완료');
+      
+      // Update last login time after response (non-blocking)
+      setImmediate(async () => {
+        try {
+          await user.update({ lastLogin: new Date() });
+          console.log('[Login] 마지막 로그인 시간 업데이트 완료');
+        } catch (err) {
+          console.error('[Login] 마지막 로그인 시간 업데이트 실패:', err);
+        }
       });
     } catch (err) {
       console.error('Login error:', err);

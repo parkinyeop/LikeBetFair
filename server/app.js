@@ -76,10 +76,22 @@ app.use((req, res, next) => {
   next();
 });
 
-// 요청 로깅 미들웨어
+// 요청 로깅 미들웨어 (보안 강화)
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) {
-    console.log(`[API] ${req.method} ${req.path}`, req.body);
+    // 민감한 정보가 포함된 경로는 요청 본문을 로그하지 않음
+    const sensitivePaths = ['/api/auth/login', '/api/auth/register'];
+    const isSensitivePath = sensitivePaths.includes(req.path);
+    
+    if (isSensitivePath) {
+      console.log(`[API] ${req.method} ${req.path}`, {
+        hasBody: !!req.body,
+        bodyKeys: req.body ? Object.keys(req.body) : [],
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      console.log(`[API] ${req.method} ${req.path}`, req.body);
+    }
   }
   next();
 });

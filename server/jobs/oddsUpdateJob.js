@@ -161,8 +161,8 @@ function withTimeout(promise, timeoutMs, operationName) {
   ]);
 }
 
-// 경기 결과 업데이트 - 10분마다 실행 (5분에서 변경)
-cron.schedule('*/10 * * * *', async () => {
+// 경기 결과 업데이트 - 30분마다 실행 (로그인 문제 해결 후 복구)
+cron.schedule('*/30 * * * *', async () => {
   console.log('[SCHEDULER_RESULTS] 🚀 Starting game results update at:', new Date().toISOString());
   
   if (isUpdatingResults) {
