@@ -12,6 +12,7 @@ import Settings from '../models/settingsModel.js';
 import actionItemService from '../services/actionItemService.js';
 import BettingAmountSettingsService from '../services/bettingAmountSettingsService.js';
 import ExchangeOddsWeightService from '../services/exchangeOddsWeightService.js';
+import CommissionSettingsService from '../services/commissionSettingsService.js';
 import bcrypt from 'bcryptjs';
 import { Op } from 'sequelize';
 
@@ -2157,7 +2158,8 @@ router.get('/settings', verifyToken, requireAdmin(1), async (req, res) => {
       maintenance_mode: false,
       max_bet_amount: 1000000,
       min_bet_amount: 1000,
-      commission_rate: 0.05,
+      sportsbook_commission_rate: 0.05,
+      exchange_commission_rate: 0.03,
       auto_settlement_enabled: true,
       odds_update_interval: 30,
       email_notifications: true,
@@ -2574,6 +2576,67 @@ router.post('/settings/backup', verifyToken, requireAdmin(2), async (req, res) =
   } catch (error) {
     console.error('백업 생성 실패:', error);
     res.status(500).json({ error: '백업 생성에 실패했습니다.' });
+  }
+});
+
+// 수수료율 설정 조회
+router.get('/settings/commission-rates', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    console.log('🔍 수수료율 설정 조회 요청:', req.admin.username);
+    
+    const commissionRates = await CommissionSettingsService.getAllCommissionRates();
+    
+    res.json({
+      success: true,
+      data: commissionRates
+    });
+  } catch (error) {
+    console.error('수수료율 설정 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '수수료율 설정 조회 중 오류가 발생했습니다.'
+    });
+  }
+});
+
+// 수수료율 설정 업데이트
+router.put('/settings/commission-rates/:platform', verifyToken, requireAdmin(3), async (req, res) => {
+  try {
+    const { platform } = req.params;
+    const { rate } = req.body;
+    
+    if (!['sportsbook', 'exchange'].includes(platform)) {
+      return res.status(400).json({
+        success: false,
+        error: '잘못된 플랫폼입니다. sportsbook 또는 exchange만 허용됩니다.'
+      });
+    }
+    
+    console.log('🔧 수수료율 설정 업데이트 요청:', {
+      admin: req.admin.username,
+      platform,
+      rate
+    });
+    
+    const result = await CommissionSettingsService.updateCommissionRate(platform, rate);
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: `${platform} 수수료율이 업데이트되었습니다.`
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error || '수수료율 업데이트 중 오류가 발생했습니다.'
+      });
+    }
+  } catch (error) {
+    console.error('수수료율 설정 업데이트 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '수수료율 업데이트 중 오류가 발생했습니다.'
+    });
   }
 });
 

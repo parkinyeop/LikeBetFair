@@ -3,6 +3,8 @@ import ExchangeOrderMatch from '../models/exchangeOrderMatchModel.js';
 import GameResult from '../models/gameResultModel.js';
 import User from '../models/userModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
+import AdminCommission from '../models/adminCommissionModel.js';
+import CommissionSettingsService from './commissionSettingsService.js';
 import { Op } from 'sequelize';
 import sequelize from '../models/sequelize.js';
 import multibetSettlementService from './multibetSettlementService.js';
@@ -685,9 +687,54 @@ class ExchangeSettlementService {
     if (!user) throw new Error(`사용자를 찾을 수 없습니다: ${userId}`);
     
     const previousBalance = parseFloat(user.balance);
-    const newBalance = previousBalance + amount;
+    
+    // 🆕 수수료 계산 및 차감 (승리 시에만)
+    let netAmount = amount;
+    let commissionAmount = 0;
+    
+    if (amount > 0) { // 승리한 경우에만 수수료 차감
+      const exchangeCommissionRate = await CommissionSettingsService.getCommissionRate('exchange');
+      
+      // Exchange에서 수수료는 순수익(amount)에 대해서만 적용
+      commissionAmount = CommissionSettingsService.calculateCommission(
+        amount + order.stakeAmount, // 총 당첨금 (수익 + 원금)
+        order.stakeAmount,          // 베팅금
+        exchangeCommissionRate
+      );
+      
+      netAmount = amount - commissionAmount;
+      
+      console.log(`      💰 수수료 계산: 수익 ${amount}원, 수수료 ${commissionAmount}원 (${(exchangeCommissionRate * 100).toFixed(2)}%), 실제 지급 ${netAmount}원`);
+    }
+    
+    const newBalance = previousBalance + netAmount;
     
     await user.update({ balance: newBalance }, { transaction });
+    
+    // 🆕 수수료가 있는 경우 AdminCommission 기록
+    if (commissionAmount > 0) {
+      await AdminCommission.create({
+        adminId: 'system', // 시스템 관리자 ID (실제로는 메인 관리자 ID 사용)
+        userId: user.id,
+        betId: `EXCHANGE_${order.id}`,
+        betAmount: order.stakeAmount,
+        winAmount: amount + order.stakeAmount, // 총 당첨금
+        commissionRate: await CommissionSettingsService.getCommissionRate('exchange'),
+        commissionAmount: commissionAmount,
+        status: 'paid',
+        paidAt: new Date()
+      }, { transaction });
+      
+      // 🆕 수수료 차감 기록을 PaymentHistory에 저장
+      await PaymentHistory.create({
+        userId: user.id,
+        betId: `EXCHANGE_${order.id}`,
+        amount: -commissionAmount, // 음수로 수수료 차감 표시
+        memo: `익스체인지 수수료 (${((await CommissionSettingsService.getCommissionRate('exchange')) * 100).toFixed(2)}%)`,
+        paidAt: new Date(),
+        balanceAfter: newBalance
+      }, { transaction });
+    }
     
     // 🆕 개선된 결제 내역 메모 생성
     const isPartialMatch = order.partiallyFilled;
@@ -697,6 +744,9 @@ class ExchangeSettlementService {
     let memo = '';
     if (amount > 0) {
       memo = `Exchange ${matchType} 베팅 승리 수익 ${matchAmount}`;
+      if (commissionAmount > 0) {
+        memo += ` (수수료 ${commissionAmount}원 차감 후)`;
+      }
     } else {
       memo = `Exchange ${matchType} 베팅 손실 ${matchAmount}`;
     }
@@ -706,17 +756,17 @@ class ExchangeSettlementService {
             `배당: ${order.price}배, ` +
             `결과: ${gameResult.result}`;
     
-    // 결제 내역 생성
+    // 🆕 실제 상금 지급 기록
     await PaymentHistory.create({
       userId,
       betId: `EXCHANGE_${order.id}`, // Exchange 주문 ID를 betId로 사용하여 추적 가능
-      amount,
+      amount: netAmount, // 수수료 차감 후 실제 지급 금액
       memo,
       paidAt: new Date(),
       balanceAfter: newBalance
     }, { transaction });
     
-    console.log(`      💳 ${userId}: ${previousBalance} → ${newBalance} (${amount > 0 ? '+' : ''}${amount})`);
+    console.log(`      💳 ${userId}: ${previousBalance} → ${newBalance} (총 ${amount > 0 ? '+' : ''}${amount}원 → 수수료 ${commissionAmount}원 차감 → 실제 ${netAmount > 0 ? '+' : ''}${netAmount}원)`);
     console.log(`      📝 메모: ${memo}`);
   }
 

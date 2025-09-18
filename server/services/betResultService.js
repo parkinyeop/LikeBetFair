@@ -2,6 +2,8 @@ import Bet from '../models/betModel.js';
 import GameResult from '../models/gameResultModel.js';
 import User from '../models/userModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
+import AdminCommission from '../models/adminCommissionModel.js';
+import CommissionSettingsService from './commissionSettingsService.js';
 import simplifiedOddsValidation from './simplifiedOddsValidation.js';
 import { Op, fn, col } from 'sequelize';
 import { normalizeTeamName, normalizeTeamNameForComparison, normalizeCategory, normalizeCategoryPair, normalizeOption, calculateTeamNameSimilarity, findBestTeamMatch } from '../normalizeUtils.js';
@@ -287,7 +289,7 @@ class BetResultService {
     return 'pending';
   }
 
-  // 🆕 베팅 적중 시 상금 지급 (중복 지급 방지)
+  // 🆕 베팅 적중 시 상금 지급 (수수료 차감 포함)
   async processBetWinnings(bet, transaction) {
     // 이미 지급된 베팅인지 확인
     const existingPayment = await PaymentHistory.findOne({
@@ -313,19 +315,58 @@ class BetResultService {
       const adjustedWinnings = this.calculateAdjustedWinnings(bet);
       const hasCancelledSelections = bet.selections.some(s => s.result === 'cancelled');
       
-      user.balance = Number(user.balance) + Number(adjustedWinnings);
+      // 🆕 수수료 계산 및 차감
+      const sportsbookCommissionRate = await CommissionSettingsService.getCommissionRate('sportsbook');
+      const commissionAmount = CommissionSettingsService.calculateCommission(
+        adjustedWinnings, 
+        bet.stake, 
+        sportsbookCommissionRate
+      );
+      
+      // 실제 지급할 금액 (수수료 차감 후)
+      const netWinnings = adjustedWinnings - commissionAmount;
+      
+      user.balance = Number(user.balance) + Number(netWinnings);
       await user.save({ transaction });
       
+      // 🆕 수수료가 있는 경우 AdminCommission 기록
+      if (commissionAmount > 0) {
+        await AdminCommission.create({
+          adminId: 'system', // 시스템 관리자 ID (실제로는 메인 관리자 ID 사용)
+          userId: user.id,
+          betId: bet.id,
+          betAmount: bet.stake,
+          winAmount: adjustedWinnings,
+          commissionRate: sportsbookCommissionRate,
+          commissionAmount: commissionAmount,
+          status: 'paid',
+          paidAt: new Date()
+        }, { transaction });
+        
+        // 🆕 수수료 차감 기록을 PaymentHistory에 저장
+        await PaymentHistory.create({
+          userId: user.id,
+          betId: bet.id,
+          amount: -commissionAmount, // 음수로 수수료 차감 표시
+          memo: `스포츠북 수수료 (${(sportsbookCommissionRate * 100).toFixed(2)}%)`,
+          paidAt: new Date(),
+          balanceAfter: user.balance
+        }, { transaction });
+        
+        console.log(`[수수료 차감] 베팅 ${bet.id}: ${commissionAmount}원 차감 (${(sportsbookCommissionRate * 100).toFixed(2)}%)`);
+      }
+      
+      // 🆕 실제 상금 지급 기록
       await PaymentHistory.create({
         userId: user.id,
         betId: bet.id,
-        amount: adjustedWinnings,
-        memo: hasCancelledSelections ? '베팅 적중 지급 (일부 경기 취소 반영)' : '베팅 적중 지급',
+        amount: netWinnings,
+        memo: hasCancelledSelections ? '베팅 적중 지급 (일부 경기 취소 반영, 수수료 차감 후)' : '베팅 적중 지급 (수수료 차감 후)',
         paidAt: new Date(),
         balanceAfter: user.balance
       }, { transaction });
       
-      console.log(`[적중 지급] 베팅 ${bet.id}: ${adjustedWinnings}원 지급`);
+      console.log(`[적중 지급] 베팅 ${bet.id}: 총 ${adjustedWinnings}원 → 수수료 ${commissionAmount}원 차감 → 실제 지급 ${netWinnings}원`);
     } else {
       throw new Error(`[BetResultService] 적중 지급 실패: userId=${bet.userId} (유저 없음)`);
     }

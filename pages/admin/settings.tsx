@@ -7,7 +7,8 @@ interface SystemSettings {
   site_name: string;
   site_description: string;
   maintenance_mode: boolean;
-  commission_rate: number;
+  sportsbook_commission_rate: number;
+  exchange_commission_rate: number;
   auto_settlement_enabled: boolean;
   odds_update_interval: number;
   email_notifications: boolean;
@@ -68,7 +69,8 @@ export default function SystemSettings() {
     site_name: '',
     site_description: '',
     maintenance_mode: false,
-    commission_rate: 0.05,
+    sportsbook_commission_rate: 0.05,
+    exchange_commission_rate: 0.03,
     auto_settlement_enabled: true,
     odds_update_interval: 30,
     email_notifications: true,
@@ -87,6 +89,12 @@ export default function SystemSettings() {
   const [exchangeOddsWeights, setExchangeOddsWeights] = useState<ExchangeOddsWeightSettings>({
     weightPercentage: 0.1,
     enabled: true
+  });
+
+  // 수수료율 설정 상태
+  const [commissionRates, setCommissionRates] = useState({
+    sportsbook: 0.05,
+    exchange: 0.03
   });
 
   // 관리자 사용자 목록
@@ -133,23 +141,25 @@ export default function SystemSettings() {
         'Content-Type': 'application/json'
       };
 
-      const [settingsRes, adminsRes, logsRes, backupRes, bettingRes, oddsWeightRes] = await Promise.all([
-        fetch('http://localhost:5050/api/admin/settings', { headers }),
-        fetch('http://localhost:5050/api/admin/settings/admins', { headers }),
-        fetch('http://localhost:5050/api/admin/settings/logs', { headers }),
-        fetch('http://localhost:5050/api/admin/settings/backup', { headers }),
-        fetch('http://localhost:5050/api/admin/settings/betting-amounts', { headers }),
-        fetch('http://localhost:5050/api/admin/settings/exchange-odds-weights', { headers })
-      ]);
+        const [settingsRes, adminsRes, logsRes, backupRes, bettingRes, oddsWeightRes, commissionRes] = await Promise.all([
+          fetch('http://localhost:5050/api/admin/settings', { headers }),
+          fetch('http://localhost:5050/api/admin/settings/admins', { headers }),
+          fetch('http://localhost:5050/api/admin/settings/logs', { headers }),
+          fetch('http://localhost:5050/api/admin/settings/backup', { headers }),
+          fetch('http://localhost:5050/api/admin/settings/betting-amounts', { headers }),
+          fetch('http://localhost:5050/api/admin/settings/exchange-odds-weights', { headers }),
+          fetch('http://localhost:5050/api/admin/settings/commission-rates', { headers })
+        ]);
 
-      const [settingsData, adminsData, logsData, backupData, bettingData, oddsWeightData] = await Promise.all([
-        settingsRes.json(),
-        adminsRes.json(),
-        logsRes.json(),
-        backupRes.json(),
-        bettingRes.json(),
-        oddsWeightRes.json()
-      ]);
+        const [settingsData, adminsData, logsData, backupData, bettingData, oddsWeightData, commissionData] = await Promise.all([
+          settingsRes.json(),
+          adminsRes.json(),
+          logsRes.json(),
+          backupRes.json(),
+          bettingRes.json(),
+          oddsWeightRes.json(),
+          commissionRes.json()
+        ]);
 
       setSettings(settingsData.settings || settings);
       setAdminUsers(adminsData.admins || []);
@@ -159,7 +169,11 @@ export default function SystemSettings() {
       if (oddsWeightData.success) {
         setExchangeOddsWeights(oddsWeightData.data);
       }
-      
+
+      if (commissionData.success) {
+        setCommissionRates(commissionData.data);
+      }
+
       if (bettingData.success && bettingData.data) {
         // 백엔드 응답 구조를 프론트엔드 구조로 변환
         const backendData = bettingData.data;
@@ -200,6 +214,52 @@ export default function SystemSettings() {
     } catch (error) {
       console.error('익스체인지 배당율 가중치 설정 저장 오류:', error);
       alert('설정 저장 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 수수료율 설정 저장
+  const handleSaveCommissionRates = async () => {
+    try {
+      const tabId = sessionStorage.getItem('tabId');
+      const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
+
+      // 스포츠북 수수료율 업데이트
+      const sportsbookResponse = await fetch('http://localhost:5050/api/admin/settings/commission-rates/sportsbook', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ rate: commissionRates.sportsbook })
+      });
+
+      // 익스체인지 수수료율 업데이트
+      const exchangeResponse = await fetch('http://localhost:5050/api/admin/settings/commission-rates/exchange', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ rate: commissionRates.exchange })
+      });
+
+      const sportsbookResult = await sportsbookResponse.json();
+      const exchangeResult = await exchangeResponse.json();
+
+      if (sportsbookResponse.ok && exchangeResponse.ok && sportsbookResult.success && exchangeResult.success) {
+        alert('수수료율 설정이 저장되었습니다.');
+        // 설정 저장 후 현재 설정값 업데이트
+        setSettings({
+          ...settings,
+          sportsbook_commission_rate: commissionRates.sportsbook,
+          exchange_commission_rate: commissionRates.exchange
+        });
+      } else {
+        alert(`수수료율 설정 저장에 실패했습니다: ${sportsbookResult.error || exchangeResult.error || '알 수 없는 오류'}`);
+      }
+    } catch (error) {
+      console.error('수수료율 설정 저장 오류:', error);
+      alert('수수료율 설정 저장 중 오류가 발생했습니다.');
     }
   };
 
@@ -422,28 +482,72 @@ export default function SystemSettings() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">수수료율 (%)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={settings.commission_rate * 100}
-                    onChange={(e) => setSettings({...settings, commission_rate: parseFloat(e.target.value) / 100})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">배당 업데이트 간격 (초)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">배당 업데이트 간격 (초) <span className="text-xs text-gray-500">(추후 구현 예정)</span></label>
                   <input
                     type="number"
                     value={settings.odds_update_interval}
                     onChange={(e) => setSettings({...settings, odds_update_interval: parseInt(e.target.value)})}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-gray-500 focus:border-gray-500 bg-gray-50"
+                      disabled
+                      title="현재는 고정된 스케줄(30분/2시간)을 사용합니다. 추후 동적 설정 기능이 구현될 예정입니다."
                     />
                   </div>
                 </div>
               </div>
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={handleSaveSettings}
+                  className="bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700 transition-colors"
+                >
+                  기본 설정 저장
+                </button>
+              </div>
             </div>
 
+
+            {/* 수수료율 설정 */}
+            <div className="bg-gradient-to-r from-orange-50 to-red-50 p-6 rounded-lg shadow border border-orange-200">
+              <h3 className="text-lg font-medium text-orange-900 mb-4 flex items-center">
+                <span className="w-3 h-3 bg-orange-500 rounded-full mr-2"></span>
+                수수료율 설정
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">스포츠북 수수료율 (%) <span className="text-xs text-blue-600">(레퍼럴 시스템 연결 예정)</span></label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={commissionRates.sportsbook * 100}
+                    onChange={(e) => setCommissionRates({...commissionRates, sportsbook: parseFloat(e.target.value) / 100})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    💡 레퍼럴 시스템 구현 시 레퍼러에게 지급될 수수료 배분 비율로 활용 예정
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">익스체인지 수수료율 (%) <span className="text-xs text-blue-600">(레퍼럴 시스템 연결 예정)</span></label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={commissionRates.exchange * 100}
+                    onChange={(e) => setCommissionRates({...commissionRates, exchange: parseFloat(e.target.value) / 100})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    💡 레퍼럴 시스템 구현 시 레퍼러에게 지급될 수수료 배분 비율로 활용 예정
+                  </p>
+                </div>
+              </div>
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={handleSaveCommissionRates}
+                  className="bg-orange-600 text-white px-6 py-2 rounded hover:bg-orange-700 transition-colors"
+                >
+                  수수료율 설정 저장
+                </button>
+              </div>
+            </div>
 
             {/* 베팅 금액 설정 */}
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg shadow border border-blue-200">
@@ -667,14 +771,6 @@ export default function SystemSettings() {
               </div>
             </div>
 
-            <div className="flex justify-end">
-              <button
-                onClick={handleSaveSettings}
-                className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors"
-              >
-                설정 저장
-              </button>
-            </div>
           </div>
         )}
 
