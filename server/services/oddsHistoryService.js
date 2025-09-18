@@ -9,7 +9,7 @@ class OddsHistoryService {
   }
 
   /**
-   * 배당율 스냅샷 저장 (단순화)
+   * 배당율 스냅샷 저장 (배치 처리로 최적화)
    * @param {Object} oddsData - OddsCache 데이터
    * @returns {Promise<number>} - 저장된 히스토리 개수
    */

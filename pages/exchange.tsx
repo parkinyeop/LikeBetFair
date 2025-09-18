@@ -5,6 +5,7 @@ import { API_CONFIG, buildApiUrl } from '../config/apiConfig';
 import { normalizeTeamNameForComparison } from '../utils/matchSportsbookGame';
 import { convertUtcToLocal, getCurrentLocalTime } from '../utils/timeUtils';
 import { useExchangeContext } from '../contexts/ExchangeContext';
+import { useExchange } from '../hooks/useExchange';
 
 export default function Exchange() {
   const router = useRouter();
@@ -32,6 +33,57 @@ export default function Exchange() {
   // 🆕 마켓 체크박스 상태 추가
   const [todayGameMarkets, setTodayGameMarkets] = useState<{[gameId: string]: Set<string>}>({});
   const [leagueGameMarkets, setLeagueGameMarkets] = useState<{[gameId: string]: Set<string>}>({});
+  
+  // 🆕 Exchange 주문 데이터 상태 추가
+  const [exchangeOrders, setExchangeOrders] = useState<any[]>([]);
+  const [oddsWeightSettings, setOddsWeightSettings] = useState({ weightPercentage: 0.1, enabled: true });
+  const { fetchAllOpenOrders } = useExchange();
+  
+  // 🆕 Exchange 주문 데이터 로드 함수
+  const loadExchangeOrders = async () => {
+    try {
+      const orders = await fetchAllOpenOrders();
+      setExchangeOrders(orders);
+      console.log('🔍 Exchange 주문 데이터 로드:', orders.length, '개');
+    } catch (error) {
+      console.error('❌ Exchange 주문 데이터 로드 실패:', error);
+    }
+  };
+  
+  // 🆕 관리자 설정에서 가중치 설정 가져오기
+  const loadOddsWeightSettings = async () => {
+    try {
+      console.log('🔍 Exchange 가중치 설정 로드 시도...');
+      const response = await fetch('http://localhost:5050/api/admin/public-settings/exchange-odds-weights', {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      console.log('🔍 Exchange 가중치 설정 응답 상태:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('🔍 Exchange 가중치 설정 응답 데이터:', data);
+        if (data.success) {
+          setOddsWeightSettings(data.data);
+          console.log('✅ Exchange 가중치 설정 로드 성공:', data.data);
+        } else {
+          console.log('❌ Exchange 가중치 설정 응답 실패:', data.error);
+        }
+      } else {
+        const errorText = await response.text();
+        console.log('❌ Exchange 가중치 설정 HTTP 오류:', response.status, errorText);
+      }
+    } catch (error) {
+      console.error('❌ Exchange 가중치 설정 로드 실패:', error);
+    }
+  };
+  
+  // 🆕 Exchange 배당율에 가중치 적용 (관리자 설정값 사용)
+  const applyExchangeWeight = (originalOdds: number) => {
+    if (!originalOdds || !oddsWeightSettings.enabled) return originalOdds;
+    return originalOdds * (1 + oddsWeightSettings.weightPercentage);
+  };
   
   // 🎯 버튼이 선택되었는지 확인하는 함수 - Exchange 기존 로직 유지
   const isButtonSelected = (gameId: string, buttonKey: string) => {
@@ -664,9 +716,18 @@ export default function Exchange() {
              );
              
              outcomes = [
-               { name: game.home_team, price: (homeOdds as any)?.averagePrice },
-               { name: 'Draw', price: (drawOdds?.[1] as any)?.averagePrice },
-               { name: game.away_team, price: (awayOdds as any)?.averagePrice }
+               { 
+                 name: game.home_team, 
+                 price: applyExchangeWeight((homeOdds as any)?.averagePrice)
+               },
+               { 
+                 name: 'Draw', 
+                 price: applyExchangeWeight((drawOdds?.[1] as any)?.averagePrice)
+               },
+               { 
+                 name: game.away_team, 
+                 price: applyExchangeWeight((awayOdds as any)?.averagePrice)
+               }
              ].filter(outcome => outcome.price !== undefined);
           } else {
             // 야구, 농구 등: Draw 없이 홈/어웨이만
@@ -679,8 +740,14 @@ export default function Exchange() {
             );
             
             outcomes = [
-              { name: game.home_team, price: homeKey ? h2hOdds[homeKey]?.averagePrice : undefined },
-              { name: game.away_team, price: awayKey ? h2hOdds[awayKey]?.averagePrice : undefined }
+              { 
+                name: game.home_team, 
+                price: applyExchangeWeight(homeKey ? h2hOdds[homeKey]?.averagePrice : undefined)
+              },
+              { 
+                name: game.away_team, 
+                price: applyExchangeWeight(awayKey ? h2hOdds[awayKey]?.averagePrice : undefined)
+              }
             ].filter(outcome => outcome.price !== undefined);
           }
           
@@ -1788,6 +1855,7 @@ export default function Exchange() {
     if (viewMode === 'today') {
       fetchTodayGames();
     }
+    loadOddsWeightSettings(); // 🆕 가중치 설정 로드
     
     const handleOrderPlaced = () => {
       console.log('🔄 주문 완료 이벤트 감지, 익스체인지 홈 투데이 베팅 데이터 새로고침');

@@ -156,6 +156,7 @@ class ExchangeMultibetController {
       console.log(`📊 totalOdds 계산: 프론트엔드 ${totalOdds} vs 백엔드 ${calculatedTotalOdds}`);
       
       // 6. 멀티배팅 주문 생성 (기존 ExchangeOrders 테이블 사용)
+      console.log('🔍 [MultibetController] ExchangeOrder.create 시작...');
       const multibetOrder = await ExchangeOrder.create({
         userId,
         gameId: 'multibet_' + Date.now(), // 멀티배팅용 고유 ID
@@ -201,13 +202,18 @@ class ExchangeMultibetController {
         commenceTime: selections[0]?.commenceTime ? new Date(selections[0].commenceTime) : new Date(), // UTC로 변환하여 저장
         sportKey: selections[0]?.sportKey || 'multibet'
       }, { transaction });
+      console.log('✅ [MultibetController] ExchangeOrder.create 성공:', multibetOrder.id);
 
       // 6. 사용자 잔액 차감
+      console.log('🔍 [MultibetController] 사용자 잔액 차감 시작...');
       user.balance -= stake;
       await user.save({ transaction });
+      console.log('✅ [MultibetController] 사용자 잔액 차감 완료:', user.balance);
 
       // 7. 거래 커밋
+      console.log('🔍 [MultibetController] 트랜잭션 커밋 시작...');
       await transaction.commit();
+      console.log('✅ [MultibetController] 트랜잭션 커밋 완료');
 
       console.log('✅ [MultibetController] 멀티배팅 주문 생성 성공:', {
         multibetId: multibetOrder.id,

@@ -181,6 +181,7 @@ class ActionItemService {
       const count = await ExchangeOrder.count({
         include: [{
           model: GameResult,
+          as: 'gameResult',
           where: {
             status: { [Op.in]: ['cancelled', 'postponed'] }
           },

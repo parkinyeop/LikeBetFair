@@ -35,13 +35,13 @@ class ActionItemMonitorJob {
     console.log('🔍 액션 아이템 모니터링 시작...');
     this.isRunning = true;
 
-    // 🔥 긴급 항목 체크 (매 2분마다)
-    const dangerJob = cron.schedule('*/2 * * * *', async () => {
+    // 🔥 긴급 항목 체크 (매 5분마다로 변경)
+    const dangerJob = cron.schedule('*/5 * * * *', async () => {
       await this.checkDangerItems();
     }, { scheduled: false });
 
-    // ⚠️ 경고 항목 체크 (매 10분마다)
-    const warningJob = cron.schedule('*/10 * * * *', async () => {
+    // ⚠️ 경고 항목 체크 (매 15분마다로 변경)
+    const warningJob = cron.schedule('*/15 * * * *', async () => {
       await this.checkWarningItems();
     }, { scheduled: false });
 

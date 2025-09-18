@@ -7,6 +7,7 @@ import verifyToken from '../middleware/verifyToken.js';
 import exchangeWebSocketService from '../services/exchangeWebSocketService.js';
 import exchangeGameMappingService from '../services/exchangeGameMappingService.js';
 import exchangeSettlementService from '../services/exchangeSettlementService.js';
+import ExchangeOddsWeightService from '../services/exchangeOddsWeightService.js';
 import { Op } from 'sequelize';
 import sequelize from '../models/sequelize.js';
 
@@ -444,12 +445,17 @@ router.post('/order', verifyToken, async (req, res) => {
     console.log('📊 매핑된 게임 데이터:', {
       homeTeam: orderData.homeTeam,
       awayTeam: orderData.awayTeam,
-      sportKey: orderData.sportKey
+      sportKey: orderData.sportKey,
+      originalPrice: price,
+      adjustedPrice: orderData.adjustedPrice
     });
+    
+    // 🆕 원본 배당율 사용 (가중치는 조회 시에만 적용)
+    const finalPrice = price;
     
     // 일반 잔고 사용 (데이터 타입 통일)
     const user = await User.findByPk(userId);
-    const required = side === 'back' ? amount : Math.floor((price - 1) * amount);
+    const required = side === 'back' ? amount : Math.floor((finalPrice - 1) * amount);
     
     // 잔고를 정수로 변환하여 비교
     const userBalance = parseInt(user.balance);
@@ -460,22 +466,23 @@ router.post('/order', verifyToken, async (req, res) => {
       userBalance, 
       required, 
       side, 
-      price, 
+      originalPrice: price,
+      finalPrice: finalPrice,
       amount,
-      calculation: side === 'back' ? `${amount} (back)` : `Math.floor((${price} - 1) * ${amount}) = ${Math.floor((price - 1) * amount)} (lay)`
+      calculation: side === 'back' ? `${amount} (back)` : `Math.floor((${finalPrice} - 1) * ${amount}) = ${Math.floor((finalPrice - 1) * amount)} (lay)`
     });
     
     if (!user || userBalance < required) {
-      console.log('❌ 잔고 부족:', { userBalance, required, side, price, amount });
+      console.log('❌ 잔고 부족:', { userBalance, required, side, finalPrice, amount });
       return res.status(400).json({ message: '잔고 부족' });
     }
     
     user.balance = userBalance - required;
     await user.save();
     
-    // 🆕 부분 매칭 처리
+    // 🆕 부분 매칭 처리 (가중치가 적용된 배당율 사용)
     const partialMatchResult = await processPartialMatching({
-      gameId, market, line, side, price, amount, userId
+      gameId, market, line, side, price: finalPrice, amount, userId
     });
     
     console.log('🎯 부분 매칭 결과:', {
@@ -694,13 +701,25 @@ router.get('/orderbook', verifyToken, async (req, res) => {
       }
     });
     
-    // 🆕 부분 매칭을 고려한 주문 정보 반환
-    const ordersWithRemainingAmount = orders.map(order => ({
-      ...order.toJSON(),
-      displayAmount: order.remainingAmount || order.amount, // 화면에 표시할 금액
-      originalAmount: order.originalAmount || order.amount,
-      filledAmount: order.filledAmount || 0,
-      partiallyFilled: order.partiallyFilled || false
+    // 🆕 부분 매칭을 고려한 주문 정보 반환 + 가중치 적용
+    const ordersWithRemainingAmount = await Promise.all(orders.map(async order => {
+      const orderData = order.toJSON();
+      
+      // Back 주문일 때만 가중치 적용하여 표시
+      let displayPrice = orderData.price;
+      if (orderData.side === 'back') {
+        displayPrice = await ExchangeOddsWeightService.applyWeightToOdds(orderData.price);
+      }
+      
+      return {
+        ...orderData,
+        price: displayPrice, // 사용자에게 표시할 가중치 적용된 배당율
+        originalPrice: orderData.price, // 원본 배당율 보존
+        displayAmount: order.remainingAmount || order.amount, // 화면에 표시할 금액
+        originalAmount: order.originalAmount || order.amount,
+        filledAmount: order.filledAmount || 0,
+        partiallyFilled: order.partiallyFilled || false
+      };
     }));
     
     res.json({ orders: ordersWithRemainingAmount });
@@ -1200,18 +1219,30 @@ router.get('/orders', verifyToken, async (req, res) => {
       ]
     });
     
-    // 🆕 부분 매칭 정보 포함한 응답
-    const ordersWithMatchInfo = orders.map(order => ({
-      ...order.toJSON(),
-      matchInfo: {
-        originalAmount: order.originalAmount || order.amount,
-        filledAmount: order.filledAmount || 0,
-        remainingAmount: order.remainingAmount || order.amount,
-        partiallyFilled: order.partiallyFilled || false,
-        fillPercentage: order.originalAmount ? 
-          Math.round((order.filledAmount || 0) / order.originalAmount * 100) : 0,
-        matchCount: (order.originalMatches?.length || 0) + (order.matchingMatches?.length || 0)
+    // 🆕 부분 매칭 정보 포함한 응답 + 가중치 적용
+    const ordersWithMatchInfo = await Promise.all(orders.map(async order => {
+      const orderData = order.toJSON();
+      
+      // Back 주문일 때만 가중치 적용하여 표시
+      let displayPrice = orderData.price;
+      if (orderData.side === 'back') {
+        displayPrice = await ExchangeOddsWeightService.applyWeightToOdds(orderData.price);
       }
+      
+      return {
+        ...orderData,
+        price: displayPrice, // 사용자에게 표시할 가중치 적용된 배당율
+        originalPrice: orderData.price, // 원본 배당율 보존
+        matchInfo: {
+          originalAmount: order.originalAmount || order.amount,
+          filledAmount: order.filledAmount || 0,
+          remainingAmount: order.remainingAmount || order.amount,
+          partiallyFilled: order.partiallyFilled || false,
+          fillPercentage: order.originalAmount ? 
+            Math.round((order.filledAmount || 0) / order.originalAmount * 100) : 0,
+          matchCount: (order.originalMatches?.length || 0) + (order.matchingMatches?.length || 0)
+        }
+      };
     }));
     
     res.json(ordersWithMatchInfo);

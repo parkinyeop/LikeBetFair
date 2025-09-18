@@ -254,18 +254,32 @@ class ExchangeGameMappingService {
         layOdds = opposingOutcome ? opposingOutcome.price : null;
       }
 
-      console.log('✅ OddsCache에서 배당율 추출 성공:', {
+      // 원본 배당율 (가중치 적용 전)
+      const originalBackOdds = backOdds !== null ? parseFloat(backOdds.toFixed(2)) : null;
+      const originalLayOdds = layOdds !== null ? parseFloat(layOdds.toFixed(2)) : null;
+
+      // 원본 배당율 사용 (가중치는 조회 시에만 적용)
+      const finalBackOdds = originalBackOdds;
+      const finalLayOdds = originalLayOdds;
+
+      console.log('✅ OddsCache에서 배당율 추출 및 가중치 적용 완료:', {
         selection,
         side,
-        backOdds,
-        layOdds,
-        oddsSource: bookmaker.title
+        sportKey: oddsCache.sportKey,
+        originalBackOdds,
+        originalLayOdds,
+        finalBackOdds,
+        finalLayOdds,
+        oddsSource: bookmaker.title,
+        weightApplied: side === 'back'
       });
 
       return {
-        backOdds: backOdds !== null ? parseFloat(backOdds.toFixed(2)) : null,
-        layOdds: layOdds !== null ? parseFloat(layOdds.toFixed(2)) : null,
-        oddsSource: bookmaker.title
+        backOdds: finalBackOdds,
+        layOdds: finalLayOdds,
+        oddsSource: bookmaker.title,
+        originalBackOdds, // 원본 배당율 보존
+        originalLayOdds   // 원본 배당율 보존
       };
 
     } catch (error) {
@@ -315,11 +329,14 @@ class ExchangeGameMappingService {
             mappedCommenceTimeISO: mappedData.commenceTime?.toISOString()
           });
           
-          // 배당율 설정
+          // 배당율 설정 (가중치 적용)
           mappedData.backOdds = oddsCacheData.backOdds;
           mappedData.layOdds = oddsCacheData.layOdds;
           mappedData.oddsSource = oddsCacheData.oddsSource;
           mappedData.oddsUpdatedAt = new Date();
+          
+          // 원본 배당율 사용 (가중치는 조회 시에만 적용)
+          mappedData.adjustedPrice = orderData.price;
 
           console.log('✅ OddsCache 기반 게임 매핑 성공:', {
             gameId: orderData.gameId,

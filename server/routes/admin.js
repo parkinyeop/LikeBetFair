@@ -11,6 +11,7 @@ import OddsCache from '../models/oddsCacheModel.js';
 import Settings from '../models/settingsModel.js';
 import actionItemService from '../services/actionItemService.js';
 import BettingAmountSettingsService from '../services/bettingAmountSettingsService.js';
+import ExchangeOddsWeightService from '../services/exchangeOddsWeightService.js';
 import bcrypt from 'bcryptjs';
 import { Op } from 'sequelize';
 
@@ -2213,6 +2214,96 @@ router.put('/settings', verifyToken, requireAdmin(2), async (req, res) => {
 });
 
 // =============================================================================
+// 베팅 금액 설정 관리
+// =============================================================================
+
+// 익스체인지 배당율 가중치 설정 관리
+// =============================================================================
+
+// 익스체인지 배당율 가중치 설정 조회 (단순화)
+router.get('/settings/exchange-odds-weights', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    console.log('🔍 익스체인지 배당율 가중치 설정 조회 요청:', req.admin.username);
+    
+    const settings = await ExchangeOddsWeightService.getOddsWeightSettings();
+    
+    res.json({
+      success: true,
+      data: settings
+    });
+  } catch (error) {
+    console.error('익스체인지 배당율 가중치 설정 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '설정 조회 중 오류가 발생했습니다.'
+    });
+  }
+});
+
+// 익스체인지 배당율 가중치 설정 조회 (공개 API - 토큰 불필요)
+router.get('/public-settings/exchange-odds-weights', async (req, res) => {
+  try {
+    console.log('🔍 공개 익스체인지 배당율 가중치 설정 조회 요청');
+    
+    const settings = await ExchangeOddsWeightService.getOddsWeightSettings();
+    
+    res.json({
+      success: true,
+      data: settings
+    });
+  } catch (error) {
+    console.error('익스체인지 배당율 가중치 설정 조회 오류:', error);
+    res.json({
+      success: true,
+      data: { weightPercentage: 0.1, enabled: true } // 기본값 반환
+    });
+  }
+});
+
+// 익스체인지 배당율 가중치 설정 업데이트 (단순화)
+router.put('/settings/exchange-odds-weights', verifyToken, requireAdmin(3), async (req, res) => {
+  try {
+    const { weightPercentage, enabled } = req.body;
+    
+    console.log('🔧 익스체인지 배당율 가중치 설정 업데이트 요청:', {
+      admin: req.admin.username,
+      weightPercentage,
+      enabled
+    });
+    
+    // 입력값 검증
+    if (weightPercentage !== undefined && (isNaN(weightPercentage) || weightPercentage < 0 || weightPercentage > 1)) {
+      return res.status(400).json({
+        success: false,
+        error: '가중치는 0과 1 사이의 값이어야 합니다. (0.1 = 10%)'
+      });
+    }
+    
+    const result = await ExchangeOddsWeightService.updateOddsWeightSettings({
+      weightPercentage,
+      enabled
+    });
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: '익스체인지 배당율 가중치 설정이 업데이트되었습니다.'
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error || '설정 업데이트 중 오류가 발생했습니다.'
+      });
+    }
+  } catch (error) {
+    console.error('익스체인지 배당율 가중치 설정 업데이트 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '설정 업데이트 중 오류가 발생했습니다.'
+    });
+  }
+});
+
 // 베팅 금액 설정 관리
 // =============================================================================
 

@@ -17,6 +17,13 @@ if (process.env.DB_CONNECTION_STRING) {
       port: process.env.DB_PORT,
       dialect: 'postgres', // 실제 사용하는 DB에 맞게!
       logging: false,
+      pool: {
+        max: 10,       // 최대 연결 수 증가 (5 → 10)
+        min: 0,        // 최소 연결 수
+        acquire: 60000, // 연결 획득 타임아웃 증가 (30초 → 60초)
+        idle: 30000,   // 유휴 연결 타임아웃 증가 (10초 → 30초)
+        evict: 1000    // 연결 제거 간격 (1초)
+      }
     }
   );
 }
