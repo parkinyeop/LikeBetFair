@@ -296,17 +296,18 @@ class ActionItemService {
    */
   async calculateUserBalance(userId) {
     try {
-      const payments = await PaymentHistory.findAll({
+      // 가장 최근 거래 내역의 balanceAfter 값 사용
+      const latestPayment = await PaymentHistory.findOne({
         where: { userId },
-        order: [['createdAt', 'ASC']]
+        order: [['createdAt', 'DESC'], ['id', 'DESC']]
       });
 
-      let calculatedBalance = 0;
-      for (const payment of payments) {
-        calculatedBalance += parseFloat(payment.amount);
+      if (!latestPayment) {
+        return 0; // 거래 내역이 없으면 0
       }
 
-      return calculatedBalance;
+      // 최근 거래 후 잔액을 반환
+      return parseFloat(latestPayment.balanceAfter) || 0;
     } catch (error) {
       console.error(`사용자 ${userId} 잔액 계산 오류:`, error);
       return 0;

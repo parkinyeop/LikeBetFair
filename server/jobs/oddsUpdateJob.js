@@ -2,6 +2,8 @@ import cron from 'node-cron';
 import oddsApiService from '../services/oddsApiService.js';
 import gameResultService from '../services/gameResultService.js';
 import betResultService from '../services/betResultService.js';
+import ExchangeSettlementService from '../services/exchangeSettlementService.js';
+import multibetSettlementService from '../services/multibetSettlementService.js';
 import fs from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
@@ -833,10 +835,9 @@ cron.schedule('*/10 * * * *', async () => {
   try {
     console.log('🔄 [Exchange] 만료된 주문 자동 취소 시작...');
     
-    // Exchange 주문 만료 처리 실행
-    const { stdout } = await execAsync('node -e "import ExchangeSettlementService from \'./services/exchangeSettlementService.js\'; const service = new ExchangeSettlementService(); service.cancelUnmatchedOrdersAtKickoff().then(() => console.log(\'완료\')).catch(e => console.error(\'실패:\', e.message));"', {
-      cwd: process.cwd()
-    });
+    // Exchange 주문 만료 처리 실행 (직접 호출)
+    const service = new ExchangeSettlementService();
+    await service.cancelUnmatchedOrdersAtKickoff();
     
     console.log('✅ [Exchange] 만료된 주문 자동 취소 완료');
     
@@ -857,27 +858,22 @@ cron.schedule('*/5 * * * *', async () => {
   try {
     console.log('🎯 [Exchange] 매칭된 주문 자동 정산 시작...');
 
-    // Exchange 개별 주문 자동 정산 실행
-    const { stdout } = await execAsync('node -e "import ExchangeSettlementService from \'./services/exchangeSettlementService.js\'; const service = new ExchangeSettlementService(); service.settleAllConnectedOrders().then((result) => console.log(\'개별주문 정산 완료:\', JSON.stringify(result))).catch(e => console.error(\'개별주문 정산 실패:\', e.message));"', {
-      cwd: process.cwd()
-    });
+    // Exchange 개별 주문 자동 정산 실행 (직접 호출)
+    const service = new ExchangeSettlementService();
+    const individualResult = await service.settleAllConnectedOrders();
+    console.log('✅ [Exchange] 개별 주문 자동 정산 완료:', individualResult);
 
-    console.log('✅ [Exchange] 개별 주문 자동 정산 완료');
-
-    // 멀티배팅 주문 자동 정산 실행 (새로 추가)
+    // 멀티배팅 주문 자동 정산 실행 (직접 호출)
     console.log('🎯 [Exchange] 멀티배팅 주문 자동 정산 시작...');
-    const { stdout: multibetResult } = await execAsync('node scripts/fixMultibetSettlements.js', {
-      cwd: process.cwd()
-    });
-
-    console.log('✅ [Exchange] 멀티배팅 주문 자동 정산 완료');
+    const multibetResult = await multibetSettlementService.settleAllMultibetOrders();
+    console.log('✅ [Exchange] 멀티배팅 주문 자동 정산 완료:', multibetResult);
 
     // 정산 결과 로그 저장
     saveUpdateLog('exchange_settlement', 'success', {
       message: 'Exchange 주문 자동 정산 완료 (개별 + 멀티배팅)',
       timestamp: new Date().toISOString(),
-      individualOrders: '완료',
-      multibetOrders: '완료'
+      individualOrders: individualResult,
+      multibetOrders: multibetResult
     });
 
   } catch (error) {

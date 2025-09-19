@@ -1,0 +1,27 @@
+# 서버 재시작 룰 (필수 순서)
+## 절대 틀리지 말 것! 하루에도 수백번씩 틀림
+
+### 서버 재시작 절차 (순서대로 실행)
+1. **PWD 확인**: `pwd` - 현재 디렉토리 확인
+2. **프로젝트 루트로 이동**: `cd ..` (server 디렉토리에 있을 때)
+3. **서버 중지**: `npm run dev:stop`
+4. **서버 시작**: `npm run dev`
+
+### 주의사항
+- 절대 순서를 바꾸지 말 것
+- pwd 확인 없이 바로 실행하지 말 것
+- 프로젝트 루트가 아닌 곳에서 npm 명령어 실행하지 말 것
+- 서버 중지 후 바로 시작하지 말고 잠시 대기
+
+### 예시 명령어 순서
+```bash
+pwd
+cd ..
+npm run dev:stop
+npm run dev
+```
+
+### 현재 프로젝트 구조
+- 프로젝트 루트: `/Users/inyeoppark/Documents/MyGemeProject/LikeBetFair`
+- 서버 디렉토리: `/Users/inyeoppark/Documents/MyGemeProject/LikeBetFair/server`
+- 서버 재시작은 항상 프로젝트 루트에서 실행

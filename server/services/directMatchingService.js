@@ -140,8 +140,6 @@ class DirectMatchingService {
         }
       });
 
-      console.log(`📊 시간 범위 내 후보 경기: ${candidateGames.length}개`);
-
       if (candidateGames.length === 0) {
         console.log('❌ 시간 범위 내 완료된 경기 없음');
         return null;
@@ -161,9 +159,10 @@ class DirectMatchingService {
         // 전체 매칭 점수 (홈팀 + 어웨이팀 평균)
         const totalScore = (homeScore + awayScore) / 2;
         
-        console.log(`🎯 경기: ${game.homeTeam} vs ${game.awayTeam}`);
-        console.log(`   홈팀 유사도: ${homeScore.toFixed(3)}, 어웨이팀 유사도: ${awayScore.toFixed(3)}`);
-        console.log(`   전체 점수: ${totalScore.toFixed(3)}`);
+        // 로그 최적화: 매칭 점수가 높을 때만 로그 출력
+        if (totalScore >= 0.5) {
+          console.log(`🎯 경기: ${game.homeTeam} vs ${game.awayTeam} (점수: ${totalScore.toFixed(3)})`);
+        }
 
         if (totalScore >= minimumScore && totalScore > bestScore) {
           bestMatch = game;

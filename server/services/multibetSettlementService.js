@@ -19,11 +19,11 @@ class MultibetSettlementService {
    * @returns {Object} 정산 결과
    */
   async settleMultibetOrder(order) {
+    const settlementStartTime = Date.now();
     const transaction = await sequelize.transaction();
-    
+
     try {
       console.log(`🎯 멀티배팅 정산 시작: 주문 ${order.id}`);
-      console.log(`   상태: ${order.status}, 부분매칭: ${order.partiallyFilled}, 체결: ${order.filledAmount}, 잔여: ${order.remainingAmount}`);
 
       if (!order.isMultibet) {
         throw new Error('멀티배팅 주문이 아닙니다.');
@@ -33,44 +33,55 @@ class MultibetSettlementService {
         throw new Error('선택된 경기가 없습니다.');
       }
 
-      // 🆕 매치 여부 확인
+      // 1단계: 매치 여부 확인 (성능 측정)
+      const matchCheckStartTime = Date.now();
       const hasMatches = await this.checkOrderMatches(order.id);
+      console.log(`⏱️ 매치 확인 완료: ${Date.now() - matchCheckStartTime}ms`);
+
       if (!hasMatches) {
         console.log(`⚠️ 매치되지 않은 주문: ${order.id} - 만료 취소 처리`);
         await this.processUnmatchedOrderCancellation(order, transaction);
         await transaction.commit();
+        const totalTime = Date.now() - settlementStartTime;
+        console.log(`🔄 주문 취소 완료: ${order.id} (총 ${totalTime}ms)`);
         return { message: 'Unmatched order cancelled', orderId: order.id };
       }
-
-      console.log(`📋 선택된 경기: ${order.selectionDetails.selections.length}개 (매치된 주문 정산)`);
 
       // 이미 정산된 경우 스킵
       if (order.status === 'settled') {
         console.log(`⚠️ 이미 정산된 주문: ${order.id}`);
         await transaction.commit();
+        const totalTime = Date.now() - settlementStartTime;
+        console.log(`⚠️ 중복 정산 방지: ${order.id} (총 ${totalTime}ms)`);
         return { message: 'Already settled', orderId: order.id };
       }
-      
-      // 1. 모든 경기 결과 수집
+
+      // 2단계: 모든 경기 결과 수집 (성능 측정)
+      const gameResultsStartTime = Date.now();
       const gameResults = await this.collectAllGameResults(order.selectionDetails.selections);
-      console.log(`📊 수집된 경기 결과: ${gameResults.length}개`);
-      
-      // 2. 멀티배팅 승패 판정
+      console.log(`⏱️ 경기 결과 수집 완료: ${Date.now() - gameResultsStartTime}ms (${gameResults.length}개)`);
+
+      // 3단계: 멀티배팅 승패 판정
+      const judgmentStartTime = Date.now();
       const settlementResult = this.determineMultibetResult(gameResults);
-      console.log(`🏆 멀티배팅 판정: ${settlementResult.finalResult}`);
-      
-      // 3. 정산 처리
+      console.log(`⏱️ 승패 판정 완료: ${Date.now() - judgmentStartTime}ms (결과: ${settlementResult.finalResult})`);
+
+      // 4단계: 정산 처리 (성능 측정)
+      const processStartTime = Date.now();
       const settlement = await this.processMultibetSettlement(order, settlementResult, transaction);
-      
+      console.log(`⏱️ 정산 처리 완료: ${Date.now() - processStartTime}ms`);
+
       await transaction.commit();
-      
-      console.log(`✅ 멀티배팅 정산 완료: 주문 ${order.id}`);
-      
+
+      const totalTime = Date.now() - settlementStartTime;
+      console.log(`✅ 멀티배팅 정산 완료: 주문 ${order.id} (총 ${totalTime}ms)`);
+
       return settlement;
-      
+
     } catch (error) {
       await transaction.rollback();
-      console.error(`❌ 멀티배팅 정산 실패: 주문 ${order.id}`, error);
+      const totalTime = Date.now() - settlementStartTime;
+      console.error(`❌ 멀티배팅 정산 실패: 주문 ${order.id} (총 ${totalTime}ms)`, error);
       throw error;
     }
   }
@@ -142,8 +153,6 @@ class MultibetSettlementService {
     const gameResults = [];
     
     for (const [index, selection] of selections.entries()) {
-      console.log(`🔍 경기 ${index + 1}/${selections.length} 결과 수집: ${selection.homeTeam} vs ${selection.awayTeam}`);
-      
       try {
         const gameResult = await this.findGameResult(selection);
         
@@ -153,7 +162,10 @@ class MultibetSettlementService {
           index: index + 1
         });
         
-        console.log(`   결과: ${gameResult ? gameResult.result || 'pending' : 'not_found'}`);
+        // 로그 최적화: 결과가 없을 때만 로그 출력
+        if (!gameResult) {
+          console.log(`❌ 경기 ${index + 1}/${selections.length}: ${selection.homeTeam} vs ${selection.awayTeam} - 결과 없음`);
+        }
         
       } catch (error) {
         console.error(`   오류: ${error.message}`);
@@ -176,22 +188,18 @@ class MultibetSettlementService {
    */
   async findGameResult(selection) {
     const { homeTeam, awayTeam, commenceTime } = selection;
-    
-    console.log(`🔍 경기 검색: ${homeTeam} vs ${awayTeam} (${commenceTime})`);
-    
+
     // 기존 DirectMatchingService 사용
     const directMatching = directMatchingService;
     const gameResult = await directMatching.findMatchingGameResult(selection);
-    
+
     if (!gameResult) {
-      console.log(`   경기 결과를 찾을 수 없음`);
       return null;
     }
-    
+
     // 경기 결과 판정
     const result = this.determineGameResult(gameResult, selection);
-    console.log(`   경기 결과: ${result} (스코어: ${gameResult.homeScore}-${gameResult.awayScore})`);
-    
+
     return {
       ...gameResult.toJSON(),
       result
@@ -208,32 +216,22 @@ class MultibetSettlementService {
     const { status, homeScore, awayScore, result, score } = gameResult;
     const { team: selectedTeam } = selection;
 
-    console.log(`   🔍 경기 결과 판정: ${gameResult.homeTeam} vs ${gameResult.awayTeam}`);
-    console.log(`      상태: ${status}, 결과: ${result}`);
-    console.log(`      선택한 팀: ${selectedTeam}`);
-
     // 경기 취소/연기
     if (status === 'cancelled' || status === 'postponed') {
-      console.log(`   ❌ 취소/연기된 경기`);
       return 'cancelled';
     }
 
     // finished + pending 패턴은 실제로 취소된 경기
     if (status === 'finished' && result === 'pending') {
-      console.log(`   📋 finished+pending 패턴 감지 - 취소된 경기로 처리`);
       return 'pending'; // determineMultibetResult에서 cancelled로 변환됨
     }
 
     // 결과가 이미 판정된 경우 직접 사용
     if (status === 'finished' && result && result !== 'pending') {
-      console.log(`   ✅ 기존 경기 결과 사용: ${result}`);
-
       // 선택한 팀이 홈팀인지 어웨이팀인지 확인
       const isHomeTeam = selectedTeam === gameResult.homeTeam ||
                         selectedTeam.includes(gameResult.homeTeam) ||
                         gameResult.homeTeam.includes(selectedTeam);
-
-      console.log(`      홈팀 여부: ${isHomeTeam}`);
 
       if (result === 'home_win') {
         return isHomeTeam ? 'won' : 'lost';
@@ -261,17 +259,15 @@ class MultibetSettlementService {
         if (Array.isArray(scoreData) && scoreData.length >= 2) {
           actualHomeScore = parseInt(scoreData[0].score);
           actualAwayScore = parseInt(scoreData[1].score);
-          console.log(`      JSON 스코어 추출: ${actualHomeScore}-${actualAwayScore}`);
         }
       } catch (e) {
-        console.log(`      JSON 스코어 파싱 실패: ${e.message}`);
+        // 스코어 파싱 실패시 silent fail
       }
     }
 
     // 경기 미완료
     if (status !== 'finished' || actualHomeScore === null || actualAwayScore === null ||
         actualHomeScore === undefined || actualAwayScore === undefined || isNaN(actualHomeScore) || isNaN(actualAwayScore)) {
-      console.log(`   ⏳ 경기 미완료 또는 스코어 없음`);
       return 'pending';
     }
 
@@ -280,36 +276,27 @@ class MultibetSettlementService {
     const awayWon = actualAwayScore > actualHomeScore;
     const draw = actualHomeScore === actualAwayScore;
 
-    console.log(`      스코어: ${actualHomeScore}-${actualAwayScore}, 홈승: ${homeWon}, 원정승: ${awayWon}, 무승부: ${draw}`);
-
     // 선택한 팀이 홈팀인지 어웨이팀인지 확인
     const isHomeTeam = selectedTeam === gameResult.homeTeam ||
                       selectedTeam.includes(gameResult.homeTeam) ||
                       gameResult.homeTeam.includes(selectedTeam);
 
-    console.log(`      홈팀 여부: ${isHomeTeam}`);
-
     if (isHomeTeam) {
       if (homeWon) {
-        console.log(`      ✅ 홈팀 승리!`);
         return 'won';
       }
       if (awayWon || draw) {
-        console.log(`      ❌ 홈팀 패배`);
         return 'lost';
       }
     } else {
       if (awayWon) {
-        console.log(`      ✅ 어웨이팀 승리!`);
         return 'won';
       }
       if (homeWon || draw) {
-        console.log(`      ❌ 어웨이팀 패배`);
         return 'lost';
       }
     }
 
-    console.log(`   ❓ 판정 불가`);
     return 'pending';
   }
   
@@ -407,12 +394,10 @@ class MultibetSettlementService {
       await this.processPayment(order, finalResult, settlementResult, transaction);
     }
 
-    const finalProfit = await this.calculateProfit(order, finalResult);
-
     return {
       orderId: order.id,
       finalResult,
-      profit: finalProfit,
+      profit: profit,
       gameResults: settlementResult.gameResults,
       summary: settlementResult.summary
     };
@@ -503,44 +488,69 @@ class MultibetSettlementService {
    * @param {Object} transaction - 트랜잭션
    */
   async processPayment(order, result, settlementResult, transaction) {
-    const user = await User.findByPk(order.userId, { transaction });
-    const profit = await this.calculateProfit(order, result);
-    
-    // 이미 정산된 경우 중복 처리 방지
-    const existingPayment = await PaymentHistory.findOne({
-      where: {
-        betId: `EXCHANGE_${order.id}`,
-        memo: { [Op.like]: '%멀티배팅%' }
-      },
-      transaction
-    });
-    
-    if (existingPayment) {
-      console.log(`⚠️ 주문 ${order.id}는 이미 정산됨`);
-      return;
-    }
-    
-    // 사용자 잔액 업데이트 (숫자 타입 보장)
-    const currentBalance = parseFloat(user.balance) || 0;
-    const profitAmount = parseFloat(profit) || 0;
-    user.balance = currentBalance + profitAmount;
-    await user.save({ transaction });
+    const paymentStartTime = Date.now();
 
-    console.log(`💰 잔액 업데이트: ${currentBalance} + ${profitAmount} = ${user.balance}`);
-    
-    // 결제 내역 생성
-    const memo = await this.generatePaymentMemo(order, result, settlementResult);
-    
-    await PaymentHistory.create({
-      userId: order.userId,
-      betId: `EXCHANGE_${order.id}`,
-      amount: profit,
-      balanceAfter: user.balance,
-      memo: memo,
-      paidAt: new Date()
-    }, { transaction });
-    
-    console.log(`💰 결제 처리 완료: ${profit}원 (잔액: ${user.balance}원)`);
+    try {
+      console.log(`💰 결제 처리 시작: 주문 ${order.id}`);
+
+      // 1단계: 병렬로 필요한 데이터 조회 (성능 측정)
+      const queryStartTime = Date.now();
+      const [user, existingPayment] = await Promise.all([
+        User.findByPk(order.userId, {
+          transaction,
+          attributes: ['id', 'balance'] // 필요한 필드만 조회
+        }),
+        PaymentHistory.findOne({
+          where: {
+            betId: `EXCHANGE_${order.id}`
+          },
+          transaction,
+          attributes: ['id'] // 존재 여부만 확인
+        })
+      ]);
+      console.log(`⏱️ 데이터 조회 완료: ${Date.now() - queryStartTime}ms`);
+
+      if (existingPayment) {
+        console.log(`⚠️ 주문 ${order.id}는 이미 정산됨 (${Date.now() - paymentStartTime}ms)`);
+        return;
+      }
+
+      // 2단계: 수익 계산 (성능 측정)
+      const profitStartTime = Date.now();
+      const profit = await this.calculateProfit(order, result);
+      console.log(`⏱️ 수익 계산 완료: ${Date.now() - profitStartTime}ms`);
+
+      // 3단계: 잔액 업데이트 준비
+      const currentBalance = parseFloat(user.balance) || 0;
+      const profitAmount = parseFloat(profit) || 0;
+      const newBalance = currentBalance + profitAmount;
+
+      // 4단계: 메모 생성 (미리 준비)
+      const memo = this.generatePaymentMemo(order, result, settlementResult, profit);
+
+      // 5단계: 데이터베이스 업데이트 (병렬 실행 + 성능 측정)
+      const saveStartTime = Date.now();
+      await Promise.all([
+        user.update({ balance: newBalance }, { transaction }),
+        PaymentHistory.create({
+          userId: order.userId,
+          betId: `EXCHANGE_${order.id}`,
+          amount: profitAmount,
+          balanceAfter: newBalance,
+          memo: memo,
+          paidAt: new Date()
+        }, { transaction })
+      ]);
+      console.log(`⏱️ DB 저장 완료: ${Date.now() - saveStartTime}ms`);
+
+      const totalTime = Date.now() - paymentStartTime;
+      console.log(`💰 결제 완료: ${currentBalance} → ${newBalance} (총 ${totalTime}ms)`);
+
+    } catch (error) {
+      const totalTime = Date.now() - paymentStartTime;
+      console.error(`❌ 결제 처리 실패 (주문 ${order.id}, ${totalTime}ms):`, error.message);
+      throw error;
+    }
   }
   
   /**
@@ -550,20 +560,105 @@ class MultibetSettlementService {
    * @param {Object} settlementResult - 정산 결과
    * @returns {Promise<string>} 결제 메모
    */
-  async generatePaymentMemo(order, result, settlementResult) {
+  generatePaymentMemo(order, result, settlementResult, profit) {
     const { summary } = settlementResult;
     const gameCount = summary.total;
     const wonCount = summary.won;
     
     if (result === 'cancelled') {
-      const refundAmount = await this.calculateProfit(order, result);
-      return `Exchange 멀티배팅 취소 환불 (${gameCount}개 경기 중 ${summary.cancelled}개 취소) - 환불: ${refundAmount}원`;
+      return `Exchange 멀티배팅 취소 환불 (${gameCount}개 경기 중 ${summary.cancelled}개 취소) - 환불: ${profit}원`;
     } else if (result === 'won') {
-      const profit = await this.calculateProfit(order, result);
       return `Exchange 멀티배팅 승리 수익 (${gameCount}개 경기 모두 승리) - 수익: ${profit}원`;
     } else {
-      const profit = await this.calculateProfit(order, result);
       return `Exchange 멀티배팅 패배 손실 (${gameCount}개 경기 중 ${wonCount}개 승리) - 손실: ${Math.abs(profit)}원`;
+    }
+  }
+
+  /**
+   * 모든 정산 가능한 멀티배팅 주문 정산
+   * @returns {Object} 정산 결과
+   */
+  async settleAllMultibetOrders() {
+    const startTime = Date.now();
+    const TIMEOUT_MS = 30000; // 30초 타임아웃
+    
+    try {
+      console.log('🎯 모든 멀티배팅 주문 정산 시작...');
+      
+      // 정산 가능한 멀티배팅 주문들 조회
+      const unsettledOrders = await ExchangeOrder.findAll({
+        where: {
+          isMultibet: true,
+          status: { [Op.in]: ['matched', 'partially_matched'] },
+          settledAt: null
+        },
+        order: [['createdAt', 'ASC']],
+        limit: 10 // 한 번에 최대 10개만 처리
+      });
+
+      console.log(`📋 정산 대상 멀티배팅 주문: ${unsettledOrders.length}개`);
+
+      if (unsettledOrders.length === 0) {
+        console.log('✅ 정산할 멀티배팅 주문이 없습니다.');
+        return { settledCount: 0, message: 'No orders to settle' };
+      }
+
+      let settledCount = 0;
+      let errorCount = 0;
+      let timeoutCount = 0;
+      const results = [];
+
+      for (const order of unsettledOrders) {
+        // 타임아웃 체크
+        if (Date.now() - startTime > TIMEOUT_MS) {
+          console.log(`⏰ 타임아웃 도달 (${TIMEOUT_MS}ms), 남은 주문 ${unsettledOrders.length - settledCount - errorCount}개 건너뜀`);
+          timeoutCount = unsettledOrders.length - settledCount - errorCount;
+          break;
+        }
+
+        try {
+          // 타임아웃 제거 - 무제한 시간으로 정산 실행
+          const result = await this.settleMultibetOrder(order);
+          results.push({ orderId: order.id, result });
+          settledCount++;
+          console.log(`✅ 주문 ${order.id} 정산 완료`);
+        } catch (error) {
+          errorCount++;
+          if (error.message === 'Settlement timeout') {
+            console.log(`⏰ 주문 ${order.id} 정산 타임아웃`);
+            results.push({ orderId: order.id, error: 'timeout' });
+          } else {
+            console.log(`❌ 주문 ${order.id} 정산 실패: ${error.message}`);
+            results.push({ orderId: order.id, error: error.message });
+          }
+        }
+      }
+
+      const duration = Date.now() - startTime;
+      console.log(`\n🎉 멀티배팅 정산 완료! (${duration}ms)`);
+      console.log(`📊 성공: ${settledCount}개, 실패: ${errorCount}개, 타임아웃: ${timeoutCount}개`);
+
+      return {
+        settledCount,
+        errorCount,
+        timeoutCount,
+        totalOrders: unsettledOrders.length,
+        duration,
+        results
+      };
+
+    } catch (error) {
+      console.error('❌ 멀티배팅 정산 실패:', error.message);
+      throw error;
+    } finally {
+      // 데이터베이스 연결 정리
+      console.log('🔌 멀티배팅 정산 서비스 데이터베이스 연결 정리 중...');
+      try {
+        await sequelize.close();
+        console.log('✅ 데이터베이스 연결 정리 완료');
+      } catch (closeError) {
+        console.error('⚠️ 데이터베이스 연결 정리 실패:', closeError.message);
+      }
     }
   }
   
