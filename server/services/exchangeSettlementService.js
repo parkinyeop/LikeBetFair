@@ -2009,12 +2009,45 @@ class ExchangeSettlementService {
           // 각 쌍에 대해 정산 실행
           for (const pair of pairs) {
             try {
-              const result = await this.settlePair(pair, gameResult, null); // transaction 없이
-              totalSettled += 2; // back + lay 주문
-              totalWinnings += result.totalWinnings || 0;
-              allSettlementResults.push(result);
+              const [order1, order2] = pair;
               
-              console.log(`   ✅ 주문 쌍 정산 완료: ${result.winnerSide} 승리, 수익: ${result.totalWinnings}`);
+              // 이미 정산된 주문이 있는지 확인
+              const order1Settled = order1.settledAt !== null;
+              const order2Settled = order2.settledAt !== null;
+              
+              if (order1Settled && order2Settled) {
+                console.log(`   ⚠️ 주문 쌍 ${order1.id} ↔ ${order2.id} 이미 정산됨`);
+                continue;
+              }
+              
+              if (order1Settled || order2Settled) {
+                // 한쪽이 이미 정산된 경우, 상대방 주문도 자동 정산
+                const settledOrder = order1Settled ? order1 : order2;
+                const unsettledOrder = order1Settled ? order2 : order1;
+                
+                console.log(`   🔄 주문 ${settledOrder.id}는 이미 정산됨, 주문 ${unsettledOrder.id} 자동 정산 시작`);
+                
+                // 상대방 주문을 자동으로 정산
+                const autoSettleResult = await this.autoSettleMatchedOrder(unsettledOrder, gameResult);
+                
+                if (autoSettleResult.success) {
+                  totalSettled += 1; // 정산된 주문 1개
+                  totalWinnings += autoSettleResult.winnings || 0;
+                  allSettlementResults.push(autoSettleResult);
+                  
+                  console.log(`   ✅ 주문 ${unsettledOrder.id} 자동 정산 완료: ${autoSettleResult.winnerSide} 승리, 수익: ${autoSettleResult.winnings}`);
+                } else {
+                  console.log(`   ❌ 주문 ${unsettledOrder.id} 자동 정산 실패: ${autoSettleResult.error}`);
+                }
+              } else {
+                // 둘 다 미정산인 경우 정상 정산
+                const result = await this.settlePair(pair, gameResult, null); // transaction 없이
+                totalSettled += 2; // back + lay 주문
+                totalWinnings += result.totalWinnings || 0;
+                allSettlementResults.push(result);
+                
+                console.log(`   ✅ 주문 쌍 정산 완료: ${result.winnerSide} 승리, 수익: ${result.totalWinnings}`);
+              }
               
             } catch (error) {
               console.error(`   ❌ 주문 쌍 정산 실패:`, error.message);
@@ -2298,6 +2331,84 @@ class ExchangeSettlementService {
       isOrphanedOrder: true,
       isMultibet: true
     };
+  }
+
+  /**
+   * 🆕 매칭된 주문 자동 정산 (한쪽이 이미 정산된 경우)
+   * @param {Object} order - 정산할 주문
+   * @param {Object} gameResult - 경기 결과
+   * @returns {Object} 정산 결과
+   */
+  async autoSettleMatchedOrder(order, gameResult) {
+    const transaction = await sequelize.transaction();
+    try {
+      console.log(`🔄 주문 ${order.id} 자동 정산 시작...`);
+      
+      // 주문 상태 확인
+      if (order.settledAt !== null) {
+        return { success: false, error: '이미 정산된 주문입니다.' };
+      }
+      
+      // 매칭된 주문 조회
+      const matchedOrder = await ExchangeOrder.findByPk(order.matchedOrderId);
+      if (!matchedOrder) {
+        return { success: false, error: '매칭된 주문을 찾을 수 없습니다.' };
+      }
+      
+      // 매칭된 주문이 정산되었는지 확인
+      if (matchedOrder.settledAt === null) {
+        return { success: false, error: '매칭된 주문이 아직 정산되지 않았습니다.' };
+      }
+      
+      // 승부 판정
+      const isWinner = this.determineSelectionWinner(order.selection, gameResult);
+      const winnerSide = isWinner ? order.side : (order.side === 'back' ? 'lay' : 'back');
+      
+      // 정산 금액 계산
+      const winnings = isWinner ? order.amount * (order.odds - 1) : -order.amount;
+      
+      // 주문 상태 업데이트
+      await order.update({
+        status: 'settled',
+        settledAt: new Date(),
+        actualProfit: winnings
+      }, { transaction });
+      
+      // 사용자 잔액 업데이트
+      const user = await User.findByPk(order.userId, { transaction });
+      if (user) {
+        const currentBalance = parseFloat(user.balance) || 0;
+        user.balance = currentBalance + winnings;
+        await user.save({ transaction });
+        
+        // 결제 내역 생성
+        await PaymentHistory.create({
+          userId: order.userId,
+          betId: `EXCHANGE_${order.id}`,
+          amount: winnings,
+          balanceAfter: user.balance,
+          memo: `Exchange 자동 정산 (${winnerSide} 승리) - ${winnings > 0 ? '수익' : '손실'}: ${winnings}원`,
+          paidAt: new Date()
+        }, { transaction });
+      }
+      
+      await transaction.commit();
+      
+      console.log(`✅ 주문 ${order.id} 자동 정산 완료: ${winnerSide} 승리, 수익: ${winnings}원`);
+      
+      return {
+        success: true,
+        winnerSide,
+        winnings,
+        orderId: order.id,
+        matchedOrderId: matchedOrder.id
+      };
+      
+    } catch (error) {
+      await transaction.rollback();
+      console.error(`❌ 주문 ${order.id} 자동 정산 실패:`, error.message);
+      return { success: false, error: error.message };
+    }
   }
 }
 

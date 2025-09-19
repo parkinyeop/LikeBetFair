@@ -424,10 +424,13 @@ class MultibetSettlementService {
       return effectiveAmount;
     }
 
-    // 매칭된 주문들을 조회하여 실제 수익/손실 계산
+    // 매칭된 주문들을 조회하여 실제 수익/손실 계산 (양방향 조회)
     const matches = await ExchangeOrderMatch.findAll({
       where: {
-        originalOrderId: order.id,
+        [Op.or]: [
+          { originalOrderId: order.id },
+          { matchingOrderId: order.id }
+        ],
         status: 'active'
       }
     });
