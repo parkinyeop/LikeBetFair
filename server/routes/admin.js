@@ -8,6 +8,7 @@ import ExchangeOrder from '../models/exchangeOrderModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
 import GameResult from '../models/gameResultModel.js';
 import OddsCache from '../models/oddsCacheModel.js';
+import { ReferralCodeValidator } from '../utils/referralCodeValidator.js';
 import Settings from '../models/settingsModel.js';
 import actionItemService from '../services/actionItemService.js';
 import BettingAmountSettingsService from '../services/bettingAmountSettingsService.js';
@@ -1040,6 +1041,180 @@ router.patch('/users/:id/status', verifyToken, requireAdmin(3), async (req, res)
   }
 });
 
+// 사용자 정보 수정 (추천코드, 추천인 등)
+router.patch('/users/:id', verifyToken, requireAdmin(3), async (req, res) => {
+  try {
+    const { referralCode, referredBy, reason } = req.body;
+    
+    const user = await User.findByPk(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
+    }
+
+    const updateData = {};
+    const logMessages = [];
+
+    // 추천코드 설정
+    if (referralCode !== undefined) {
+      if (referralCode === null || referralCode === '') {
+        updateData.referralCode = null;
+        logMessages.push(`추천코드 제거: ${user.referralCode || '없음'} -> 없음`);
+      } else {
+        // 통합 추천코드 검증
+        const codeValidation = await ReferralCodeValidator.validateCodeForUser(referralCode, user.id);
+        if (!codeValidation.isValid) {
+          return res.status(400).json({ message: codeValidation.message });
+        }
+
+        updateData.referralCode = referralCode;
+        logMessages.push(`추천코드 설정: ${user.referralCode || '없음'} -> ${referralCode}`);
+      }
+    }
+
+    // 추천인 코드 설정
+    if (referredBy !== undefined) {
+      if (referredBy === null || referredBy === '') {
+        updateData.referredBy = null;
+        updateData.referrerAdminId = null;
+        logMessages.push(`추천인 코드 제거: ${user.referredBy || '없음'} -> 없음`);
+      } else {
+        // 추천인 코드 존재 확인
+        const referrerValidation = await ReferralCodeValidator.validateReferrerCode(referredBy);
+        if (!referrerValidation.exists) {
+          return res.status(400).json({ message: referrerValidation.message });
+        }
+
+        // ReferralCode 정보 다시 조회하여 adminId 가져오기
+        const referralCodeExists = await ReferralCode.findOne({
+          where: { code: referredBy, isActive: true }
+        });
+
+        updateData.referredBy = referredBy;
+        updateData.referrerAdminId = referralCodeExists.adminId;
+        logMessages.push(`추천인 코드 설정: ${user.referredBy || '없음'} -> ${referredBy}`);
+        
+        // 추천코드 사용자 수 증가
+        await referralCodeExists.incrementUserCount();
+      }
+    }
+
+    // 업데이트할 데이터가 있는지 확인
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ message: '수정할 데이터가 없습니다.' });
+    }
+
+    // 사용자 정보 업데이트
+    await user.update(updateData);
+
+    // 로그 기록
+    const logMessage = `User updated by admin ${req.admin.username}: ${user.username} - ${logMessages.join(', ')}. Reason: ${reason || 'N/A'}`;
+    console.log(logMessage);
+
+    res.json({ 
+      message: '사용자 정보가 성공적으로 수정되었습니다.',
+      updatedFields: Object.keys(updateData),
+      log: logMessages
+    });
+
+  } catch (error) {
+    console.error('User update error:', error);
+    res.status(500).json({ message: '사용자 정보 수정 중 오류가 발생했습니다.' });
+  }
+});
+
+// 사용자별 추천코드 현황 조회
+router.get('/users/:id/referral-stats', verifyToken, requireAdmin(2), async (req, res) => {
+  try {
+    const user = await User.findByPk(req.params.id, {
+      attributes: ['id', 'username', 'email', 'referralCode', 'referredBy', 'referrerAdminId']
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
+    }
+
+    let referralStats = {
+      user: user,
+      hasReferralCode: !!user.referralCode,
+      referredBy: user.referredBy,
+      referredUsers: [],
+      referralCodeInfo: null,
+      referrerInfo: null
+    };
+
+    // 사용자의 추천코드 정보 조회
+    if (user.referralCode) {
+      const referralCodeInfo = await ReferralCode.findOne({
+        where: { code: user.referralCode },
+        include: [{
+          model: User,
+          as: 'admin',
+          attributes: ['id', 'username', 'email', 'adminLevel']
+        }]
+      });
+
+      if (referralCodeInfo) {
+        referralStats.referralCodeInfo = {
+          id: referralCodeInfo.id,
+          code: referralCodeInfo.code,
+          commissionRate: referralCodeInfo.commissionRate,
+          isActive: referralCodeInfo.isActive,
+          maxUsers: referralCodeInfo.maxUsers,
+          currentUsers: referralCodeInfo.currentUsers,
+          expiresAt: referralCodeInfo.expiresAt,
+          admin: referralCodeInfo.admin
+        };
+
+        // 이 추천코드로 가입한 사용자들 조회
+        const referredUsers = await User.findAll({
+          where: { referredBy: user.referralCode },
+          attributes: ['id', 'username', 'email', 'createdAt', 'isActive', 'balance'],
+          order: [['createdAt', 'DESC']],
+          limit: 50
+        });
+
+        referralStats.referredUsers = referredUsers.map(user => ({
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          createdAt: user.createdAt,
+          isActive: user.isActive,
+          balance: user.balance
+        }));
+      }
+    }
+
+    // 사용자가 추천받은 정보 조회
+    if (user.referredBy) {
+      const referrerInfo = await ReferralCode.findOne({
+        where: { code: user.referredBy },
+        include: [{
+          model: User,
+          as: 'admin',
+          attributes: ['id', 'username', 'email', 'adminLevel']
+        }]
+      });
+
+      if (referrerInfo) {
+        referralStats.referrerInfo = {
+          code: referrerInfo.code,
+          commissionRate: referrerInfo.commissionRate,
+          admin: referrerInfo.admin
+        };
+      }
+    }
+
+    res.json({
+      message: '사용자 추천코드 현황 조회 성공',
+      stats: referralStats
+    });
+
+  } catch (error) {
+    console.error('User referral stats error:', error);
+    res.status(500).json({ message: '사용자 추천코드 현황 조회 중 오류가 발생했습니다.' });
+  }
+});
+
 // =============================================================================
 // 베팅 관리 (기존 bet.js의 관리자 기능을 확장)
 // =============================================================================
@@ -1414,20 +1589,16 @@ router.get('/referral-codes/stats/summary', verifyToken, requireAdmin(1), async 
 // 추천코드 생성
 router.post('/referral-codes', verifyToken, requireAdmin(3), async (req, res) => {
   try {
-    const { code, commissionRate, maxUsers, expiresAt } = req.body;
+    const { code, commissionRate, maxUsers, expiresAt, assignToUserId } = req.body;
     
-    if (!code || code.length < 5 || code.length > 20) {
-      return res.status(400).json({ message: '추천코드는 5-20자 사이여야 합니다.' });
-    }
-
     if (commissionRate < 0 || commissionRate > 0.2) {
       return res.status(400).json({ message: '수수료율은 0-20% 사이여야 합니다.' });
     }
 
-    // 코드 중복 확인
-    const existingCode = await ReferralCode.findOne({ where: { code } });
-    if (existingCode) {
-      return res.status(400).json({ message: '이미 존재하는 추천코드입니다.' });
+    // 통합 추천코드 검증
+    const codeValidation = await ReferralCodeValidator.validateCode(code);
+    if (!codeValidation.isValid) {
+      return res.status(400).json({ message: codeValidation.message });
     }
 
     const newCode = await ReferralCode.create({
@@ -1438,9 +1609,48 @@ router.post('/referral-codes', verifyToken, requireAdmin(3), async (req, res) =>
       expiresAt: expiresAt ? new Date(expiresAt) : null
     });
 
+    let assignedUser = null;
+
+    // 특정 사용자에게 즉시 할당
+    if (assignToUserId) {
+      const targetUser = await User.findByPk(assignToUserId);
+      if (targetUser) {
+        // 기존 추천코드가 있다면 제거
+        if (targetUser.referralCode) {
+          const existingUserReferralCode = await ReferralCode.findOne({ 
+            where: { code: targetUser.referralCode } 
+          });
+          if (existingUserReferralCode) {
+            await existingUserReferralCode.decrement('currentUsers');
+          }
+        }
+
+        // 새 추천코드 할당
+        await targetUser.update({ 
+          referralCode: code,
+          referredBy: null, // 사용자 자신의 추천코드이므로 referredBy는 null
+          referrerAdminId: req.admin.id
+        });
+
+        // ReferralCode의 currentUsers 증가
+        await newCode.increment('currentUsers');
+        
+        assignedUser = {
+          id: targetUser.id,
+          username: targetUser.username,
+          email: targetUser.email
+        };
+
+        console.log(`Referral code ${code} assigned to user ${targetUser.username} by admin ${req.admin.username}`);
+      }
+    }
+
     res.status(201).json({ 
-      message: '추천코드가 성공적으로 생성되었습니다.',
-      code: newCode
+      message: assignedUser 
+        ? `추천코드가 성공적으로 생성되고 ${assignedUser.username}님에게 할당되었습니다.`
+        : '추천코드가 성공적으로 생성되었습니다.',
+      code: newCode,
+      assignedUser
     });
 
   } catch (error) {

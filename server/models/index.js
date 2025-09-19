@@ -3,6 +3,7 @@ import sequelize from './sequelize.js';
 
 // 모델들 import
 import User from './userModel.js';
+import ReferralCode from './referralCodeModel.js';
 import ExchangeOrder from './exchangeOrderModel.js';
 import ExchangeOrderMatch from './exchangeOrderMatchModel.js';
 import GameResult from './gameResultModel.js';
@@ -56,6 +57,7 @@ const syncDatabase = async (force = false) => {
 export {
   sequelize,
   User,
+  ReferralCode,
   ExchangeOrder,
   ExchangeOrderMatch,
   GameResult,

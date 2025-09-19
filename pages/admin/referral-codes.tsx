@@ -73,8 +73,11 @@ export default function AdminReferralCodes() {
     code: '',
     commissionRate: 0.05,
     maxUsers: '',
-    expiresAt: ''
+    expiresAt: '',
+    assignToUserId: ''
   });
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -157,6 +160,26 @@ export default function AdminReferralCodes() {
     }
   };
 
+  const fetchAvailableUsers = async () => {
+    try {
+      setLoadingUsers(true);
+      const headers = getAuthHeaders();
+      
+      const response = await fetch('http://localhost:5050/api/admin/users?limit=100', {
+        headers
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableUsers(data.users || []);
+      }
+    } catch (err) {
+      console.error('사용자 목록 로딩 오류:', err);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
   const fetchCodeDetail = async (codeId: string) => {
     try {
       const headers = getAuthHeaders();
@@ -190,14 +213,16 @@ export default function AdminReferralCodes() {
           code: createForm.code,
           commissionRate: createForm.commissionRate,
           maxUsers: createForm.maxUsers ? parseInt(createForm.maxUsers) : null,
-          expiresAt: createForm.expiresAt || null
+          expiresAt: createForm.expiresAt || null,
+          assignToUserId: createForm.assignToUserId || null
         })
       });
 
       if (response.ok) {
-        alert('추천코드가 성공적으로 생성되었습니다.');
+        const data = await response.json();
+        alert(data.message || '추천코드가 성공적으로 생성되었습니다.');
         setShowCreateModal(false);
-        setCreateForm({ code: '', commissionRate: 0.05, maxUsers: '', expiresAt: '' });
+        setCreateForm({ code: '', commissionRate: 0.05, maxUsers: '', expiresAt: '', assignToUserId: '' });
         fetchCodes();
         fetchStats();
       } else {
@@ -258,7 +283,7 @@ export default function AdminReferralCodes() {
   const generateRandomCode = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 4; i++) {
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     setCreateForm(prev => ({ ...prev, code: result }));
@@ -316,7 +341,10 @@ export default function AdminReferralCodes() {
                   <div className="flex space-x-3">
                     {adminLevel >= 3 && (
                       <button
-                        onClick={() => setShowCreateModal(true)}
+                        onClick={() => {
+                          setShowCreateModal(true);
+                          fetchAvailableUsers();
+                        }}
                         className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition-colors"
                       >
                         + 새 추천코드
@@ -574,7 +602,7 @@ export default function AdminReferralCodes() {
                             onChange={(e) => setCreateForm(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
                             placeholder="추천코드 입력"
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            maxLength={20}
+                            maxLength={4}
                           />
                           <button
                             type="button"
@@ -616,6 +644,30 @@ export default function AdminReferralCodes() {
                           onChange={(e) => setCreateForm(prev => ({ ...prev, expiresAt: e.target.value }))}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
+                      </div>
+                      <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">즉시 할당할 사용자 (선택사항)</label>
+                        {loadingUsers ? (
+                          <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50">
+                            <span className="text-gray-500">사용자 목록 로딩 중...</span>
+                          </div>
+                        ) : (
+                          <select
+                            value={createForm.assignToUserId}
+                            onChange={(e) => setCreateForm(prev => ({ ...prev, assignToUserId: e.target.value }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="">선택하지 않음</option>
+                            {availableUsers.map((user) => (
+                              <option key={user.id} value={user.id}>
+                                {user.username} ({user.email}) {user.referralCode ? `[현재: ${user.referralCode}]` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        <p className="text-xs text-gray-500 mt-1">
+                          사용자를 선택하면 추천코드가 생성과 동시에 해당 사용자에게 할당됩니다.
+                        </p>
                       </div>
                       <div className="flex justify-end space-x-3">
                         <button

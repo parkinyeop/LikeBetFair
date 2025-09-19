@@ -91,6 +91,14 @@ export default function AdminUsers() {
   });
   const [showUserDetail, setShowUserDetail] = useState(false);
   const [balanceEdit, setBalanceEdit] = useState({ isEditing: false, newBalance: 0, reason: '' });
+  const [showUserEditModal, setShowUserEditModal] = useState(false);
+  const [userEditForm, setUserEditForm] = useState({
+    referralCode: '',
+    referredBy: '',
+    reason: ''
+  });
+  const [userReferralStats, setUserReferralStats] = useState<any>(null);
+  const [showCreateReferralModal, setShowCreateReferralModal] = useState(false);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -243,6 +251,24 @@ export default function AdminUsers() {
 
   const handleUserClick = (user: User) => {
     fetchUserDetail(user.id);
+    fetchUserReferralStats(user.id);
+  };
+
+  const fetchUserReferralStats = async (userId: string) => {
+    try {
+      const headers = getAuthHeaders();
+      
+      const response = await fetch(`http://localhost:5050/api/admin/users/${userId}/referral-stats`, {
+        headers
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUserReferralStats(data.stats);
+      }
+    } catch (err) {
+      console.error('사용자 추천코드 현황 로딩 오류:', err);
+    }
   };
 
   const handleBalanceEdit = (user: User) => {
@@ -265,6 +291,50 @@ export default function AdminUsers() {
     const reason = prompt(`${user.isActive ? '비활성화' : '활성화'} 사유를 입력해주세요:`);
     if (reason) {
       updateUserStatus(user.id, !user.isActive, reason);
+    }
+  };
+
+  const handleUserEdit = (user: User) => {
+    setUserEditForm({
+      referralCode: user.referralCode || '',
+      referredBy: user.referredBy || '',
+      reason: ''
+    });
+    setShowUserEditModal(true);
+  };
+
+  const handleUserEditSubmit = async () => {
+    if (!selectedUser || !userEditForm.reason.trim()) {
+      alert('수정 사유를 입력해주세요.');
+      return;
+    }
+
+    try {
+      const headers = getAuthHeaders();
+      
+      const response = await fetch(`http://localhost:5050/api/admin/users/${selectedUser.id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          referralCode: userEditForm.referralCode || null,
+          referredBy: userEditForm.referredBy || null,
+          reason: userEditForm.reason
+        })
+      });
+
+      if (response.ok) {
+        alert('사용자 정보가 성공적으로 수정되었습니다.');
+        setShowUserEditModal(false);
+        setUserEditForm({ referralCode: '', referredBy: '', reason: '' });
+        fetchUserDetail(selectedUser.id);
+        fetchUsers();
+      } else {
+        const errorData = await response.json();
+        alert(errorData.message || '사용자 정보 수정에 실패했습니다.');
+      }
+    } catch (err) {
+      console.error('사용자 정보 수정 오류:', err);
+      alert('서버 연결에 실패했습니다.');
     }
   };
 
@@ -591,11 +661,31 @@ export default function AdminUsers() {
                             </div>
                             <div>
                               <label className="block text-sm font-medium text-gray-500">추천코드</label>
-                              <p className="text-sm text-gray-900">{selectedUser.referralCode || '없음'}</p>
+                              <div className="flex items-center space-x-2">
+                                <p className="text-sm text-gray-900">{selectedUser.referralCode || '없음'}</p>
+                                {adminLevel >= 3 && (
+                                  <button
+                                    onClick={() => handleUserEdit(selectedUser)}
+                                    className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-200"
+                                  >
+                                    수정
+                                  </button>
+                                )}
+                              </div>
                             </div>
                             <div>
                               <label className="block text-sm font-medium text-gray-500">추천인 코드</label>
-                              <p className="text-sm text-gray-900">{selectedUser.referredBy || '없음'}</p>
+                              <div className="flex items-center space-x-2">
+                                <p className="text-sm text-gray-900">{selectedUser.referredBy || '없음'}</p>
+                                {adminLevel >= 3 && (
+                                  <button
+                                    onClick={() => handleUserEdit(selectedUser)}
+                                    className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-200"
+                                  >
+                                    수정
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -756,6 +846,124 @@ export default function AdminUsers() {
                         </div>
                       )}
 
+                      {/* 추천코드 현황 대시보드 */}
+                      {userReferralStats && (
+                        <div className="mt-6">
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="text-lg font-medium text-gray-900">추천코드 현황</h4>
+                            {adminLevel >= 3 && !userReferralStats.hasReferralCode && (
+                              <button
+                                onClick={() => setShowCreateReferralModal(true)}
+                                className="bg-blue-600 text-white px-3 py-1 text-sm rounded hover:bg-blue-700"
+                              >
+                                추천코드 생성
+                              </button>
+                            )}
+                          </div>
+                          
+                          <div className="bg-gray-50 p-6 rounded-lg">
+                            {/* 사용자 추천코드 정보 */}
+                            <div className="mb-6">
+                              <h5 className="text-md font-medium text-gray-800 mb-3">사용자 추천코드</h5>
+                              {userReferralStats.hasReferralCode ? (
+                                <div className="bg-white p-4 rounded border">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-600">추천코드</label>
+                                      <p className="text-lg font-mono font-bold text-blue-600">{userReferralStats.referralCodeInfo?.code}</p>
+                                    </div>
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-600">수수료율</label>
+                                      <p className="text-lg font-bold text-green-600">{(userReferralStats.referralCodeInfo?.commissionRate * 100).toFixed(2)}%</p>
+                                    </div>
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-600">상태</label>
+                                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                        userReferralStats.referralCodeInfo?.isActive 
+                                          ? 'bg-green-100 text-green-800' 
+                                          : 'bg-red-100 text-red-800'
+                                      }`}>
+                                        {userReferralStats.referralCodeInfo?.isActive ? '활성' : '비활성'}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-600">추천받은 사용자 수</label>
+                                      <p className="text-lg font-bold text-purple-600">{userReferralStats.referralCodeInfo?.currentUsers || 0}명</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="bg-yellow-50 p-4 rounded border border-yellow-200">
+                                  <p className="text-yellow-800">아직 추천코드가 설정되지 않았습니다.</p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* 추천받은 정보 */}
+                            {userReferralStats.referredBy && (
+                              <div className="mb-6">
+                                <h5 className="text-md font-medium text-gray-800 mb-3">추천받은 정보</h5>
+                                <div className="bg-white p-4 rounded border">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-600">추천인 코드</label>
+                                      <p className="text-lg font-mono font-bold text-purple-600">{userReferralStats.referrerInfo?.code}</p>
+                                    </div>
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-600">추천 관리자</label>
+                                      <p className="text-lg font-bold text-blue-600">{userReferralStats.referrerInfo?.admin?.username}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 추천한 사용자 목록 */}
+                            {userReferralStats.referredUsers && userReferralStats.referredUsers.length > 0 && (
+                              <div>
+                                <h5 className="text-md font-medium text-gray-800 mb-3">
+                                  추천한 사용자 목록 ({userReferralStats.referredUsers.length}명)
+                                </h5>
+                                <div className="bg-white rounded border overflow-hidden">
+                                  <div className="max-h-64 overflow-y-auto">
+                                    <table className="min-w-full divide-y divide-gray-200">
+                                      <thead className="bg-gray-50">
+                                        <tr>
+                                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">사용자명</th>
+                                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">이메일</th>
+                                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">가입일</th>
+                                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">잔액</th>
+                                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">상태</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="bg-white divide-y divide-gray-200">
+                                        {userReferralStats.referredUsers.map((user: any) => (
+                                          <tr key={user.id}>
+                                            <td className="px-4 py-2 text-sm font-medium text-gray-900">{user.username}</td>
+                                            <td className="px-4 py-2 text-sm text-gray-500">{user.email}</td>
+                                            <td className="px-4 py-2 text-sm text-gray-500">{new Date(user.createdAt).toLocaleDateString('ko-KR')}</td>
+                                            <td className="px-4 py-2 text-sm text-gray-500">₩{parseFloat(user.balance.toString()).toLocaleString()}</td>
+                                            <td className="px-4 py-2">
+                                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                                user.isActive 
+                                                  ? 'bg-green-100 text-green-800' 
+                                                  : 'bg-red-100 text-red-800'
+                                              }`}>
+                                                {user.isActive ? '활성' : '비활성'}
+                                              </span>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
                       {/* 베팅 통계 */}
                       {userStats && (
                         <div className="mt-6">
@@ -828,6 +1036,186 @@ export default function AdminUsers() {
                           className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
                         >
                           수정
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 사용자 정보 수정 모달 */}
+              {showUserEditModal && selectedUser && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+                    <div className="px-6 py-4 border-b border-gray-200">
+                      <h3 className="text-lg font-medium text-gray-900">
+                        사용자 정보 수정 - {selectedUser.username}
+                      </h3>
+                    </div>
+                    <div className="p-6">
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">추천코드</label>
+                          <input
+                            type="text"
+                            value={userEditForm.referralCode}
+                            onChange={(e) => setUserEditForm(prev => ({ ...prev, referralCode: e.target.value.toUpperCase() }))}
+                            placeholder="추천코드 입력 (빈 값으로 제거)"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            maxLength={4}
+                          />
+                          <p className="text-xs text-gray-500 mt-1">빈 값으로 설정하면 추천코드가 제거됩니다.</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">추천인 코드</label>
+                          <input
+                            type="text"
+                            value={userEditForm.referredBy}
+                            onChange={(e) => setUserEditForm(prev => ({ ...prev, referredBy: e.target.value.toUpperCase() }))}
+                            placeholder="추천인 코드 입력 (빈 값으로 제거)"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            maxLength={4}
+                          />
+                          <p className="text-xs text-gray-500 mt-1">빈 값으로 설정하면 추천인 코드가 제거됩니다.</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">수정 사유</label>
+                          <textarea
+                            value={userEditForm.reason}
+                            onChange={(e) => setUserEditForm(prev => ({ ...prev, reason: e.target.value }))}
+                            placeholder="수정 사유를 입력해주세요"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            rows={3}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end space-x-3 mt-6">
+                        <button
+                          onClick={() => setShowUserEditModal(false)}
+                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                        >
+                          취소
+                        </button>
+                        <button
+                          onClick={handleUserEditSubmit}
+                          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                        >
+                          수정
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 추천코드 생성 모달 */}
+              {showCreateReferralModal && selectedUser && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+                    <div className="px-6 py-4 border-b border-gray-200">
+                      <h3 className="text-lg font-medium text-gray-900">
+                        추천코드 생성 - {selectedUser.username}
+                      </h3>
+                    </div>
+                    <div className="p-6">
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">추천코드</label>
+                          <div className="flex space-x-2">
+                            <input
+                              type="text"
+                              placeholder="추천코드 입력"
+                              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              maxLength={4}
+                              onChange={(e) => setCreateForm(prev => ({ ...prev, referralCode: e.target.value.toUpperCase() }))}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                                let result = '';
+                                for (let i = 0; i < 4; i++) {
+                                  result += chars.charAt(Math.floor(Math.random() * chars.length));
+                                }
+                                setCreateForm(prev => ({ ...prev, referralCode: result }));
+                              }}
+                              className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                            >
+                              랜덤
+                            </button>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">수수료율 (%)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="20"
+                            defaultValue="5"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">최대 사용자 수 (선택사항)</label>
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder="무제한"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">만료일 (선택사항)</label>
+                          <input
+                            type="datetime-local"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end space-x-3 mt-6">
+                        <button
+                          onClick={() => setShowCreateReferralModal(false)}
+                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                        >
+                          취소
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const headers = getAuthHeaders();
+                              const formData = new FormData(document.querySelector('#referralCreateForm') as HTMLFormElement);
+                              
+                              const response = await fetch('http://localhost:5050/api/admin/referral-codes', {
+                                method: 'POST',
+                                headers,
+                                body: JSON.stringify({
+                                  code: (document.querySelector('input[placeholder="추천코드 입력"]') as HTMLInputElement)?.value,
+                                  commissionRate: parseFloat((document.querySelector('input[type="number"]') as HTMLInputElement)?.value || '5') / 100,
+                                  maxUsers: (document.querySelector('input[placeholder="무제한"]') as HTMLInputElement)?.value ? parseInt((document.querySelector('input[placeholder="무제한"]') as HTMLInputElement)?.value || '0') : null,
+                                  expiresAt: (document.querySelector('input[type="datetime-local"]') as HTMLInputElement)?.value || null,
+                                  assignToUserId: selectedUser.id
+                                })
+                              });
+
+                              if (response.ok) {
+                                const data = await response.json();
+                                alert(data.message || '추천코드가 성공적으로 생성되었습니다.');
+                                setShowCreateReferralModal(false);
+                                fetchUserReferralStats(selectedUser.id);
+                                fetchUserDetail(selectedUser.id);
+                              } else {
+                                const errorData = await response.json();
+                                alert(errorData.message || '추천코드 생성에 실패했습니다.');
+                              }
+                            } catch (err) {
+                              console.error('추천코드 생성 오류:', err);
+                              alert('서버 연결에 실패했습니다.');
+                            }
+                          }}
+                          className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700"
+                        >
+                          생성 및 할당
                         </button>
                       </div>
                     </div>

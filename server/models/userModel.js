@@ -51,12 +51,12 @@ const User = sequelize.define('User', {
     }
   },
   referralCode: {
-    type: DataTypes.STRING(20),
+    type: DataTypes.STRING(4),
     allowNull: true,
     unique: true
   },
   referredBy: {
-    type: DataTypes.STRING(20),
+    type: DataTypes.STRING(4),
     allowNull: true
   },
   referrerAdminId: {
