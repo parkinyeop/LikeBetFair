@@ -1,5 +1,6 @@
 import User from '../models/userModel.js';
 import ReferralCode from '../models/referralCodeModel.js';
+import { Op } from 'sequelize';
 
 /**
  * 추천코드 중복 검사 통합 유틸리티

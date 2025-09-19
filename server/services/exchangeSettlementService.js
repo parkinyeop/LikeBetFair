@@ -1916,11 +1916,11 @@ class ExchangeSettlementService {
       // 1. 경기 시작 후 미매칭된 오픈 주문들 환불 처리
       const refundResult = await this.refundUnmatchedOpenOrders();
       
-      // 2. 연결된 모든 매칭 주문들 조회 (부분 매치 포함)
+      // 2. 연결된 모든 매칭 주문들 조회 (부분 매치 포함) - 정산된 주문도 포함
       const allMatchedOrders = await ExchangeOrder.findAll({
         where: { 
-          status: { [Op.in]: ['matched', 'partially_matched'] },
-          settledAt: null  // 아직 정산되지 않은 주문들
+          status: { [Op.in]: ['matched', 'partially_matched'] }
+          // settledAt 조건 제거 - 정산된 주문도 포함해서 쌍을 찾기 위해
         }
       });
       
