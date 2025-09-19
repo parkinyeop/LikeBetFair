@@ -685,6 +685,31 @@ export default function AdminDashboard() {
                   </button>
                 </div>
 
+                {/* 수수료 현황 관리 */}
+                <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+                  <div className="flex items-center mb-4">
+                    <div className="bg-yellow-100 p-3 rounded-full">
+                      <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 ml-3">수수료 현황</h3>
+                  </div>
+                  <p className="text-gray-600 mb-4">수수료 수입 현황 및 분석</p>
+                  <div className="space-y-2 text-sm text-gray-500">
+                    <div>• 수수료 수입 통계</div>
+                    <div>• 수수료 유형별 분석</div>
+                    <div>• 수취자별 현황</div>
+                    <div>• 실시간 수수료 모니터링</div>
+                  </div>
+                  <button 
+                    onClick={() => router.push('/admin/commissions')}
+                    className="mt-4 w-full bg-yellow-600 text-white py-2 px-4 rounded hover:bg-yellow-700 transition-colors"
+                  >
+                    수수료 현황 보기
+                  </button>
+                </div>
+
                 {/* 경기 데이터 관리 */}
                 <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
                   <div className="flex items-center mb-4">
@@ -817,6 +842,12 @@ export default function AdminDashboard() {
                     className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
                   >
                     새 추천코드 생성
+                  </button>
+                  <button 
+                    onClick={() => router.push('/admin/commissions')}
+                    className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 transition-colors"
+                  >
+                    수수료 현황 보기
                   </button>
                   <button 
                     onClick={() => router.push('/admin/bets')}

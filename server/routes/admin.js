@@ -16,6 +16,7 @@ import ExchangeOddsWeightService from '../services/exchangeOddsWeightService.js'
 import CommissionSettingsService from '../services/commissionSettingsService.js';
 import bcrypt from 'bcryptjs';
 import { Op } from 'sequelize';
+import sequelize from '../models/sequelize.js';
 
 
 const router = express.Router();
@@ -1340,9 +1341,9 @@ router.get('/bets/stats/summary', verifyToken, requireAdmin(1), async (req, res)
     const statusCounts = await Bet.findAll({
       attributes: [
         'status',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-        [sequelize.fn('SUM', sequelize.col('stake')), 'totalStake'],
-        [sequelize.fn('SUM', sequelize.col('potentialWinnings')), 'totalWinnings']
+        [sequelize.fn('COUNT', sequelize.col('Bet.id')), 'count'],
+        [sequelize.fn('SUM', sequelize.col('Bet.stake')), 'totalStake'],
+        [sequelize.fn('SUM', sequelize.col('Bet.potentialWinnings')), 'totalWinnings']
       ],
       where,
       group: ['status']
@@ -2786,6 +2787,160 @@ router.post('/settings/backup', verifyToken, requireAdmin(2), async (req, res) =
   } catch (error) {
     console.error('백업 생성 실패:', error);
     res.status(500).json({ error: '백업 생성에 실패했습니다.' });
+  }
+});
+
+// 수수료 현황 조회
+router.get('/commissions', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    console.log('🔍 수수료 현황 조회 요청:', req.admin.username);
+    
+    const { period = '7d', type = 'all' } = req.query;
+    
+    // 기간 설정
+    let dateFilter = {};
+    const now = new Date();
+    switch (period) {
+      case '1d':
+        dateFilter = { createdAt: { [Op.gte]: new Date(now - 24 * 60 * 60 * 1000) } };
+        break;
+      case '7d':
+        dateFilter = { createdAt: { [Op.gte]: new Date(now - 7 * 24 * 60 * 60 * 1000) } };
+        break;
+      case '30d':
+        dateFilter = { createdAt: { [Op.gte]: new Date(now - 30 * 24 * 60 * 60 * 1000) } };
+        break;
+      case '90d':
+        dateFilter = { createdAt: { [Op.gte]: new Date(now - 90 * 24 * 60 * 60 * 1000) } };
+        break;
+      default:
+        dateFilter = {};
+    }
+    
+    // 유형 필터
+    let typeFilter = {};
+    if (type !== 'all') {
+      typeFilter = { type: type };
+    }
+    
+    const whereClause = {
+      ...dateFilter,
+      ...typeFilter
+    };
+    
+    // 수수료 통계 조회
+    const commissionStats = await AdminCommission.findAll({
+      attributes: [
+        'type',
+        [sequelize.fn('COUNT', sequelize.col('AdminCommission.id')), 'count'],
+        [sequelize.fn('SUM', sequelize.col('AdminCommission.commissionAmount')), 'totalAmount'],
+        [sequelize.fn('AVG', sequelize.col('AdminCommission.commissionAmount')), 'avgAmount']
+      ],
+      where: whereClause,
+      group: ['type']
+    });
+    
+    // 최근 수수료 내역
+    const recentCommissions = await AdminCommission.findAll({
+      where: whereClause,
+      order: [['createdAt', 'DESC']],
+      limit: 20,
+      include: [
+        { 
+          model: User, 
+          as: 'user', 
+          attributes: ['email', 'username'],
+          required: false 
+        }
+      ]
+    });
+    
+    // 일별 수수료 통계 (최근 7일)
+    const dailyStats = await AdminCommission.findAll({
+      attributes: [
+        [sequelize.fn('DATE', sequelize.col('AdminCommission.createdAt')), 'date'],
+        'type',
+        [sequelize.fn('COUNT', sequelize.col('AdminCommission.id')), 'count'],
+        [sequelize.fn('SUM', sequelize.col('AdminCommission.commissionAmount')), 'totalAmount']
+      ],
+      where: {
+        createdAt: { [Op.gte]: new Date(now - 7 * 24 * 60 * 60 * 1000) },
+        ...(type !== 'all' ? { type: type } : {})
+      },
+      group: [
+        sequelize.fn('DATE', sequelize.col('createdAt')),
+        'type'
+      ],
+      order: [[sequelize.fn('DATE', sequelize.col('createdAt')), 'DESC']]
+    });
+    
+    // 수수료 수취자별 통계 (include 없이 별도 조회)
+    const adminStatsRaw = await AdminCommission.findAll({
+      attributes: [
+        'adminId',
+        [sequelize.fn('COUNT', sequelize.col('AdminCommission.id')), 'count'],
+        [sequelize.fn('SUM', sequelize.col('AdminCommission.commissionAmount')), 'totalAmount']
+      ],
+      where: whereClause,
+      group: ['adminId']
+    });
+    
+    // 각 adminId에 대해 사용자 정보 조회
+    const adminStats = await Promise.all(adminStatsRaw.map(async (stat) => {
+      const admin = await User.findByPk(stat.adminId, {
+        attributes: ['email', 'username']
+      });
+      return {
+        adminId: stat.adminId,
+        count: parseInt(stat.dataValues.count || 0),
+        totalAmount: parseFloat(stat.dataValues.totalAmount || 0),
+        admin: admin ? {
+          email: admin.email,
+          username: admin.username
+        } : null
+      };
+    }));
+    
+    res.json({
+      success: true,
+      data: {
+        summary: {
+          totalCommissions: commissionStats.reduce((sum, stat) => sum + parseFloat(stat.dataValues.totalAmount || 0), 0),
+          totalCount: commissionStats.reduce((sum, stat) => sum + parseInt(stat.dataValues.count || 0), 0),
+          byType: commissionStats.map(stat => ({
+            type: stat.type,
+            count: parseInt(stat.dataValues.count || 0),
+            totalAmount: parseFloat(stat.dataValues.totalAmount || 0),
+            avgAmount: parseFloat(stat.dataValues.avgAmount || 0)
+          }))
+        },
+        recentCommissions: recentCommissions.map(commission => ({
+          id: commission.id,
+          type: commission.type,
+          amount: parseFloat(commission.commissionAmount),
+          rate: parseFloat(commission.commissionRate),
+          status: commission.status,
+          createdAt: commission.createdAt,
+          user: commission.user ? {
+            email: commission.user.email,
+            username: commission.user.username
+          } : null
+        })),
+        dailyStats: dailyStats.map(stat => ({
+          date: stat.dataValues.date,
+          type: stat.type,
+          count: parseInt(stat.dataValues.count || 0),
+          totalAmount: parseFloat(stat.dataValues.totalAmount || 0)
+        })),
+        adminStats: adminStats
+      }
+    });
+  } catch (error) {
+    console.error('수수료 현황 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '수수료 현황 조회 중 오류가 발생했습니다.'
+    });
   }
 });
 
