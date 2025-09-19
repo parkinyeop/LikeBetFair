@@ -1962,38 +1962,13 @@ export default function ExchangeAdmin() {
                       </div>
 
                       {/* Action Items 섹션 */}
-                      {(actionItems.length > 0 || true) && (
+                      {actionItems.length > 0 && (
                         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6">
                           <h3 className="text-lg font-semibold text-yellow-800 mb-4 flex items-center">
                             <span className="mr-2">⚠️</span>
                             긴급 조치 필요 항목 (Action Items)
                           </h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {/* 테스트용 Action Items */}
-                            {actionItems.length === 0 && (
-                              <>
-                                <div className="p-4 rounded-lg border cursor-pointer transition-all hover:shadow-md bg-red-50 border-red-200 hover:bg-red-100">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <span className="text-2xl">🔒</span>
-                                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                      44건
-                                    </span>
-                                  </div>
-                                  <h4 className="font-semibold text-gray-900 mb-1">높은 취소율 경고</h4>
-                                  <p className="text-sm text-gray-600">현재 취소율이 44%입니다</p>
-                                </div>
-                                <div className="p-4 rounded-lg border cursor-pointer transition-all hover:shadow-md bg-orange-50 border-orange-200 hover:bg-orange-100">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <span className="text-2xl">📊</span>
-                                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                                      38건
-                                    </span>
-                                  </div>
-                                  <h4 className="font-semibold text-gray-900 mb-1">낮은 정산율 경고</h4>
-                                  <p className="text-sm text-gray-600">현재 정산율이 38%입니다</p>
-                                </div>
-                              </>
-                            )}
                             {actionItems.map((item) => (
                               <div
                                 key={item.id}
@@ -2058,8 +2033,11 @@ export default function ExchangeAdmin() {
                         <div className="bg-white p-6 rounded-lg shadow">
                           <h3 className="text-sm font-medium text-gray-500">정산율</h3>
                           <p className="text-2xl font-bold text-blue-600">
-                            {orders.length > 0 ?
-                              Math.round(((exchangeStats?.total?.settlements || 0) / orders.length) * 100) : 0}%
+                            {(() => {
+                              const settledOrders = orders.filter(o => o.status === 'settled').length;
+                              const totalOrders = orders.length;
+                              return totalOrders > 0 ? Math.round((settledOrders / totalOrders) * 100) : 0;
+                            })()}%
                           </p>
                           <div className="mt-2 text-sm text-gray-600">
                             정산 완료 / 전체 주문
