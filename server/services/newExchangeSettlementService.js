@@ -2,6 +2,8 @@ import GameResult from '../models/gameResultModel.js';
 import ExchangeOrder from '../models/exchangeOrderModel.js';
 import User from '../models/userModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
+import AdminCommission from '../models/adminCommissionModel.js';
+import CommissionSettingsService from './commissionSettingsService.js';
 import { Op } from 'sequelize';
 import teamMatchingService from './teamMatchingService.js';
 
@@ -303,20 +305,67 @@ class NewExchangeSettlementService {
     if (orderResult === 'won') {
       // 승리: 잠재 수익을 실제 수익으로
       winnings = order.potentialProfit || 0;
-      newBalance += winnings;
+      
+      // 🆕 익스체인지 수수료 계산 및 차감
+      const exchangeCommissionRate = await CommissionSettingsService.getCommissionRate('exchange');
+      const commissionAmount = CommissionSettingsService.calculateCommission(
+        winnings, 
+        order.stakeAmount || order.stake, 
+        exchangeCommissionRate
+      );
+      
+      // 실제 지급할 금액 (수수료 차감 후)
+      const netWinnings = Number(winnings) - Number(commissionAmount);
+      newBalance = Number(newBalance) + Number(netWinnings);
       
       // 잔액 업데이트
       await user.update({ balance: newBalance });
       
-      // PaymentHistory 기록
+      // 🆕 수수료가 있는 경우 AdminCommission 기록
+      if (commissionAmount > 0) {
+        await AdminCommission.create({
+          adminId: 'fb4b780d-c7c0-4112-90fd-f7ca85427a90', // admin 사용자 ID
+          userId: user.id,
+          betId: null, // 익스체인지는 betId 사용하지 않음
+          exchangeOrderId: order.id, // Exchange 주문 ID
+          betAmount: order.stakeAmount || order.stake,
+          winAmount: winnings,
+          commissionRate: exchangeCommissionRate,
+          commissionAmount: commissionAmount,
+          status: 'paid',
+          paidAt: new Date(),
+          type: 'exchange' // 익스체인지 수수료 구분
+        });
+        
+        // 🆕 수수료 차감 기록을 PaymentHistory에 저장
+        await PaymentHistory.create({
+          userId: user.id,
+          betId: `exchange-${order.id}`,
+          amount: -commissionAmount, // 음수로 수수료 차감 표시
+          memo: `익스체인지 수수료 (${(exchangeCommissionRate * 100).toFixed(2)}%)`,
+          balanceAfter: newBalance,
+          paidAt: new Date()
+        });
+        
+        console.log(`[익스체인지 수수료 차감] 주문 ${order.id}: ${commissionAmount}원 차감 (${(exchangeCommissionRate * 100).toFixed(2)}%)`);
+      }
+      
+      // 🆕 실제 상금 지급 기록
       await PaymentHistory.create({
         userId: user.id,
-        amount: winnings,
-        type: 'Exchange 정산',
-        description: `Exchange 주문 정산 - ${gameResult.homeTeam} vs ${gameResult.awayTeam}`,
+        betId: `exchange-${order.id}`,
+        amount: netWinnings,
+        memo: `Exchange 주문 정산 - ${gameResult.homeTeam} vs ${gameResult.awayTeam} (수수료 차감 후)`,
         balanceAfter: newBalance,
-        relatedOrderId: order.id
+        paidAt: new Date()
       });
+      
+      // 🆕 추천인 수수료 지급 로직
+      if (user.referredBy) {
+        await this.processReferralCommission(user, order, winnings);
+      }
+      
+      console.log(`[익스체인지 정산] 주문 ${order.id}: 총 ${winnings}원 → 수수료 ${commissionAmount}원 차감 → 실제 지급 ${netWinnings}원`);
       
     } else {
       // 패배: 추가 처리 없음 (이미 리스크 금액은 차감됨)
@@ -369,6 +418,80 @@ class NewExchangeSettlementService {
     }
     
     return settlableOrders;
+  }
+
+  // 🆕 익스체인지용 추천인 수수료 지급 처리
+  async processReferralCommission(user, order, adjustedWinnings) {
+    try {
+      // ReferralCode 테이블에서 추천인 정보 조회
+      const ReferralCode = (await import('../models/referralCodeModel.js')).default;
+      const referralCode = await ReferralCode.findOne({
+        where: { 
+          code: user.referredBy, 
+          isActive: true 
+        }
+      });
+
+      if (!referralCode) {
+        console.log(`[익스체인지 추천인 수수료] 추천코드 '${user.referredBy}'를 찾을 수 없거나 비활성화됨`);
+        return;
+      }
+
+      // 추천인 사용자 조회
+      const referrerUser = await User.findByPk(referralCode.adminId);
+
+      if (!referrerUser) {
+        console.log(`[익스체인지 추천인 수수료] 추천인 사용자 ID '${referralCode.adminId}'를 찾을 수 없음`);
+        return;
+      }
+
+      // 추천인 수수료 계산 (승리 금액의 5%)
+      const referralCommissionRate = referralCode.commissionRate || 0.05;
+      const referralCommissionAmount = Math.floor(adjustedWinnings * referralCommissionRate);
+
+      if (referralCommissionAmount <= 0) {
+        console.log(`[익스체인지 추천인 수수료] 수수료 금액이 0원 이하: ${referralCommissionAmount}원`);
+        return;
+      }
+
+      // 추천인 잔액 증가
+      referrerUser.balance = Number(referrerUser.balance) + Number(referralCommissionAmount);
+      await referrerUser.save();
+
+      // 추천인 수수료 기록을 AdminCommission에 저장
+      await AdminCommission.create({
+        adminId: referrerUser.id,
+        userId: user.id,
+        betId: null, // 익스체인지는 betId 사용하지 않음
+        exchangeOrderId: order.id, // Exchange 주문 ID
+        betAmount: order.stakeAmount || order.stake,
+        winAmount: adjustedWinnings,
+        commissionRate: referralCommissionRate,
+        commissionAmount: referralCommissionAmount,
+        status: 'paid',
+        paidAt: new Date(),
+        type: 'referral' // 추천인 수수료 구분
+      });
+
+      // 추천인에게 지급된 수수료 기록을 PaymentHistory에 저장
+      await PaymentHistory.create({
+        userId: referrerUser.id,
+        betId: `exchange-${order.id}`,
+        amount: referralCommissionAmount,
+        memo: `익스체인지 추천인 수수료 (${user.email} 주문 승리, ${(referralCommissionRate * 100).toFixed(2)}%)`,
+        balanceAfter: referrerUser.balance,
+        paidAt: new Date()
+      });
+
+      // 추천코드 사용자 수 증가
+      await referralCode.incrementUserCount();
+
+      console.log(`[익스체인지 추천인 수수료] 주문 ${order.id}: 추천인 ${referrerUser.email}에게 ${referralCommissionAmount}원 지급 (${(referralCommissionRate * 100).toFixed(2)}%)`);
+
+    } catch (error) {
+      console.error(`[익스체인지 추천인 수수료] 처리 중 오류 발생:`, error);
+      // 추천인 수수료 처리 실패는 전체 정산 처리를 중단시키지 않음
+    }
   }
 }
 

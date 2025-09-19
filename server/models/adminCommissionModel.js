@@ -27,9 +27,17 @@ const AdminCommission = sequelize.define('AdminCommission', {
   },
   betId: {
     type: DataTypes.UUID,
-    allowNull: false,
+    allowNull: true,
     references: {
       model: Bet,
+      key: 'id'
+    }
+  },
+  exchangeOrderId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'ExchangeOrders',
       key: 'id'
     }
   },
@@ -59,6 +67,11 @@ const AdminCommission = sequelize.define('AdminCommission', {
   paidAt: {
     type: DataTypes.DATE,
     allowNull: true
+  },
+  type: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    defaultValue: 'sportsbook'
   }
 }, {
   timestamps: true,

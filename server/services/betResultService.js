@@ -332,15 +332,17 @@ class BetResultService {
       // 🆕 수수료가 있는 경우 AdminCommission 기록
       if (commissionAmount > 0) {
         await AdminCommission.create({
-          adminId: 'system', // 시스템 관리자 ID (실제로는 메인 관리자 ID 사용)
+          adminId: 'fb4b780d-c7c0-4112-90fd-f7ca85427a90', // admin 사용자 ID
           userId: user.id,
-          betId: bet.id,
+          betId: bet.id, // 스포츠북은 betId 사용
+          exchangeOrderId: null, // 스포츠북은 exchangeOrderId 사용하지 않음
           betAmount: bet.stake,
           winAmount: adjustedWinnings,
           commissionRate: sportsbookCommissionRate,
           commissionAmount: commissionAmount,
           status: 'paid',
-          paidAt: new Date()
+          paidAt: new Date(),
+          type: 'sportsbook' // 스포츠북 수수료 구분
         }, { transaction });
         
         // 🆕 수수료 차감 기록을 PaymentHistory에 저장
@@ -354,6 +356,11 @@ class BetResultService {
         }, { transaction });
         
         console.log(`[수수료 차감] 베팅 ${bet.id}: ${commissionAmount}원 차감 (${(sportsbookCommissionRate * 100).toFixed(2)}%)`);
+      }
+      
+      // 🆕 추천인 수수료 지급 로직
+      if (user.referredBy) {
+        await this.processReferralCommission(user, bet, adjustedWinnings, transaction);
       }
       
       // 🆕 실제 상금 지급 기록
@@ -969,6 +976,84 @@ class BetResultService {
           await bet.update({ selections: bet.selections });
         }
       }
+    }
+  }
+
+  // 🆕 추천인 수수료 지급 처리
+  async processReferralCommission(user, bet, adjustedWinnings, transaction) {
+    try {
+      // ReferralCode 테이블에서 추천인 정보 조회
+      const ReferralCode = (await import('../models/referralCodeModel.js')).default;
+      const referralCode = await ReferralCode.findOne({
+        where: { 
+          code: user.referredBy, 
+          isActive: true 
+        },
+        transaction
+      });
+
+      if (!referralCode) {
+        console.log(`[추천인 수수료] 추천코드 '${user.referredBy}'를 찾을 수 없거나 비활성화됨`);
+        return;
+      }
+
+      // 추천인 사용자 조회
+      const referrerUser = await User.findByPk(referralCode.adminId, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+
+      if (!referrerUser) {
+        console.log(`[추천인 수수료] 추천인 사용자 ID '${referralCode.adminId}'를 찾을 수 없음`);
+        return;
+      }
+
+      // 추천인 수수료 계산 (승리 금액의 5%)
+      const referralCommissionRate = referralCode.commissionRate || 0.05;
+      const referralCommissionAmount = Math.floor(adjustedWinnings * referralCommissionRate);
+
+      if (referralCommissionAmount <= 0) {
+        console.log(`[추천인 수수료] 수수료 금액이 0원 이하: ${referralCommissionAmount}원`);
+        return;
+      }
+
+      // 추천인 잔액 증가
+      referrerUser.balance = Number(referrerUser.balance) + Number(referralCommissionAmount);
+      await referrerUser.save({ transaction });
+
+      // 추천인 수수료 기록을 AdminCommission에 저장
+      await AdminCommission.create({
+        adminId: referrerUser.id,
+        userId: user.id,
+        betId: bet.id, // 스포츠북은 betId 사용
+        exchangeOrderId: null, // 스포츠북은 exchangeOrderId 사용하지 않음
+        betAmount: bet.stake,
+        winAmount: adjustedWinnings,
+        commissionRate: referralCommissionRate,
+        commissionAmount: referralCommissionAmount,
+        status: 'paid',
+        paidAt: new Date(),
+        type: 'referral' // 추천인 수수료 구분
+      }, { transaction });
+
+      // 추천인에게 지급된 수수료 기록을 PaymentHistory에 저장
+      await PaymentHistory.create({
+        userId: referrerUser.id,
+        betId: bet.id,
+        amount: referralCommissionAmount,
+        memo: `추천인 수수료 (${user.email} 베팅 승리, ${(referralCommissionRate * 100).toFixed(2)}%)`,
+        paidAt: new Date(),
+        balanceAfter: referrerUser.balance
+      }, { transaction });
+
+      // 추천코드 사용자 수 증가
+      await referralCode.incrementUserCount({ transaction });
+
+      console.log(`[추천인 수수료] 베팅 ${bet.id}: 추천인 ${referrerUser.email}에게 ${referralCommissionAmount}원 지급 (${(referralCommissionRate * 100).toFixed(2)}%)`);
+
+    } catch (error) {
+      console.error(`[추천인 수수료] 처리 중 오류 발생:`, error);
+      // 추천인 수수료 처리 실패는 전체 베팅 승리 처리를 중단시키지 않음
     }
   }
 }

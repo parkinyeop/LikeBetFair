@@ -714,15 +714,17 @@ class ExchangeSettlementService {
     // 🆕 수수료가 있는 경우 AdminCommission 기록
     if (commissionAmount > 0) {
       await AdminCommission.create({
-        adminId: 'system', // 시스템 관리자 ID (실제로는 메인 관리자 ID 사용)
+        adminId: 'fb4b780d-c7c0-4112-90fd-f7ca85427a90', // admin 사용자 ID
         userId: user.id,
-        betId: `EXCHANGE_${order.id}`,
+        betId: null, // 익스체인지는 betId 사용하지 않음
+        exchangeOrderId: order.id, // Exchange 주문 ID
         betAmount: order.stakeAmount,
         winAmount: amount + order.stakeAmount, // 총 당첨금
         commissionRate: await CommissionSettingsService.getCommissionRate('exchange'),
         commissionAmount: commissionAmount,
         status: 'paid',
-        paidAt: new Date()
+        paidAt: new Date(),
+        type: 'exchange' // 익스체인지 수수료 구분
       }, { transaction });
       
       // 🆕 수수료 차감 기록을 PaymentHistory에 저장
