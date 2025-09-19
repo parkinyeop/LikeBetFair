@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { Op } from 'sequelize';
 import GameResult from '../models/gameResultModel.js';
+import sequelize from '../models/sequelize.js';
 import { normalizeTeamName, normalizeCategoryPair } from '../normalizeUtils.js';
 
 const API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // TheSportsDB 프리미엄 키
@@ -377,9 +378,13 @@ async function collectMLBData() {
     
   } catch (error) {
     console.error('❌ MLB 데이터 수집 중 오류 발생:', error.message);
+  } finally {
+    // 데이터베이스 연결 종료
+    console.log('🔌 데이터베이스 연결 종료 중...');
+    await sequelize.close();
+    console.log('✅ 데이터베이스 연결 종료 완료');
+    process.exit(0);
   }
-  
-  process.exit(0);
 }
 
 collectMLBData(); 

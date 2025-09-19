@@ -1,6 +1,7 @@
 import axios from 'axios';
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName } from '../normalizeUtils.js';
+import sequelize from '../models/sequelize.js';
 
 const THESPORTSDB_API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // 기본 키
 const LEAGUE_ID = '4335'; // 스페인 라리가
@@ -160,13 +161,25 @@ async function collectLaLigaData() {
 
 // 스크립트 실행
 if (import.meta.url === `file://${process.argv[1]}`) {
-  collectLaLigaData().then(() => {
+  collectLaLigaData().then(async () => {
+
     console.log('스크립트 실행 완료');
     process.exit(0);
-  }).catch(error => {
+  
+      // 데이터베이스 연결 종료
+      console.log('🔌 데이터베이스 연결 종료 중...');
+      await sequelize.close();
+      console.log('✅ 데이터베이스 연결 종료 완료');
+    }).catch(async (error) => {
+
     console.error('스크립트 실행 중 오류:', error);
     process.exit(1);
-  });
+  
+      // 데이터베이스 연결 종료
+      console.log('🔌 데이터베이스 연결 종료 중...');
+      await sequelize.close();
+      console.log('✅ 데이터베이스 연결 종료 완료');
+    });
 }
 
 export default collectLaLigaData; 

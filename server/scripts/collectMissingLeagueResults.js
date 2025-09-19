@@ -1,5 +1,6 @@
 import GameResult from '../models/gameResultModel.js';
 import axios from 'axios';
+import sequelize from '../models/sequelize.js';
 
 const API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // SportsDB API 키
 const BASE_URL = 'https://www.thesportsdb.com/api/v1/json';
@@ -133,11 +134,23 @@ async function collectMissingLeagueResults() {
 
 // 스크립트 실행
 collectMissingLeagueResults()
-  .then(() => {
+  .then(async () => {
+
     console.log('스크립트 실행 완료');
     process.exit(0);
-  })
-  .catch(error => {
+  
+      // 데이터베이스 연결 종료
+      console.log('🔌 데이터베이스 연결 종료 중...');
+      await sequelize.close();
+      console.log('✅ 데이터베이스 연결 종료 완료');
+    })
+  .catch(async (error) => {
+
     console.error('스크립트 실행 중 에러:', error);
     process.exit(1);
-  }); 
+  
+      // 데이터베이스 연결 종료
+      console.log('🔌 데이터베이스 연결 종료 중...');
+      await sequelize.close();
+      console.log('✅ 데이터베이스 연결 종료 완료');
+    }); 

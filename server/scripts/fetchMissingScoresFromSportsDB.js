@@ -1,6 +1,7 @@
 import GameResult from '../models/gameResultModel.js';
 import axios from 'axios';
 import { normalizeTeamName } from '../normalizeUtils.js';
+import sequelize from '../models/sequelize.js';
 
 const API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // 반드시 프리미엄 키 사용
 const BASE_URL = 'https://www.thesportsdb.com/api/v1/json';

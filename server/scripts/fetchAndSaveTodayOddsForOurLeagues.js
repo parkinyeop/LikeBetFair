@@ -4,6 +4,7 @@ import OddsCache from '../models/oddsCacheModel.js';
 import Bet from '../models/betModel.js';
 import fs from 'fs';
 import path from 'path';
+import sequelize from '../models/sequelize.js';
 
 // 우리가 배당률을 제공하는 리그만 명시 (올바른 스포츠 키 사용)
 const activeCategories = ['soccer_korea_kleague1', 'baseball_mlb', 'basketball_nba']; // 필요시 확장

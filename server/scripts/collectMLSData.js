@@ -1,6 +1,7 @@
 import axios from 'axios';
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName } from '../normalizeUtils.js';
+import sequelize from '../models/sequelize.js';
 
 /**
  * MLS 2025 시즌 데이터 수집
@@ -133,13 +134,25 @@ async function collectMLSData() {
 // 직접 실행
 if (import.meta.url === `file://${process.argv[1]}`) {
   collectMLSData()
-    .then(() => {
+    .then(async () => {
+
       console.log('✅ 스크립트 완료');
       process.exit(0);
+    
+      // 데이터베이스 연결 종료
+      console.log('🔌 데이터베이스 연결 종료 중...');
+      await sequelize.close();
+      console.log('✅ 데이터베이스 연결 종료 완료');
     })
-    .catch(error => {
+    .catch(async (error) => {
+
       console.error('❌ 스크립트 실패:', error);
       process.exit(1);
+    
+      // 데이터베이스 연결 종료
+      console.log('🔌 데이터베이스 연결 종료 중...');
+      await sequelize.close();
+      console.log('✅ 데이터베이스 연결 종료 완료');
     });
 }
 
