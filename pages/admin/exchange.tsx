@@ -685,7 +685,7 @@ export default function ExchangeAdmin() {
         
         // 주문 상세 정보 새로고침 - handleOrderClick 대신 직접 API 호출
         try {
-          const orderResponse = await fetch(`/api/admin/exchange/orders/${selectedOrder.id}`, {
+          const orderResponse = await fetch(`http://localhost:5050/api/admin/exchange/orders/${selectedOrder.id}`, {
             headers: getAuthHeaders()
           });
           
@@ -2838,6 +2838,7 @@ export default function ExchangeAdmin() {
                             <table className="min-w-full divide-y divide-gray-200">
                               <thead className="bg-gray-50">
                                 <tr>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">주문번호</th>
                                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">사용자명</th>
                                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">이메일</th>
                                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">매치 금액</th>
@@ -2848,6 +2849,9 @@ export default function ExchangeAdmin() {
                               <tbody className="bg-white divide-y divide-gray-200">
                                 {selectedOrder.matchedOrders.map((match) => (
                                   <tr key={match.id}>
+                                    <td className="px-4 py-2 text-sm font-medium text-blue-600">
+                                      #{match.id}
+                                    </td>
                                     <td className="px-4 py-2 text-sm font-medium text-gray-900">
                                       {match.user?.username || 'N/A'}
                                     </td>
