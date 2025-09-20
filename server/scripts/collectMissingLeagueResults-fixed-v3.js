@@ -1,16 +1,9 @@
 const axios = require('axios');
-const { Sequelize, DataTypes } = require('sequelize');
+const { DataTypes } = require('sequelize');
+const createScriptSequelize = require('../config/scriptDatabase.cjs');
 
-// 데이터베이스 연결 설정
-const sequelize = new Sequelize({
-  dialect: 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  username: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'bettingDB',
-  logging: false
-});
+// 스크립트 전용 데이터베이스 연결
+const sequelize = createScriptSequelize();
 
 // GameResult 모델 정의 (실제 DB 스키마와 일치)
 const GameResult = sequelize.define('GameResult', {

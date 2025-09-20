@@ -4,7 +4,10 @@ import GameResult from '../models/gameResultModel.js';
 import User from '../models/userModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
 import { Op } from 'sequelize';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+
+// 스크립트 전용 Sequelize 인스턴스 생성
+const sequelize = createScriptSequelize();
 
 /**
  * 관리자 대시보드 긴급 조치 항목 서비스

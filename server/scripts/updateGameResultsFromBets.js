@@ -1,18 +1,12 @@
-import { Sequelize, DataTypes } from 'sequelize';
+import { DataTypes } from 'sequelize';
 import dotenv from 'dotenv';
 dotenv.config();
 import fs from 'fs';
 
-// Sequelize 인스턴스 생성
-const sequelize = new Sequelize({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  username: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  dialect: 'postgres',
-  logging: false
-});
+import createScriptSequelize from '../config/scriptDatabase.js';
+
+// 스크립트 전용 Sequelize 인스턴스 생성
+const sequelize = createScriptSequelize();
 
 // Bet 모델 정의
 const Bet = sequelize.define('Bet', {

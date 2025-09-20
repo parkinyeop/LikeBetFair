@@ -1,6 +1,7 @@
 import GameResult from '../models/gameResultModel.js';
 import axios from 'axios';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+const sequelize = createScriptSequelize();
 
 const API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // SportsDB API 키
 const BASE_URL = 'https://www.thesportsdb.com/api/v1/json';

@@ -1,7 +1,8 @@
 import axios from 'axios';
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName } from '../normalizeUtils.js';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+const sequelize = createScriptSequelize();
 
 const API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // TheSportsDB 프리미엄 키
 const KBL_LEAGUE_ID = '5124'; // KBL 리그 ID

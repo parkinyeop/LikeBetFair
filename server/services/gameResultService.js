@@ -3,7 +3,10 @@ import GameResult from '../models/gameResultModel.js';
 import sportsConfig from '../config/sportsConfig.js';
 import Bet from '../models/betModel.js';
 import { Op } from 'sequelize';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+
+// 스크립트 전용 Sequelize 인스턴스 생성
+const sequelize = createScriptSequelize();
 import betResultService from './betResultService.js';
 import OddsCache from '../models/oddsCacheModel.js';
 import { normalizeTeamName, normalizeCategory, normalizeCommenceTime, normalizeCategoryPair } from '../normalizeUtils.js';

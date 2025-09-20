@@ -1,7 +1,8 @@
 import axios from 'axios';
 import { Op } from 'sequelize';
 import GameResult from '../models/gameResultModel.js';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+const sequelize = createScriptSequelize();
 import { normalizeTeamName, normalizeCategoryPair } from '../normalizeUtils.js';
 
 const API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // TheSportsDB 프리미엄 키

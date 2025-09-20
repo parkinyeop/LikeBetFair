@@ -4,7 +4,10 @@ import OddsCache from '../models/oddsCacheModel.js';
 import Bet from '../models/betModel.js';
 import fs from 'fs';
 import path from 'path';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+
+// 스크립트 전용 Sequelize 인스턴스 생성
+const sequelize = createScriptSequelize();
 
 // 우리가 배당률을 제공하는 리그만 명시 (올바른 스포츠 키 사용)
 const activeCategories = ['soccer_korea_kleague1', 'baseball_mlb', 'basketball_nba']; // 필요시 확장
@@ -101,6 +104,9 @@ async function fetchAndSaveTodayOddsForOurLeagues() {
     }
   }
   console.log(`총 저장된 odds row: ${totalSaved}`);
+  
+  // 데이터베이스 연결 종료
+  await sequelize.close();
   process.exit(0);
 }
 

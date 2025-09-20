@@ -1,7 +1,10 @@
 import { ExchangeOrder, User } from '../models/index.js';
 import { ExchangeMultibetValidationService } from '../services/exchangeMultibetValidation.js';
 import BettingAmountSettingsService from '../services/bettingAmountSettingsService.js';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+
+// 스크립트 전용 Sequelize 인스턴스 생성
+const sequelize = createScriptSequelize();
 
 /**
  * 익스체인지 멀티배팅 컨트롤러

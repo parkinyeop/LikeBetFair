@@ -5,7 +5,10 @@ import User from '../models/userModel.js';
 import Bet from '../models/betModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
 import GameResult from '../models/gameResultModel.js';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+
+// 스크립트 전용 Sequelize 인스턴스 생성
+const sequelize = createScriptSequelize();
 import { Op } from 'sequelize';
 import BettingAmountSettingsService from '../services/bettingAmountSettingsService.js';
 

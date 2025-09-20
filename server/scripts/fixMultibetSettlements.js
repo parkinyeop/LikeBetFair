@@ -3,7 +3,10 @@ import PaymentHistory from '../models/paymentHistoryModel.js';
 import User from '../models/userModel.js';
 import multibetSettlementService from '../services/multibetSettlementService.js';
 import { Op } from 'sequelize';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+
+// 스크립트 전용 Sequelize 인스턴스 생성
+const sequelize = createScriptSequelize();
 
 /**
  * 기존 잘못 정산된 멀티배팅 주문들 재정산 처리 스크립트
@@ -246,9 +249,12 @@ async function main() {
       await fixer.fixAllMultibetSettlements();
     }
     
+    // 데이터베이스 연결 종료
+    await sequelize.close();
     process.exit(0);
   } catch (error) {
     console.error('❌ 스크립트 실행 실패:', error);
+    await sequelize.close();
     process.exit(1);
   }
 }

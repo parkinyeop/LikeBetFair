@@ -1,7 +1,8 @@
 import axios from 'axios';
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName } from '../normalizeUtils.js';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+const sequelize = createScriptSequelize();
 
 /**
  * MLS 2025 시즌 데이터 수집

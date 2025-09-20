@@ -1,7 +1,8 @@
 import axios from 'axios';
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName } from '../normalizeUtils.js';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+const sequelize = createScriptSequelize();
 
 const THESPORTSDB_API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // 기본 키
 const LEAGUE_ID = '4335'; // 스페인 라리가

@@ -1,7 +1,10 @@
 import Bet from '../models/betModel.js';
 import User from '../models/userModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+
+// 스크립트 전용 Sequelize 인스턴스 생성
+const sequelize = createScriptSequelize();
 import { Op } from 'sequelize';
 
 class BetCancellationService {

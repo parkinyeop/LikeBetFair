@@ -1,7 +1,8 @@
 import axios from 'axios';
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName, findBestTeamMatch } from '../normalizeUtils.js';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+const sequelize = createScriptSequelize();
 
 const THESPORTSDB_API_KEY = process.env.THESPORTSDB_API_KEY || '3'; // 실제 운영키로 교체 필요
 const LEAGUE_ID = '4328'; // EPL 리그 ID

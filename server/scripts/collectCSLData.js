@@ -1,7 +1,8 @@
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName } from '../normalizeUtils.js';
 import axios from 'axios';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+const sequelize = createScriptSequelize();
 
 const CSL_LEAGUE_ID = '4359';  // 중국 슈퍼리그 TheSportsDB ID
 const API_KEY = process.env.THESPORTSDB_API_KEY || '116108';      // TheSportsDB API 키

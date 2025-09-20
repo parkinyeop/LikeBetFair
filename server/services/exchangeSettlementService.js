@@ -6,7 +6,10 @@ import PaymentHistory from '../models/paymentHistoryModel.js';
 import AdminCommission from '../models/adminCommissionModel.js';
 import CommissionSettingsService from './commissionSettingsService.js';
 import { Op } from 'sequelize';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+
+// 스크립트 전용 Sequelize 인스턴스 생성
+const sequelize = createScriptSequelize();
 import multibetSettlementService from './multibetSettlementService.js';
 
 /**

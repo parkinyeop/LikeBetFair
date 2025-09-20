@@ -1,6 +1,7 @@
 import axios from 'axios';
 import GameResult from '../models/gameResultModel.js';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+const sequelize = createScriptSequelize();
 import { normalizeTeamName } from '../normalizeUtils.js';
 
 /**

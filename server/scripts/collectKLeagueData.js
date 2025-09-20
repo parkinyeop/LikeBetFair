@@ -1,6 +1,7 @@
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName } from '../normalizeUtils.js';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+const sequelize = createScriptSequelize();
 
 // K리그 1 팀명 매핑 테이블 (TheSportsDB 팀명 → 정규화된 팀명)
 const KLEAGUE_TEAM_MAPPING = {

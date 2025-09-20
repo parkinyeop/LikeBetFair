@@ -9,7 +9,10 @@ import path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { collectPremierLeagueData } from '../scripts/collectPremierLeagueData.js';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+
+// 스크립트 전용 Sequelize 인스턴스 생성
+const sequelize = createScriptSequelize();
 
 const execAsync = promisify(exec);
 
