@@ -2,8 +2,6 @@
 import GameResult from './models/gameResultModel.js';
 import gameResultService from './services/gameResultService.js';
 import { Op } from 'sequelize';
-import sequelize from '../models/sequelize.js';
-import sequelize from './models/sequelize.js';
 
 (async () => {
   try {

@@ -1,7 +1,6 @@
 import axios from 'axios';
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName } from '../normalizeUtils.js';
-import sequelize from '../models/sequelize.js';
 
 const API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // TheSportsDB 프리미엄 키
 const NFL_LEAGUE_ID = '4391'; // NFL 리그 ID
@@ -193,25 +192,13 @@ async function collectNFLData() {
 // 스크립트 실행
 if (import.meta.url === `file://${process.argv[1]}`) {
   collectNFLData()
-    .then(async () => {
-
+    .then(() => {
       console.log('NFL 데이터 수집 스크립트 종료');
       process.exit(0);
-    
-      // 데이터베이스 연결 종료
-      console.log('🔌 데이터베이스 연결 종료 중...');
-      await sequelize.close();
-      console.log('✅ 데이터베이스 연결 종료 완료');
     })
-    .catch(async (error) => {
-
+    .catch(error => {
       console.error('NFL 데이터 수집 중 치명적 오류:', error);
       process.exit(1);
-    
-      // 데이터베이스 연결 종료
-      console.log('🔌 데이터베이스 연결 종료 중...');
-      await sequelize.close();
-      console.log('✅ 데이터베이스 연결 종료 완료');
     });
 }
 
