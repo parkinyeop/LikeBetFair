@@ -7,7 +7,7 @@ import verifyToken from '../middleware/verifyToken.js';
 import exchangeWebSocketService from '../services/exchangeWebSocketService.js';
 import exchangeGameMappingService from '../services/exchangeGameMappingService.js';
 import exchangeSettlementService from '../services/exchangeSettlementService.js';
-import ExchangeOddsWeightService from '../services/exchangeOddsWeightService.js';
+import ExchangeOddsReturnRateService from '../services/exchangeOddsReturnRateService.js';
 import { Op } from 'sequelize';
 import sequelize from '../models/sequelize.js';
 
@@ -705,15 +705,15 @@ router.get('/orderbook', verifyToken, async (req, res) => {
     const ordersWithRemainingAmount = await Promise.all(orders.map(async order => {
       const orderData = order.toJSON();
       
-      // Back 주문일 때만 가중치 적용하여 표시
+      // Back 주문일 때만 환수율 적용하여 표시
       let displayPrice = orderData.price;
       if (orderData.side === 'back') {
-        displayPrice = await ExchangeOddsWeightService.applyWeightToOdds(orderData.price);
+        displayPrice = await ExchangeOddsReturnRateService.applyReturnRateToOdds(orderData.price);
       }
       
       return {
         ...orderData,
-        price: displayPrice, // 사용자에게 표시할 가중치 적용된 배당율
+        price: displayPrice, // 사용자에게 표시할 환수율 적용된 배당율
         originalPrice: orderData.price, // 원본 배당율 보존
         displayAmount: order.remainingAmount || order.amount, // 화면에 표시할 금액
         originalAmount: order.originalAmount || order.amount,
@@ -1223,15 +1223,15 @@ router.get('/orders', verifyToken, async (req, res) => {
     const ordersWithMatchInfo = await Promise.all(orders.map(async order => {
       const orderData = order.toJSON();
       
-      // Back 주문일 때만 가중치 적용하여 표시
+      // Back 주문일 때만 환수율 적용하여 표시
       let displayPrice = orderData.price;
       if (orderData.side === 'back') {
-        displayPrice = await ExchangeOddsWeightService.applyWeightToOdds(orderData.price);
+        displayPrice = await ExchangeOddsReturnRateService.applyReturnRateToOdds(orderData.price);
       }
       
       return {
         ...orderData,
-        price: displayPrice, // 사용자에게 표시할 가중치 적용된 배당율
+        price: displayPrice, // 사용자에게 표시할 환수율 적용된 배당율
         originalPrice: orderData.price, // 원본 배당율 보존
         matchInfo: {
           originalAmount: order.originalAmount || order.amount,

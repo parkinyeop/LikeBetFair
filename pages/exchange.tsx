@@ -36,7 +36,7 @@ export default function Exchange() {
   
   // 🆕 Exchange 주문 데이터 상태 추가
   const [exchangeOrders, setExchangeOrders] = useState<any[]>([]);
-  const [oddsWeightSettings, setOddsWeightSettings] = useState({ weightPercentage: 0.1, enabled: true });
+  const [oddsReturnRateSettings, setOddsReturnRateSettings] = useState({ returnRate: 0.95, enabled: true });
   const { fetchAllOpenOrders } = useExchange();
   
   // 🆕 Exchange 주문 데이터 로드 함수
@@ -50,39 +50,67 @@ export default function Exchange() {
     }
   };
   
-  // 🆕 관리자 설정에서 가중치 설정 가져오기
-  const loadOddsWeightSettings = async () => {
+  // 🆕 관리자 설정에서 환수율 설정 가져오기
+  const loadOddsReturnRateSettings = async () => {
     try {
-      console.log('🔍 Exchange 가중치 설정 로드 시도...');
-      const response = await fetch('http://localhost:5050/api/admin/public-settings/exchange-odds-weights', {
+      console.log('🔍 Exchange 환수율 설정 로드 시도...');
+      const response = await fetch('http://localhost:5050/api/admin/public-settings/exchange-odds-return-rate', {
         headers: {
           'Content-Type': 'application/json'
         }
       });
-      console.log('🔍 Exchange 가중치 설정 응답 상태:', response.status);
+      console.log('🔍 Exchange 환수율 설정 응답 상태:', response.status);
       
       if (response.ok) {
         const data = await response.json();
-        console.log('🔍 Exchange 가중치 설정 응답 데이터:', data);
+        console.log('🔍 Exchange 환수율 설정 응답 데이터:', data);
         if (data.success) {
-          setOddsWeightSettings(data.data);
-          console.log('✅ Exchange 가중치 설정 로드 성공:', data.data);
+          setOddsReturnRateSettings(data.data);
+          console.log('✅ Exchange 환수율 설정 로드 성공:', data.data);
         } else {
-          console.log('❌ Exchange 가중치 설정 응답 실패:', data.error);
+          console.log('❌ Exchange 환수율 설정 응답 실패:', data.error);
         }
       } else {
         const errorText = await response.text();
-        console.log('❌ Exchange 가중치 설정 HTTP 오류:', response.status, errorText);
+        console.log('❌ Exchange 환수율 설정 HTTP 오류:', response.status, errorText);
       }
     } catch (error) {
-      console.error('❌ Exchange 가중치 설정 로드 실패:', error);
+      console.error('❌ Exchange 환수율 설정 로드 실패:', error);
     }
   };
   
-  // 🆕 Exchange 배당율에 가중치 적용 (관리자 설정값 사용)
-  const applyExchangeWeight = (originalOdds: number) => {
-    if (!originalOdds || !oddsWeightSettings.enabled) return originalOdds;
-    return originalOdds * (1 + oddsWeightSettings.weightPercentage);
+  // 🆕 Exchange 배당율에 환수율 적용 (올바른 방식 - Proportional Margin Application)
+  const applyExchangeReturnRate = (originalOdds: number, allOdds: number[] = []) => {
+    if (!originalOdds || !oddsReturnRateSettings.enabled) return originalOdds;
+    
+    // 단일 배당율인 경우 기존 방식 사용 (호환성)
+    if (allOdds.length === 0) {
+      return originalOdds * oddsReturnRateSettings.returnRate;
+    }
+    
+    // 전체 경기의 환수율을 올바르게 조정
+    const adjustOddsSophisticated = (oddsArray: number[], targetPayout: number) => {
+      // 1. 각 배당률의 내재 확률 계산
+      const impliedProbs = oddsArray.map(odd => 1 / odd);
+      
+      // 2. 현재 환수율 (내재 확률의 총합) 계산
+      const currentPayoutSum = impliedProbs.reduce((sum, prob) => sum + prob, 0);
+      
+      // 3. 목표 환수율 (목표 확률의 총합) 설정
+      const targetPayoutSum = 1 / targetPayout;
+      
+      // 4. 각 확률을 조정
+      const adjustedProbs = impliedProbs.map(prob => prob * (targetPayoutSum / currentPayoutSum));
+      
+      // 5. 조정된 확률을 다시 배당률로 변환
+      const newOdds = adjustedProbs.map(prob => 1 / prob);
+      
+      return newOdds;
+    };
+    
+    const adjustedOdds = adjustOddsSophisticated(allOdds, oddsReturnRateSettings.returnRate);
+    const originalIndex = allOdds.indexOf(originalOdds);
+    return adjustedOdds[originalIndex] || originalOdds;
   };
   
   // 🎯 버튼이 선택되었는지 확인하는 함수 - Exchange 기존 로직 유지
@@ -715,18 +743,25 @@ export default function Exchange() {
                name.toLowerCase().includes('draw') || name === 'Draw' || name === 'Tie'
              );
              
+             // 전체 배당율 배열 생성
+             const allOdds = [
+               (homeOdds as any)?.averagePrice,
+               (drawOdds?.[1] as any)?.averagePrice,
+               (awayOdds as any)?.averagePrice
+             ].filter(odds => odds !== undefined);
+             
              outcomes = [
                { 
                  name: game.home_team, 
-                 price: applyExchangeWeight((homeOdds as any)?.averagePrice)
+                 price: applyExchangeReturnRate((homeOdds as any)?.averagePrice, allOdds)
                },
                { 
                  name: 'Draw', 
-                 price: applyExchangeWeight((drawOdds?.[1] as any)?.averagePrice)
+                 price: applyExchangeReturnRate((drawOdds?.[1] as any)?.averagePrice, allOdds)
                },
                { 
                  name: game.away_team, 
-                 price: applyExchangeWeight((awayOdds as any)?.averagePrice)
+                 price: applyExchangeReturnRate((awayOdds as any)?.averagePrice, allOdds)
                }
              ].filter(outcome => outcome.price !== undefined);
           } else {
@@ -739,14 +774,20 @@ export default function Exchange() {
               normalizeTeamNameForComparison(key) === normalizeTeamNameForComparison(game.away_team)
             );
             
+            // 전체 배당율 배열 생성
+            const allOdds = [
+              homeKey ? h2hOdds[homeKey]?.averagePrice : undefined,
+              awayKey ? h2hOdds[awayKey]?.averagePrice : undefined
+            ].filter(odds => odds !== undefined);
+            
             outcomes = [
               { 
                 name: game.home_team, 
-                price: applyExchangeWeight(homeKey ? h2hOdds[homeKey]?.averagePrice : undefined)
+                price: applyExchangeReturnRate(homeKey ? h2hOdds[homeKey]?.averagePrice : undefined, allOdds)
               },
               { 
                 name: game.away_team, 
-                price: applyExchangeWeight(awayKey ? h2hOdds[awayKey]?.averagePrice : undefined)
+                price: applyExchangeReturnRate(awayKey ? h2hOdds[awayKey]?.averagePrice : undefined, allOdds)
               }
             ].filter(outcome => outcome.price !== undefined);
           }
@@ -1382,10 +1423,17 @@ export default function Exchange() {
                      name.toLowerCase().includes('draw') || name === 'Draw' || name === 'Draw' || name === 'Tie'
                    );
                    
+                   // 전체 배당율 배열 생성
+                   const allOdds = [
+                     (homeOdds as any)?.averagePrice,
+                     (drawOdds?.[1] as any)?.averagePrice,
+                     (awayOdds as any)?.averagePrice
+                   ].filter(odds => odds !== undefined);
+                   
                    outcomes = [
-                     { name: game.home_team, price: (homeOdds as any)?.averagePrice },
-                     { name: 'Draw', price: (drawOdds?.[1] as any)?.averagePrice },
-                     { name: game.away_team, price: (awayOdds as any)?.averagePrice }
+                     { name: game.home_team, price: applyExchangeReturnRate((homeOdds as any)?.averagePrice, allOdds) },
+                     { name: 'Draw', price: applyExchangeReturnRate((drawOdds?.[1] as any)?.averagePrice, allOdds) },
+                     { name: game.away_team, price: applyExchangeReturnRate((awayOdds as any)?.averagePrice, allOdds) }
                    ].filter(outcome => outcome.price !== undefined);
                 } else {
                   const h2hKeys = Object.keys(h2hOdds);
@@ -1396,9 +1444,15 @@ export default function Exchange() {
                     normalizeTeamNameForComparison(key) === normalizeTeamNameForComparison(game.away_team)
                   );
                   
+                  // 전체 배당율 배열 생성
+                  const allOdds = [
+                    homeKey ? h2hOdds[homeKey]?.averagePrice : undefined,
+                    awayKey ? h2hOdds[awayKey]?.averagePrice : undefined
+                  ].filter(odds => odds !== undefined);
+                  
                   outcomes = [
-                    { name: game.home_team, price: homeKey ? h2hOdds[homeKey]?.averagePrice : undefined },
-                    { name: game.away_team, price: awayKey ? h2hOdds[awayKey]?.averagePrice : undefined }
+                    { name: game.home_team, price: applyExchangeReturnRate(homeKey ? h2hOdds[homeKey]?.averagePrice : undefined, allOdds) },
+                    { name: game.away_team, price: applyExchangeReturnRate(awayKey ? h2hOdds[awayKey]?.averagePrice : undefined, allOdds) }
                   ].filter(outcome => outcome.price !== undefined);
                 }
                 
@@ -1855,7 +1909,7 @@ export default function Exchange() {
     if (viewMode === 'today') {
       fetchTodayGames();
     }
-    loadOddsWeightSettings(); // 🆕 가중치 설정 로드
+    loadOddsReturnRateSettings(); // 🆕 환수율 설정 로드
     
     const handleOrderPlaced = () => {
       console.log('🔄 주문 완료 이벤트 감지, 익스체인지 홈 투데이 베팅 데이터 새로고침');
