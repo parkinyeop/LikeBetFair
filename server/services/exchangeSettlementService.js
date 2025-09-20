@@ -691,11 +691,12 @@ class ExchangeSettlementService {
     
     const previousBalance = parseFloat(user.balance);
     
-    // 🆕 수수료 계산 및 차감 (승리 시에만)
+    // 🆕 수수료 계산 및 차감 (Lay 주문 승리 시에만)
     let netAmount = amount;
     let commissionAmount = 0;
     
-    if (amount > 0) { // 승리한 경우에만 수수료 차감
+    // Back 주문은 승리 시에도 수수료 차감하지 않음, Lay 주문만 승리 시 수수료 차감
+    if (amount > 0 && order.side === 'lay') { // Lay 주문 승리 시에만 수수료 차감
       const exchangeCommissionRate = await CommissionSettingsService.getCommissionRate('exchange');
       
       // Exchange에서 수수료는 순수익(amount)에 대해서만 적용
@@ -707,7 +708,9 @@ class ExchangeSettlementService {
       
       netAmount = amount - commissionAmount;
       
-      console.log(`      💰 수수료 계산: 수익 ${amount}원, 수수료 ${commissionAmount}원 (${(exchangeCommissionRate * 100).toFixed(2)}%), 실제 지급 ${netAmount}원`);
+      console.log(`      💰 Lay 주문 수수료 계산: 수익 ${amount}원, 수수료 ${commissionAmount}원 (${(exchangeCommissionRate * 100).toFixed(2)}%), 실제 지급 ${netAmount}원`);
+    } else if (amount > 0 && order.side === 'back') {
+      console.log(`      💰 Back 주문 승리: 수익 ${amount}원 (수수료 없음)`);
     }
     
     const newBalance = previousBalance + netAmount;
@@ -748,12 +751,16 @@ class ExchangeSettlementService {
     
     let memo = '';
     if (amount > 0) {
-      memo = `Exchange ${matchType} 베팅 승리 수익 ${matchAmount}`;
-      if (commissionAmount > 0) {
-        memo += ` (수수료 ${commissionAmount}원 차감 후)`;
+      if (order.side === 'back') {
+        memo = `Exchange Back ${matchType} 베팅 승리 수익 ${matchAmount} (수수료 없음)`;
+      } else {
+        memo = `Exchange Lay ${matchType} 베팅 승리 수익 ${matchAmount}`;
+        if (commissionAmount > 0) {
+          memo += ` (수수료 ${commissionAmount}원 차감 후)`;
+        }
       }
     } else {
-      memo = `Exchange ${matchType} 베팅 손실 ${matchAmount}`;
+      memo = `Exchange ${order.side.toUpperCase()} ${matchType} 베팅 손실 ${matchAmount}`;
     }
     
     memo += ` - ${order.side.toUpperCase()}: ${order.selection}, ` +

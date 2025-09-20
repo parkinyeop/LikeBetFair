@@ -306,16 +306,27 @@ class NewExchangeSettlementService {
       // 승리: 잠재 수익을 실제 수익으로
       winnings = order.potentialProfit || 0;
       
-      // 🆕 익스체인지 수수료 계산 및 차감
-      const exchangeCommissionRate = await CommissionSettingsService.getCommissionRate('exchange');
-      const commissionAmount = CommissionSettingsService.calculateCommission(
-        winnings, 
-        order.stakeAmount || order.stake, 
-        exchangeCommissionRate
-      );
+      // 🆕 익스체인지 수수료 계산 및 차감 (Lay 주문 승리 시에만)
+      let netWinnings = Number(winnings);
+      let commissionAmount = 0;
       
-      // 실제 지급할 금액 (수수료 차감 후)
-      const netWinnings = Number(winnings) - Number(commissionAmount);
+      // Back 주문은 승리 시에도 수수료 차감하지 않음, Lay 주문만 승리 시 수수료 차감
+      if (order.side === 'lay') { // Lay 주문 승리 시에만 수수료 차감
+        const exchangeCommissionRate = await CommissionSettingsService.getCommissionRate('exchange');
+        commissionAmount = CommissionSettingsService.calculateCommission(
+          winnings, 
+          order.stakeAmount || order.stake, 
+          exchangeCommissionRate
+        );
+        
+        // 실제 지급할 금액 (수수료 차감 후)
+        netWinnings = Number(winnings) - Number(commissionAmount);
+        
+        console.log(`[익스체인지 Lay 주문 수수료] 주문 ${order.id}: 수익 ${winnings}원, 수수료 ${commissionAmount}원 (${(exchangeCommissionRate * 100).toFixed(2)}%), 실제 지급 ${netWinnings}원`);
+      } else if (order.side === 'back') {
+        console.log(`[익스체인지 Back 주문 승리] 주문 ${order.id}: 수익 ${winnings}원 (수수료 없음)`);
+      }
+      
       newBalance = Number(newBalance) + Number(netWinnings);
       
       // 잔액 업데이트
@@ -323,6 +334,7 @@ class NewExchangeSettlementService {
       
       // 🆕 수수료가 있는 경우 AdminCommission 기록
       if (commissionAmount > 0) {
+        const exchangeCommissionRate = await CommissionSettingsService.getCommissionRate('exchange');
         await AdminCommission.create({
           adminId: 'fb4b780d-c7c0-4112-90fd-f7ca85427a90', // admin 사용자 ID
           userId: user.id,
@@ -355,7 +367,9 @@ class NewExchangeSettlementService {
         userId: user.id,
         betId: `exchange-${order.id}`,
         amount: netWinnings,
-        memo: `Exchange 주문 정산 - ${gameResult.homeTeam} vs ${gameResult.awayTeam} (수수료 차감 후)`,
+        memo: order.side === 'back' 
+          ? `Exchange Back 주문 정산 - ${gameResult.homeTeam} vs ${gameResult.awayTeam} (수수료 없음)`
+          : `Exchange Lay 주문 정산 - ${gameResult.homeTeam} vs ${gameResult.awayTeam} (수수료 차감 후)`,
         balanceAfter: newBalance,
         paidAt: new Date()
       });
@@ -365,7 +379,11 @@ class NewExchangeSettlementService {
         await this.processReferralCommission(user, order, winnings);
       }
       
-      console.log(`[익스체인지 정산] 주문 ${order.id}: 총 ${winnings}원 → 수수료 ${commissionAmount}원 차감 → 실제 지급 ${netWinnings}원`);
+      if (order.side === 'back') {
+        console.log(`[익스체인지 Back 정산] 주문 ${order.id}: 총 ${winnings}원 (수수료 없음)`);
+      } else {
+        console.log(`[익스체인지 Lay 정산] 주문 ${order.id}: 총 ${winnings}원 → 수수료 ${commissionAmount}원 차감 → 실제 지급 ${netWinnings}원`);
+      }
       
     } else {
       // 패배: 추가 처리 없음 (이미 리스크 금액은 차감됨)
