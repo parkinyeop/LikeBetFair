@@ -12,11 +12,12 @@ dotenv.config({ path: '.env.local' });
 dotenv.config({ path: '.env' });
 dotenv.config();
 
-// 🚨 임시 해결책: API 키 강제 설정 (dotenv 문제 해결 후 제거)
-process.env.ODDS_API_KEY = 'b1a67915235b9dd963dcb5be603853ea';
-process.env.THE_ODDS_API_KEY = 'b1a67915235b9dd963dcb5be603853ea';
-console.log('[환경변수] 새로운 API 키 설정됨:', process.env.ODDS_API_KEY.substring(0, 8) + '...');
-console.log('[환경변수] JWT_SECRET 설정됨:', process.env.JWT_SECRET ? '설정됨' : '미설정');
+// 환경 변수 확인
+console.log('[환경변수] ODDS_API_KEY:', process.env.ODDS_API_KEY ? '설정됨' : '미설정');
+console.log('[환경변수] THE_ODDS_API_KEY:', process.env.THE_ODDS_API_KEY ? '설정됨' : '미설정');
+console.log('[환경변수] THESPORTSDB_API_KEY:', process.env.THESPORTSDB_API_KEY ? '설정됨' : '미설정');
+console.log('[환경변수] JWT_SECRET:', process.env.JWT_SECRET ? '설정됨' : '미설정');
+console.log('[환경변수] SYSTEM_ADMIN_ID:', process.env.SYSTEM_ADMIN_ID ? '설정됨' : '미설정');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

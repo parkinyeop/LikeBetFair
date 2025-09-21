@@ -1,3 +1,4 @@
+import { buildApiUrl } from '../config/apiConfig';
 import React, { useState, useEffect } from 'react';
 import { useBetStore } from '../stores/useBetStore';
 import { useAuth } from '../contexts/AuthContext';
@@ -127,7 +128,7 @@ const BetSelectionPanel = () => {
       // API URL 결정
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
                     (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                     ? 'http://localhost:5050' 
+                     ? 'buildApiUrl' 
                      : 'https://likebetfair.onrender.com');
       
       console.log('[BetSelectionPanel] (배당변경) 베팅 요청 body:', {
@@ -188,7 +189,7 @@ const BetSelectionPanel = () => {
       // API URL 결정
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
                     (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                     ? 'http://localhost:5050' 
+                     ? 'buildApiUrl' 
                      : 'https://likebetfair.onrender.com');
       
       console.log('[BetSelectionPanel] 베팅 요청 body:', {

@@ -1,3 +1,4 @@
+import { buildApiUrl } from '../config/apiConfig';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useExchange, ExchangeOrder, OrderForm } from '../hooks/useExchange';
@@ -230,7 +231,7 @@ function OrderPanel() {
         
         // 🆕 API URL 결정 (개발환경에서는 localhost:5050 사용)
         const apiUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                       ? 'http://localhost:5050' 
+                       ? 'buildApiUrl' 
                        : window.location.origin;
         
         console.log('🌐 API URL:', apiUrl);

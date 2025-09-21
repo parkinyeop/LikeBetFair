@@ -1,3 +1,4 @@
+import { buildApiUrl } from '../config/apiConfig';
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import JoinForm from './JoinForm';
@@ -18,7 +19,7 @@ export default function Header() {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const response = await fetch('http://localhost:5050/api/admin/public-settings');
+        const response = await fetch(buildApiUrl('/api/admin/public-settings'));
         if (response.ok) {
           const data = await response.json();
           console.log('Header 설정 로드 성공:', data);

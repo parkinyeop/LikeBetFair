@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { buildApiUrl } from '../config/apiConfig';
 
 interface AuthContextType {
   isLoggedIn: boolean;
@@ -191,7 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // API URL 결정 (apiConfig 사용)
       const apiUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                     ? 'http://localhost:5050' 
+                     ? 'buildApiUrl' 
                      : window.location.origin;
       
       console.log('[AuthContext] API URL:', apiUrl);
@@ -237,7 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // API URL 결정
       const apiUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                     ? 'http://localhost:5050' 
+                     ? 'buildApiUrl' 
                      : window.location.origin;
       
       // 캐시 방지를 위한 타임스탬프 추가

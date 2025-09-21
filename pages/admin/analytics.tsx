@@ -1,3 +1,4 @@
+import { buildApiUrl } from '../../config/apiConfig';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Header from '../../components/Header';
@@ -62,10 +63,10 @@ export default function Analytics() {
       };
 
       const [salesRes, usersRes, sportsbookRes, adminRes] = await Promise.all([
-        fetch(`http://localhost:5050/api/admin/analytics/sales?range=${dateRange}`, { headers }),
-        fetch(`http://localhost:5050/api/admin/analytics/users?range=${dateRange}`, { headers }),
-        fetch(`http://localhost:5050/api/admin/analytics/sportsbook?range=${dateRange}`, { headers }),
-        fetch(`http://localhost:5050/api/admin/analytics/admin?range=${dateRange}`, { headers })
+        fetch(`buildApiUrl('/api/admin/analytics/sales?range=${dateRange}`, { headers }),
+        fetch(`buildApiUrl('/api/admin/analytics/users?range=${dateRange}`, { headers }),
+        fetch(`buildApiUrl('/api/admin/analytics/sportsbook?range=${dateRange}`, { headers }),
+        fetch(`buildApiUrl('/api/admin/analytics/admin?range=${dateRange}`, { headers })
       ]);
 
       const [salesData, usersData, sportsbookData, adminData] = await Promise.all([

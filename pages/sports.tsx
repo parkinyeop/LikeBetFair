@@ -64,7 +64,7 @@ export default function SportsPage() {
       // API URL 결정
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
                     (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                     ? 'http://localhost:5050' 
+                     ? 'buildApiUrl' 
                      : 'https://likebetfair.onrender.com');
       
       const response = await fetch(`${apiUrl}/api/odds/${leagueKey}`);

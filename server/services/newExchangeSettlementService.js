@@ -6,6 +6,7 @@ import AdminCommission from '../models/adminCommissionModel.js';
 import CommissionSettingsService from './commissionSettingsService.js';
 import { Op } from 'sequelize';
 import teamMatchingService from './teamMatchingService.js';
+import { ADMIN_CONFIG } from '../config/centralizedConfig.js';
 
 /**
  * 새로운 Exchange 정산 서비스
@@ -336,7 +337,7 @@ class NewExchangeSettlementService {
       if (commissionAmount > 0) {
         const exchangeCommissionRate = await CommissionSettingsService.getCommissionRate('exchange');
         await AdminCommission.create({
-          adminId: 'fb4b780d-c7c0-4112-90fd-f7ca85427a90', // admin 사용자 ID
+          adminId: ADMIN_CONFIG.SYSTEM_ADMIN_ID, // 시스템 관리자 ID
           userId: user.id,
           betId: null, // 익스체인지는 betId 사용하지 않음
           exchangeOrderId: order.id, // Exchange 주문 ID

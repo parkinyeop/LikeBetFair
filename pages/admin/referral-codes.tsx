@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
 import Header from '../../components/Header';
+import { buildApiUrl } from '../../config/apiConfig';
 
 interface ReferralCode {
   id: string;
@@ -118,7 +119,7 @@ export default function AdminReferralCodes() {
         sortOrder: filters.sortOrder
       });
       
-      const response = await fetch(`http://localhost:5050/api/admin/referral-codes?${queryParams}`, {
+      const response = await fetch(buildApiUrl(`/api/admin/referral-codes?${queryParams}`), {
         headers
       });
 
@@ -147,7 +148,7 @@ export default function AdminReferralCodes() {
     try {
       const headers = getAuthHeaders();
       
-      const response = await fetch('http://localhost:5050/api/admin/referral-codes/stats/summary', {
+      const response = await fetch(buildApiUrl('/api/admin/referral-codes/stats/summary'), {
         headers
       });
 
@@ -165,7 +166,7 @@ export default function AdminReferralCodes() {
       setLoadingUsers(true);
       const headers = getAuthHeaders();
       
-      const response = await fetch('http://localhost:5050/api/admin/users?limit=100', {
+      const response = await fetch(buildApiUrl('/api/admin/users?limit=100'), {
         headers
       });
 
@@ -184,7 +185,7 @@ export default function AdminReferralCodes() {
     try {
       const headers = getAuthHeaders();
       
-      const response = await fetch(`http://localhost:5050/api/admin/referral-codes/${codeId}`, {
+      const response = await fetch(buildApiUrl(`/api/admin/referral-codes/${codeId}`), {
         headers
       });
 
@@ -206,7 +207,7 @@ export default function AdminReferralCodes() {
     try {
       const headers = getAuthHeaders();
       
-      const response = await fetch('http://localhost:5050/api/admin/referral-codes', {
+      const response = await fetch(buildApiUrl('/api/admin/referral-codes'), {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -239,7 +240,7 @@ export default function AdminReferralCodes() {
     try {
       const headers = getAuthHeaders();
       
-      const response = await fetch(`http://localhost:5050/api/admin/referral-codes/${codeId}/status`, {
+      const response = await fetch(buildApiUrl(`/api/admin/referral-codes/${codeId}/status`), {
         method: 'PATCH',
         headers,
         body: JSON.stringify({ isActive })

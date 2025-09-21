@@ -1,4 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { buildApiUrl } from '../../../config/apiConfig';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -7,7 +8,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // Express 서버로 프록시
-    const response = await fetch('http://localhost:5050/api/exchange/all-orders', {
+    const response = await fetch('buildApiUrl('/api')/exchange/all-orders', {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

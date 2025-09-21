@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from 'next/router';
 import { useActionItems } from '../hooks/useActionItems';
 import Header from '../components/Header';
+import { buildApiUrl } from '../config/apiConfig';
 
 interface ActionItem {
   id: string;
@@ -128,7 +129,7 @@ export default function AdminDashboard() {
         return;
       }
 
-      const response = await fetch('http://localhost:5050/api/admin/dashboard', {
+      const response = await fetch(buildApiUrl('/api/admin/dashboard'), {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

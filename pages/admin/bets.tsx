@@ -1,3 +1,4 @@
+import { buildApiUrl } from '../../config/apiConfig';
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
@@ -435,7 +436,7 @@ export default function BettingAdmin() {
       }));
 
       const headers = getAuthHeaders();
-      const baseUrl = 'http://localhost:5050/api/admin';
+      const baseUrl = 'buildApiUrl('/api/admin';
 
       // 병렬로 모든 데이터 로딩
       const [betsResponse, statsResponse] = await Promise.all([
@@ -579,7 +580,7 @@ export default function BettingAdmin() {
     try {
       console.log('일별 통계 로딩 시작...');
       const headers = getAuthHeaders();
-      const url = `http://localhost:5050/api/admin/bets/daily-stats?year=${selectedYear}&month=${selectedMonth}`;
+      const url = `buildApiUrl('/api/admin/bets/daily-stats?year=${selectedYear}&month=${selectedMonth}`;
       
       const response = await fetch(url, { headers });
       if (response.ok) {

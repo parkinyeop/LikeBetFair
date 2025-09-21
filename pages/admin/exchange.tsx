@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
 import { formatToLocalDateTime } from '../../utils/timeUtils';
 import { toast } from 'react-hot-toast';
+import { buildApiUrl } from '../../config/apiConfig';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -565,7 +566,7 @@ export default function ExchangeAdmin() {
   const handleExportSettlements = useCallback(async () => {
     try {
       const headers = getAuthHeaders();
-      const response = await fetch('http://localhost:5050/api/exchange/settlements/export', {
+      const response = await fetch('buildApiUrl/api/exchange/settlements/export', {
         headers
       });
 
@@ -685,7 +686,7 @@ export default function ExchangeAdmin() {
         
         // 주문 상세 정보 새로고침 - handleOrderClick 대신 직접 API 호출
         try {
-          const orderResponse = await fetch(`http://localhost:5050/api/admin/exchange/orders/${selectedOrder.id}`, {
+          const orderResponse = await fetch(`buildApiUrl('/api/admin')/exchange/orders/${selectedOrder.id}`, {
             headers: getAuthHeaders()
           });
           
@@ -824,7 +825,7 @@ export default function ExchangeAdmin() {
       }));
 
       const headers = getAuthHeaders();
-      const baseUrl = 'http://localhost:5050/api/admin/exchange';
+      const baseUrl = 'buildApiUrl('/api/admin')/exchange';
 
       if (process.env.NODE_ENV === 'development') {
         console.log('API 호출 시작:', baseUrl);
@@ -1007,7 +1008,7 @@ export default function ExchangeAdmin() {
         console.log('일별 통계 로딩 시작...');
       }
       const headers = getAuthHeaders();
-      const url = `http://localhost:5050/api/admin/exchange/daily-stats?year=${selectedYear}&month=${selectedMonth}`;
+      const url = `buildApiUrl('/api/admin')/exchange/daily-stats?year=${selectedYear}&month=${selectedMonth}`;
       
       const response = await fetch(url, { headers });
       if (response.ok) {
@@ -1411,7 +1412,7 @@ export default function ExchangeAdmin() {
       const headers = getAuthHeaders();
       
       // 매치된 주문들 및 경기 결과 조회
-      const matchedOrdersResponse = await fetch(`http://localhost:5050/api/admin/exchange/orders/${order.id}/matches`, { headers });
+      const matchedOrdersResponse = await fetch(`buildApiUrl('/api/admin')/exchange/orders/${order.id}/matches`, { headers });
       let matchedOrders = [];
       let gameResults = {};
       let gameResult = null;
@@ -1462,7 +1463,7 @@ export default function ExchangeAdmin() {
   const exportData = useCallback(async (options: ExportOptions) => {
     try {
       const headers = getAuthHeaders();
-      const response = await fetch('http://localhost:5050/api/admin/exchange/export', {
+      const response = await fetch('buildApiUrl('/api/admin')/exchange/export', {
         method: 'POST',
         headers,
         body: JSON.stringify(options)
@@ -1544,7 +1545,7 @@ export default function ExchangeAdmin() {
       
       if (!token) return;
 
-      const response = await fetch(`http://localhost:5050/api/admin/exchange/orders/${orderId}/status`, {
+      const response = await fetch(`buildApiUrl('/api/admin')/exchange/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1572,7 +1573,7 @@ export default function ExchangeAdmin() {
       
       if (!token) return;
 
-      const response = await fetch(`http://localhost:5050/api/exchange/settle/${gameResultId}`, {
+      const response = await fetch(`buildApiUrl/api/exchange/settle/${gameResultId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1903,7 +1904,7 @@ export default function ExchangeAdmin() {
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
                   ❌ {error || adminState.global.error}
                   <div className="mt-2 text-sm">
-                    <p>API 서버 연결을 확인해주세요. (http://localhost:5050)</p>
+                    <p>API 서버 연결을 확인해주세요. (buildApiUrl)</p>
                     <button 
                       onClick={fetchExchangeData} 
                       className="text-red-600 underline hover:text-red-800 mt-2"

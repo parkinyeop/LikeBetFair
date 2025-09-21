@@ -7,6 +7,7 @@ import CommissionSettingsService from './commissionSettingsService.js';
 import simplifiedOddsValidation from './simplifiedOddsValidation.js';
 import { Op, fn, col } from 'sequelize';
 import { normalizeTeamName, normalizeTeamNameForComparison, normalizeCategory, normalizeCategoryPair, normalizeOption, calculateTeamNameSimilarity, findBestTeamMatch } from '../normalizeUtils.js';
+import { ADMIN_CONFIG } from '../config/centralizedConfig.js';
 
 // 배당률 제공 카테고리만 허용 (gameResultService와 동일하게 유지)
 const allowedCategories = ['baseball', 'soccer', 'basketball'];
@@ -332,7 +333,7 @@ class BetResultService {
       // 🆕 수수료가 있는 경우 AdminCommission 기록
       if (commissionAmount > 0) {
         await AdminCommission.create({
-          adminId: 'fb4b780d-c7c0-4112-90fd-f7ca85427a90', // admin 사용자 ID
+          adminId: ADMIN_CONFIG.SYSTEM_ADMIN_ID, // 시스템 관리자 ID
           userId: user.id,
           betId: bet.id, // 스포츠북은 betId 사용
           exchangeOrderId: null, // 스포츠북은 exchangeOrderId 사용하지 않음

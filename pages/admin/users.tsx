@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
 import Header from '../../components/Header';
+import { buildApiUrl } from '../../config/apiConfig';
 
 interface User {
   id: string;
@@ -139,7 +140,7 @@ export default function AdminUsers() {
         sortOrder: filters.sortOrder
       });
       
-      const response = await fetch(`http://localhost:5050/api/admin/users?${queryParams}`, {
+      const response = await fetch(`buildApiUrl('/api/admin')/users?${queryParams}`, {
         headers
       });
 
@@ -168,7 +169,7 @@ export default function AdminUsers() {
     try {
       const headers = getAuthHeaders();
       
-      const response = await fetch(`http://localhost:5050/api/admin/users/${userId}`, {
+      const response = await fetch(`buildApiUrl('/api/admin')/users/${userId}`, {
         headers
       });
 
@@ -193,7 +194,7 @@ export default function AdminUsers() {
     try {
       const headers = getAuthHeaders();
       
-      const response = await fetch(`http://localhost:5050/api/admin/users/${userId}/balance`, {
+      const response = await fetch(`buildApiUrl('/api/admin')/users/${userId}/balance`, {
         method: 'PATCH',
         headers,
         body: JSON.stringify({ balance: newBalance, reason })
@@ -220,7 +221,7 @@ export default function AdminUsers() {
     try {
       const headers = getAuthHeaders();
       
-      const response = await fetch(`http://localhost:5050/api/admin/users/${userId}/status`, {
+      const response = await fetch(`buildApiUrl('/api/admin')/users/${userId}/status`, {
         method: 'PATCH',
         headers,
         body: JSON.stringify({ isActive, reason })
@@ -258,7 +259,7 @@ export default function AdminUsers() {
     try {
       const headers = getAuthHeaders();
       
-      const response = await fetch(`http://localhost:5050/api/admin/users/${userId}/referral-stats`, {
+      const response = await fetch(`buildApiUrl('/api/admin')/users/${userId}/referral-stats`, {
         headers
       });
 
@@ -312,7 +313,7 @@ export default function AdminUsers() {
     try {
       const headers = getAuthHeaders();
       
-      const response = await fetch(`http://localhost:5050/api/admin/users/${selectedUser.id}`, {
+      const response = await fetch(`buildApiUrl('/api/admin')/users/${selectedUser.id}`, {
         method: 'PATCH',
         headers,
         body: JSON.stringify({
@@ -1186,7 +1187,7 @@ export default function AdminUsers() {
                               const headers = getAuthHeaders();
                               const formData = new FormData(document.querySelector('#referralCreateForm') as HTMLFormElement);
                               
-                              const response = await fetch('http://localhost:5050/api/admin/referral-codes', {
+                              const response = await fetch('buildApiUrl('/api/admin')/referral-codes', {
                                 method: 'POST',
                                 headers,
                                 body: JSON.stringify({

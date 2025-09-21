@@ -1,3 +1,4 @@
+import { buildApiUrl } from '../config/apiConfig';
 import React, { useState, useEffect } from "react";
 import BetSelectionPanel from "./BetSelectionPanel";
 import { useAuth } from '../contexts/AuthContext';
@@ -36,7 +37,7 @@ function MyBetsPanel() {
       // API URL 결정
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
                     (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                     ? 'http://localhost:5050' 
+                     ? 'buildApiUrl' 
                      : 'https://likebetfair.onrender.com');
       
       console.log('[클라이언트] API 요청 시작:', `${apiUrl}/api/bet/history`);
@@ -547,7 +548,7 @@ else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; la
                               // API URL 동적 설정
                               const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
                                             (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                                             ? 'http://localhost:5050' 
+                                             ? 'buildApiUrl' 
                                              : 'https://likebetfair.onrender.com');
                               
                               console.log('[배팅취소] API 요청 시작:', `${apiUrl}/api/bet/${bet.id}/cancel`);

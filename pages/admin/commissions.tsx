@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
 import Header from '../../components/Header';
+import { buildApiUrl } from '../../config/apiConfig';
 
 interface CommissionSummary {
   totalCommissions: number;
@@ -96,7 +97,7 @@ export default function AdminCommissions() {
         type: filters.type
       });
       
-      const response = await fetch(`http://localhost:5050/api/admin/commissions?${params}`, {
+      const response = await fetch(buildApiUrl(`/api/admin/commissions?${params}`), {
         headers: getAuthHeaders()
       });
       

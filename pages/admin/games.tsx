@@ -1,3 +1,4 @@
+import { buildApiUrl } from '../../config/apiConfig';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Header from '../../components/Header';
@@ -58,7 +59,7 @@ export default function GamesManagement() {
   const fetchGames = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5050/api/admin/games', {
+      const response = await fetch('buildApiUrl('/api/admin/games', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -76,7 +77,7 @@ export default function GamesManagement() {
   const fetchLeagues = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5050/api/admin/leagues', {
+      const response = await fetch('buildApiUrl('/api/admin/leagues', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -93,7 +94,7 @@ export default function GamesManagement() {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5050/api/admin/games', {
+      const response = await fetch('buildApiUrl('/api/admin/games', {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -125,7 +126,7 @@ export default function GamesManagement() {
   const handleUpdateGame = async (gameId: number, updates: Partial<Game>) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5050/api/admin/games/${gameId}`, {
+      const response = await fetch(`buildApiUrl('/api/admin/games/${gameId}`, {
         method: 'PUT',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -146,7 +147,7 @@ export default function GamesManagement() {
   const handleToggleLeague = async (sportKey: string, isActive: boolean) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5050/api/admin/leagues', {
+      const response = await fetch('buildApiUrl('/api/admin/leagues', {
         method: 'PUT',
         headers: { 
           'Authorization': `Bearer ${token}`,

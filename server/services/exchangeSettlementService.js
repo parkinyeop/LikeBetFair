@@ -7,6 +7,7 @@ import AdminCommission from '../models/adminCommissionModel.js';
 import CommissionSettingsService from './commissionSettingsService.js';
 import { Op } from 'sequelize';
 import createScriptSequelize from '../config/scriptDatabase.js';
+import { ADMIN_CONFIG } from '../config/centralizedConfig.js';
 
 // 스크립트 전용 Sequelize 인스턴스 생성
 const sequelize = createScriptSequelize();
@@ -720,7 +721,7 @@ class ExchangeSettlementService {
     // 🆕 수수료가 있는 경우 AdminCommission 기록
     if (commissionAmount > 0) {
       await AdminCommission.create({
-        adminId: 'fb4b780d-c7c0-4112-90fd-f7ca85427a90', // admin 사용자 ID
+        adminId: ADMIN_CONFIG.SYSTEM_ADMIN_ID, // 시스템 관리자 ID
         userId: user.id,
         betId: null, // 익스체인지는 betId 사용하지 않음
         exchangeOrderId: order.id, // Exchange 주문 ID
