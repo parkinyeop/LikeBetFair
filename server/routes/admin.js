@@ -14,6 +14,7 @@ import actionItemService from '../services/actionItemService.js';
 import BettingAmountSettingsService from '../services/bettingAmountSettingsService.js';
 import ExchangeOddsReturnRateService from '../services/exchangeOddsReturnRateService.js';
 import CommissionSettingsService from '../services/commissionSettingsService.js';
+import SportsbookPayoutRateService from '../services/sportsbookPayoutRateService.js';
 import bcrypt from 'bcryptjs';
 import { Op } from 'sequelize';
 import sequelize from '../models/sequelize.js';
@@ -3001,6 +3002,87 @@ router.put('/settings/commission-rates/:platform', verifyToken, requireAdmin(3),
     res.status(500).json({
       success: false,
       error: '수수료율 업데이트 중 오류가 발생했습니다.'
+    });
+  }
+});
+
+// =============================================================================
+// 스포츠북 평균 환수율 API
+// =============================================================================
+
+// 전체 스포츠북 평균 환수율 조회
+router.get('/sportsbook-payout-rate', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    console.log('📊 스포츠북 평균 환수율 조회 요청:', {
+      admin: req.admin.username
+    });
+    
+    const result = await SportsbookPayoutRateService.getOverallAveragePayoutRate();
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('스포츠북 평균 환수율 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '스포츠북 평균 환수율 조회 중 오류가 발생했습니다.'
+    });
+  }
+});
+
+// 특정 스포츠의 평균 환수율 조회
+router.get('/sportsbook-payout-rate/:sportKey', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    const { sportKey } = req.params;
+    
+    console.log(`📊 ${sportKey} 스포츠북 평균 환수율 조회 요청:`, {
+      admin: req.admin.username,
+      sportKey
+    });
+    
+    const result = await SportsbookPayoutRateService.getSportAveragePayoutRate(sportKey);
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error(`${req.params.sportKey} 스포츠북 평균 환수율 조회 오류:`, error);
+    res.status(500).json({
+      success: false,
+      error: '스포츠북 평균 환수율 조회 중 오류가 발생했습니다.'
+    });
+  }
+});
+
+// 실시간 평균 환수율 업데이트
+router.post('/sportsbook-payout-rate/update', verifyToken, requireAdmin(2), async (req, res) => {
+  try {
+    console.log('🔄 스포츠북 평균 환수율 실시간 업데이트 요청:', {
+      admin: req.admin.username
+    });
+    
+    const result = await SportsbookPayoutRateService.updateRealtimeAveragePayoutRate();
+    
+    if (result) {
+      res.json({
+        success: true,
+        data: result,
+        message: '스포츠북 평균 환수율이 업데이트되었습니다.'
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: '평균 환수율 업데이트에 실패했습니다.'
+      });
+    }
+  } catch (error) {
+    console.error('스포츠북 평균 환수율 업데이트 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '평균 환수율 업데이트 중 오류가 발생했습니다.'
     });
   }
 });
