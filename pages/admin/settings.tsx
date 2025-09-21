@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Header';
+import { buildApiUrl } from '../../config/apiConfig';
 
 interface SystemSettings {
   site_name: string;
@@ -25,6 +26,14 @@ interface BettingAmountSettings {
 interface ExchangeOddsReturnRateSettings {
   returnRate: number;
   enabled: boolean;
+}
+
+interface SportsbookPayoutRateData {
+  averagePayoutRate: number | null;
+  gameCount: number;
+  totalMarkets: number;
+  message: string;
+  sportKey?: string;
 }
 
 interface AdminUser {
@@ -91,6 +100,10 @@ export default function SystemSettings() {
     enabled: true
   });
 
+  // 스포츠북 평균 환수율 상태
+  const [sportsbookPayoutRate, setSportsbookPayoutRate] = useState<SportsbookPayoutRateData | null>(null);
+  const [sportsbookPayoutRateLoading, setSportsbookPayoutRateLoading] = useState(false);
+
   // 수수료율 설정 상태
   const [commissionRates, setCommissionRates] = useState({
     sportsbook: 0.05,
@@ -129,7 +142,34 @@ export default function SystemSettings() {
     }
 
     fetchSystemData();
+    loadSportsbookPayoutRate();
   }, [isLoggedIn, isAdmin, adminLevel, router]);
+
+  // 스포츠북 평균 환수율 로드
+  const loadSportsbookPayoutRate = async () => {
+    try {
+      setSportsbookPayoutRateLoading(true);
+      const tabId = sessionStorage.getItem('tabId');
+      const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+      
+      const response = await fetch(buildApiUrl('/api/admin/sportsbook-payout-rate'), { headers });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data) {
+          setSportsbookPayoutRate(data.data);
+        }
+      }
+    } catch (error) {
+      console.error('스포츠북 평균 환수율 로드 오류:', error);
+    } finally {
+      setSportsbookPayoutRateLoading(false);
+    }
+  };
 
   const fetchSystemData = async () => {
     setLoading(true);
@@ -142,13 +182,13 @@ export default function SystemSettings() {
       };
 
         const [settingsRes, adminsRes, logsRes, backupRes, bettingRes, oddsWeightRes, commissionRes] = await Promise.all([
-          fetch('http://localhost:5050/api/admin/settings', { headers }),
-          fetch('http://localhost:5050/api/admin/settings/admins', { headers }),
-          fetch('http://localhost:5050/api/admin/settings/logs', { headers }),
-          fetch('http://localhost:5050/api/admin/settings/backup', { headers }),
-          fetch('http://localhost:5050/api/admin/settings/betting-amounts', { headers }),
-          fetch('http://localhost:5050/api/admin/settings/exchange-odds-return-rate', { headers }),
-          fetch('http://localhost:5050/api/admin/settings/commission-rates', { headers })
+          fetch(buildApiUrl('/api/admin/settings'), { headers }),
+          fetch(buildApiUrl('/api/admin/settings/admins'), { headers }),
+          fetch(buildApiUrl('/api/admin/settings/logs'), { headers }),
+          fetch(buildApiUrl('/api/admin/settings/backup'), { headers }),
+          fetch(buildApiUrl('/api/admin/settings/betting-amounts'), { headers }),
+          fetch(buildApiUrl('/api/admin/settings/exchange-odds-return-rate'), { headers }),
+          fetch(buildApiUrl('/api/admin/settings/commission-rates'), { headers })
         ]);
 
         const [settingsData, adminsData, logsData, backupData, bettingData, oddsWeightData, commissionData] = await Promise.all([
@@ -196,7 +236,7 @@ export default function SystemSettings() {
       const tabId = sessionStorage.getItem('tabId');
       const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
       
-      const response = await fetch('http://localhost:5050/api/admin/settings/exchange-odds-return-rate', {
+      const response = await fetch(buildApiUrl('/api/admin/settings/exchange-odds-return-rate'), {
         method: 'PUT',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -224,7 +264,7 @@ export default function SystemSettings() {
       const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
 
       // 스포츠북 수수료율 업데이트
-      const sportsbookResponse = await fetch('http://localhost:5050/api/admin/settings/commission-rates/sportsbook', {
+      const sportsbookResponse = await fetch(buildApiUrl('/api/admin/settings/commission-rates/sportsbook'), {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -234,7 +274,7 @@ export default function SystemSettings() {
       });
 
       // 익스체인지 수수료율 업데이트
-      const exchangeResponse = await fetch('http://localhost:5050/api/admin/settings/commission-rates/exchange', {
+      const exchangeResponse = await fetch(buildApiUrl('/api/admin/settings/commission-rates/exchange'), {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -267,7 +307,7 @@ export default function SystemSettings() {
     try {
       const tabId = sessionStorage.getItem('tabId');
       const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
-      const response = await fetch('http://localhost:5050/api/admin/settings', {
+      const response = await fetch(buildApiUrl('/api/admin/settings'), {
         method: 'PUT',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -295,7 +335,7 @@ export default function SystemSettings() {
         maxBetAmount: bettingSettings[`${platform}_max_bet_amount` as keyof BettingAmountSettings]
       };
 
-      const response = await fetch(`http://localhost:5050/api/admin/settings/betting-amounts/${platform}`, {
+      const response = await fetch(buildApiUrl(`/api/admin/settings/betting-amounts/${platform}`), {
         method: 'PUT',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -321,7 +361,7 @@ export default function SystemSettings() {
     try {
       const tabId = sessionStorage.getItem('tabId');
       const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
-      const response = await fetch('http://localhost:5050/api/admin/settings/admins', {
+      const response = await fetch(buildApiUrl('/api/admin/settings/admins'), {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -345,7 +385,7 @@ export default function SystemSettings() {
     try {
       const tabId = sessionStorage.getItem('tabId');
       const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
-      const response = await fetch(`http://localhost:5050/api/admin/settings/admins/${adminId}`, {
+      const response = await fetch(buildApiUrl(`/api/admin/settings/admins/${adminId}`), {
         method: 'PUT',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -368,7 +408,7 @@ export default function SystemSettings() {
       
       const tabId = sessionStorage.getItem('tabId');
       const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
-      const response = await fetch('http://localhost:5050/api/admin/settings/backup', {
+      const response = await fetch(buildApiUrl('/api/admin/settings/backup'), {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -652,6 +692,61 @@ export default function SystemSettings() {
               </div>
             </div>
 
+            {/* 스포츠북 평균 환수율 정보 */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg shadow border border-blue-200">
+              <h3 className="text-lg font-medium text-blue-900 mb-4 flex items-center">
+                <span className="w-3 h-3 bg-blue-500 rounded-full mr-2"></span>
+                스포츠북 평균 환수율 정보
+              </h3>
+              <div className="bg-white p-4 rounded-lg border border-blue-100">
+                {sportsbookPayoutRateLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                    <span className="ml-2 text-blue-600">평균 환수율 계산 중...</span>
+                  </div>
+                ) : sportsbookPayoutRate ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">전체 평균 환수율:</span>
+                      <span className="text-lg font-bold text-blue-600">
+                        {sportsbookPayoutRate.averagePayoutRate 
+                          ? `${(sportsbookPayoutRate.averagePayoutRate * 100).toFixed(2)}%`
+                          : '데이터 없음'
+                        }
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">분석 경기 수:</span>
+                      <span className="text-sm text-gray-600">{sportsbookPayoutRate.gameCount}개</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">분석 마켓 수:</span>
+                      <span className="text-sm text-gray-600">{sportsbookPayoutRate.totalMarkets}개</span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-2">
+                      {sportsbookPayoutRate.message}
+                    </div>
+                    <button
+                      onClick={loadSportsbookPayoutRate}
+                      className="mt-3 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors text-sm"
+                    >
+                      평균 환수율 새로고침
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-gray-500">스포츠북 평균 환수율 데이터를 불러올 수 없습니다.</p>
+                    <button
+                      onClick={loadSportsbookPayoutRate}
+                      className="mt-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors text-sm"
+                    >
+                      다시 시도
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* 익스체인지 배당율 환수율 설정 */}
             <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-lg shadow border border-green-200">
               <h3 className="text-lg font-medium text-green-900 mb-4 flex items-center">
@@ -686,6 +781,11 @@ export default function SystemSettings() {
                     <p className="text-xs text-gray-500 mt-1">
                       예: 95% = 원본 배당률에 95% 적용 (2.0 → 1.9). 최대 99.8%까지 설정 가능
                     </p>
+                    {sportsbookPayoutRate?.averagePayoutRate && (
+                      <p className="text-xs text-blue-600 mt-1 font-medium">
+                        💡 참고: 현재 스포츠북 평균 환수율은 {(sportsbookPayoutRate.averagePayoutRate * 100).toFixed(2)}%입니다.
+                      </p>
+                    )}
                   </div>
 
                   <div>
