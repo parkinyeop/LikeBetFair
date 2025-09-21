@@ -68,31 +68,6 @@ class ExchangeOddsReturnRateService {
     }
   }
 
-  /**
-   * 배당율에 환수율 적용 (단일 배당율용 - 단순 곱셈)
-   * @param {number} originalOdds - 원본 배당율
-   * @returns {number} - 환수율이 적용된 배당율
-   */
-  static async applyReturnRateToOdds(originalOdds) {
-    if (originalOdds === null || originalOdds === undefined) {
-      return null;
-    }
-
-    const settings = await this.getOddsReturnRateSettings();
-
-    if (!settings.enabled) {
-      return originalOdds; // 환수율 적용 비활성화 시 원본 반환
-    }
-
-    const returnRate = settings.returnRate || 0.95;
-    
-    // 단일 배당율의 경우 단순 곱셈 (호환성 유지)
-    const adjustedOdds = originalOdds * returnRate;
-    
-    console.log(`[ExchangeOddsReturnRate] 단일 배당율 조정: ${originalOdds} × ${returnRate} = ${adjustedOdds.toFixed(2)}`);
-    
-    return parseFloat(adjustedOdds.toFixed(2)); // 소수점 2자리로 반환
-  }
 
   /**
    * 배당율 배열에 환수율 적용 (새로운 메서드)

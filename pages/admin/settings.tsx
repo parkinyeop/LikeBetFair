@@ -248,6 +248,8 @@ export default function SystemSettings() {
       const result = await response.json();
       if (response.ok && result.success) {
         alert('익스체인지 배당율 환수율 설정이 저장되었습니다.');
+        // 🆕 환수율 설정 변경 이벤트 발생
+        window.dispatchEvent(new CustomEvent('payoutRateChanged'));
       } else {
         alert(`설정 저장에 실패했습니다: ${result.error || '알 수 없는 오류'}`);
       }

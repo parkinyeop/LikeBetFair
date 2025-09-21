@@ -37,7 +37,7 @@ export default function Exchange() {
   
   // 🆕 Exchange 주문 데이터 상태 추가
   const [exchangeOrders, setExchangeOrders] = useState<any[]>([]);
-  const [oddsReturnRateSettings, setOddsReturnRateSettings] = useState({ returnRate: 0.97, enabled: true });
+  const [oddsReturnRateSettings, setOddsReturnRateSettings] = useState({ returnRate: 0.95, enabled: true });
 
   const { fetchAllOpenOrders } = useExchange();
   
@@ -56,7 +56,7 @@ export default function Exchange() {
   const loadOddsReturnRateSettings = async () => {
     try {
       console.log('🔍 Exchange 환수율 설정 로드 시도...');
-      const response = await fetch('/api/admin/exchange-odds-return-rate', {
+      const response = await fetch(buildApiUrl('/api/admin/public-settings/exchange-odds-return-rate'), {
         headers: {
           'Content-Type': 'application/json'
         }
@@ -1906,7 +1906,15 @@ export default function Exchange() {
         fetchTodayGames();
       }
     };
+
+    // 🆕 환수율 설정 변경 이벤트 리스너
+    const handlePayoutRateChanged = () => {
+      console.log('🔄 환수율 설정 변경 감지, 설정 새로고침');
+      loadOddsReturnRateSettings();
+    };
+
     window.addEventListener('exchangeOrderPlaced', handleOrderPlaced);
+    window.addEventListener('payoutRateChanged', handlePayoutRateChanged);
     
     if (typeof document !== 'undefined') {
       const interval = setInterval(() => {
@@ -1918,10 +1926,12 @@ export default function Exchange() {
       return () => {
         clearInterval(interval);
         window.removeEventListener('exchangeOrderPlaced', handleOrderPlaced);
+        window.removeEventListener('payoutRateChanged', handlePayoutRateChanged);
       };
     }
     return () => {
       window.removeEventListener('exchangeOrderPlaced', handleOrderPlaced);
+      window.removeEventListener('payoutRateChanged', handlePayoutRateChanged);
     };
   }, [viewMode]);
 

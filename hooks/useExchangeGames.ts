@@ -33,12 +33,32 @@ export function useExchangeGames(category?: string) {
   const [games, setGames] = useState<ExchangeGame[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [payoutRateSettings, setPayoutRateSettings] = useState({ returnRate: 0.95, enabled: true });
+
+  // 환수율 설정 로드 함수
+  const loadPayoutRateSettings = useCallback(async () => {
+    try {
+      const response = await fetch(buildApiUrl('/api/admin/public-settings/exchange-odds-return-rate'));
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data) {
+          setPayoutRateSettings(data.data);
+          console.log('🎯 환수율 설정 로드됨:', data.data);
+        }
+      }
+    } catch (error) {
+      console.error('환수율 설정 로드 오류:', error);
+    }
+  }, []);
 
   const fetchGames = useCallback(async () => {
     try {
       console.log('🔄 fetchGames 호출됨, category:', category);
       setLoading(true);
       setError(null);
+
+      // 환수율 설정 먼저 로드
+      await loadPayoutRateSettings();
 
       // 카테고리에서 스포츠 키 추출
       let sportKey = '';
@@ -92,20 +112,19 @@ export function useExchangeGames(category?: string) {
         const originalAwayOdds = game.officialOdds?.h2h?.[game.away_team]?.averagePrice || null;
         const originalDrawOdds = game.officialOdds?.h2h?.Draw?.averagePrice || null;
         
-        // 환수율 조정 적용 (97% 환수율)
-        const targetPayout = 0.97;
+        // 환수율 조정 적용 (실시간 설정 사용)
         let adjustedHomeOdds = originalHomeOdds;
         let adjustedAwayOdds = originalAwayOdds;
         let adjustedDrawOdds = originalDrawOdds;
         
-        // H2H 마켓 배당률 조정 (승/무/패)
-        if (originalHomeOdds && originalAwayOdds) {
+        // 환수율이 활성화된 경우에만 조정 적용
+        if (payoutRateSettings.enabled && originalHomeOdds && originalAwayOdds) {
           const h2hOdds = [originalHomeOdds, originalAwayOdds];
           if (originalDrawOdds) {
             h2hOdds.push(originalDrawOdds);
           }
           
-          const adjustedH2hOdds = adjustOddsSophisticated(h2hOdds, targetPayout);
+          const adjustedH2hOdds = adjustOddsSophisticated(h2hOdds, payoutRateSettings.returnRate);
           adjustedHomeOdds = adjustedH2hOdds[0];
           adjustedAwayOdds = adjustedH2hOdds[1];
           if (originalDrawOdds) {
@@ -115,7 +134,8 @@ export function useExchangeGames(category?: string) {
           console.log('🎯 환수율 조정:', {
             original: h2hOdds,
             adjusted: adjustedH2hOdds,
-            targetPayout: targetPayout
+            targetPayout: payoutRateSettings.returnRate,
+            enabled: payoutRateSettings.enabled
           });
         }
         
@@ -149,11 +169,19 @@ export function useExchangeGames(category?: string) {
     } finally {
       setLoading(false);
     }
-  }, [category]);
+  }, [category]); // payoutRateSettings 제거
 
   useEffect(() => {
     fetchGames();
   }, [fetchGames]);
+
+  // 환수율 설정이 변경될 때만 새로고침
+  useEffect(() => {
+    if (payoutRateSettings.returnRate !== 0.95 || payoutRateSettings.enabled !== true) {
+      console.log('🔄 환수율 설정 변경 감지, 게임 데이터 새로고침');
+      fetchGames();
+    }
+  }, [payoutRateSettings.returnRate, payoutRateSettings.enabled, fetchGames]);
 
   // 카테고리별 게임 필터링
   const getGamesByCategory = useCallback((filterCategory: string) => {
@@ -186,6 +214,9 @@ export function useExchangeGames(category?: string) {
     refetch: fetchGames,
     getGamesByCategory,
     getGamesBySport,
+    // 환수율 설정 새로고침 함수 추가
+    refreshPayoutRateSettings: loadPayoutRateSettings,
+    payoutRateSettings,
     // 통계 정보
     stats: {
       total: games.length,

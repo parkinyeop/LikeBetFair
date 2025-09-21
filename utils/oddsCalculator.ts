@@ -44,3 +44,4 @@ export const adjustSingleOdds = (originalOdds: number, targetPayout: number): nu
   
   return originalOdds * targetPayout;
 };
+

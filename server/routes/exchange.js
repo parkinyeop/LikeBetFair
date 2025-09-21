@@ -705,11 +705,8 @@ router.get('/orderbook', verifyToken, async (req, res) => {
     const ordersWithRemainingAmount = await Promise.all(orders.map(async order => {
       const orderData = order.toJSON();
       
-      // Back 주문일 때만 환수율 적용하여 표시
+      // 환수율 조정은 프론트엔드에서 처리 (정확한 배열 기반 계산을 위해)
       let displayPrice = orderData.price;
-      if (orderData.side === 'back') {
-        displayPrice = await ExchangeOddsReturnRateService.applyReturnRateToOdds(orderData.price);
-      }
       
       return {
         ...orderData,
@@ -1223,11 +1220,8 @@ router.get('/orders', verifyToken, async (req, res) => {
     const ordersWithMatchInfo = await Promise.all(orders.map(async order => {
       const orderData = order.toJSON();
       
-      // Back 주문일 때만 환수율 적용하여 표시
+      // 환수율 조정은 프론트엔드에서 처리 (정확한 배열 기반 계산을 위해)
       let displayPrice = orderData.price;
-      if (orderData.side === 'back') {
-        displayPrice = await ExchangeOddsReturnRateService.applyReturnRateToOdds(orderData.price);
-      }
       
       return {
         ...orderData,
