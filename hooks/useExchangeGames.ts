@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { buildApiUrl } from '../config/apiConfig';
 import { getSportKey } from '../config/sportsMapping';
+import { adjustOddsSophisticated } from '../utils/oddsCalculator';
 
 export interface ExchangeGame {
   id: string;
@@ -86,6 +87,38 @@ export function useExchangeGames(category?: string) {
           awayTeam: game.away_team
         });
         
+        // 원본 배당률 추출
+        const originalHomeOdds = game.officialOdds?.h2h?.[game.home_team]?.averagePrice || null;
+        const originalAwayOdds = game.officialOdds?.h2h?.[game.away_team]?.averagePrice || null;
+        const originalDrawOdds = game.officialOdds?.h2h?.Draw?.averagePrice || null;
+        
+        // 환수율 조정 적용 (97% 환수율)
+        const targetPayout = 0.97;
+        let adjustedHomeOdds = originalHomeOdds;
+        let adjustedAwayOdds = originalAwayOdds;
+        let adjustedDrawOdds = originalDrawOdds;
+        
+        // H2H 마켓 배당률 조정 (승/무/패)
+        if (originalHomeOdds && originalAwayOdds) {
+          const h2hOdds = [originalHomeOdds, originalAwayOdds];
+          if (originalDrawOdds) {
+            h2hOdds.push(originalDrawOdds);
+          }
+          
+          const adjustedH2hOdds = adjustOddsSophisticated(h2hOdds, targetPayout);
+          adjustedHomeOdds = adjustedH2hOdds[0];
+          adjustedAwayOdds = adjustedH2hOdds[1];
+          if (originalDrawOdds) {
+            adjustedDrawOdds = adjustedH2hOdds[2];
+          }
+          
+          console.log('🎯 환수율 조정:', {
+            original: h2hOdds,
+            adjusted: adjustedH2hOdds,
+            targetPayout: targetPayout
+          });
+        }
+        
         return {
           id: game.id || '',
           eventId: game.id || '',
@@ -97,10 +130,10 @@ export function useExchangeGames(category?: string) {
           league: gameSportKey ? gameSportKey.split('_').pop() || '' : '',
           category: category || '',
           availableMarkets: game.bookmakers?.[0]?.markets || [],
-          // 실제 배당률 추출 (officialOdds 사용)
-          homeTeamOdds: game.officialOdds?.h2h?.[game.home_team]?.averagePrice || null,
-          awayTeamOdds: game.officialOdds?.h2h?.[game.away_team]?.averagePrice || null,
-          drawOdds: game.officialOdds?.h2h?.Draw?.averagePrice || null,
+          // 환수율이 조정된 배당률 사용
+          homeTeamOdds: adjustedHomeOdds,
+          awayTeamOdds: adjustedAwayOdds,
+          drawOdds: adjustedDrawOdds,
           officialOdds: game.officialOdds || null
         };
       });

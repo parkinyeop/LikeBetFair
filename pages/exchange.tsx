@@ -6,6 +6,7 @@ import { normalizeTeamNameForComparison } from '../utils/matchSportsbookGame';
 import { convertUtcToLocal, getCurrentLocalTime } from '../utils/timeUtils';
 import { useExchangeContext } from '../contexts/ExchangeContext';
 import { useExchange } from '../hooks/useExchange';
+import { adjustOddsSophisticated } from '../utils/oddsCalculator';
 
 export default function Exchange() {
   const router = useRouter();
@@ -36,7 +37,8 @@ export default function Exchange() {
   
   // 🆕 Exchange 주문 데이터 상태 추가
   const [exchangeOrders, setExchangeOrders] = useState<any[]>([]);
-  const [oddsReturnRateSettings, setOddsReturnRateSettings] = useState({ returnRate: 0.95, enabled: true });
+  const [oddsReturnRateSettings, setOddsReturnRateSettings] = useState({ returnRate: 0.97, enabled: true });
+
   const { fetchAllOpenOrders } = useExchange();
   
   // 🆕 Exchange 주문 데이터 로드 함수
@@ -54,7 +56,7 @@ export default function Exchange() {
   const loadOddsReturnRateSettings = async () => {
     try {
       console.log('🔍 Exchange 환수율 설정 로드 시도...');
-      const response = await fetch('http://localhost:5050/api/admin/public-settings/exchange-odds-return-rate', {
+      const response = await fetch('/api/admin/exchange-odds-return-rate', {
         headers: {
           'Content-Type': 'application/json'
         }
@@ -88,26 +90,7 @@ export default function Exchange() {
       return originalOdds * oddsReturnRateSettings.returnRate;
     }
     
-    // 전체 경기의 환수율을 올바르게 조정
-    const adjustOddsSophisticated = (oddsArray: number[], targetPayout: number) => {
-      // 1. 각 배당률의 내재 확률 계산
-      const impliedProbs = oddsArray.map(odd => 1 / odd);
-      
-      // 2. 현재 환수율 (내재 확률의 총합) 계산
-      const currentPayoutSum = impliedProbs.reduce((sum, prob) => sum + prob, 0);
-      
-      // 3. 목표 환수율 (목표 확률의 총합) 설정
-      const targetPayoutSum = 1 / targetPayout;
-      
-      // 4. 각 확률을 조정
-      const adjustedProbs = impliedProbs.map(prob => prob * (targetPayoutSum / currentPayoutSum));
-      
-      // 5. 조정된 확률을 다시 배당률로 변환
-      const newOdds = adjustedProbs.map(prob => 1 / prob);
-      
-      return newOdds;
-    };
-    
+    // 전체 경기의 환수율을 올바르게 조정 (유틸리티 함수 사용)
     const adjustedOdds = adjustOddsSophisticated(allOdds, oddsReturnRateSettings.returnRate);
     const originalIndex = allOdds.indexOf(originalOdds);
     return adjustedOdds[originalIndex] || originalOdds;
