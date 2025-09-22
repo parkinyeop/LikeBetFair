@@ -183,6 +183,9 @@ router.post('/match-order', verifyToken, async (req, res) => {
       return res.status(400).json({ success: false, message: '매칭 배팅은 반대 타입으로만 가능합니다.' });
     }
     
+    // 🆕 원본 배당율 사용 (환수율은 프론트엔드에서 적용)
+    const adjustedPrice = targetOrder.price;
+    
     // 🆕 올바른 매칭 금액 계산 로직
     let actualMatchAmount;
     let stakeAmount;
@@ -196,20 +199,20 @@ router.post('/match-order', verifyToken, async (req, res) => {
           message: '유효하지 않은 배당율입니다. (1.0 이하)' 
         });
       }
-      // 🆕 소수점 문제 해결: Math.floor → Math.round 사용
-      const maxMatchableAmount = Math.round(matchAmount / (targetOrder.price - 1));
+      // 🆕 소수점 문제 해결: Math.floor → Math.round 사용 (환수율 적용된 배당율 사용)
+      const maxMatchableAmount = Math.round(matchAmount / (adjustedPrice - 1));
       actualMatchAmount = Math.min(maxMatchableAmount, targetOrder.remainingAmount || targetOrder.amount);
       stakeAmount = matchAmount; // 리스크 금액
     } else {
       // Lay 주문에 Back으로 매칭: matchAmount는 주문 금액
-      if (targetOrder.price <= 1.0) {
+      if (adjustedPrice <= 1.0) {
         return res.status(400).json({ 
           success: false, 
           message: '유효하지 않은 배당율입니다. (1.0 이하)' 
         });
       }
       actualMatchAmount = Math.min(matchAmount, targetOrder.remainingAmount || targetOrder.amount);
-      stakeAmount = Math.floor((targetOrder.price - 1) * actualMatchAmount); // 리스크 금액
+      stakeAmount = Math.floor((adjustedPrice - 1) * actualMatchAmount); // 리스크 금액 (환수율 적용된 배당율 사용)
     }
     
     if (actualMatchAmount <= 0) {
@@ -450,7 +453,7 @@ router.post('/order', verifyToken, async (req, res) => {
       adjustedPrice: orderData.adjustedPrice
     });
     
-    // 🆕 원본 배당율 사용 (가중치는 조회 시에만 적용)
+    // 🆕 원본 배당율 사용 (환수율은 프론트엔드에서 적용)
     const finalPrice = price;
     
     // 일반 잔고 사용 (데이터 타입 통일)

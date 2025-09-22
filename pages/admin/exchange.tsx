@@ -566,7 +566,7 @@ export default function ExchangeAdmin() {
   const handleExportSettlements = useCallback(async () => {
     try {
       const headers = getAuthHeaders();
-      const response = await fetch('buildApiUrl/api/exchange/settlements/export', {
+      const response = await fetch(buildApiUrl('/api/exchange/settlements/export'), {
         headers
       });
 
@@ -686,7 +686,7 @@ export default function ExchangeAdmin() {
         
         // 주문 상세 정보 새로고침 - handleOrderClick 대신 직접 API 호출
         try {
-          const orderResponse = await fetch(`buildApiUrl('/api/admin')/exchange/orders/${selectedOrder.id}`, {
+          const orderResponse = await fetch(buildApiUrl('/api/admin') + `/exchange/orders/${selectedOrder.id}`, {
             headers: getAuthHeaders()
           });
           
@@ -825,7 +825,7 @@ export default function ExchangeAdmin() {
       }));
 
       const headers = getAuthHeaders();
-      const baseUrl = 'buildApiUrl('/api/admin')/exchange';
+      const baseUrl = buildApiUrl('/api/admin') + '/exchange';
 
       if (process.env.NODE_ENV === 'development') {
         console.log('API 호출 시작:', baseUrl);
@@ -1008,7 +1008,7 @@ export default function ExchangeAdmin() {
         console.log('일별 통계 로딩 시작...');
       }
       const headers = getAuthHeaders();
-      const url = `buildApiUrl('/api/admin')/exchange/daily-stats?year=${selectedYear}&month=${selectedMonth}`;
+      const url = buildApiUrl('/api/admin') + `/exchange/daily-stats?year=${selectedYear}&month=${selectedMonth}`;
       
       const response = await fetch(url, { headers });
       if (response.ok) {
@@ -1412,7 +1412,7 @@ export default function ExchangeAdmin() {
       const headers = getAuthHeaders();
       
       // 매치된 주문들 및 경기 결과 조회
-      const matchedOrdersResponse = await fetch(`buildApiUrl('/api/admin')/exchange/orders/${order.id}/matches`, { headers });
+      const matchedOrdersResponse = await fetch(buildApiUrl('/api/admin') + `/exchange/orders/${order.id}/matches`, { headers });
       let matchedOrders = [];
       let gameResults = {};
       let gameResult = null;
@@ -1463,7 +1463,7 @@ export default function ExchangeAdmin() {
   const exportData = useCallback(async (options: ExportOptions) => {
     try {
       const headers = getAuthHeaders();
-      const response = await fetch('buildApiUrl('/api/admin')/exchange/export', {
+      const response = await fetch(buildApiUrl('/api/admin') + '/exchange/export', {
         method: 'POST',
         headers,
         body: JSON.stringify(options)
@@ -1545,7 +1545,7 @@ export default function ExchangeAdmin() {
       
       if (!token) return;
 
-      const response = await fetch(`buildApiUrl('/api/admin')/exchange/orders/${orderId}/status`, {
+      const response = await fetch(buildApiUrl('/api/admin') + `/exchange/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1573,7 +1573,7 @@ export default function ExchangeAdmin() {
       
       if (!token) return;
 
-      const response = await fetch(`buildApiUrl/api/exchange/settle/${gameResultId}`, {
+      const response = await fetch(buildApiUrl('/api/exchange/settle') + `/${gameResultId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
