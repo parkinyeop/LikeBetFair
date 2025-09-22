@@ -1,12 +1,14 @@
 import { buildApiUrl } from '../config/apiConfig';
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import JoinForm from './JoinForm';
 import LoginForm from './LoginForm';
 import { useAuth } from '../contexts/AuthContext';
 
 
 export default function Header() {
+  const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState("Sportsbook");
   const [showJoin, setShowJoin] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
@@ -14,6 +16,20 @@ export default function Header() {
   const [siteName, setSiteName] = useState("Lbetfair"); // 기본값
   const [siteDescription, setSiteDescription] = useState("스포츠 베팅 플랫폼"); // 기본값
   const { isLoggedIn, username, logout, isAdmin, adminLevel } = useAuth();
+
+  // 현재 경로에 따라 카테고리 설정
+  useEffect(() => {
+    const path = router.asPath;
+    console.log('현재 경로:', path);
+    
+    if (path.startsWith('/exchange')) {
+      setSelectedCategory("Exchange");
+    } else if (path.startsWith('/admin')) {
+      setSelectedCategory("Admin");
+    } else if (path === '/' || path.startsWith('/odds') || path.startsWith('/sports')) {
+      setSelectedCategory("Sportsbook");
+    }
+  }, [router.asPath]);
 
   // 설정값 로드
   useEffect(() => {
