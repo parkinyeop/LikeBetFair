@@ -85,15 +85,19 @@ export default function Exchange() {
   const applyExchangeReturnRate = (originalOdds: number, allOdds: number[] = []) => {
     if (!originalOdds || !oddsReturnRateSettings.enabled) return originalOdds;
     
-    // 단일 배당율인 경우 기존 방식 사용 (호환성)
+    // 단일 배당율인 경우에도 adjustOddsSophisticated 사용 (일관성)
     if (allOdds.length === 0) {
-      return originalOdds * oddsReturnRateSettings.returnRate;
+      allOdds = [originalOdds]; // 단일 배당률을 배열로 변환
     }
     
-    // 전체 경기의 환수율을 올바르게 조정 (유틸리티 함수 사용)
+    // 모든 경우에 adjustOddsSophisticated 함수 사용 (일관성 보장)
     const adjustedOdds = adjustOddsSophisticated(allOdds, oddsReturnRateSettings.returnRate);
     const originalIndex = allOdds.indexOf(originalOdds);
-    return adjustedOdds[originalIndex] || originalOdds;
+    const result = adjustedOdds[originalIndex] || originalOdds;
+    
+    // 디버깅 로그 제거
+    
+    return result;
   };
   
   // 🎯 버튼이 선택되었는지 확인하는 함수 - Exchange 기존 로직 유지
@@ -961,16 +965,22 @@ export default function Exchange() {
                           const overOdds = oddsPair.over?.averagePrice;
                           const underOdds = oddsPair.under?.averagePrice;
                           
+                          // ========================= [ 환수율 적용 로직 추가 ] =========================
+                          const allTotalsOdds = [overOdds, underOdds].filter(odds => odds != null);
+                          const adjustedOverOdds = applyExchangeReturnRate(overOdds, allTotalsOdds);
+                          const adjustedUnderOdds = applyExchangeReturnRate(underOdds, allTotalsOdds);
+                          // ========================================================================
+                          
                           return (
                             <div key={point} className="flex items-center gap-2">
                               <button
                                 onClick={() => {
                                   // 🎯 버튼 선택 상태 토글
                                   const wasSelected = isButtonSelected(game.id, `총점_Over ${point}`);
-                                  handleButtonClick(game, `Over ${point}`, overOdds, '총점');
+                                  handleButtonClick(game, `Over ${point}`, adjustedOverOdds, '총점');
                                   
                                   // 선택 해제된 경우가 아니라면 사이드바로 이동
-                                  if (!wasSelected && isBettable && overOdds) {
+                                  if (!wasSelected && isBettable && adjustedOverOdds) {
                                     const gameInfo = {
                                       gameId: game.id,
                                       homeTeam: game.home_team,
@@ -978,7 +988,7 @@ export default function Exchange() {
                                       sportKey: game.sport_key,
                                       market: '총점',
                                       selection: `Over ${point}`,
-                                      odds: overOdds,
+                                      odds: adjustedOverOdds,
                                       commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString()
                                     };
                                     localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
@@ -1000,22 +1010,22 @@ export default function Exchange() {
                                 className={`flex-1 p-2 rounded-lg text-center transition-colors ${
                                   isButtonSelected(game.id, `총점_Over ${point}`)
                                     ? 'bg-yellow-500 hover:bg-yellow-600'
-                                    : isBettable && overOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                    : isBettable && adjustedOverOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                 } text-white text-sm`}
-                                disabled={!isBettable || !overOdds}
+                                disabled={!isBettable || !adjustedOverOdds}
                               >
                                 <div className="font-medium">{game.home_team}</div>
-                                <div className="text-xs">{overOdds ? overOdds.toFixed(2) : 'N/A'}</div>
+                                <div className="text-xs">{adjustedOverOdds ? adjustedOverOdds.toFixed(2) : 'N/A'}</div>
                               </button>
                               <div className="w-12 text-sm font-medium text-blue-400 text-center">{point}</div>
                               <button
                                 onClick={() => {
                                   // 🎯 버튼 선택 상태 토글
                                   const wasSelected = isButtonSelected(game.id, `총점_Under ${point}`);
-                                  handleButtonClick(game, `Under ${point}`, underOdds, '총점');
+                                  handleButtonClick(game, `Under ${point}`, adjustedUnderOdds, '총점');
                                   
                                   // 선택 해제된 경우가 아니라면 사이드바로 이동
-                                  if (!wasSelected && isBettable && underOdds) {
+                                  if (!wasSelected && isBettable && adjustedUnderOdds) {
                                     const gameInfo = {
                                       gameId: game.id,
                                       homeTeam: game.home_team,
@@ -1023,7 +1033,7 @@ export default function Exchange() {
                                       sportKey: game.sport_key,
                                       market: '총점',
                                       selection: `Under ${point}`,
-                                      odds: underOdds,
+                                      odds: adjustedUnderOdds,
                                       commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString()
                                     };
                                     localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
@@ -1045,12 +1055,12 @@ export default function Exchange() {
                                 className={`flex-1 p-2 rounded-lg text-center transition-colors ${
                                   isButtonSelected(game.id, `총점_Under ${point}`)
                                     ? 'bg-yellow-500 hover:bg-yellow-600'
-                                    : isBettable && underOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                    : isBettable && adjustedUnderOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                 } text-white text-sm`}
-                                disabled={!isBettable || !underOdds}
+                                disabled={!isBettable || !adjustedUnderOdds}
                               >
                                 <div className="font-medium">{game.away_team}</div>
-                                <div className="text-xs">{underOdds ? underOdds.toFixed(2) : 'N/A'}</div>
+                                <div className="text-xs">{adjustedUnderOdds ? adjustedUnderOdds.toFixed(2) : 'N/A'}</div>
                               </button>
                             </div>
                           );
@@ -1126,18 +1136,24 @@ export default function Exchange() {
                           const homeHandicap = pointValue;
                           const awayHandicap = -pointValue;
                           
+                          // ========================= [ 환수율 적용 로직 추가 ] =========================
+                          const allSpreadsOdds = [homeOdds, awayOdds].filter(odds => odds != null);
+                          const adjustedHomeOdds = applyExchangeReturnRate(homeOdds, allSpreadsOdds);
+                          const adjustedAwayOdds = applyExchangeReturnRate(awayOdds, allSpreadsOdds);
+                          // ========================================================================
+                          
                           return (
                             <div key={absPoint} className="flex items-center gap-2">
-                              {homeOdds != null && (
+                              {adjustedHomeOdds != null && (
                                 <button
                                   onClick={() => {
                                     // 🎯 버튼 선택 상태 토글
                                     const selection = `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`;
                                     const wasSelected = isButtonSelected(game.id, `핸디캡_${selection}`);
-                                    handleButtonClick(game, selection, homeOdds, '핸디캡');
+                                    handleButtonClick(game, selection, adjustedHomeOdds, '핸디캡');
                                     
                                     // 선택 해제된 경우가 아니라면 사이드바로 이동
-                                    if (!wasSelected && isBettable && homeOdds) {
+                                    if (!wasSelected && isBettable && adjustedHomeOdds) {
                                       const gameInfo = {
                                         gameId: game.id,
                                         homeTeam: game.home_team,
@@ -1145,7 +1161,7 @@ export default function Exchange() {
                                         sportKey: game.sport_key,
                                         market: '핸디캡',
                                         selection: selection,
-                                        odds: homeOdds,
+                                        odds: adjustedHomeOdds,
                                         commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString()
                                       };
                                       localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
@@ -1167,25 +1183,25 @@ export default function Exchange() {
                                   className={`flex-1 p-2 rounded-lg text-center transition-colors ${
                                     isButtonSelected(game.id, `핸디캡_${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`)
                                       ? 'bg-yellow-500 hover:bg-yellow-600'
-                                      : isBettable && homeOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                      : isBettable && adjustedHomeOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                   } text-white text-sm`}
-                                  disabled={!isBettable || !homeOdds}
+                                  disabled={!isBettable || !adjustedHomeOdds}
                                 >
                                   <div className="font-medium">{game.home_team} {homeHandicap > 0 ? '+' : ''}{homeHandicap}</div>
-                                  <div className="text-xs">{homeOdds.toFixed(2)}</div>
+                                  <div className="text-xs">{adjustedHomeOdds ? adjustedHomeOdds.toFixed(2) : 'N/A'}</div>
                                 </button>
                               )}
                               <div className="w-12 text-sm font-medium text-blue-400 text-center">{pointValue}</div>
-                              {awayOdds != null && (
+                              {adjustedAwayOdds != null && (
                                 <button
                                   onClick={() => {
                                     // 🎯 버튼 선택 상태 토글
                                     const selection = `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`;
                                     const wasSelected = isButtonSelected(game.id, `핸디캡_${selection}`);
-                                    handleButtonClick(game, selection, awayOdds, '핸디캡');
+                                    handleButtonClick(game, selection, adjustedAwayOdds, '핸디캡');
                                     
                                     // 선택 해제된 경우가 아니라면 사이드바로 이동
-                                    if (!wasSelected && isBettable && awayOdds) {
+                                    if (!wasSelected && isBettable && adjustedAwayOdds) {
                                       const gameInfo = {
                                         gameId: game.id,
                                         homeTeam: game.home_team,
@@ -1193,7 +1209,7 @@ export default function Exchange() {
                                         sportKey: game.sport_key,
                                         market: '핸디캡',
                                         selection: selection,
-                                        odds: awayOdds,
+                                        odds: adjustedAwayOdds,
                                         commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString()
                                       };
                                       localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
@@ -1215,12 +1231,12 @@ export default function Exchange() {
                                   className={`flex-1 p-2 rounded-lg text-center transition-colors ${
                                     isButtonSelected(game.id, `핸디캡_${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`)
                                       ? 'bg-yellow-500 hover:bg-yellow-600'
-                                      : isBettable && awayOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                      : isBettable && adjustedAwayOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                   } text-white text-sm`}
-                                  disabled={!isBettable || !awayOdds}
+                                  disabled={!isBettable || !adjustedAwayOdds}
                                 >
                                   <div className="font-medium">{game.away_team} {awayHandicap > 0 ? '+' : ''}{awayHandicap}</div>
-                                  <div className="text-xs">{awayOdds.toFixed(2)}</div>
+                                  <div className="text-xs">{adjustedAwayOdds ? adjustedAwayOdds.toFixed(2) : 'N/A'}</div>
                                 </button>
                               )}
                             </div>
@@ -1605,16 +1621,23 @@ export default function Exchange() {
                                 const overOdds = oddsPair.over?.averagePrice;
                                 const underOdds = oddsPair.under?.averagePrice;
                                 
+                                // 🆕 환수율 적용
+                                const allTotalsOdds = [overOdds, underOdds].filter(odds => odds !== undefined);
+                                const adjustedOverOdds = overOdds ? applyExchangeReturnRate(overOdds, allTotalsOdds) : undefined;
+                                const adjustedUnderOdds = underOdds ? applyExchangeReturnRate(underOdds, allTotalsOdds) : undefined;
+                                
                                 return (
                                   <div key={point} className="flex items-center gap-2">
                                     <button
                                       onClick={() => {
                                         // 🎯 버튼 선택 상태 토글
                                         const wasSelected = isButtonSelected(game.id, `총점_Over ${point}`);
-                                        handleButtonClick(game, `Over ${point}`, overOdds, '총점');
+                                        if (adjustedOverOdds) {
+                                          handleButtonClick(game, `Over ${point}`, adjustedOverOdds, '총점');
+                                        }
                                         
                                         // 선택 해제된 경우가 아니라면 사이드바로 이동
-                                        if (!wasSelected && game.isBettable && overOdds) {
+                                        if (!wasSelected && game.isBettable && adjustedOverOdds) {
                                           const gameInfo = {
                                             gameId: game.id,
                                             homeTeam: game.home_team,
@@ -1622,7 +1645,7 @@ export default function Exchange() {
                                             sportKey: game.sport_key,
                                             market: '총점',
                                             selection: `Over ${point}`,
-                                            odds: overOdds,
+                                            odds: adjustedOverOdds,
                                             commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString()
                                           };
                                           localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
@@ -1644,22 +1667,24 @@ export default function Exchange() {
                                       className={`flex-1 p-2 rounded-lg text-center transition-colors ${
                                         isButtonSelected(game.id, `총점_Over ${point}`)
                                           ? 'bg-yellow-500 hover:bg-yellow-600'
-                                          : game.isBettable && overOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                          : game.isBettable && adjustedOverOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                       } text-white text-sm`}
-                                      disabled={!game.isBettable || !overOdds}
+                                      disabled={!game.isBettable || !adjustedOverOdds}
                                     >
                                       <div className="font-medium">{game.home_team}</div>
-                                      <div className="text-xs">{overOdds ? overOdds.toFixed(2) : 'N/A'}</div>
+                                      <div className="text-xs">{adjustedOverOdds ? adjustedOverOdds.toFixed(2) : 'N/A'}</div>
                                     </button>
                                     <div className="w-12 text-sm font-medium text-blue-400 text-center">{point}</div>
                                     <button
                                       onClick={() => {
                                         // 🎯 버튼 선택 상태 토글
                                         const wasSelected = isButtonSelected(game.id, `총점_Under ${point}`);
-                                        handleButtonClick(game, `Under ${point}`, underOdds, '총점');
+                                        if (adjustedUnderOdds) {
+                                          handleButtonClick(game, `Under ${point}`, adjustedUnderOdds, '총점');
+                                        }
                                         
                                         // 선택 해제된 경우가 아니라면 사이드바로 이동
-                                        if (!wasSelected && game.isBettable && underOdds) {
+                                        if (!wasSelected && game.isBettable && adjustedUnderOdds) {
                                           const gameInfo = {
                                             gameId: game.id,
                                             homeTeam: game.home_team,
@@ -1667,7 +1692,7 @@ export default function Exchange() {
                                             sportKey: game.sport_key,
                                             market: '총점',
                                             selection: `Under ${point}`,
-                                            odds: underOdds,
+                                            odds: adjustedUnderOdds,
                                             commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString()
                                           };
                                           localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
@@ -1689,12 +1714,12 @@ export default function Exchange() {
                                       className={`flex-1 p-2 rounded-lg text-center transition-colors ${
                                         isButtonSelected(game.id, `총점_Under ${point}`)
                                           ? 'bg-yellow-500 hover:bg-yellow-600'
-                                          : game.isBettable && underOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                          : game.isBettable && adjustedUnderOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                       } text-white text-sm`}
-                                      disabled={!game.isBettable || !underOdds}
+                                      disabled={!game.isBettable || !adjustedUnderOdds}
                                     >
                                       <div className="font-medium">{game.away_team}</div>
-                                      <div className="text-xs">{underOdds ? underOdds.toFixed(2) : 'N/A'}</div>
+                                      <div className="text-xs">{adjustedUnderOdds ? adjustedUnderOdds.toFixed(2) : 'N/A'}</div>
                                     </button>
                                   </div>
                                 );
@@ -1766,6 +1791,11 @@ export default function Exchange() {
                                 
                                 const homeOdds = homeData?.oddsData?.averagePrice;
                                 const awayOdds = awayData?.oddsData?.averagePrice;
+                                
+                                // 🆕 환수율 적용
+                                const allSpreadsOdds = [homeOdds, awayOdds].filter(odds => odds !== undefined);
+                                const adjustedHomeOdds = homeOdds ? applyExchangeReturnRate(homeOdds, allSpreadsOdds) : undefined;
+                                const adjustedAwayOdds = awayOdds ? applyExchangeReturnRate(awayOdds, allSpreadsOdds) : undefined;
                                 const pointValue = parseFloat(absPoint);
                                 // 스프레드 베팅에서는 하나의 핸디캡 값으로 양팀이 반대 방향을 가짐
                                 const homeHandicap = pointValue;
@@ -1779,10 +1809,12 @@ export default function Exchange() {
                                           // 🎯 버튼 선택 상태 토글
                                           const selection = `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`;
                                           const wasSelected = isButtonSelected(game.id, `핸디캡_${selection}`);
-                                          handleButtonClick(game, selection, homeOdds, '핸디캡');
+                                          if (adjustedHomeOdds) {
+                                            handleButtonClick(game, selection, adjustedHomeOdds, '핸디캡');
+                                          }
                                           
                                           // 선택 해제된 경우가 아니라면 사이드바로 이동
-                                          if (!wasSelected && game.isBettable && homeOdds) {
+                                          if (!wasSelected && game.isBettable && adjustedHomeOdds) {
                                             const gameInfo = {
                                               gameId: game.id,
                                               homeTeam: game.home_team,
@@ -1790,7 +1822,7 @@ export default function Exchange() {
                                               sportKey: game.sport_key,
                                               market: '핸디캡',
                                               selection: selection,
-                                              odds: homeOdds,
+                                              odds: adjustedHomeOdds,
                                               commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString()
                                             };
                                             localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
@@ -1812,13 +1844,13 @@ export default function Exchange() {
                                         className={`flex-1 p-2 rounded-lg text-center transition-colors ${
                                           isButtonSelected(game.id, `핸디캡_${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`)
                                             ? 'bg-yellow-500 hover:bg-yellow-600'
-                                            : game.isBettable && homeOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                            : game.isBettable && adjustedHomeOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                         } text-white text-sm`}
-                                        disabled={!game.isBettable || !homeOdds}
-                                        title={game.isBettable && homeOdds ? `클릭하여 ${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap} 주문하기` : '베팅 마감됨'}
+                                        disabled={!game.isBettable || !adjustedHomeOdds}
+                                        title={game.isBettable && adjustedHomeOdds ? `클릭하여 ${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap} 주문하기` : '베팅 마감됨'}
                                       >
                                         <div className="font-medium">{game.home_team} {homeHandicap > 0 ? '+' : ''}{homeHandicap}</div>
-                                        <div className="text-xs">{homeOdds.toFixed(2)}</div>
+                                        <div className="text-xs">{adjustedHomeOdds ? adjustedHomeOdds.toFixed(2) : 'N/A'}</div>
                                       </button>
                                     )}
                                     <div className="w-12 text-sm font-medium text-blue-400 text-center">{pointValue}</div>
@@ -1828,10 +1860,12 @@ export default function Exchange() {
                                           // 🎯 버튼 선택 상태 토글
                                           const selection = `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`;
                                           const wasSelected = isButtonSelected(game.id, `핸디캡_${selection}`);
-                                          handleButtonClick(game, selection, awayOdds, '핸디캡');
+                                          if (adjustedAwayOdds) {
+                                            handleButtonClick(game, selection, adjustedAwayOdds, '핸디캡');
+                                          }
                                           
                                           // 선택 해제된 경우가 아니라면 사이드바로 이동
-                                          if (!wasSelected && game.isBettable && awayOdds) {
+                                          if (!wasSelected && game.isBettable && adjustedAwayOdds) {
                                             const gameInfo = {
                                               gameId: game.id,
                                               homeTeam: game.home_team,
@@ -1839,7 +1873,7 @@ export default function Exchange() {
                                               sportKey: game.sport_key,
                                               market: '핸디캡',
                                               selection: selection,
-                                              odds: awayOdds,
+                                              odds: adjustedAwayOdds,
                                               commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString()
                                             };
                                             localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
@@ -1861,13 +1895,13 @@ export default function Exchange() {
                                         className={`flex-1 p-2 rounded-lg text-center transition-colors ${
                                           isButtonSelected(game.id, `핸디캡_${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`)
                                             ? 'bg-yellow-500 hover:bg-yellow-600'
-                                            : game.isBettable && awayOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                            : game.isBettable && adjustedAwayOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                         } text-white text-sm`}
-                                        disabled={!game.isBettable || !awayOdds}
-                                        title={game.isBettable && awayOdds ? `클릭하여 ${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap} 주문하기` : '베팅 마감됨'}
+                                        disabled={!game.isBettable || !adjustedAwayOdds}
+                                        title={game.isBettable && adjustedAwayOdds ? `클릭하여 ${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap} 주문하기` : '베팅 마감됨'}
                                       >
                                         <div className="font-medium">{game.away_team} {awayHandicap > 0 ? '+' : ''}{awayHandicap}</div>
-                                        <div className="text-xs">{awayOdds.toFixed(2)}</div>
+                                        <div className="text-xs">{adjustedAwayOdds ? adjustedAwayOdds.toFixed(2) : 'N/A'}</div>
                                       </button>
                                     )}
                                   </div>

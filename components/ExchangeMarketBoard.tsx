@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { getSportKey } from '../config/sportsMapping';
 import { useExchangeGames, ExchangeGame } from '../hooks/useExchangeGames';
 import { useExchangeStore } from '../stores/useExchangeStore';
+import { adjustOddsSophisticated } from '../utils/oddsCalculator';
 
 interface ExchangeMarketBoardProps {
   selectedCategory?: string;
@@ -17,6 +18,45 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
   const { games: exchangeGames, loading: gamesLoading, error: gamesError, refetch } = useExchangeGames(selectedCategory);
   // 체크박스 방식으로 변경: 여러 마켓을 동시에 선택 가능
   const [gameMarkets, setGameMarkets] = useState<{[gameId: string]: Set<string>}>({});
+  
+  // 🆕 Exchange 환수율 설정
+  const [oddsReturnRateSettings, setOddsReturnRateSettings] = useState({ returnRate: 0.99, enabled: true });
+
+  // 🆕 Exchange 환수율 설정 로드
+  useEffect(() => {
+    const loadOddsReturnRateSettings = async () => {
+      try {
+        const response = await fetch(buildApiUrl('/api/exchange/odds-return-rate-settings'));
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            setOddsReturnRateSettings(data.data);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Exchange 환수율 설정 로드 실패:', error);
+      }
+    };
+    
+    loadOddsReturnRateSettings();
+  }, []);
+
+  // 🆕 Exchange 배당율에 환수율 적용
+  const applyExchangeReturnRate = (originalOdds: number, allOdds: number[] = []) => {
+    if (!originalOdds || !oddsReturnRateSettings.enabled) return originalOdds;
+    
+    // 단일 배당율인 경우에도 adjustOddsSophisticated 사용 (일관성)
+    if (allOdds.length === 0) {
+      allOdds = [originalOdds]; // 단일 배당률을 배열로 변환
+    }
+    
+    // 모든 경우에 adjustOddsSophisticated 함수 사용 (일관성 보장)
+    const adjustedOdds = adjustOddsSophisticated(allOdds, oddsReturnRateSettings.returnRate);
+    const originalIndex = allOdds.indexOf(originalOdds);
+    const result = adjustedOdds[originalIndex] || originalOdds;
+    
+    return result;
+  };
 
   // 선택된 카테고리에서 스포츠 키 추출
   const getSportKeyFromCategory = (category: string): string | null => {
@@ -517,10 +557,16 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                           const overOdds = oddsPair.over?.averagePrice;
                           const underOdds = oddsPair.under?.averagePrice;
                           
+                          // 🆕 환수율 적용
+                          const allTotalsOdds = [overOdds, underOdds].filter(odds => odds !== undefined);
+                          const adjustedOverOdds = overOdds ? applyExchangeReturnRate(overOdds, allTotalsOdds) : undefined;
+                          const adjustedUnderOdds = underOdds ? applyExchangeReturnRate(underOdds, allTotalsOdds) : undefined;
+                          
+                          
                           return (
                             <div key={point} className="flex items-center gap-2">
                               <button
-                                onClick={() => handleBetClick(game, `Over ${point}`, overOdds || 1.9, 'back', '총점')}
+                                onClick={() => handleBetClick(game, `Over ${point}`, adjustedOverOdds || 1.9, 'back', '총점')}
                                 disabled={!isOpen}
                                 className={`flex-1 p-2 rounded-lg text-center text-white text-sm transition-colors ${
                                   isBetSelected(game.id, '총점', `Over ${point}`)
@@ -529,11 +575,11 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                                 }`}
                               >
                                 <div className="font-medium">{game.homeTeam}</div>
-                                <div className="text-xs">{overOdds ? overOdds.toFixed(2) : 'N/A'}</div>
+                                <div className="text-xs">{adjustedOverOdds ? adjustedOverOdds.toFixed(2) : 'N/A'}</div>
                               </button>
                               <div className="w-12 text-sm font-medium text-blue-400 text-center">{point}</div>
                               <button
-                                onClick={() => handleBetClick(game, `Under ${point}`, underOdds || 1.9, 'back', '총점')}
+                                onClick={() => handleBetClick(game, `Under ${point}`, adjustedUnderOdds || 1.9, 'back', '총점')}
                                 disabled={!isOpen}
                                 className={`flex-1 p-2 rounded-lg text-center text-white text-sm transition-colors ${
                                   isBetSelected(game.id, '총점', `Under ${point}`)
@@ -542,7 +588,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                                 }`}
                               >
                                 <div className="font-medium">{game.awayTeam}</div>
-                                <div className="text-xs">{underOdds ? underOdds.toFixed(2) : 'N/A'}</div>
+                                <div className="text-xs">{adjustedUnderOdds ? adjustedUnderOdds.toFixed(2) : 'N/A'}</div>
                               </button>
                             </div>
                           );
@@ -613,6 +659,12 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                           
                           const homeOdds = homeData?.oddsData?.averagePrice;
                           const awayOdds = awayData?.oddsData?.averagePrice;
+                          
+                          // 🆕 환수율 적용
+                          const allSpreadsOdds = [homeOdds, awayOdds].filter(odds => odds !== undefined);
+                          const adjustedHomeOdds = homeOdds ? applyExchangeReturnRate(homeOdds, allSpreadsOdds) : undefined;
+                          const adjustedAwayOdds = awayOdds ? applyExchangeReturnRate(awayOdds, allSpreadsOdds) : undefined;
+                          
                           const pointValue = parseFloat(absPoint);
                           // 스프레드 베팅에서는 하나의 핸디캡 값으로 양팀이 반대 방향을 가짐
                           const homeHandicap = pointValue;
@@ -622,7 +674,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                             <div key={absPoint} className="flex items-center gap-2">
                               {homeOdds != null && (
                                 <button
-                                  onClick={() => handleBetClick(game, `${game.homeTeam} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`, homeOdds, 'back', '핸디캡')}
+                                  onClick={() => handleBetClick(game, `${game.homeTeam} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`, adjustedHomeOdds, 'back', '핸디캡')}
                                   disabled={!isOpen}
                                   className={`flex-1 p-2 rounded-lg text-center text-white text-sm transition-colors ${
                                     isBetSelected(game.id, '핸디캡', `${game.homeTeam} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`)
@@ -631,13 +683,13 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                                   }`}
                                 >
                                   <div className="font-medium">{game.homeTeam}</div>
-                                  <div className="text-xs">{homeOdds.toFixed(2)}</div>
+                                  <div className="text-xs">{adjustedHomeOdds ? adjustedHomeOdds.toFixed(2) : 'N/A'}</div>
                                 </button>
                               )}
                               <div className="w-12 text-sm font-medium text-blue-400 text-center">{pointValue}</div>
                               {awayOdds != null && (
                                 <button
-                                  onClick={() => handleBetClick(game, `${game.awayTeam} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`, awayOdds, 'back', '핸디캡')}
+                                  onClick={() => handleBetClick(game, `${game.awayTeam} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`, adjustedAwayOdds, 'back', '핸디캡')}
                                   disabled={!isOpen}
                                   className={`flex-1 p-2 rounded-lg text-center text-white text-sm transition-colors ${
                                     isBetSelected(game.id, '핸디캡', `${game.awayTeam} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`)
@@ -646,7 +698,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                                   }`}
                                 >
                                   <div className="font-medium">{game.awayTeam}</div>
-                                  <div className="text-xs">{awayOdds.toFixed(2)}</div>
+                                  <div className="text-xs">{adjustedAwayOdds ? adjustedAwayOdds.toFixed(2) : 'N/A'}</div>
                                 </button>
                               )}
                             </div>

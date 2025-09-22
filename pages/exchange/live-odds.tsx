@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import { useExchangeContext, MultiBetSelection } from '../../contexts/ExchangeContext';
 import { formatToLocalDateTime } from '../../utils/timeUtils';
 import { getButtonStyle } from '../../utils/buttonStyles';
+import { applyExchangeReturnRate } from '../../utils/oddsCalculator';
 
 // 렌더링을 위한 그룹화된 멀티배팅 주문 타입 정의
 interface GroupedMultiBetOrder extends ExchangeOrder {
@@ -542,7 +543,7 @@ export default function LiveOddsPage() {
                         </span>
                       </div>
                       <div className="text-xs text-gray-400">
-                        {(multibetOrder as any).stakeAmount?.toLocaleString()}원 • {parseFloat((multibetOrder as any).totalOdds).toFixed(2)}배당
+                        {(multibetOrder as any).stakeAmount?.toLocaleString()}원 • {applyExchangeReturnRate(parseFloat((multibetOrder as any).totalOdds), [parseFloat((multibetOrder as any).totalOdds)]).toFixed(2)}배당
                       </div>
                     </div>
 
@@ -559,7 +560,7 @@ export default function LiveOddsPage() {
                           {selection.commenceTime ? formatToLocalDateTime(selection.commenceTime) : '시간 미정'}
                         </div>
                         <div className="text-gray-300 text-sm mb-3">
-                          {selection.selection} • {selection.side === 'back' ? '🎯 Back' : '📉 Lay'} • {selection.odds?.toFixed(2)}배당
+                          {selection.selection} • {selection.side === 'back' ? '🎯 Back' : '📉 Lay'} • {selection.odds ? applyExchangeReturnRate(selection.odds, [selection.odds]).toFixed(2) : 'N/A'}배당
                         </div>
                         
                         {/* Lay 버튼들 추가 */}
@@ -594,7 +595,7 @@ export default function LiveOddsPage() {
                                       <div className="font-medium">{selection.selection}</div>
                                       <div className="text-xs mt-1 opacity-90">🎯 Back</div>
                                       <div className="text-xs mt-1 text-white font-medium">
-                                        배당률: {selection.odds?.toFixed(2)}
+                                        배당률: {selection.odds ? applyExchangeReturnRate(selection.odds, [selection.odds]).toFixed(2) : 'N/A'}
                                       </div>
                                     </button>
                                     
@@ -624,7 +625,7 @@ export default function LiveOddsPage() {
                                       <div className="font-medium">{selection.selection}</div>
                                       <div className="text-xs mt-1 opacity-90">🎯 Back</div>
                                       <div className="text-xs mt-1 text-white font-medium">
-                                        배당률: {selection.odds?.toFixed(2)}
+                                        배당률: {selection.odds ? applyExchangeReturnRate(selection.odds, [selection.odds]).toFixed(2) : 'N/A'}
                                       </div>
                                     </button>
                                     
@@ -773,7 +774,7 @@ export default function LiveOddsPage() {
                               <button disabled={true} className={getButtonStyle(false, true, false, false)}>
                                 <div className="font-medium">{order.selection}</div>
                                 <div className="text-xs mt-1 opacity-90">🎯 Back</div>
-                                <div className="text-xs mt-1 text-white font-medium">배당률: {order.price.toFixed(2)}</div>
+                                <div className="text-xs mt-1 text-white font-medium">배당률: {applyExchangeReturnRate(order.price, [order.price]).toFixed(2)}</div>
                                 <div className="text-xs mt-1 text-white font-medium">금액: {order.amount.toLocaleString()}원</div>
                               </button>
                               <button onClick={() => handleButtonClick(String(order.id), `lay_무승부`)} className={getButtonStyle(true, false, isButtonSelected(String(order.id), `lay_무승부`), false)}>
@@ -794,7 +795,7 @@ export default function LiveOddsPage() {
                               <button disabled={true} className={getButtonStyle(false, true, false, false)}>
                                 <div className="font-medium">{order.selection}</div>
                                 <div className="text-xs mt-1 opacity-90">🎯 Back</div>
-                                <div className="text-xs mt-1 text-white font-medium">배당률: {order.price.toFixed(2)}</div>
+                                <div className="text-xs mt-1 text-white font-medium">배당률: {applyExchangeReturnRate(order.price, [order.price]).toFixed(2)}</div>
                                 <div className="text-xs mt-1 text-white font-medium">금액: {order.amount.toLocaleString()}원</div>
                               </button>
                               <button onClick={() => handleButtonClick(String(order.id), `lay_${order.market}_${order.selection}`)} className={getButtonStyle(true, false, false, false)}>

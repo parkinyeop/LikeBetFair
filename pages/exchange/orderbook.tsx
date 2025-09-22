@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useExchange } from '../../hooks/useExchange';
 import { useExchangeContext, MatchTargetOrder } from '../../contexts/ExchangeContext';
 import { API_CONFIG, buildApiUrl } from '../../config/apiConfig';
+import { applyExchangeReturnRate } from '../../utils/oddsCalculator';
 
 interface Order {
   id: string;
@@ -306,17 +307,25 @@ const OrderbookPage: React.FC = () => {
     return amount.toLocaleString('ko-KR');
   };
 
-  // 🆕 멀티배팅 총 배당 계산(백엔드 값이 없을 때 레그 배당 곱으로 보조 계산)
+  // 🆕 멀티배팅 총 배당 계산(백엔드 값이 없을 때 레그 배당 곱으로 보조 계산) - 환수율 적용
   const computeTotalOdds = (order: Order) => {
-    if (order.totalOdds) return Number(order.totalOdds);
-    const legs = normalizeSelectionDetails(order.selectionDetails);
-    if (legs.length > 0) {
-      return legs.reduce((prod: number, leg: any) => {
-        const legOdds = Number(leg?.odds);
-        return prod * (isNaN(legOdds) ? 1 : legOdds);
-      }, 1);
+    let totalOdds;
+    if (order.totalOdds) {
+      totalOdds = Number(order.totalOdds);
+    } else {
+      const legs = normalizeSelectionDetails(order.selectionDetails);
+      if (legs.length > 0) {
+        totalOdds = legs.reduce((prod: number, leg: any) => {
+          const legOdds = Number(leg?.odds);
+          return prod * (isNaN(legOdds) ? 1 : legOdds);
+        }, 1);
+      } else {
+        totalOdds = order.odds || 0;
+      }
     }
-    return order.odds || 0;
+    
+    // 🆕 환수율 적용
+    return applyExchangeReturnRate(totalOdds, [totalOdds]);
   };
 
   // 🆕 매칭 시 사용자가 실제로 베팅해야 하는 금액 계산
@@ -619,7 +628,7 @@ const OrderbookPage: React.FC = () => {
                     
                     <div className="text-right">
                       <div className="text-lg font-bold text-blue-600">
-                        {order.odds ? order.odds.toFixed(2) : 'N/A'}
+                        {order.odds ? applyExchangeReturnRate(order.odds, [order.odds]).toFixed(2) : 'N/A'}
                       </div>
                       <div className="text-sm text-gray-500">
                         베팅: {formatCurrency(order.displayAmount || order.amount)}원
@@ -757,7 +766,7 @@ const OrderbookPage: React.FC = () => {
                   <div>
                     <span className="text-gray-600">배당률:</span>
                     <span className="ml-2 font-medium text-blue-600">
-                      {selectedOrderDetail.odds ? selectedOrderDetail.odds.toFixed(2) : 'N/A'}
+                      {selectedOrderDetail.odds ? applyExchangeReturnRate(selectedOrderDetail.odds, [selectedOrderDetail.odds]).toFixed(2) : 'N/A'}
                     </span>
                   </div>
                   <div>

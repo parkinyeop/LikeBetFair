@@ -19,7 +19,8 @@ export const adjustOddsSophisticated = (oddsArray: number[], targetPayout: numbe
   // 2. 현재 환수율 (내재 확률의 총합) 계산
   const currentPayoutSum = impliedProbs.reduce((sum, prob) => sum + prob, 0);
   
-  // 3. 목표 환수율 (목표 확률의 총합) 설정
+  // 3. 목표 환수율에 맞게 확률을 조정
+  // targetPayout이 높을수록 (예: 0.99) 확률의 총합이 낮아져야 함 (더 높은 배당률)
   const targetPayoutSum = 1 / targetPayout;
   
   // 4. 각 확률을 조정
@@ -42,6 +43,6 @@ export const adjustSingleOdds = (originalOdds: number, targetPayout: number): nu
     return originalOdds;
   }
   
-  return originalOdds * targetPayout;
+  return originalOdds / targetPayout;
 };
 
