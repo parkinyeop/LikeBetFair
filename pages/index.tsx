@@ -985,9 +985,6 @@ export default function Home() {
                     }
                     return (
                       <div className="flex items-center gap-2">
-                        <div className="w-16 text-sm font-medium text-blue-700 text-center">
-                          승/패
-                        </div>
                         {(() => {
                           // 홈팀, 무승부, 어웨이팀 순서로 정렬
                           const sortedOutcomes = outcomes.sort((a, b) => {
@@ -1584,7 +1581,7 @@ export default function Home() {
                     {/* 승/패 배당 */}
                     {selectedMarketsForGame.has('Win/Loss') && game.officialOdds?.h2h && Object.keys(game.officialOdds.h2h).length > 0 && (
                       <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                        <div className="text-sm font-medium text-blue-800 mb-2">🏆 승/패 (Win/Loss)</div>
+                        <div className="text-sm font-medium text-blue-800 mb-2">🏆 승패</div>
                         {(() => {
                             const h2hOdds = game.officialOdds.h2h;
                             
