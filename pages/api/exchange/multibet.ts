@@ -8,11 +8,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // Express 서버로 프록시
-    const response = await fetch('buildApiUrl('/api')/exchange/multibet', {
+    const response = await fetch(buildApiUrl('/api/exchange/multibet'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Auth-Token': req.headers['x-auth-token'] || '',
+        'X-Auth-Token': Array.isArray(req.headers['x-auth-token']) 
+          ? req.headers['x-auth-token'][0] 
+          : req.headers['x-auth-token'] || '',
       },
       body: JSON.stringify(req.body),
     });

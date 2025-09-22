@@ -8,7 +8,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // Express 서버로 프록시
-    const response = await fetch('buildApiUrl('/api')/exchange/all-orders', {
+    const response = await fetch(buildApiUrl('/api/exchange/all-orders'), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
