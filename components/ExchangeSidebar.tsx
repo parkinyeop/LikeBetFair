@@ -231,7 +231,7 @@ function OrderPanel() {
         
         // 🆕 API URL 결정 (개발환경에서는 localhost:5050 사용)
         const apiUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                       ? 'buildApiUrl' 
+                       ? 'http://localhost:5050' 
                        : window.location.origin;
         
         console.log('🌐 API URL:', apiUrl);
