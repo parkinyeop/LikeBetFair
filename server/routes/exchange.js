@@ -282,6 +282,9 @@ router.post('/match-order', verifyToken, async (req, res) => {
       partiallyFilled: false // 🆕 매칭 주문은 즉시 체결되므로 false
     });
 
+    // 🆕 양방향 매칭 관계 설정 - targetOrder에도 matchedOrderId 설정
+    targetOrder.matchedOrderId = matchOrder.id;
+
     // 🆕 대상 주문 상태 업데이트 (부분 매칭 처리)
     if (actualMatchAmount >= (targetOrder.remainingAmount || targetOrder.amount)) {
       // 완전 매칭
@@ -290,11 +293,16 @@ router.post('/match-order', verifyToken, async (req, res) => {
       targetOrder.remainingAmount = 0;
       targetOrder.partiallyFilled = false;
       
-      // 🆕 Back과 Lay 구분 상태 설정
-      if (targetOrder.side === 'lay') {
-        targetOrder.status = 'active'; // Lay 매치는 active 상태 유지
+      // 🆕 멀티베팅 주문은 매칭 시 matched 상태로 설정
+      if (targetOrder.isMultibet) {
+        targetOrder.status = 'matched'; // 멀티베팅 주문은 매칭 시 matched 상태
       } else {
-        targetOrder.status = 'matched'; // Back 주문은 matched 상태
+        // 일반 주문: Back과 Lay 구분 상태 설정
+        if (targetOrder.side === 'lay') {
+          targetOrder.status = 'active'; // Lay 매치는 active 상태 유지
+        } else {
+          targetOrder.status = 'matched'; // Back 주문은 matched 상태
+        }
       }
     } else {
       // 부분 매칭
@@ -303,11 +311,16 @@ router.post('/match-order', verifyToken, async (req, res) => {
       targetOrder.filledAmount = (targetOrder.filledAmount || 0) + actualMatchAmount;
       targetOrder.remainingAmount = (targetOrder.remainingAmount || targetOrder.amount) - actualMatchAmount;
       
-      // 🆕 Back과 Lay 구분 상태 설정
-      if (targetOrder.side === 'lay') {
-        targetOrder.status = 'active'; // Lay 매치는 부분 매칭되어도 active 상태 유지
+      // 🆕 멀티베팅 주문은 부분 매칭 시에도 matched 상태로 설정
+      if (targetOrder.isMultibet) {
+        targetOrder.status = 'matched'; // 멀티베팅 주문은 부분 매칭되어도 matched 상태
       } else {
-        targetOrder.status = 'partially_matched'; // Back 주문은 partially_matched 상태
+        // 일반 주문: Back과 Lay 구분 상태 설정
+        if (targetOrder.side === 'lay') {
+          targetOrder.status = 'active'; // Lay 매치는 부분 매칭되어도 active 상태 유지
+        } else {
+          targetOrder.status = 'partially_matched'; // Back 주문은 partially_matched 상태
+        }
       }
       
       // 🆕 소수점 문제 해결: 잔액이 100원 미만이면 0으로 처리
@@ -316,11 +329,16 @@ router.post('/match-order', verifyToken, async (req, res) => {
         targetOrder.remainingAmount = 0;
         targetOrder.partiallyFilled = false;
         
-        // 🆕 Back과 Lay 구분 상태 설정
-        if (targetOrder.side === 'lay') {
-          targetOrder.status = 'active'; // Lay 매치는 active 상태 유지
+        // 🆕 멀티베팅 주문은 잔액 정리 후에도 matched 상태로 설정
+        if (targetOrder.isMultibet) {
+          targetOrder.status = 'matched'; // 멀티베팅 주문은 matched 상태
         } else {
-          targetOrder.status = 'matched'; // Back 주문은 matched 상태
+          // 일반 주문: Back과 Lay 구분 상태 설정
+          if (targetOrder.side === 'lay') {
+            targetOrder.status = 'active'; // Lay 매치는 active 상태 유지
+          } else {
+            targetOrder.status = 'matched'; // Back 주문은 matched 상태
+          }
         }
       }
     }

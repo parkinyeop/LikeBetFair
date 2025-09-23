@@ -124,13 +124,13 @@ class ExchangeSettlementService {
       const matchSettlementResult = await this.settleMatchedOrdersByGame(gameResult.id, gameResult);
       
       // 🆕 정산 대상 주문들 조회 (매칭된 상태 + 부분 매칭된 상태의 주문들)
+      // 수정: settledAt: null 조건을 제거하여 이미 정산된 주문도 포함하여 매칭된 쌍을 찾을 수 있도록 함
       const orders = await ExchangeOrder.findAll({
         where: {
           homeTeam,
           awayTeam,
           commenceTime,
-          status: { [Op.in]: ['matched', 'partially_matched'] },  // 🆕 부분 매칭 포함
-          settledAt: null  // 아직 정산되지 않은 주문들
+          status: { [Op.in]: ['matched', 'partially_matched', 'active'] }  // 🆕 active 상태도 포함
         },
         transaction
       });
@@ -160,13 +160,13 @@ class ExchangeSettlementService {
       orders = regularOrders;
       
       // 🆕 연결된 주문들도 함께 조회 (matchedOrderId가 있는 주문들 + 부분 매칭된 주문들)
+      // 수정: settledAt: null 조건을 제거하여 이미 정산된 주문도 포함
       const connectedOrders = await ExchangeOrder.findAll({
         where: {
           homeTeam,
           awayTeam,
           commenceTime,
-          status: { [Op.in]: ['matched', 'partially_matched'] },  // 🆕 부분 매칭 포함
-          settledAt: null
+          status: { [Op.in]: ['matched', 'partially_matched', 'active', 'settled'] }  // 🆕 settled 상태도 포함
         },
         transaction
       });
@@ -368,12 +368,12 @@ class ExchangeSettlementService {
     
     console.log(`\n🔍 주문 쌍 그룹화 시작: ${orders.length}개 주문`);
     
-    // 1. matchedOrderId가 있는 주문들 먼저 처리
+    // 1. matchedOrderId가 있는 주문들 먼저 처리 (이미 정산된 주문과 매칭된 주문도 포함)
     for (const order of orders) {
       if (processedIds.has(order.id)) continue;
       
       if (order.matchedOrderId) {
-        // 매칭된 상대 주문 찾기
+        // 매칭된 상대 주문 찾기 (상태에 관계없이 찾기)
         const matchedOrder = orders.find(o => 
           o.id === order.matchedOrderId && !processedIds.has(o.id)
         );
@@ -382,7 +382,10 @@ class ExchangeSettlementService {
           pairs.push([order, matchedOrder]);
           processedIds.add(order.id);
           processedIds.add(matchedOrder.id);
-          console.log(`   ✅ 쌍 생성: ${order.id} ↔ ${matchedOrder.id} (${order.side} ↔ ${matchedOrder.side})`);
+          console.log(`   ✅ 쌍 생성: ${order.id} ↔ ${matchedOrder.id} (${order.side} ↔ ${matchedOrder.side}) [${order.status} ↔ ${matchedOrder.status}]`);
+        } else {
+          // 매칭된 상대 주문이 orders 배열에 없는 경우, 데이터베이스에서 직접 조회
+          console.log(`   🔍 주문 ${order.id}의 매칭된 주문 ${order.matchedOrderId}를 데이터베이스에서 조회 중...`);
         }
       }
     }
@@ -945,6 +948,15 @@ class ExchangeSettlementService {
 
       for (const order of unmatchedOrders) {
         try {
+          // 🆕 매칭 상태 재확인 - 매칭된 주문이 있는지 확인
+          if (order.matchedOrderId) {
+            const matchedOrder = await ExchangeOrder.findByPk(order.matchedOrderId);
+            if (matchedOrder && matchedOrder.status !== 'cancelled') {
+              console.log(`⚠️ 주문 ${order.id}는 매칭된 상태이므로 취소하지 않음 (매칭 주문: ${matchedOrder.id})`);
+              continue;
+            }
+          }
+          
           const gameTime = new Date(order.commenceTime);
           const hoursSinceGame = (now.getTime() - gameTime.getTime()) / (1000 * 60 * 60);
           
@@ -965,7 +977,42 @@ class ExchangeSettlementService {
               settledAt: new Date()
             }, { transaction });
 
-            // 2. 사용자 잔액 환불
+            // 🆕 2. 매칭된 상대 주문이 있다면 함께 취소 처리
+            if (order.matchedOrderId) {
+              const matchedOrder = await ExchangeOrder.findByPk(order.matchedOrderId, { transaction });
+              if (matchedOrder && matchedOrder.status === 'active') {
+                console.log(`   🔄 매칭된 주문 ${matchedOrder.id}도 함께 취소 처리`);
+                
+                await matchedOrder.update({
+                  status: 'cancelled',
+                  settlementNote: `매칭된 주문 ${order.id} 취소로 인한 동반 취소`,
+                  settledAt: new Date()
+                }, { transaction });
+                
+                // 매칭된 주문의 사용자 잔액 환불
+                await User.increment('balance', {
+                  by: matchedOrder.stakeAmount,
+                  where: { id: matchedOrder.userId }
+                }, { transaction });
+                
+                // 매칭된 주문의 환불 내역 기록
+                const matchedUser = await User.findByPk(matchedOrder.userId, { transaction });
+                await PaymentHistory.create({
+                  userId: matchedOrder.userId,
+                  betId: `EXCHANGE_${matchedOrder.id}`,
+                  amount: matchedOrder.stakeAmount,
+                  type: 'refund',
+                  memo: `매칭된 주문 취소로 인한 자동 환불 (경기: ${matchedOrder.homeTeam} vs ${matchedOrder.awayTeam})`,
+                  status: 'completed',
+                  balanceAfter: matchedUser.balance,
+                  paidAt: new Date()
+                }, { transaction });
+                
+                console.log(`   ✅ 매칭된 주문 ${matchedOrder.id} 취소 완료 - 환불: ${matchedOrder.stakeAmount}원`);
+              }
+            }
+
+            // 3. 사용자 잔액 환불
             await User.increment('balance', {
               by: order.stakeAmount,
               where: { id: order.userId }
@@ -974,7 +1021,7 @@ class ExchangeSettlementService {
             // 환불 후 잔액 조회
             const user = await User.findByPk(order.userId, { transaction });
 
-            // 3. 환불 내역 기록
+            // 4. 환불 내역 기록
             await PaymentHistory.create({
               userId: order.userId,
               betId: `EXCHANGE_${order.id}`, // Exchange 주문 ID를 betId로 사용하여 추적 가능
@@ -2420,6 +2467,77 @@ class ExchangeSettlementService {
     } catch (error) {
       await transaction.rollback();
       console.error(`❌ 주문 ${order.id} 자동 정산 실패:`, error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 🆕 고아 주문 정산 처리 (상대방이 이미 정산된 경우)
+   * @param {Object} orphanOrder - 고아 주문
+   * @param {Object} settledMatchedOrder - 이미 정산된 매칭 주문
+   * @param {Object} gameResult - 경기 결과
+   * @param {Object} transaction - DB 트랜잭션
+   * @returns {Object} 정산 결과
+   */
+  async settleOrphanedOrder(orphanOrder, settledMatchedOrder, gameResult, transaction) {
+    try {
+      console.log(`\n🔄 고아 주문 ${orphanOrder.id} 정산 시작`);
+      console.log(`   매칭된 주문 ${settledMatchedOrder.id}: ${settledMatchedOrder.status}, 수익: ${settledMatchedOrder.actualProfit}원`);
+      
+      // 상대방 주문의 정산 결과를 기반으로 고아 주문의 결과 결정
+      const isMatchedOrderWinner = settledMatchedOrder.actualProfit > 0;
+      const isOrphanWinner = (orphanOrder.side === 'back' && isMatchedOrderWinner) || 
+                            (orphanOrder.side === 'lay' && !isMatchedOrderWinner);
+      
+      let actualProfit = 0;
+      if (isOrphanWinner) {
+        // 고아 주문이 승리한 경우: 상대방의 손실만큼 수익
+        actualProfit = Math.abs(settledMatchedOrder.actualProfit);
+      } else {
+        // 고아 주문이 패배한 경우: 자신의 베팅 금액만큼 손실
+        actualProfit = -orphanOrder.amount;
+      }
+      
+      // 고아 주문 상태 업데이트
+      await orphanOrder.update({
+        status: 'settled',
+        settledAt: new Date(),
+        actualProfit: actualProfit,
+        settlementNote: `고아 주문 정산 - 매칭된 주문 ${settledMatchedOrder.id} 결과 기반 (${isOrphanWinner ? '승리' : '패배'})`
+      }, { transaction });
+      
+      // 사용자 잔액 업데이트
+      if (actualProfit !== 0) {
+        const user = await User.findByPk(orphanOrder.userId, { transaction });
+        if (user) {
+          const newBalance = Number(user.balance) + Number(actualProfit);
+          await user.update({ balance: newBalance }, { transaction });
+          
+          // 결제 내역 생성
+          await PaymentHistory.create({
+            userId: orphanOrder.userId,
+            betId: `EXCHANGE_${orphanOrder.id}`,
+            amount: actualProfit,
+            balanceAfter: newBalance,
+            memo: `고아 주문 정산 (${isOrphanWinner ? '승리' : '패배'}) - ${actualProfit > 0 ? '수익' : '손실'}: ${actualProfit}원`,
+            paidAt: new Date()
+          }, { transaction });
+        }
+      }
+      
+      console.log(`✅ 고아 주문 ${orphanOrder.id} 정산 완료: ${isOrphanWinner ? '승리' : '패배'}, 수익: ${actualProfit}원`);
+      
+      return {
+        success: true,
+        winnerSide: isOrphanWinner ? orphanOrder.side : settledMatchedOrder.side,
+        winnings: actualProfit,
+        orderId: orphanOrder.id,
+        matchedOrderId: settledMatchedOrder.id,
+        totalWinnings: Math.abs(actualProfit)
+      };
+      
+    } catch (error) {
+      console.error(`❌ 고아 주문 ${orphanOrder.id} 정산 실패:`, error.message);
       return { success: false, error: error.message };
     }
   }
