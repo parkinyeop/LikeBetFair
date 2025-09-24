@@ -583,7 +583,7 @@ export default function AdminDashboard() {
                 </>
               )}
 
-              {/* 관리 메뉴 그리드 - 균등 배치 (3x3 구조) */}
+              {/* 관리 메뉴 그리드 - 균등 배치 (2x3 구조) */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
                 
                 {/* Exchange 관리 */}
@@ -711,30 +711,6 @@ export default function AdminDashboard() {
                   </button>
                 </div>
 
-                {/* 경기 데이터 관리 */}
-                <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-                  <div className="flex items-center mb-4">
-                    <div className="bg-orange-100 p-3 rounded-full">
-                      <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
-                      </svg>
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 ml-3">경기 데이터 관리</h3>
-                  </div>
-                  <p className="text-gray-600 mb-4">경기 입력, 배당율 모니터링, 리그 관리</p>
-                  <div className="space-y-2 text-sm text-gray-500">
-                    <div>• 경기 수동 입력/수정</div>
-                    <div>• 배당율 모니터링</div>
-                    <div>• 리그 활성화 관리</div>
-                    <div>• 경기 결과 확인</div>
-                  </div>
-                  <button 
-                    onClick={() => router.push('/admin/games')}
-                    className="mt-4 w-full bg-orange-600 text-white py-2 px-4 rounded hover:bg-orange-700 transition-colors"
-                  >
-                    경기 관리하기
-                  </button>
-                </div>
 
                 {/* 통계 및 리포트 */}
                 <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
@@ -851,10 +827,10 @@ export default function AdminDashboard() {
                     수수료 현황 보기
                   </button>
                   <button 
-                    onClick={() => router.push('/admin/bets')}
-                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors"
+                    onClick={() => router.push('/admin/exchange')}
+                    className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition-colors"
                   >
-                    스포츠북 결과 처리
+                    Exchange 관리
                   </button>
                   <button 
                     onClick={() => {
