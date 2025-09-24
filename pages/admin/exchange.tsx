@@ -102,7 +102,6 @@ interface GlobalFilters {
   dateRange: DateRange;
   status: OrderStatus[];
   sport: string[];
-  searchTerm: string;
 }
 
 interface SelectedItems {
@@ -153,7 +152,6 @@ interface OrderFilters {
   status: OrderStatus[];
   dateRange: DateRange;
   sport: string[];
-  searchTerm: string;
   isMultibet?: boolean;
 }
 
@@ -241,7 +239,6 @@ interface NavigationContext {
     selectedOrder?: ExchangeOrder;
     selectedSettlement?: SettlementHistory;
     filters?: GlobalFilters;
-    searchTerm?: string;
   };
 }
 
@@ -421,7 +418,6 @@ export default function ExchangeAdmin() {
             end: new Date()
           },
           sport: [],
-          searchTerm: '',
           isMultibet: undefined
         },
         selectedOrder: null,
@@ -462,8 +458,7 @@ export default function ExchangeAdmin() {
           end: new Date()
         },
         status: [],
-        sport: [],
-        searchTerm: ''
+        sport: []
       },
       selectedItems: {
         orders: [],
@@ -489,12 +484,10 @@ export default function ExchangeAdmin() {
   // 통합된 로딩 상태 (기존 loading 제거)
   // const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
   
   // 정산 관리 모달 상태 - 제거됨
   const [showExportModal, setShowExportModal] = useState(false);
   const [showSettlementDetailModal, setShowSettlementDetailModal] = useState(false);
-  const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<ExchangeOrder | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [showManualInputModal, setShowManualInputModal] = useState(false);
@@ -1596,27 +1589,6 @@ export default function ExchangeAdmin() {
   // 새로운 통합 필터링 로직
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
-      // 검색어 필터
-      const matchesSearch = !searchTerm || 
-        order.homeTeam?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.awayTeam?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.gameId?.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      // 상태 필터 (취소 원인별 필터링 포함)
-      let matchesStatus = statusFilter === 'all' || order.status === statusFilter;
-      
-      // 취소 원인별 필터링
-      if (statusFilter.startsWith('cancelled_') && order.status === 'cancelled') {
-        const reason = getCancellationReason((order as any).settlementNote, (order as any).paymentMemo);
-        const filterReason = statusFilter.replace('cancelled_', '');
-        matchesStatus = (filterReason === 'user' && reason === '사용자') ||
-                       (filterReason === 'game' && reason === '경기') ||
-                       (filterReason === 'expired' && reason === '만료') ||
-                       (filterReason === 'original' && reason === '원주문') ||
-                       (filterReason === 'unknown' && reason === '사유 불명') ||
-                       (filterReason === 'other' && reason === '기타');
-      }
-      
       // 멀티배팅 필터
       const matchesMultibet = adminState.tabs.orders.filters.isMultibet === undefined || 
         order.isMultibet === adminState.tabs.orders.filters.isMultibet;
@@ -1636,9 +1608,9 @@ export default function ExchangeAdmin() {
                        (tabReason === 'other' && reason === '기타');
       }
       
-      return matchesSearch && matchesStatus && matchesMultibet && matchesSubTab;
+      return matchesMultibet && matchesSubTab;
     });
-  }, [orders, searchTerm, statusFilter, adminState.tabs.orders.filters.isMultibet, activeSubTab]);
+  }, [orders, adminState.tabs.orders.filters.isMultibet, activeSubTab]);
 
   if (!isLoggedIn || !isAdmin) {
     return null;
@@ -2161,65 +2133,6 @@ export default function ExchangeAdmin() {
                         </div>
                       </div>
 
-                      {/* 필터 */}
-                      <div className="bg-white p-4 rounded-lg shadow">
-                        <div className="flex flex-col md:flex-row gap-4">
-                          <div className="flex-1">
-                            <input
-                              type="text"
-                              placeholder="팀명 또는 게임 ID로 검색..."
-                              value={searchTerm}
-                              onChange={(e) => setSearchTerm(e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            />
-                          </div>
-                          <div className="flex gap-2">
-                            <select
-                              value={statusFilter}
-                              onChange={(e) => setStatusFilter(e.target.value)}
-                              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            >
-                <option value="all">모든 상태</option>
-                <option value="open">오픈</option>
-                <option value="matched">매칭됨</option>
-                <option value="partially_matched">부분 매칭</option>
-                <option value="active">활성</option>
-                <option value="settled">정산완료</option>
-                <option value="cancelled">취소됨</option>
-                <option value="cancelled_user">취소 (사용자)</option>
-                <option value="cancelled_game">취소 (경기)</option>
-                <option value="cancelled_expired">취소 (만료)</option>
-                <option value="cancelled_original">취소 (원주문)</option>
-                <option value="cancelled_unknown">취소 (사유불명)</option>
-                <option value="cancelled_other">취소 (기타)</option>
-                            </select>
-                            <select
-                              value={adminState.tabs.orders.filters.isMultibet === undefined ? 'all' : adminState.tabs.orders.filters.isMultibet ? 'multibet' : 'single'}
-                              onChange={(e) => {
-                                const value = e.target.value === 'all' ? undefined : e.target.value === 'multibet';
-                                setAdminState(prev => ({
-                                  ...prev,
-                                  tabs: {
-                                    ...prev.tabs,
-                                    orders: {
-                                      ...prev.tabs.orders,
-                                      filters: {
-                                        ...prev.tabs.orders.filters,
-                                        isMultibet: value
-                                      }
-                                    }
-                                  }
-                                }));
-                              }}
-                              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            >
-                              <option value="all">모든 주문</option>
-                              <option value="single">단일 주문</option>
-                              <option value="multibet">멀티배팅</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
 
                       {/* 주문 목록 */}
                       <div className="bg-white rounded-lg shadow overflow-hidden">
