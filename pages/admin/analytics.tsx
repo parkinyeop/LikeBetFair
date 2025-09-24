@@ -63,10 +63,10 @@ export default function Analytics() {
       };
 
       const [salesRes, usersRes, sportsbookRes, adminRes] = await Promise.all([
-        fetch(`buildApiUrl('/api/admin/analytics/sales?range=${dateRange}`, { headers }),
-        fetch(`buildApiUrl('/api/admin/analytics/users?range=${dateRange}`, { headers }),
-        fetch(`buildApiUrl('/api/admin/analytics/sportsbook?range=${dateRange}`, { headers }),
-        fetch(`buildApiUrl('/api/admin/analytics/admin?range=${dateRange}`, { headers })
+        fetch(`${buildApiUrl('/api/admin/analytics/sales')}?range=${dateRange}`, { headers }),
+        fetch(`${buildApiUrl('/api/admin/analytics/users')}?range=${dateRange}`, { headers }),
+        fetch(`${buildApiUrl('/api/admin/analytics/sportsbook')}?range=${dateRange}`, { headers }),
+        fetch(`${buildApiUrl('/api/admin/analytics/admin')}?range=${dateRange}`, { headers })
       ]);
 
       const [salesData, usersData, sportsbookData, adminData] = await Promise.all([

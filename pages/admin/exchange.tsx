@@ -1008,7 +1008,7 @@ export default function ExchangeAdmin() {
         console.log('일별 통계 로딩 시작...');
       }
       const headers = getAuthHeaders();
-      const url = buildApiUrl('/api/admin') + `/exchange/daily-stats?year=${selectedYear}&month=${selectedMonth}`;
+      const url = `${buildApiUrl('/api/admin')}/exchange/daily-stats?year=${selectedYear}&month=${selectedMonth}`;
       
       const response = await fetch(url, { headers });
       if (response.ok) {

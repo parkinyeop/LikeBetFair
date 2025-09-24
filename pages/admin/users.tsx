@@ -1,1229 +1,472 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { useRouter } from 'next/router';
-import Header from '../../components/Header';
-import { buildApiUrl } from '../../config/apiConfig';
+import React, { useState, useMemo, useEffect } from 'react';
+import AdminLayout from '../../components/AdminLayout';
+import AdminTable from '../../components/admin/AdminTable';
+import FilterBar from '../../components/admin/FilterBar';
+import ConfirmationModal from '../../components/admin/ConfirmationModal';
+import { useAdminApi, useAdminApiMutation } from '../../hooks/useAdminApi';
 
 interface User {
   id: string;
   username: string;
   email: string;
   balance: number;
-  isAdmin: boolean;
-  adminLevel: number;
-  referralCode: string | null;
-  referredBy: string | null;
-  referrerAdminId: string | null;
-  lastLogin: string | null;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  admin_level: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  last_login?: string;
 }
 
-interface UserStats {
-  totalBets: number;
-  totalStake: number;
-  totalWinnings: number;
-}
-
-interface ReferralInfo {
-  referredBy: string;
-  referrerAdmin: {
-    id: string;
-    username: string;
-    adminLevel: number;
-  } | null;
-  referralCode: {
-    id: string;
-    code: string;
-    commissionRate: number;
-    isActive: boolean;
-    currentUsers: number;
-    maxUsers: number | null;
-    expiresAt: string | null;
-  } | null;
-}
-
-interface ReferredUser {
-  id: string;
-  username: string;
-  email: string;
-  createdAt: string;
-  isActive: boolean;
-}
-
-interface UserFilters {
-  search: string;
-  status: 'all' | 'active' | 'inactive';
-  adminLevel: 'all' | '0' | '1' | '2' | '3' | '4' | '5';
-  sortBy: 'createdAt' | 'lastLogin' | 'balance' | 'username';
-  sortOrder: 'asc' | 'desc';
-}
-
-interface PaginationState {
-  currentPage: number;
-  totalPages: number;
-  totalItems: number;
-  itemsPerPage: number;
-}
-
-export default function AdminUsers() {
-  const { isLoggedIn, isAdmin, adminLevel, username } = useAuth();
-  const router = useRouter();
-  const [users, setUsers] = useState<User[]>([]);
+export default function UsersManagement() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [userStats, setUserStats] = useState<UserStats | null>(null);
-  const [referralInfo, setReferralInfo] = useState<ReferralInfo | null>(null);
-  const [referredUsers, setReferredUsers] = useState<ReferredUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [filters, setFilters] = useState<UserFilters>({
-    search: '',
-    status: 'all',
-    adminLevel: 'all',
-    sortBy: 'createdAt',
-    sortOrder: 'desc'
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [confirmationModal, setConfirmationModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
   });
-  const [pagination, setPagination] = useState<PaginationState>({
-    currentPage: 1,
-    totalPages: 1,
-    totalItems: 0,
-    itemsPerPage: 20
-  });
-  const [showUserDetail, setShowUserDetail] = useState(false);
-  const [balanceEdit, setBalanceEdit] = useState({ isEditing: false, newBalance: 0, reason: '' });
-  const [showUserEditModal, setShowUserEditModal] = useState(false);
-  const [userEditForm, setUserEditForm] = useState({
-    referralCode: '',
-    referredBy: '',
-    reason: ''
-  });
-  const [userReferralStats, setUserReferralStats] = useState<any>(null);
-  const [showCreateReferralModal, setShowCreateReferralModal] = useState(false);
 
+  // 새 사용자 추가 폼 상태
+  const [newUser, setNewUser] = useState({
+    username: '',
+    email: '',
+    password: '',
+    admin_level: 0,
+    balance: 0,
+    is_active: true
+  });
+
+  // 편집 폼 상태
+  const [editUser, setEditUser] = useState({
+    id: '',
+    username: '',
+    email: '',
+    admin_level: 0,
+    balance: 0,
+    is_active: true
+  });
+
+  // 서버사이드 필터링을 위한 쿼리 파라미터
+  const queryParams = useMemo(() => {
+    const params: Record<string, string> = {};
+    if (searchTerm) params.search = searchTerm;
+    if (selectedStatus !== 'all') params.status = selectedStatus;
+    return params;
+  }, [searchTerm, selectedStatus]);
+
+  // API 호출 (서버사이드 필터링 적용)
+  const { data: usersData, loading: usersLoading, error: usersError, refetch: refetchUsers } = useAdminApi<{users: User[]}>('/api/admin/users', {
+    queryParams
+  });
+  
+  // API 뮤테이션 (성공 후 자동 새로고침)
+  const { mutate: addUser, loading: addLoading } = useAdminApiMutation('/api/admin/users', 'POST', refetchUsers);
+  const { mutate: updateUser, loading: updateLoading } = useAdminApiMutation('/api/admin/users', 'PUT', refetchUsers);
+  const { mutate: deleteUser, loading: deleteLoading } = useAdminApiMutation('/api/admin/users', 'DELETE', refetchUsers);
+
+  const users = usersData?.users || [];
+
+  // 토큰 만료 감지 및 리디렉션
   useEffect(() => {
-    if (!isLoggedIn) {
-      router.push('/');
-      return;
+    if (usersError && usersError.includes('로그인이 만료되었습니다')) {
+      // 토큰이 만료된 경우 로그인 페이지로 리디렉션
+      setTimeout(() => {
+        window.location.href = '/admin';
+      }, 2000);
     }
-    
-    if (!isAdmin || adminLevel < 2) {
-      alert('사용자 관리 권한이 필요합니다.');
-      router.push('/admin');
-      return;
+  }, [usersError]);
+
+  // 서버사이드 필터링을 사용하므로 클라이언트 필터링 제거
+  const filteredUsers = users;
+
+  // 상태 옵션
+  const statusOptions = [
+    { value: 'all', label: '전체' },
+    { value: 'active', label: '활성' },
+    { value: 'inactive', label: '비활성' }
+  ];
+
+  // 사용자 테이블 컬럼 정의
+  const userColumns = [
+    {
+      key: 'username',
+      label: '사용자명',
+      className: 'w-32'
+    },
+    {
+      key: 'email',
+      label: '이메일',
+      className: 'w-48'
+    },
+    {
+      key: 'balance',
+      label: '잔액',
+      render: (value: number) => `${value.toLocaleString()}원`,
+      className: 'w-32'
+    },
+    {
+      key: 'admin_level',
+      label: '관리자 레벨',
+      render: (value: number) => (
+        <span className={`px-2 py-1 text-xs rounded-full ${
+          value === 0 ? 'bg-gray-100 text-gray-800' :
+          value <= 2 ? 'bg-blue-100 text-blue-800' :
+          value <= 4 ? 'bg-yellow-100 text-yellow-800' :
+          'bg-red-100 text-red-800'
+        }`}>
+          {value === 0 ? '일반' : `레벨 ${value}`}
+        </span>
+      ),
+      className: 'w-24'
+    },
+    {
+      key: 'is_active',
+      label: '상태',
+      render: (value: boolean) => (
+        <span className={`px-2 py-1 text-xs rounded-full ${
+          value ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+        }`}>
+          {value ? '활성' : '비활성'}
+        </span>
+      ),
+      className: 'w-20'
+    },
+    {
+      key: 'created_at',
+      label: '가입일',
+      render: (value: string) => new Date(value).toLocaleDateString('ko-KR'),
+      className: 'w-32'
+    },
+    {
+      key: 'last_login',
+      label: '최근 로그인',
+      render: (value: string) => value ? new Date(value).toLocaleString('ko-KR') : '없음',
+      className: 'w-40'
+    },
+    {
+      key: 'actions',
+      label: '작업',
+      render: (_: any, user: User) => (
+        <div className="flex space-x-2">
+          <button
+            onClick={() => handleEditUser(user)}
+            className="text-blue-600 hover:text-blue-800 text-sm"
+          >
+            수정
+          </button>
+          <button
+            onClick={() => handleDeleteUser(user)}
+            className="text-red-600 hover:text-red-800 text-sm"
+          >
+            삭제
+          </button>
+        </div>
+      ),
+      className: 'w-24'
     }
+  ];
 
-    fetchUsers();
-  }, [isLoggedIn, isAdmin, adminLevel, router, filters, pagination.currentPage]);
-
-  const getAuthHeaders = useCallback(() => {
-    const tabId = sessionStorage.getItem('tabId');
-    const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
-    return {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    };
-  }, []);
-
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      const headers = getAuthHeaders();
-      
-      const queryParams = new URLSearchParams({
-        page: pagination.currentPage.toString(),
-        limit: pagination.itemsPerPage.toString(),
-        search: filters.search,
-        status: filters.status,
-        adminLevel: filters.adminLevel,
-        sortBy: filters.sortBy,
-        sortOrder: filters.sortOrder
+  // 이벤트 핸들러들
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const result = await addUser(newUser);
+    if (result) {
+      setShowAddModal(false);
+      setNewUser({
+        username: '',
+        email: '',
+        password: '',
+        admin_level: 0,
+        balance: 0,
+        is_active: true
       });
-      
-      const response = await fetch(`${buildApiUrl('/api/admin')}/users?${queryParams}`, {
-        headers
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUsers(data.users || []);
-        setPagination(prev => ({
-          ...prev,
-          totalPages: data.pagination?.totalPages || 1,
-          totalItems: data.pagination?.totalItems || 0
-        }));
-        setError('');
-      } else {
-        const errorData = await response.json();
-        setError(errorData.message || '사용자 목록을 불러올 수 없습니다.');
-      }
-    } catch (err) {
-      console.error('사용자 목록 로딩 오류:', err);
-      setError('서버 연결에 실패했습니다.');
-    } finally {
-      setLoading(false);
     }
   };
 
-  const fetchUserDetail = async (userId: string) => {
-    try {
-      const headers = getAuthHeaders();
-      
-      const response = await fetch(`${buildApiUrl('/api/admin')}/users/${userId}`, {
-        headers
-      });
+  const handleEditUser = (user: User) => {
+    setEditUser({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      admin_level: user.admin_level,
+      balance: user.balance,
+      is_active: user.is_active
+    });
+    setShowEditModal(true);
+  };
 
-      if (response.ok) {
-        const data = await response.json();
-        setSelectedUser(data.user);
-        setUserStats(data.stats);
-        setReferralInfo(data.referralInfo);
-        setReferredUsers(data.referredUsers || []);
-        setShowUserDetail(true);
-      } else {
-        const errorData = await response.json();
-        alert(errorData.message || '사용자 정보를 불러올 수 없습니다.');
-      }
-    } catch (err) {
-      console.error('사용자 상세 정보 로딩 오류:', err);
-      alert('서버 연결에 실패했습니다.');
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const result = await updateUser(editUser);
+    if (result) {
+      setShowEditModal(false);
     }
   };
 
-  const updateUserBalance = async (userId: string, newBalance: number, reason: string) => {
-    try {
-      const headers = getAuthHeaders();
-      
-      const response = await fetch(`${buildApiUrl('/api/admin')}/users/${userId}/balance`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({ balance: newBalance, reason })
-      });
-
-      if (response.ok) {
-        alert('잔액이 성공적으로 수정되었습니다.');
-        setBalanceEdit({ isEditing: false, newBalance: 0, reason: '' });
-        fetchUsers(); // 목록 새로고침
-        if (selectedUser?.id === userId) {
-          fetchUserDetail(userId); // 상세 정보 새로고침
+  const handleDeleteUser = (user: User) => {
+    setConfirmationModal({
+      isOpen: true,
+      title: '사용자 삭제',
+      message: `"${user.username}" 사용자를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`,
+      onConfirm: async () => {
+        const result = await deleteUser({ id: user.id });
+        if (result) {
+          setConfirmationModal({ isOpen: false, title: '', message: '', onConfirm: () => {} });
         }
-      } else {
-        const errorData = await response.json();
-        alert(errorData.message || '잔액 수정에 실패했습니다.');
       }
-    } catch (err) {
-      console.error('잔액 수정 오류:', err);
-      alert('서버 연결에 실패했습니다.');
-    }
-  };
-
-  const updateUserStatus = async (userId: string, isActive: boolean, reason: string) => {
-    try {
-      const headers = getAuthHeaders();
-      
-      const response = await fetch(`${buildApiUrl('/api/admin')}/users/${userId}/status`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({ isActive, reason })
-      });
-
-      if (response.ok) {
-        alert(`사용자 계정이 ${isActive ? '활성화' : '비활성화'}되었습니다.`);
-        fetchUsers(); // 목록 새로고침
-        if (selectedUser?.id === userId) {
-          fetchUserDetail(userId); // 상세 정보 새로고침
-        }
-      } else {
-        const errorData = await response.json();
-        alert(errorData.message || '계정 상태 변경에 실패했습니다.');
-      }
-    } catch (err) {
-      console.error('계정 상태 변경 오류:', err);
-      alert('서버 연결에 실패했습니다.');
-    }
-  };
-
-  // 서버에서 필터링된 데이터를 받으므로 클라이언트 사이드 필터링 제거
-
-  const handleFilterChange = (key: keyof UserFilters, value: any) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-    setPagination(prev => ({ ...prev, currentPage: 1 }));
-  };
-
-  const handleUserClick = (user: User) => {
-    fetchUserDetail(user.id);
-    fetchUserReferralStats(user.id);
-  };
-
-  const fetchUserReferralStats = async (userId: string) => {
-    try {
-      const headers = getAuthHeaders();
-      
-      const response = await fetch(`${buildApiUrl('/api/admin')}/users/${userId}/referral-stats`, {
-        headers
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUserReferralStats(data.stats);
-      }
-    } catch (err) {
-      console.error('사용자 추천코드 현황 로딩 오류:', err);
-    }
-  };
-
-  const handleBalanceEdit = (user: User) => {
-    setBalanceEdit({
-      isEditing: true,
-      newBalance: parseFloat(user.balance.toString()),
-      reason: ''
     });
   };
 
-  const handleBalanceSave = () => {
-    if (selectedUser && balanceEdit.reason.trim()) {
-      updateUserBalance(selectedUser.id, balanceEdit.newBalance, balanceEdit.reason);
-    } else {
-      alert('수정 사유를 입력해주세요.');
-    }
+  const handleResetFilters = () => {
+    setSelectedStatus('all');
+    setSearchTerm('');
   };
-
-  const handleStatusToggle = (user: User) => {
-    const reason = prompt(`${user.isActive ? '비활성화' : '활성화'} 사유를 입력해주세요:`);
-    if (reason) {
-      updateUserStatus(user.id, !user.isActive, reason);
-    }
-  };
-
-  const handleUserEdit = (user: User) => {
-    setUserEditForm({
-      referralCode: user.referralCode || '',
-      referredBy: user.referredBy || '',
-      reason: ''
-    });
-    setShowUserEditModal(true);
-  };
-
-  const handleUserEditSubmit = async () => {
-    if (!selectedUser || !userEditForm.reason.trim()) {
-      alert('수정 사유를 입력해주세요.');
-      return;
-    }
-
-    try {
-      const headers = getAuthHeaders();
-      
-      const response = await fetch(`${buildApiUrl('/api/admin')}/users/${selectedUser.id}`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({
-          referralCode: userEditForm.referralCode || null,
-          referredBy: userEditForm.referredBy || null,
-          reason: userEditForm.reason
-        })
-      });
-
-      if (response.ok) {
-        alert('사용자 정보가 성공적으로 수정되었습니다.');
-        setShowUserEditModal(false);
-        setUserEditForm({ referralCode: '', referredBy: '', reason: '' });
-        fetchUserDetail(selectedUser.id);
-        fetchUsers();
-      } else {
-        const errorData = await response.json();
-        alert(errorData.message || '사용자 정보 수정에 실패했습니다.');
-      }
-    } catch (err) {
-      console.error('사용자 정보 수정 오류:', err);
-      alert('서버 연결에 실패했습니다.');
-    }
-  };
-
-  if (!isLoggedIn || !isAdmin || adminLevel < 2) {
-    return null;
-  }
 
   return (
-    <div className="admin-page fixed inset-0 bg-gray-100 flex flex-col z-50">
-      <style jsx global>{`
-        body {
-          margin: 0;
-          padding: 0;
-          overflow-x: hidden;
-        }
-        #__next {
-          height: 100vh;
-          overflow-x: hidden;
-        }
-        .admin-page * {
-          box-sizing: border-box;
-        }
-      `}</style>
-        <Header />
-        <div className="flex-1 bg-gray-50 overflow-y-auto">
-          <div className="p-6">
-            <div className="max-w-7xl mx-auto">
-              {/* 헤더 */}
-              <div className="mb-8">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h1 className="text-3xl font-bold text-gray-900">사용자 관리</h1>
-                    <p className="text-gray-600 mt-2">사용자 목록 조회, 계정 관리, 잔액 수정</p>
-                  </div>
+    <AdminLayout requiredLevel={2} title="사용자 관리">
+      {/* 필터 바 */}
+      <FilterBar
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="사용자명 또는 이메일 검색..."
+        filters={[
+          {
+            key: 'status',
+            label: '상태',
+            value: selectedStatus,
+            options: statusOptions,
+            onChange: setSelectedStatus
+          }
+        ]}
+        onReset={handleResetFilters}
+      />
+
+      {/* 액션 버튼 */}
+      <div className="mb-4">
                   <button
-                    onClick={() => router.push('/admin')}
-                    className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors"
+          onClick={() => setShowAddModal(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    관리자홈
+          새 사용자 추가
                   </button>
-                </div>
               </div>
 
-              {loading ? (
-                <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="mt-4 text-gray-600">사용자 목록을 불러오는 중...</p>
+      {/* 에러 표시 */}
+      {usersError && (
+        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+          {usersError}
                 </div>
-              ) : error ? (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
-                  ❌ {error}
-                  <div className="mt-2 text-sm">
-                    <button 
-                      onClick={fetchUsers} 
-                      className="text-red-600 underline hover:text-red-800"
-                    >
-                      다시 시도
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {/* 필터 및 검색 */}
-                  <div className="bg-white rounded-lg shadow p-6 mb-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      )}
+
+      {/* 사용자 테이블 */}
+      <AdminTable
+        data={filteredUsers}
+        columns={userColumns}
+        loading={usersLoading}
+        emptyMessage="사용자 데이터가 없습니다."
+      />
+
+      {/* 새 사용자 추가 모달 */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowAddModal(false)}></div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <form onSubmit={handleAddUser}>
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">새 사용자 추가</h3>
+                  <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">검색</label>
+                      <label className="block text-sm font-medium text-gray-700">사용자명</label>
                         <input
                           type="text"
-                          placeholder="사용자명, 이메일, 추천코드"
-                          value={filters.search}
-                          onChange={(e) => handleFilterChange('search', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={newUser.username}
+                        onChange={(e) => setNewUser({...newUser, username: e.target.value})}
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        required
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">상태</label>
-                        <select
-                          value={filters.status}
-                          onChange={(e) => handleFilterChange('status', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="all">전체</option>
-                          <option value="active">활성</option>
-                          <option value="inactive">비활성</option>
-                        </select>
+                      <label className="block text-sm font-medium text-gray-700">이메일</label>
+                      <input
+                        type="email"
+                        value={newUser.email}
+                        onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        required
+                      />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">관리자 레벨</label>
-                        <select
-                          value={filters.adminLevel}
-                          onChange={(e) => handleFilterChange('adminLevel', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="all">전체</option>
-                          <option value="0">일반 사용자</option>
-                          <option value="1">레벨 1</option>
-                          <option value="2">레벨 2</option>
-                          <option value="3">레벨 3</option>
-                          <option value="4">레벨 4</option>
-                          <option value="5">레벨 5</option>
-                        </select>
+                      <label className="block text-sm font-medium text-gray-700">비밀번호</label>
+                      <input
+                        type="password"
+                        value={newUser.password}
+                        onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        required
+                      />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">정렬 기준</label>
+                      <label className="block text-sm font-medium text-gray-700">관리자 레벨</label>
                         <select
-                          value={filters.sortBy}
-                          onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="createdAt">가입일</option>
-                          <option value="lastLogin">최근 로그인</option>
-                          <option value="balance">잔액</option>
-                          <option value="username">사용자명</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">정렬 순서</label>
-                        <select
-                          value={filters.sortOrder}
-                          onChange={(e) => handleFilterChange('sortOrder', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="desc">내림차순</option>
-                          <option value="asc">오름차순</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 사용자 목록 */}
-                  <div className="bg-white rounded-lg shadow overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                      <h3 className="text-lg font-medium text-gray-900">
-                        사용자 목록 ({pagination.totalItems}명)
-                      </h3>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">사용자</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">잔액</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">관리자</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">레퍼럴</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">가입일</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">최근 로그인</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">액션</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {users.map((user) => (
-                            <tr key={user.id} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="flex items-center">
-                                  <div className="flex-shrink-0 h-10 w-10">
-                                    <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                      <span className="text-sm font-medium text-blue-600">
-                                        {user.username.charAt(0).toUpperCase()}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <div className="ml-4">
-                                    <div className="text-sm font-medium text-gray-900">{user.username}</div>
-                                    <div className="text-sm text-gray-500">{user.email}</div>
-                                    {user.referralCode && (
-                                      <div className="text-xs text-purple-600">코드: {user.referralCode}</div>
-                                    )}
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900">₩{parseFloat(user.balance.toString()).toLocaleString()}</div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                  user.isActive 
-                                    ? 'bg-green-100 text-green-800' 
-                                    : 'bg-red-100 text-red-800'
-                                }`}>
-                                  {user.isActive ? '활성' : '비활성'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                {user.isAdmin ? (
-                                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
-                                    레벨 {user.adminLevel}
-                                  </span>
-                                ) : (
-                                  <span className="text-sm text-gray-500">일반</span>
-                                )}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                {user.referredBy ? (
-                                  <div className="text-sm">
-                                    <div className="font-mono text-purple-600">{user.referredBy}</div>
-                                    {user.referralCode && (
-                                      <div className="text-xs text-gray-500">코드: {user.referralCode}</div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <span className="text-sm text-gray-500">없음</span>
-                                )}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {new Date(user.createdAt).toLocaleDateString('ko-KR')}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString('ko-KR') : '없음'}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <button
-                                  onClick={() => handleUserClick(user)}
-                                  className="text-blue-600 hover:text-blue-900 mr-3"
-                                >
-                                  상세보기
-                                </button>
-                                {adminLevel >= 4 && (
-                                  <button
-                                    onClick={() => handleBalanceEdit(user)}
-                                    className="text-green-600 hover:text-green-900 mr-3"
-                                  >
-                                    잔액수정
-                                  </button>
-                                )}
-                                {adminLevel >= 3 && (
-                                  <button
-                                    onClick={() => handleStatusToggle(user)}
-                                    className={`${
-                                      user.isActive 
-                                        ? 'text-red-600 hover:text-red-900' 
-                                        : 'text-green-600 hover:text-green-900'
-                                    }`}
-                                  >
-                                    {user.isActive ? '비활성화' : '활성화'}
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    
-                    {/* 페이지네이션 */}
-                    {pagination.totalPages > 1 && (
-                      <div className="px-6 py-4 border-t border-gray-200">
-                        <div className="flex items-center justify-between">
-                          <div className="text-sm text-gray-700">
-                            {pagination.totalItems}명 중 {((pagination.currentPage - 1) * pagination.itemsPerPage) + 1}-{Math.min(pagination.currentPage * pagination.itemsPerPage, pagination.totalItems)}명 표시
-                          </div>
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={() => setPagination(prev => ({ ...prev, currentPage: Math.max(1, prev.currentPage - 1) }))}
-                              disabled={pagination.currentPage === 1}
-                              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              이전
-                            </button>
-                            
-                            {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                              const pageNum = Math.max(1, Math.min(pagination.totalPages - 4, pagination.currentPage - 2)) + i;
-                              if (pageNum > pagination.totalPages) return null;
-                              
-                              return (
-                                <button
-                                  key={pageNum}
-                                  onClick={() => setPagination(prev => ({ ...prev, currentPage: pageNum }))}
-                                  className={`px-3 py-2 text-sm font-medium rounded-md ${
-                                    pageNum === pagination.currentPage
-                                      ? 'bg-blue-600 text-white'
-                                      : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
-                                  }`}
-                                >
-                                  {pageNum}
-                                </button>
-                              );
-                            })}
-                            
-                            <button
-                              onClick={() => setPagination(prev => ({ ...prev, currentPage: Math.min(prev.totalPages, prev.currentPage + 1) }))}
-                              disabled={pagination.currentPage === pagination.totalPages}
-                              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              다음
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {/* 사용자 상세 모달 */}
-              {showUserDetail && selectedUser && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                  <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-                    <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                      <h3 className="text-lg font-medium text-gray-900">사용자 상세 정보</h3>
-                      <button
-                        onClick={() => setShowUserDetail(false)}
-                        className="text-gray-400 hover:text-gray-600"
+                        value={newUser.admin_level}
+                        onChange={(e) => setNewUser({...newUser, admin_level: parseInt(e.target.value)})}
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
                       >
-                        ✕
-                      </button>
-                    </div>
-                    <div className="p-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* 기본 정보 */}
-                        <div>
-                          <h4 className="text-lg font-medium text-gray-900 mb-4">기본 정보</h4>
-                          <div className="space-y-3">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-500">사용자명</label>
-                              <p className="text-sm text-gray-900">{selectedUser.username}</p>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-500">이메일</label>
-                              <p className="text-sm text-gray-900">{selectedUser.email}</p>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-500">추천코드</label>
-                              <div className="flex items-center space-x-2">
-                                <p className="text-sm text-gray-900">{selectedUser.referralCode || '없음'}</p>
-                                {adminLevel >= 3 && (
-                                  <button
-                                    onClick={() => handleUserEdit(selectedUser)}
-                                    className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-200"
-                                  >
-                                    수정
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-500">추천인 코드</label>
-                              <div className="flex items-center space-x-2">
-                                <p className="text-sm text-gray-900">{selectedUser.referredBy || '없음'}</p>
-                                {adminLevel >= 3 && (
-                                  <button
-                                    onClick={() => handleUserEdit(selectedUser)}
-                                    className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-200"
-                                  >
-                                    수정
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* 계정 정보 */}
-                        <div>
-                          <h4 className="text-lg font-medium text-gray-900 mb-4">계정 정보</h4>
-                          <div className="space-y-3">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-500">잔액</label>
-                              <div className="flex items-center space-x-2">
-                                <p className="text-sm text-gray-900">₩{parseFloat(selectedUser.balance.toString()).toLocaleString()}</p>
-                                {adminLevel >= 4 && (
-                                  <button
-                                    onClick={() => handleBalanceEdit(selectedUser)}
-                                    className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-200"
-                                  >
-                                    수정
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-500">계정 상태</label>
-                              <div className="flex items-center space-x-2">
-                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                  selectedUser.isActive 
-                                    ? 'bg-green-100 text-green-800' 
-                                    : 'bg-red-100 text-red-800'
-                                }`}>
-                                  {selectedUser.isActive ? '활성' : '비활성'}
-                                </span>
-                                {adminLevel >= 3 && (
-                                  <button
-                                    onClick={() => handleStatusToggle(selectedUser)}
-                                    className={`text-xs px-2 py-1 rounded ${
-                                      selectedUser.isActive 
-                                        ? 'bg-red-100 text-red-600 hover:bg-red-200' 
-                                        : 'bg-green-100 text-green-600 hover:bg-green-200'
-                                    }`}
-                                  >
-                                    {selectedUser.isActive ? '비활성화' : '활성화'}
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-500">관리자 권한</label>
-                              <p className="text-sm text-gray-900">
-                                {selectedUser.isAdmin ? `레벨 ${selectedUser.adminLevel}` : '일반 사용자'}
-                              </p>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-500">가입일</label>
-                              <p className="text-sm text-gray-900">{new Date(selectedUser.createdAt).toLocaleString('ko-KR')}</p>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-500">최근 로그인</label>
-                              <p className="text-sm text-gray-900">
-                                {selectedUser.lastLogin ? new Date(selectedUser.lastLogin).toLocaleString('ko-KR') : '없음'}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
+                        <option value={0}>일반 사용자</option>
+                        <option value={1}>레벨 1</option>
+                        <option value={2}>레벨 2</option>
+                        <option value={3}>레벨 3</option>
+                        <option value={4}>레벨 4</option>
+                        <option value={5}>최고 관리자</option>
+                        </select>
                       </div>
-
-                      {/* 레퍼럴 정보 */}
-                      {referralInfo && (
-                        <div className="mt-6">
-                          <h4 className="text-lg font-medium text-gray-900 mb-4">레퍼럴 정보</h4>
-                          <div className="bg-purple-50 p-4 rounded-lg">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-sm font-medium text-purple-600">추천인 코드</label>
-                                <p className="text-sm text-gray-900 font-mono">{referralInfo.referredBy}</p>
-                              </div>
-                              {referralInfo.referrerAdmin && (
-                                <div>
-                                  <label className="block text-sm font-medium text-purple-600">추천 관리자</label>
-                                  <p className="text-sm text-gray-900">
-                                    {referralInfo.referrerAdmin.username} (레벨 {referralInfo.referrerAdmin.adminLevel})
-                                  </p>
-                                </div>
-                              )}
-                              {referralInfo.referralCode && (
-                                <>
-                                  <div>
-                                    <label className="block text-sm font-medium text-purple-600">수수료율</label>
-                                    <p className="text-sm text-gray-900">{(referralInfo.referralCode.commissionRate * 100).toFixed(2)}%</p>
-                                  </div>
-                                  <div>
-                                    <label className="block text-sm font-medium text-purple-600">코드 상태</label>
-                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                      referralInfo.referralCode.isActive 
-                                        ? 'bg-green-100 text-green-800' 
-                                        : 'bg-red-100 text-red-800'
-                                    }`}>
-                                      {referralInfo.referralCode.isActive ? '활성' : '비활성'}
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <label className="block text-sm font-medium text-purple-600">현재 사용자 수</label>
-                                    <p className="text-sm text-gray-900">
-                                      {referralInfo.referralCode.currentUsers}명
-                                      {referralInfo.referralCode.maxUsers && ` / ${referralInfo.referralCode.maxUsers}명`}
-                                    </p>
-                                  </div>
-                                  {referralInfo.referralCode.expiresAt && (
-                                    <div>
-                                      <label className="block text-sm font-medium text-purple-600">만료일</label>
-                                      <p className="text-sm text-gray-900">
-                                        {new Date(referralInfo.referralCode.expiresAt).toLocaleDateString('ko-KR')}
-                                      </p>
-                                    </div>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 추천한 사용자들 (관리자인 경우) */}
-                      {referredUsers.length > 0 && (
-                        <div className="mt-6">
-                          <h4 className="text-lg font-medium text-gray-900 mb-4">추천한 사용자들 ({referredUsers.length}명)</h4>
-                          <div className="bg-gray-50 rounded-lg p-4">
-                            <div className="space-y-3">
-                              {referredUsers.map((referredUser) => (
-                                <div key={referredUser.id} className="flex items-center justify-between bg-white p-3 rounded border">
-                                  <div className="flex items-center space-x-3">
-                                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                                      <span className="text-xs font-medium text-blue-600">
-                                        {referredUser.username.charAt(0).toUpperCase()}
-                                      </span>
-                                    </div>
-                                    <div>
-                                      <p className="text-sm font-medium text-gray-900">{referredUser.username}</p>
-                                      <p className="text-xs text-gray-500">{referredUser.email}</p>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                      referredUser.isActive 
-                                        ? 'bg-green-100 text-green-800' 
-                                        : 'bg-red-100 text-red-800'
-                                    }`}>
-                                      {referredUser.isActive ? '활성' : '비활성'}
-                                    </span>
-                                    <span className="text-xs text-gray-500">
-                                      {new Date(referredUser.createdAt).toLocaleDateString('ko-KR')}
-                                    </span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 추천코드 현황 대시보드 */}
-                      {userReferralStats && (
-                        <div className="mt-6">
-                          <div className="flex items-center justify-between mb-4">
-                            <h4 className="text-lg font-medium text-gray-900">추천코드 현황</h4>
-                            {adminLevel >= 3 && !userReferralStats.hasReferralCode && (
-                              <button
-                                onClick={() => setShowCreateReferralModal(true)}
-                                className="bg-blue-600 text-white px-3 py-1 text-sm rounded hover:bg-blue-700"
-                              >
-                                추천코드 생성
-                              </button>
-                            )}
-                          </div>
-                          
-                          <div className="bg-gray-50 p-6 rounded-lg">
-                            {/* 사용자 추천코드 정보 */}
-                            <div className="mb-6">
-                              <h5 className="text-md font-medium text-gray-800 mb-3">사용자 추천코드</h5>
-                              {userReferralStats.hasReferralCode ? (
-                                <div className="bg-white p-4 rounded border">
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                      <label className="block text-sm font-medium text-gray-600">추천코드</label>
-                                      <p className="text-lg font-mono font-bold text-blue-600">{userReferralStats.referralCodeInfo?.code}</p>
-                                    </div>
-                                    <div>
-                                      <label className="block text-sm font-medium text-gray-600">수수료율</label>
-                                      <p className="text-lg font-bold text-green-600">{(userReferralStats.referralCodeInfo?.commissionRate * 100).toFixed(2)}%</p>
-                                    </div>
-                                    <div>
-                                      <label className="block text-sm font-medium text-gray-600">상태</label>
-                                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                        userReferralStats.referralCodeInfo?.isActive 
-                                          ? 'bg-green-100 text-green-800' 
-                                          : 'bg-red-100 text-red-800'
-                                      }`}>
-                                        {userReferralStats.referralCodeInfo?.isActive ? '활성' : '비활성'}
-                                      </span>
-                                    </div>
-                                    <div>
-                                      <label className="block text-sm font-medium text-gray-600">추천받은 사용자 수</label>
-                                      <p className="text-lg font-bold text-purple-600">{userReferralStats.referralCodeInfo?.currentUsers || 0}명</p>
-                                    </div>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="bg-yellow-50 p-4 rounded border border-yellow-200">
-                                  <p className="text-yellow-800">아직 추천코드가 설정되지 않았습니다.</p>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* 추천받은 정보 */}
-                            {userReferralStats.referredBy && (
-                              <div className="mb-6">
-                                <h5 className="text-md font-medium text-gray-800 mb-3">추천받은 정보</h5>
-                                <div className="bg-white p-4 rounded border">
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                      <label className="block text-sm font-medium text-gray-600">추천인 코드</label>
-                                      <p className="text-lg font-mono font-bold text-purple-600">{userReferralStats.referrerInfo?.code}</p>
-                                    </div>
-                                    <div>
-                                      <label className="block text-sm font-medium text-gray-600">추천 관리자</label>
-                                      <p className="text-lg font-bold text-blue-600">{userReferralStats.referrerInfo?.admin?.username}</p>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* 추천한 사용자 목록 */}
-                            {userReferralStats.referredUsers && userReferralStats.referredUsers.length > 0 && (
-                              <div>
-                                <h5 className="text-md font-medium text-gray-800 mb-3">
-                                  추천한 사용자 목록 ({userReferralStats.referredUsers.length}명)
-                                </h5>
-                                <div className="bg-white rounded border overflow-hidden">
-                                  <div className="max-h-64 overflow-y-auto">
-                                    <table className="min-w-full divide-y divide-gray-200">
-                                      <thead className="bg-gray-50">
-                                        <tr>
-                                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">사용자명</th>
-                                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">이메일</th>
-                                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">가입일</th>
-                                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">잔액</th>
-                                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">상태</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody className="bg-white divide-y divide-gray-200">
-                                        {userReferralStats.referredUsers.map((user: any) => (
-                                          <tr key={user.id}>
-                                            <td className="px-4 py-2 text-sm font-medium text-gray-900">{user.username}</td>
-                                            <td className="px-4 py-2 text-sm text-gray-500">{user.email}</td>
-                                            <td className="px-4 py-2 text-sm text-gray-500">{new Date(user.createdAt).toLocaleDateString('ko-KR')}</td>
-                                            <td className="px-4 py-2 text-sm text-gray-500">₩{parseFloat(user.balance.toString()).toLocaleString()}</td>
-                                            <td className="px-4 py-2">
-                                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                                user.isActive 
-                                                  ? 'bg-green-100 text-green-800' 
-                                                  : 'bg-red-100 text-red-800'
-                                              }`}>
-                                                {user.isActive ? '활성' : '비활성'}
-                                              </span>
-                                            </td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 베팅 통계 */}
-                      {userStats && (
-                        <div className="mt-6">
-                          <h4 className="text-lg font-medium text-gray-900 mb-4">베팅 통계</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="bg-blue-50 p-4 rounded-lg">
-                              <h5 className="text-sm font-medium text-blue-600">총 베팅 수</h5>
-                              <p className="text-2xl font-bold text-blue-900">{userStats.totalBets}</p>
-                            </div>
-                            <div className="bg-green-50 p-4 rounded-lg">
-                              <h5 className="text-sm font-medium text-green-600">총 베팅 금액</h5>
-                              <p className="text-2xl font-bold text-green-900">₩{userStats.totalStake.toLocaleString()}</p>
-                            </div>
-                            <div className="bg-purple-50 p-4 rounded-lg">
-                              <h5 className="text-sm font-medium text-purple-600">총 당첨 금액</h5>
-                              <p className="text-2xl font-bold text-purple-900">₩{userStats.totalWinnings.toLocaleString()}</p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 잔액 수정 모달 */}
-              {balanceEdit.isEditing && selectedUser && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                  <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                      <h3 className="text-lg font-medium text-gray-900">잔액 수정</h3>
-                    </div>
-                    <div className="p-6">
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">사용자</label>
-                        <p className="text-sm text-gray-900">{selectedUser.username} ({selectedUser.email})</p>
-                      </div>
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">현재 잔액</label>
-                        <p className="text-sm text-gray-900">₩{parseFloat(selectedUser.balance.toString()).toLocaleString()}</p>
-                      </div>
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">새 잔액</label>
+                      <div>
+                      <label className="block text-sm font-medium text-gray-700">초기 잔액</label>
                         <input
                           type="number"
-                          value={balanceEdit.newBalance}
-                          onChange={(e) => setBalanceEdit(prev => ({ ...prev, newBalance: parseFloat(e.target.value) || 0 }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={newUser.balance}
+                        onChange={(e) => setNewUser({...newUser, balance: parseInt(e.target.value)})}
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        min="0"
                         />
                       </div>
-                      <div className="mb-6">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">수정 사유</label>
-                        <textarea
-                          value={balanceEdit.reason}
-                          onChange={(e) => setBalanceEdit(prev => ({ ...prev, reason: e.target.value }))}
-                          placeholder="잔액 수정 사유를 입력해주세요"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          rows={3}
-                        />
                       </div>
-                      <div className="flex justify-end space-x-3">
+                </div>
+                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                         <button
-                          onClick={() => setBalanceEdit({ isEditing: false, newBalance: 0, reason: '' })}
-                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                    type="submit"
+                    disabled={addLoading}
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
                         >
-                          취소
+                    {addLoading ? '추가 중...' : '추가'}
                         </button>
                         <button
-                          onClick={handleBalanceSave}
-                          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                    type="button"
+                    onClick={() => setShowAddModal(false)}
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                         >
-                          수정
+                    취소
                         </button>
                       </div>
+              </form>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* 사용자 정보 수정 모달 */}
-              {showUserEditModal && selectedUser && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                  <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                      <h3 className="text-lg font-medium text-gray-900">
-                        사용자 정보 수정 - {selectedUser.username}
-                      </h3>
-                    </div>
-                    <div className="p-6">
+      {/* 사용자 편집 모달 */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowEditModal(false)}></div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <form onSubmit={handleUpdateUser}>
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">사용자 정보 수정</h3>
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">추천코드</label>
+                      <label className="block text-sm font-medium text-gray-700">사용자명</label>
                           <input
                             type="text"
-                            value={userEditForm.referralCode}
-                            onChange={(e) => setUserEditForm(prev => ({ ...prev, referralCode: e.target.value.toUpperCase() }))}
-                            placeholder="추천코드 입력 (빈 값으로 제거)"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            maxLength={4}
-                          />
-                          <p className="text-xs text-gray-500 mt-1">빈 값으로 설정하면 추천코드가 제거됩니다.</p>
+                        value={editUser.username}
+                        onChange={(e) => setEditUser({...editUser, username: e.target.value})}
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        required
+                      />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">추천인 코드</label>
+                      <label className="block text-sm font-medium text-gray-700">이메일</label>
                           <input
-                            type="text"
-                            value={userEditForm.referredBy}
-                            onChange={(e) => setUserEditForm(prev => ({ ...prev, referredBy: e.target.value.toUpperCase() }))}
-                            placeholder="추천인 코드 입력 (빈 값으로 제거)"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            maxLength={4}
-                          />
-                          <p className="text-xs text-gray-500 mt-1">빈 값으로 설정하면 추천인 코드가 제거됩니다.</p>
+                        type="email"
+                        value={editUser.email}
+                        onChange={(e) => setEditUser({...editUser, email: e.target.value})}
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        required
+                      />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">수정 사유</label>
-                          <textarea
-                            value={userEditForm.reason}
-                            onChange={(e) => setUserEditForm(prev => ({ ...prev, reason: e.target.value }))}
-                            placeholder="수정 사유를 입력해주세요"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            rows={3}
-                          />
-                        </div>
+                      <label className="block text-sm font-medium text-gray-700">관리자 레벨</label>
+                      <select
+                        value={editUser.admin_level}
+                        onChange={(e) => setEditUser({...editUser, admin_level: parseInt(e.target.value)})}
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                      >
+                        <option value={0}>일반 사용자</option>
+                        <option value={1}>레벨 1</option>
+                        <option value={2}>레벨 2</option>
+                        <option value={3}>레벨 3</option>
+                        <option value={4}>레벨 4</option>
+                        <option value={5}>최고 관리자</option>
+                      </select>
                       </div>
-                      <div className="flex justify-end space-x-3 mt-6">
-                        <button
-                          onClick={() => setShowUserEditModal(false)}
-                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
-                        >
-                          취소
-                        </button>
-                        <button
-                          onClick={handleUserEditSubmit}
-                          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-                        >
-                          수정
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 추천코드 생성 모달 */}
-              {showCreateReferralModal && selectedUser && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                  <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                      <h3 className="text-lg font-medium text-gray-900">
-                        추천코드 생성 - {selectedUser.username}
-                      </h3>
-                    </div>
-                    <div className="p-6">
-                      <div className="space-y-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">추천코드</label>
-                          <div className="flex space-x-2">
-                            <input
-                              type="text"
-                              placeholder="추천코드 입력"
-                              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              maxLength={4}
-                              onChange={(e) => setCreateForm(prev => ({ ...prev, referralCode: e.target.value.toUpperCase() }))}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-                                let result = '';
-                                for (let i = 0; i < 4; i++) {
-                                  result += chars.charAt(Math.floor(Math.random() * chars.length));
-                                }
-                                setCreateForm(prev => ({ ...prev, referralCode: result }));
-                              }}
-                              className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-                            >
-                              랜덤
-                            </button>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">수수료율 (%)</label>
+                      <label className="block text-sm font-medium text-gray-700">잔액</label>
                           <input
                             type="number"
-                            step="0.01"
+                        value={editUser.balance}
+                        onChange={(e) => setEditUser({...editUser, balance: parseInt(e.target.value)})}
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
                             min="0"
-                            max="20"
-                            defaultValue="5"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">최대 사용자 수 (선택사항)</label>
+                      <label className="flex items-center">
                           <input
-                            type="number"
-                            min="1"
-                            placeholder="무제한"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
+                          type="checkbox"
+                          checked={editUser.is_active}
+                          onChange={(e) => setEditUser({...editUser, is_active: e.target.checked})}
+                          className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">활성 상태</span>
+                      </label>
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">만료일 (선택사항)</label>
-                          <input
-                            type="datetime-local"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
                         </div>
                       </div>
-                      <div className="flex justify-end space-x-3 mt-6">
+                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                         <button
-                          onClick={() => setShowCreateReferralModal(false)}
-                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                    type="submit"
+                    disabled={updateLoading}
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
                         >
-                          취소
+                    {updateLoading ? '수정 중...' : '수정'}
                         </button>
                         <button
-                          onClick={async () => {
-                            try {
-                              const headers = getAuthHeaders();
-                              const formData = new FormData(document.querySelector('#referralCreateForm') as HTMLFormElement);
-                              
-                              const response = await fetch(`${buildApiUrl('/api/admin')}/referral-codes`, {
-                                method: 'POST',
-                                headers,
-                                body: JSON.stringify({
-                                  code: (document.querySelector('input[placeholder="추천코드 입력"]') as HTMLInputElement)?.value,
-                                  commissionRate: parseFloat((document.querySelector('input[type="number"]') as HTMLInputElement)?.value || '5') / 100,
-                                  maxUsers: (document.querySelector('input[placeholder="무제한"]') as HTMLInputElement)?.value ? parseInt((document.querySelector('input[placeholder="무제한"]') as HTMLInputElement)?.value || '0') : null,
-                                  expiresAt: (document.querySelector('input[type="datetime-local"]') as HTMLInputElement)?.value || null,
-                                  assignToUserId: selectedUser.id
-                                })
-                              });
-
-                              if (response.ok) {
-                                const data = await response.json();
-                                alert(data.message || '추천코드가 성공적으로 생성되었습니다.');
-                                setShowCreateReferralModal(false);
-                                fetchUserReferralStats(selectedUser.id);
-                                fetchUserDetail(selectedUser.id);
-                              } else {
-                                const errorData = await response.json();
-                                alert(errorData.message || '추천코드 생성에 실패했습니다.');
-                              }
-                            } catch (err) {
-                              console.error('추천코드 생성 오류:', err);
-                              alert('서버 연결에 실패했습니다.');
-                            }
-                          }}
-                          className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700"
-                        >
-                          생성 및 할당
+                    type="button"
+                    onClick={() => setShowEditModal(false)}
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    취소
                         </button>
                       </div>
+              </form>
                     </div>
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      </div>
+
+      {/* 확인 모달 */}
+      <ConfirmationModal
+        isOpen={confirmationModal.isOpen}
+        onClose={() => setConfirmationModal({ isOpen: false, title: '', message: '', onConfirm: () => {} })}
+        onConfirm={confirmationModal.onConfirm}
+        title={confirmationModal.title}
+        message={confirmationModal.message}
+        confirmText="삭제"
+        cancelText="취소"
+        confirmButtonColor="red"
+      />
+    </AdminLayout>
   );
 }

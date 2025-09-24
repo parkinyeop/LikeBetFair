@@ -878,9 +878,25 @@ router.get('/users', verifyToken, requireAdmin(2), async (req, res) => {
 
     const totalPages = Math.ceil(count / limit);
 
+    // 디버깅을 위한 로깅 추가
+    console.log(`[Admin Users API] 조회된 사용자 수: ${users.length}`);
+    users.forEach((user, index) => {
+      console.log(`[Admin Users API] 사용자 ${index + 1}: ${user.username}, isActive: ${user.isActive}, adminLevel: ${user.adminLevel}`);
+    });
+
+    // 프론트엔드와의 호환성을 위해 필드명을 snake_case로 변환
+    const formattedUsers = users.map(user => ({
+      ...user.toJSON(),
+      admin_level: user.adminLevel,
+      is_active: user.isActive,
+      created_at: user.createdAt,
+      updated_at: user.updatedAt,
+      last_login: user.lastLogin
+    }));
+
     res.json({
       message: '사용자 목록 조회 성공',
-      users,
+      users: formattedUsers,
       pagination: {
         currentPage: parseInt(page),
         totalPages,
@@ -895,7 +911,7 @@ router.get('/users', verifyToken, requireAdmin(2), async (req, res) => {
 });
 
 // 사용자 상세 정보
-router.get('/users/:id', verifyToken, requireAdmin(2), async (req, res) => {
+router.get('/users/detail/:id', verifyToken, requireAdmin(2), async (req, res) => {
   try {
     const user = await User.findByPk(req.params.id, {
       attributes: { exclude: ['password'] },
@@ -989,7 +1005,7 @@ router.get('/users/:id', verifyToken, requireAdmin(2), async (req, res) => {
 });
 
 // 사용자 잔액 수정
-router.patch('/users/:id/balance', verifyToken, requireAdmin(4), async (req, res) => {
+router.patch('/users/detail/:id/balance', verifyToken, requireAdmin(4), async (req, res) => {
   try {
     const { balance, reason } = req.body;
     
@@ -1020,7 +1036,7 @@ router.patch('/users/:id/balance', verifyToken, requireAdmin(4), async (req, res
 });
 
 // 사용자 계정 상태 변경
-router.patch('/users/:id/status', verifyToken, requireAdmin(3), async (req, res) => {
+router.patch('/users/detail/:id/status', verifyToken, requireAdmin(3), async (req, res) => {
   try {
     const { isActive, reason } = req.body;
     
@@ -1044,7 +1060,7 @@ router.patch('/users/:id/status', verifyToken, requireAdmin(3), async (req, res)
 });
 
 // 사용자 정보 수정 (추천코드, 추천인 등)
-router.patch('/users/:id', verifyToken, requireAdmin(3), async (req, res) => {
+router.patch('/users/detail/:id', verifyToken, requireAdmin(3), async (req, res) => {
   try {
     const { referralCode, referredBy, reason } = req.body;
     
@@ -1121,6 +1137,164 @@ router.patch('/users/:id', verifyToken, requireAdmin(3), async (req, res) => {
   } catch (error) {
     console.error('User update error:', error);
     res.status(500).json({ message: '사용자 정보 수정 중 오류가 발생했습니다.' });
+  }
+});
+
+// 사용자 생성
+router.post('/users', verifyToken, requireAdmin(3), async (req, res) => {
+  try {
+    const { username, email, password, admin_level, balance, is_active } = req.body;
+
+    // 필수 필드 검증
+    if (!username || !email || !password) {
+      return res.status(400).json({ message: '사용자명, 이메일, 비밀번호는 필수입니다.' });
+    }
+
+    // 이메일 중복 확인
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({ message: '이미 존재하는 이메일입니다.' });
+    }
+
+    // 사용자명 중복 확인
+    const existingUsername = await User.findOne({ where: { username } });
+    if (existingUsername) {
+      return res.status(400).json({ message: '이미 존재하는 사용자명입니다.' });
+    }
+
+    // 비밀번호 해시화
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 새 사용자 생성
+    const newUser = await User.create({
+      username,
+      email,
+      password: hashedPassword,
+      adminLevel: admin_level || 0,
+      balance: balance || 0,
+      isActive: is_active !== undefined ? is_active : true,
+      isAdmin: admin_level > 0
+    });
+
+    // 비밀번호 제외하고 응답
+    const userResponse = {
+      id: newUser.id,
+      username: newUser.username,
+      email: newUser.email,
+      admin_level: newUser.adminLevel,
+      balance: newUser.balance,
+      is_active: newUser.isActive,
+      created_at: newUser.createdAt,
+      updated_at: newUser.updatedAt
+    };
+
+    res.status(201).json({
+      message: '사용자가 성공적으로 생성되었습니다.',
+      user: userResponse
+    });
+  } catch (error) {
+    console.error('User creation error:', error);
+    res.status(500).json({ message: '사용자 생성 중 오류가 발생했습니다.' });
+  }
+});
+
+// 사용자 수정
+router.put('/users', verifyToken, requireAdmin(3), async (req, res) => {
+  try {
+    const { id, username, email, admin_level, balance, is_active } = req.body;
+
+    if (!id) {
+      return res.status(400).json({ message: '사용자 ID는 필수입니다.' });
+    }
+
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
+    }
+
+    // 이메일 중복 확인 (자신 제외)
+    if (email && email !== user.email) {
+      const existingUser = await User.findOne({ where: { email } });
+      if (existingUser) {
+        return res.status(400).json({ message: '이미 존재하는 이메일입니다.' });
+      }
+    }
+
+    // 사용자명 중복 확인 (자신 제외)
+    if (username && username !== user.username) {
+      const existingUsername = await User.findOne({ where: { username } });
+      if (existingUsername) {
+        return res.status(400).json({ message: '이미 존재하는 사용자명입니다.' });
+      }
+    }
+
+    // 사용자 정보 업데이트
+    const updateData = {};
+    if (username !== undefined) updateData.username = username;
+    if (email !== undefined) updateData.email = email;
+    if (admin_level !== undefined) {
+      updateData.adminLevel = admin_level;
+      updateData.isAdmin = admin_level > 0;
+    }
+    if (balance !== undefined) updateData.balance = balance;
+    if (is_active !== undefined) updateData.isActive = is_active;
+
+    await user.update(updateData);
+
+    // 업데이트된 사용자 정보 반환
+    const updatedUser = await User.findByPk(id, {
+      attributes: { exclude: ['password'] }
+    });
+
+    const userResponse = {
+      id: updatedUser.id,
+      username: updatedUser.username,
+      email: updatedUser.email,
+      admin_level: updatedUser.adminLevel,
+      balance: updatedUser.balance,
+      is_active: updatedUser.isActive,
+      created_at: updatedUser.createdAt,
+      updated_at: updatedUser.updatedAt
+    };
+
+    res.json({
+      message: '사용자 정보가 성공적으로 수정되었습니다.',
+      user: userResponse
+    });
+  } catch (error) {
+    console.error('User update error:', error);
+    res.status(500).json({ message: '사용자 정보 수정 중 오류가 발생했습니다.' });
+  }
+});
+
+// 사용자 삭제
+router.delete('/users', verifyToken, requireAdmin(4), async (req, res) => {
+  try {
+    const { id } = req.body;
+
+    if (!id) {
+      return res.status(400).json({ message: '사용자 ID는 필수입니다.' });
+    }
+
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
+    }
+
+    // 관리자 레벨 5 이상은 삭제 불가
+    if (user.adminLevel >= 5) {
+      return res.status(403).json({ message: '최고 관리자는 삭제할 수 없습니다.' });
+    }
+
+    // 사용자 삭제
+    await user.destroy();
+
+    res.json({
+      message: '사용자가 성공적으로 삭제되었습니다.'
+    });
+  } catch (error) {
+    console.error('User deletion error:', error);
+    res.status(500).json({ message: '사용자 삭제 중 오류가 발생했습니다.' });
   }
 });
 

@@ -9,6 +9,7 @@ interface AuthContextType {
   adminLevel: number;
   token: string | null;
   userId: string | null;
+  isAuthLoading: boolean; // 인증 로딩 상태 추가
   login: (username: string, balance: number, token: string, isAdmin?: boolean, adminLevel?: number, userId?: string) => void;
   logout: () => void;
   setBalance: (balance: number) => void;
@@ -27,6 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [adminLevel, setAdminLevel] = useState(0);
   const [token, setToken] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true); // 인증 로딩 상태 추가
 
   // 탭별 고유 식별자 생성
   const [tabId, setTabId] = useState<string | null>(null);
@@ -86,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUserId(null);
         } finally {
           setIsInitialized(true);
+          setIsAuthLoading(false); // 인증 로딩 완료
         }
       };
 
@@ -93,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       // SSR 환경에서는 초기화만 완료
       setIsInitialized(true);
+      setIsAuthLoading(false);
     }
   }, []);
 
@@ -298,6 +302,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       adminLevel,
       token,
       userId,
+      isAuthLoading,
       login,
       logout,
       setBalance,
