@@ -383,6 +383,7 @@ export default function BettingAdmin() {
   // 월별 필터 상태
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [showCumulativeStats, setShowCumulativeStats] = useState(true);
 
   // 권한 체크
   useEffect(() => {
@@ -863,103 +864,151 @@ export default function BettingAdmin() {
               {/* 대시보드 탭 */}
               {activeTab === 'dashboard' && (
                 <div className="space-y-6">
-                  {/* KPI 카드들 */}
-                  {betStats && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                      <div className="bg-white p-6 rounded-lg shadow">
-                        <h3 className="text-sm font-medium text-gray-500">총 스포츠북 수</h3>
-                        <p className="text-2xl font-bold text-gray-900">{betStats.summary.totalBets}</p>
-                      </div>
-                      <div className="bg-white p-6 rounded-lg shadow">
-                        <h3 className="text-sm font-medium text-gray-500">총 스포츠북 금액</h3>
-                        <p className="text-2xl font-bold text-gray-900">₩{betStats.summary.totalStake.toLocaleString()}</p>
-                      </div>
-                      <div className="bg-white p-6 rounded-lg shadow">
-                        <h3 className="text-sm font-medium text-gray-500">총 당첨 금액</h3>
-                        <p className="text-2xl font-bold text-gray-900">₩{betStats.summary.actualWinnings.toLocaleString()}</p>
-                      </div>
-                      <div className="bg-white p-6 rounded-lg shadow">
-                        <h3 className="text-sm font-medium text-gray-500">순수익</h3>
-                        <p className={`text-2xl font-bold ${betStats.summary.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          ₩{betStats.summary.netProfit.toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 일별 베팅 현황 차트 */}
-                  <div className="bg-white rounded-lg shadow">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-medium text-gray-900">일별 스포츠북 현황</h3>
+                  {/* 통계 필터 */}
+                  <div className="bg-white p-4 rounded-lg shadow">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-medium text-gray-900">통계 필터</h3>
+                      <div className="flex items-center space-x-4">
+                        {/* 통계 타입 토글 */}
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => setShowCumulativeStats(true)}
+                            className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                              showCumulativeStats 
+                                ? 'bg-blue-600 text-white' 
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
+                          >
+                            📊 전체 누적
+                          </button>
+                          <button
+                            onClick={() => setShowCumulativeStats(false)}
+                            className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                              !showCumulativeStats 
+                                ? 'bg-blue-600 text-white' 
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
+                          >
+                            📅 월별 통계
+                          </button>
+                        </div>
                         
-                        {/* 월별 필터 */}
-                        <div className="flex items-center space-x-4">
-                          <div className="flex items-center space-x-2">
-                            <label className="text-sm font-medium text-gray-700">년도:</label>
-                            <select
-                              value={selectedYear}
-                              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                              className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
-                                <option key={year} value={year}>{year}년</option>
-                              ))}
-                            </select>
-                          </div>
-                          
-                          <div className="flex items-center space-x-2">
-                            <label className="text-sm font-medium text-gray-700">월:</label>
-                            <select
-                              value={selectedMonth}
-                              onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                              className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                              {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
-                                <option key={month} value={month}>{month}월</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 월별 요약 통계 */}
-                      {monthlySummary && (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-blue-600">{monthlySummary.totalBets}</div>
-                            <div className="text-sm text-gray-600">총 베팅</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-green-600">{monthlySummary.wonBets}</div>
-                            <div className="text-sm text-gray-600">당첨된 베팅</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-yellow-600">{monthlySummary.pendingBets}</div>
-                            <div className="text-sm text-gray-600">대기 중인 베팅</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-purple-600">{monthlySummary.totalStake}</div>
-                            <div className="text-sm text-gray-600">총 베팅 금액</div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-6">
-                      <div className="w-full h-96 relative">
-                        {dailyStats.length > 0 ? (
-                          <Bar data={prepareChartData()} options={chartOptions} />
-                        ) : (
-                          <div className="flex items-center justify-center h-full text-gray-500">
-                            <div className="text-center">
-                              <div className="text-4xl mb-2">📊</div>
-                              <div>해당 기간의 데이터가 없습니다.</div>
+                        {/* 월별 필터 (월별 통계 선택 시에만 표시) */}
+                        {!showCumulativeStats && (
+                          <>
+                            <div className="flex items-center space-x-2">
+                              <label className="text-sm font-medium text-gray-700">년도:</label>
+                              <select
+                                value={selectedYear}
+                                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                                className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              >
+                                {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
+                                  <option key={year} value={year}>{year}년</option>
+                                ))}
+                              </select>
                             </div>
-                          </div>
+                            
+                            <div className="flex items-center space-x-2">
+                              <label className="text-sm font-medium text-gray-700">월:</label>
+                              <select
+                                value={selectedMonth}
+                                onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                                className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              >
+                                {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                                  <option key={month} value={month}>{month}월</option>
+                                ))}
+                              </select>
+                            </div>
+                          </>
                         )}
                       </div>
                     </div>
                   </div>
+
+                  {/* 누적 통계 카드들 */}
+                  {showCumulativeStats && betStats && (
+                    <div className="mb-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 전체 누적 통계</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-lg shadow border border-blue-200">
+                          <h3 className="text-sm font-medium text-blue-700">총 스포츠북 수</h3>
+                          <p className="text-2xl font-bold text-blue-900">{betStats.summary.totalBets}</p>
+                        </div>
+                        <div className="bg-gradient-to-r from-green-50 to-green-100 p-6 rounded-lg shadow border border-green-200">
+                          <h3 className="text-sm font-medium text-green-700">총 스포츠북 금액</h3>
+                          <p className="text-2xl font-bold text-green-900">₩{betStats.summary.totalStake.toLocaleString()}</p>
+                        </div>
+                        <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-6 rounded-lg shadow border border-purple-200">
+                          <h3 className="text-sm font-medium text-purple-700">총 당첨 금액</h3>
+                          <p className="text-2xl font-bold text-purple-900">₩{betStats.summary.actualWinnings.toLocaleString()}</p>
+                        </div>
+                        <div className={`p-6 rounded-lg shadow border ${betStats.summary.netProfit >= 0 ? 'bg-gradient-to-r from-emerald-50 to-emerald-100 border-emerald-200' : 'bg-gradient-to-r from-red-50 to-red-100 border-red-200'}`}>
+                          <h3 className={`text-sm font-medium ${betStats.summary.netProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>순수익</h3>
+                          <p className={`text-2xl font-bold ${betStats.summary.netProfit >= 0 ? 'text-emerald-900' : 'text-red-900'}`}>
+                            ₩{betStats.summary.netProfit.toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 월별 KPI 카드들 */}
+                  {!showCumulativeStats && (
+                    <div className="mb-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">📅 {selectedYear}년 {selectedMonth}월 통계</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+                          <h3 className="text-sm font-medium text-gray-500">스포츠북 수</h3>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {monthlySummary ? monthlySummary.totalBets : 0}
+                          </p>
+                        </div>
+                        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+                          <h3 className="text-sm font-medium text-gray-500">스포츠북 금액</h3>
+                          <p className="text-2xl font-bold text-gray-900">
+                            ₩{monthlySummary ? monthlySummary.totalStake : '0'}
+                          </p>
+                        </div>
+                        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+                          <h3 className="text-sm font-medium text-gray-500">당첨된 스포츠북</h3>
+                          <p className="text-2xl font-bold text-green-600">
+                            {monthlySummary ? monthlySummary.wonBets : 0}
+                          </p>
+                        </div>
+                        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+                          <h3 className="text-sm font-medium text-gray-500">대기 중인 스포츠북</h3>
+                          <p className="text-2xl font-bold text-yellow-600">
+                            {monthlySummary ? monthlySummary.pendingBets : 0}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 일별 베팅 현황 차트 (월별 통계 선택 시에만 표시) */}
+                  {!showCumulativeStats && (
+                    <div className="bg-white rounded-lg shadow">
+                      <div className="px-6 py-4 border-b border-gray-200">
+                        <h3 className="text-lg font-medium text-gray-900">{selectedYear}년 {selectedMonth}월 일별 스포츠북 현황</h3>
+                      </div>
+                      <div className="p-6">
+                        <div className="w-full h-96 relative">
+                          {dailyStats.length > 0 ? (
+                            <Bar data={prepareChartData()} options={chartOptions} />
+                          ) : (
+                            <div className="flex items-center justify-center h-full text-gray-500">
+                              <div className="text-center">
+                                <div className="text-4xl mb-2">📊</div>
+                                <div>해당 기간의 데이터가 없습니다.</div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* 고급 통계 차트들 */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1015,51 +1064,6 @@ export default function BettingAdmin() {
                     </div>
                   </div>
 
-                  {/* 최근 베팅 */}
-                  <div className="bg-white rounded-lg shadow">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                        <h3 className="text-lg font-medium text-gray-900">최근 스포츠북</h3>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">스포츠북 정보</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">사용자</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">금액</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">날짜</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {bets.slice(0, 10).map((bet) => (
-                            <tr key={bet.id} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900">#{bet.id.substring(0, 8)}</div>
-                                <div className="text-sm text-gray-500">배당률: {bet.totalOdds}</div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900">{bet.User.username}</div>
-                                <div className="text-sm text-gray-500">{bet.User.email}</div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900">₩{bet.stake.toLocaleString()}</div>
-                                <div className="text-sm text-gray-500">당첨: ₩{bet.potentialWinnings.toLocaleString()}</div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(bet.status)}`}>
-                                  {getStatusText(bet.status)}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {new Date(bet.createdAt).toLocaleDateString('ko-KR')}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
                 </div>
               )}
 
@@ -1285,103 +1289,151 @@ export default function BettingAdmin() {
                     </div>
                   </div>
 
-                  {/* 종합 통계 카드 */}
-                  {betStats && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                      <div className="bg-white p-6 rounded-lg shadow">
-                        <h3 className="text-sm font-medium text-gray-500">총 스포츠북 수</h3>
-                        <p className="text-2xl font-bold text-gray-900">{betStats.summary.totalBets}</p>
-                      </div>
-                      <div className="bg-white p-6 rounded-lg shadow">
-                        <h3 className="text-sm font-medium text-gray-500">총 스포츠북 금액</h3>
-                        <p className="text-2xl font-bold text-gray-900">₩{betStats.summary.totalStake.toLocaleString()}</p>
-                      </div>
-                      <div className="bg-white p-6 rounded-lg shadow">
-                        <h3 className="text-sm font-medium text-gray-500">총 당첨 금액</h3>
-                        <p className="text-2xl font-bold text-gray-900">₩{betStats.summary.actualWinnings.toLocaleString()}</p>
-                      </div>
-                      <div className="bg-white p-6 rounded-lg shadow">
-                        <h3 className="text-sm font-medium text-gray-500">순수익</h3>
-                        <p className={`text-2xl font-bold ${betStats.summary.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          ₩{betStats.summary.netProfit.toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 일별 베팅 현황 차트 */}
-                  <div className="bg-white rounded-lg shadow">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-medium text-gray-900">일별 스포츠북 현황</h3>
+                  {/* 통계 필터 */}
+                  <div className="bg-white p-4 rounded-lg shadow">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-medium text-gray-900">통계 필터</h3>
+                      <div className="flex items-center space-x-4">
+                        {/* 통계 타입 토글 */}
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => setShowCumulativeStats(true)}
+                            className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                              showCumulativeStats 
+                                ? 'bg-blue-600 text-white' 
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
+                          >
+                            📊 전체 누적
+                          </button>
+                          <button
+                            onClick={() => setShowCumulativeStats(false)}
+                            className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                              !showCumulativeStats 
+                                ? 'bg-blue-600 text-white' 
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
+                          >
+                            📅 월별 통계
+                          </button>
+                        </div>
                         
-                        {/* 월별 필터 */}
-                        <div className="flex items-center space-x-4">
-                          <div className="flex items-center space-x-2">
-                            <label className="text-sm font-medium text-gray-700">년도:</label>
-                            <select
-                              value={selectedYear}
-                              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                              className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
-                                <option key={year} value={year}>{year}년</option>
-                              ))}
-                            </select>
-                          </div>
-                          
-                          <div className="flex items-center space-x-2">
-                            <label className="text-sm font-medium text-gray-700">월:</label>
-                            <select
-                              value={selectedMonth}
-                              onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                              className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                              {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
-                                <option key={month} value={month}>{month}월</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 월별 요약 통계 */}
-                      {monthlySummary && (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-blue-600">{monthlySummary.totalBets}</div>
-                            <div className="text-sm text-gray-600">총 베팅</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-green-600">{monthlySummary.wonBets}</div>
-                            <div className="text-sm text-gray-600">당첨된 베팅</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-yellow-600">{monthlySummary.pendingBets}</div>
-                            <div className="text-sm text-gray-600">대기 중인 베팅</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-purple-600">{monthlySummary.totalStake}</div>
-                            <div className="text-sm text-gray-600">총 베팅 금액</div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-6">
-                      <div className="w-full h-96 relative">
-                        {dailyStats.length > 0 ? (
-                          <Bar data={prepareChartData()} options={chartOptions} />
-                        ) : (
-                          <div className="flex items-center justify-center h-full text-gray-500">
-                            <div className="text-center">
-                              <div className="text-4xl mb-2">📊</div>
-                              <div>해당 기간의 데이터가 없습니다.</div>
+                        {/* 월별 필터 (월별 통계 선택 시에만 표시) */}
+                        {!showCumulativeStats && (
+                          <>
+                            <div className="flex items-center space-x-2">
+                              <label className="text-sm font-medium text-gray-700">년도:</label>
+                              <select
+                                value={selectedYear}
+                                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                                className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              >
+                                {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
+                                  <option key={year} value={year}>{year}년</option>
+                                ))}
+                              </select>
                             </div>
-                          </div>
+                            
+                            <div className="flex items-center space-x-2">
+                              <label className="text-sm font-medium text-gray-700">월:</label>
+                              <select
+                                value={selectedMonth}
+                                onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                                className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              >
+                                {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                                  <option key={month} value={month}>{month}월</option>
+                                ))}
+                              </select>
+                            </div>
+                          </>
                         )}
                       </div>
                     </div>
                   </div>
+
+                  {/* 누적 통계 카드들 */}
+                  {showCumulativeStats && betStats && (
+                    <div className="mb-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 전체 누적 통계</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-lg shadow border border-blue-200">
+                          <h3 className="text-sm font-medium text-blue-700">총 스포츠북 수</h3>
+                          <p className="text-2xl font-bold text-blue-900">{betStats.summary.totalBets}</p>
+                        </div>
+                        <div className="bg-gradient-to-r from-green-50 to-green-100 p-6 rounded-lg shadow border border-green-200">
+                          <h3 className="text-sm font-medium text-green-700">총 스포츠북 금액</h3>
+                          <p className="text-2xl font-bold text-green-900">₩{betStats.summary.totalStake.toLocaleString()}</p>
+                        </div>
+                        <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-6 rounded-lg shadow border border-purple-200">
+                          <h3 className="text-sm font-medium text-purple-700">총 당첨 금액</h3>
+                          <p className="text-2xl font-bold text-purple-900">₩{betStats.summary.actualWinnings.toLocaleString()}</p>
+                        </div>
+                        <div className={`p-6 rounded-lg shadow border ${betStats.summary.netProfit >= 0 ? 'bg-gradient-to-r from-emerald-50 to-emerald-100 border-emerald-200' : 'bg-gradient-to-r from-red-50 to-red-100 border-red-200'}`}>
+                          <h3 className={`text-sm font-medium ${betStats.summary.netProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>순수익</h3>
+                          <p className={`text-2xl font-bold ${betStats.summary.netProfit >= 0 ? 'text-emerald-900' : 'text-red-900'}`}>
+                            ₩{betStats.summary.netProfit.toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 월별 종합 통계 카드 */}
+                  {!showCumulativeStats && (
+                    <div className="mb-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">📅 {selectedYear}년 {selectedMonth}월 통계</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+                          <h3 className="text-sm font-medium text-gray-500">스포츠북 수</h3>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {monthlySummary ? monthlySummary.totalBets : 0}
+                          </p>
+                        </div>
+                        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+                          <h3 className="text-sm font-medium text-gray-500">스포츠북 금액</h3>
+                          <p className="text-2xl font-bold text-gray-900">
+                            ₩{monthlySummary ? monthlySummary.totalStake : '0'}
+                          </p>
+                        </div>
+                        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+                          <h3 className="text-sm font-medium text-gray-500">당첨된 스포츠북</h3>
+                          <p className="text-2xl font-bold text-green-600">
+                            {monthlySummary ? monthlySummary.wonBets : 0}
+                          </p>
+                        </div>
+                        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+                          <h3 className="text-sm font-medium text-gray-500">대기 중인 스포츠북</h3>
+                          <p className="text-2xl font-bold text-yellow-600">
+                            {monthlySummary ? monthlySummary.pendingBets : 0}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 일별 베팅 현황 차트 (월별 통계 선택 시에만 표시) */}
+                  {!showCumulativeStats && (
+                    <div className="bg-white rounded-lg shadow">
+                      <div className="px-6 py-4 border-b border-gray-200">
+                        <h3 className="text-lg font-medium text-gray-900">{selectedYear}년 {selectedMonth}월 일별 스포츠북 현황</h3>
+                      </div>
+                      <div className="p-6">
+                        <div className="w-full h-96 relative">
+                          {dailyStats.length > 0 ? (
+                            <Bar data={prepareChartData()} options={chartOptions} />
+                          ) : (
+                            <div className="flex items-center justify-center h-full text-gray-500">
+                              <div className="text-center">
+                                <div className="text-4xl mb-2">📊</div>
+                                <div>해당 기간의 데이터가 없습니다.</div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* 고급 통계 차트들 */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

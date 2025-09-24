@@ -1473,6 +1473,92 @@ router.get('/bets', verifyToken, requireAdmin(1), async (req, res) => {
   }
 });
 
+// 베팅 일별 통계 (더 구체적인 라우트를 먼저 정의)
+router.get('/bets/daily-stats', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    const { year, month } = req.query;
+    
+    if (!year || !month) {
+      return res.status(400).json({ message: '년도와 월을 입력해주세요.' });
+    }
+
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+
+    console.log(`📊 베팅 일별 통계 조회: ${year}-${month}`);
+    console.log(`   기간: ${startDate.toISOString()} ~ ${endDate.toISOString()}`);
+
+    // 해당 월의 모든 베팅 조회
+    const bets = await Bet.findAll({
+      where: {
+        createdAt: {
+          [Op.gte]: startDate,
+          [Op.lte]: endDate
+        }
+      },
+      include: [
+        {
+          model: User,
+          attributes: ['id', 'username', 'email']
+        }
+      ],
+      order: [['createdAt', 'ASC']]
+    });
+
+    // 일별 통계 생성
+    const dailyStats = [];
+    const daysInMonth = new Date(year, month, 0).getDate();
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      const currentDate = new Date(year, month - 1, day);
+      const dayStart = new Date(currentDate);
+      const dayEnd = new Date(currentDate);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const dayBets = bets.filter(bet => {
+        const betDate = new Date(bet.createdAt);
+        return betDate >= dayStart && betDate <= dayEnd;
+      });
+
+      const totalBets = dayBets.length;
+      const totalStake = dayBets.reduce((sum, bet) => sum + parseFloat(bet.stake), 0);
+      const totalWinnings = dayBets
+        .filter(bet => bet.status === 'won')
+        .reduce((sum, bet) => sum + parseFloat(bet.potentialWinnings), 0);
+      const profit = totalWinnings - totalStake;
+
+      dailyStats.push({
+        date: currentDate.toISOString().split('T')[0],
+        bets: totalBets,
+        stake: totalStake,
+        winnings: totalWinnings,
+        profit: profit
+      });
+    }
+
+    // 월별 요약 통계
+    const totalBets = bets.length;
+    const wonBets = bets.filter(bet => bet.status === 'won').length;
+    const pendingBets = bets.filter(bet => bet.status === 'pending').length;
+    const totalStake = bets.reduce((sum, bet) => sum + parseFloat(bet.stake), 0);
+
+    const monthlySummary = {
+      totalBets,
+      wonBets,
+      pendingBets,
+      totalStake: totalStake.toLocaleString()
+    };
+
+    res.json({
+      dailyStats,
+      monthlySummary
+    });
+  } catch (error) {
+    console.error('일별 통계 조회 오류:', error);
+    res.status(500).json({ message: '일별 통계를 불러오는 중 오류가 발생했습니다.' });
+  }
+});
+
 // 베팅 상세 정보
 router.get('/bets/:id', verifyToken, requireAdmin(1), async (req, res) => {
   try {
