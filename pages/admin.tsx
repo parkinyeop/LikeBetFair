@@ -765,45 +765,115 @@ export default function AdminDashboard() {
 
               </div>
 
-              {/* 향후 업데이트 예정 기능 */}
+              {/* 관리자 레벨별 권한 가이드 */}
               <div className="mb-8">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">🚀 향후 업데이트 예정</h2>
-                <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-3">📊 고급 분석 기능</h3>
-                      <ul className="space-y-2 text-sm text-gray-700">
-                        <li>• 실시간 대시보드 차트</li>
-                        <li>• 수익률 분석 도구</li>
-                        <li>• 사용자 세그멘테이션</li>
-                        <li>• 예측 분석 모델</li>
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">🔐 관리자 레벨별 권한 가이드</h2>
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {/* 레벨 1 */}
+                    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                      <div className="flex items-center mb-3">
+                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                          <span className="text-green-600 font-bold text-sm">1</span>
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900">기본 관리자</h3>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-3">조회 전용 권한</p>
+                      <ul className="space-y-1 text-xs text-gray-700">
+                        <li>• 대시보드 조회</li>
+                        <li>• Exchange 통계 조회</li>
+                        <li>• 스포츠북 내역 조회</li>
+                        <li>• 추천코드 조회</li>
+                        <li>• 분석 리포트 조회</li>
                       </ul>
                     </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-3">🤖 자동화 시스템</h3>
-                      <ul className="space-y-2 text-sm text-gray-700">
-                        <li>• 자동 스포츠북 결과 처리</li>
-                        <li>• 이상 패턴 감지 알림</li>
-                        <li>• 자동 수수료 지급</li>
-                        <li>• 스케줄된 리포트 발송</li>
+
+                    {/* 레벨 2 */}
+                    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                      <div className="flex items-center mb-3">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                          <span className="text-blue-600 font-bold text-sm">2</span>
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900">중급 관리자</h3>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-3">기본 관리 권한</p>
+                      <ul className="space-y-1 text-xs text-gray-700">
+                        <li>• 레벨 1 권한 +</li>
+                        <li>• Exchange 주문 상태 변경</li>
+                        <li>• 사용자 목록 조회</li>
+                        <li>• 경기 생성/수정</li>
+                        <li>• 기본 설정 수정</li>
                       </ul>
                     </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-3">🎨 UI/UX 개선</h3>
-                      <ul className="space-y-2 text-sm text-gray-700">
-                        <li>• 다크 모드 지원</li>
-                        <li>• 모바일 최적화</li>
-                        <li>• 커스터마이징 가능한 대시보드</li>
-                        <li>• 드래그 앤 드롭 인터페이스</li>
+
+                    {/* 레벨 3 */}
+                    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                      <div className="flex items-center mb-3">
+                        <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center mr-3">
+                          <span className="text-yellow-600 font-bold text-sm">3</span>
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900">고급 관리자</h3>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-3">고급 관리 권한</p>
+                      <ul className="space-y-1 text-xs text-gray-700">
+                        <li>• 레벨 2 권한 +</li>
+                        <li>• 사용자 생성/수정</li>
+                        <li>• 스포츠북 결과 처리</li>
+                        <li>• 추천코드 관리</li>
+                        <li>• 수수료율 설정</li>
                       </ul>
                     </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-3">🔐 보안 강화</h3>
-                      <ul className="space-y-2 text-sm text-gray-700">
-                        <li>• 2단계 인증 (2FA)</li>
-                        <li>• 감사 로그 시스템</li>
-                        <li>• IP 화이트리스트</li>
-                        <li>• 세션 관리 개선</li>
+
+                    {/* 레벨 4 */}
+                    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                      <div className="flex items-center mb-3">
+                        <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center mr-3">
+                          <span className="text-orange-600 font-bold text-sm">4</span>
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900">최고 관리자</h3>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-3">최고 관리 권한</p>
+                      <ul className="space-y-1 text-xs text-gray-700">
+                        <li>• 레벨 3 권한 +</li>
+                        <li>• 사용자 잔액 수정</li>
+                        <li>• 사용자 삭제 (레벨 5 제외)</li>
+                        <li>• 모든 관리 기능</li>
+                        <li>• 시스템 설정 관리</li>
+                      </ul>
+                    </div>
+
+                    {/* 레벨 5 */}
+                    <div className="bg-white rounded-lg p-4 shadow-sm border border-red-200 ring-2 ring-red-100">
+                      <div className="flex items-center mb-3">
+                        <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center mr-3">
+                          <span className="text-red-600 font-bold text-sm">5</span>
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900">시스템 관리자</h3>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-3">시스템 관리 권한</p>
+                      <ul className="space-y-1 text-xs text-gray-700">
+                        <li>• 모든 권한</li>
+                        <li>• 시스템 전체 관리</li>
+                        <li>• 삭제 보호 (본인 계정)</li>
+                        <li>• 최고 권한</li>
+                        <li>• 모든 기능 접근</li>
+                      </ul>
+                    </div>
+
+                    {/* 권한 안내 */}
+                    <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-4 shadow-sm border border-gray-200">
+                      <div className="flex items-center mb-3">
+                        <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mr-3">
+                          <span className="text-gray-600 font-bold text-sm">ℹ️</span>
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900">권한 안내</h3>
+                      </div>
+                      <ul className="space-y-1 text-xs text-gray-700">
+                        <li>• 권한은 서버에서 엄격하게 검증</li>
+                        <li>• 레벨이 높을수록 더 많은 권한</li>
+                        <li>• 레벨 5는 시스템 보호 대상</li>
+                        <li>• 삭제 권한은 레벨 4 이상</li>
+                        <li>• 모든 작업은 로그에 기록</li>
                       </ul>
                     </div>
                   </div>

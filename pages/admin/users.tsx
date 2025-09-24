@@ -233,6 +233,22 @@ export default function UsersManagement() {
 
   return (
     <AdminLayout requiredLevel={2} title="사용자 관리">
+      {/* 홈으로 가기 버튼 */}
+      <div className="mb-6">
+        <div className="flex justify-between items-center">
+          <div></div>
+                  <button
+            onClick={() => {
+              window.location.href = '/admin';
+            }}
+            className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            <span>🏠</span>
+            <span>관리자홈</span>
+                  </button>
+                </div>
+              </div>
+
       {/* 필터 바 */}
       <FilterBar
         searchValue={searchTerm}
@@ -252,19 +268,19 @@ export default function UsersManagement() {
 
       {/* 액션 버튼 */}
       <div className="mb-4">
-                  <button
+                                <button
           onClick={() => setShowAddModal(true)}
           className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
+                                >
           새 사용자 추가
-                  </button>
-              </div>
-
+                                </button>
+                    </div>
+                    
       {/* 에러 표시 */}
       {usersError && (
         <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
           {usersError}
-                </div>
+                      </div>
       )}
 
       {/* 사용자 테이블 */}
@@ -286,7 +302,7 @@ export default function UsersManagement() {
                 <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                   <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">새 사용자 추가</h3>
                   <div className="space-y-4">
-                      <div>
+                        <div>
                       <label className="block text-sm font-medium text-gray-700">사용자명</label>
                         <input
                           type="text"
@@ -295,8 +311,8 @@ export default function UsersManagement() {
                         className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
                         required
                         />
-                      </div>
-                      <div>
+                            </div>
+                            <div>
                       <label className="block text-sm font-medium text-gray-700">이메일</label>
                       <input
                         type="email"
@@ -305,8 +321,8 @@ export default function UsersManagement() {
                         className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
                         required
                       />
-                      </div>
-                      <div>
+                            </div>
+                            <div>
                       <label className="block text-sm font-medium text-gray-700">비밀번호</label>
                       <input
                         type="password"
@@ -315,8 +331,8 @@ export default function UsersManagement() {
                         className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
                         required
                       />
-                      </div>
-                      <div>
+                            </div>
+                            <div>
                       <label className="block text-sm font-medium text-gray-700">관리자 레벨</label>
                         <select
                         value={newUser.admin_level}
@@ -330,8 +346,8 @@ export default function UsersManagement() {
                         <option value={4}>레벨 4</option>
                         <option value={5}>최고 관리자</option>
                         </select>
-                      </div>
-                      <div>
+                          </div>
+                                    <div>
                       <label className="block text-sm font-medium text-gray-700">초기 잔액</label>
                         <input
                           type="number"
