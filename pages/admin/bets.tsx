@@ -436,7 +436,7 @@ export default function BettingAdmin() {
       }));
 
       const headers = getAuthHeaders();
-      const baseUrl = 'buildApiUrl('/api/admin';
+      const baseUrl = buildApiUrl('/api/admin');
 
       // 병렬로 모든 데이터 로딩
       const [betsResponse, statsResponse] = await Promise.all([
