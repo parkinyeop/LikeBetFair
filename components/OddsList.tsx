@@ -343,7 +343,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                       <span className={`text-sm font-medium ${
                         isSelected ? 'text-blue-700' : 'text-gray-600'
                       }`}>
-                        {marketTab === 'Win/Loss' ? '' : 
+                        {marketTab === 'Win/Loss' ? '승/패' : 
                          marketTab === 'Over/Under' ? '언더/오버' : '핸디캡'}
                       </span>
                     </label>

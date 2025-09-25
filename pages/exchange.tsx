@@ -832,7 +832,7 @@ export default function Exchange() {
                         <span className={`text-sm font-medium ${
                           isSelected ? 'text-blue-400' : 'text-gray-400'
                         }`}>
-                          {market === '승패' ? '' : 
+                          {market === '승패' ? '승/패' : 
                            market === '총점' ? '언더/오버' : '핸디캡'}
                         </span>
                       </label>
@@ -1488,7 +1488,7 @@ export default function Exchange() {
                               <span className={`text-sm font-medium ${
                                 isSelected ? 'text-blue-400' : 'text-gray-400'
                               }`}>
-                                {market === '승패' ? '' : 
+                                {market === '승패' ? '승/패' : 
                                  market === '총점' ? '언더/오버' : '핸디캡'}
                               </span>
                             </label>
