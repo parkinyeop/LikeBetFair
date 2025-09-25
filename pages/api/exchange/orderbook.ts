@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { API_CONFIG, buildApiUrl } from '../../../config/apiConfig';
+import { buildServerApiUrl, SERVER_CONFIG } from '../../../config/serverApiConfig';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || '3aad092c060aa49ac87be19a33431c81c6fa287c9bcdda983c1b5d5a83380a7fa816ea915bbc9aff816c78db2a39ff673ae60b5ce4bbcce50c060569d99ec1c1';
@@ -37,7 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`📊 호가 조회 요청 (Next.js API): gameId=${gameId}, market=${market}, line=${line}`);
 
     // 백엔드 서버로 프록시 (환경변수 기반)
-    const backendUrl = buildApiUrl('/api/exchange/orderbook', {
+    const backendUrl = buildServerApiUrl('/api/exchange/orderbook', {
       gameId: encodeURIComponent(gameId as string),
       market: encodeURIComponent(market as string),
       line: String(line)

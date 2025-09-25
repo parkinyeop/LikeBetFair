@@ -1,12 +1,12 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { API_CONFIG, buildApiUrl } from '../../../config/apiConfig';
+import { buildServerApiUrl, SERVER_CONFIG } from '../../../config/serverApiConfig';
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
   // 내부 표준 프록시 경유 (직접 외부 호출 대신 서버 API 사용)
-  const url = buildApiUrl(`${API_CONFIG.ENDPOINTS.ODDS}/basketball_nba`);
+  const url = buildServerApiUrl(`${SERVER_CONFIG.ENDPOINTS.ODDS}/basketball_nba`);
 
   try {
     const response = await fetch(url);

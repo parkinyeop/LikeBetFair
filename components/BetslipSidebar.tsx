@@ -280,92 +280,138 @@ function MyBetsPanel() {
               }
             }
             const isOpen = openBetIds[bet.id] || false;
-            // 요약 줄
+            // 익스체인지 스타일로 변경
             return (
-              <li key={bet.id} className="border-b pb-2 mb-2">
-                {/* 1줄: 날짜 | 상태 */}
-                <div className="flex justify-between items-center text-xs text-gray-400 mb-1">
-                  <span>{dateStr}</span>
-                  <span className={`font-semibold ${statusColor(bet.status)}`}>{statusLabel(bet.status)}</span>
+              <li key={bet.id} className="relative mb-4">
+                {/* 구분선 */}
+                <div className="my-4">
+                  <div className="border-t border-gray-200"></div>
                 </div>
-                {/* 2줄: 경기 정보 (팀명, 배당율) */}
-                <div className="flex justify-between items-center">
-                  <div className="flex-1">
+                
+                <div className="bg-white rounded-xl border-2 border-gray-200 p-4 hover:shadow-lg hover:border-gray-300 transition-all duration-200 shadow-sm">
+                  {/* 1줄: 날짜 | 상태 */}
+                  <div className="flex justify-between items-center text-xs text-gray-400 mb-2">
+                    <span>{dateStr}</span>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor(bet.status)}`}>{statusLabel(bet.status)}</span>
+                  </div>
+                  
+                  {/* 배팅 유형 표시 */}
+                  {Array.isArray(bet.selections) && bet.selections.length > 1 && (
+                    <div className="mb-3">
+                      <span className="text-sm font-bold text-gray-800">
+                        멀티배팅 ({bet.selections.length}개)
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* 2줄: 경기 정보 (팀명, 배당율) */}
+                  <div className="space-y-2">
                     {Array.isArray(bet.selections) && bet.selections.length > 0 ? (
-                      <div className="space-y-1">
-                        {bet.selections.map((sel: any, idx: number) => {
-                          const isOverUnder = sel.market === 'Over/Under' || sel.market === 'totals';
-                          const isHandicap = sel.market === 'Handicap' || sel.market === 'spreads';
-                          
-                          return (
-                            <div key={idx} className="flex items-center justify-between text-sm">
-                              <div className="flex flex-col">
-                                <span className="font-medium text-black">
-                                  {isOverUnder ? (
-                                    normalizeOverUnderOption(sel.option || sel.team, sel.desc, sel.point)
-                                  ) : isHandicap ? (
-                                    sel.team
-                                  ) : sel.result === 'draw' ? (
-                                    `${sel.desc ? sel.desc.replace(' vs ', ' vs ') : sel.team} (Draw)`
-                                  ) : (
-                                    (() => {
-                                      // desc에서 홈팀과 원정팀 파악
-                                      if (sel.desc) {
-                                        const teams = sel.desc.split(' vs ');
-                                        const homeTeam = teams[0];
-                                        const awayTeam = teams[1];
-                                        
-                                        // 베팅한 팀이 홈팀인지 원정팀인지 확인
-                                        if (sel.team === homeTeam) {
-                                          return `${sel.team} (Win)`;
-                                        } else if (sel.team === awayTeam) {
-                                          return `${sel.team} (Win)`;
-                                        } else {
-                                          // 베팅한 팀이 홈/원정과 다르면 패 베팅일 가능성
-                                          if (sel.team.includes(homeTeam) || homeTeam.includes(sel.team)) {
-                                            return `${homeTeam} (Lose)`;
-                                          } else if (sel.team.includes(awayTeam) || awayTeam.includes(sel.team)) {
-                                            return `${awayTeam} (Lose)`;
-                                          }
-                                        }
-                                      }
-                                      return `${sel.team} Win`;
-                                    })()
-                                  )}
-                                </span>
-                                {/* 경기명 표시 (무승부가 아닌 경우만) */}
-                                {sel.result !== 'draw' && (
-                                  <span className="text-xs text-gray-500">
-                                    {sel.desc || `${sel.team} Game`}
-                                  </span>
+                      bet.selections.map((sel: any, idx: number) => {
+                        const isOverUnder = sel.market === 'Over/Under' || sel.market === 'totals';
+                        const isHandicap = sel.market === 'Handicap' || sel.market === 'spreads';
+                        
+                        return (
+                          <div key={idx} className="flex items-center justify-between text-sm">
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-800">
+                                {isOverUnder ? (
+                                  normalizeOverUnderOption(sel.option || sel.team, sel.desc, sel.point)
+                                ) : isHandicap ? (
+                                  sel.team
+                                ) : sel.result === 'draw' ? (
+                                  `Draw`
+                                ) : (
+                                  `${sel.team} (Win)`
                                 )}
                               </div>
-                              <span className="text-blue-600 font-medium">@ {sel.odds}</span>
                             </div>
-                          );
-                        })}
-                      </div>
+                            <div className="text-right">
+                              <div className="font-bold text-gray-800">
+                                @ {Number(sel.odds).toFixed(2)}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
                     ) : (
                       <span className="text-gray-500">No game info</span>
                     )}
                   </div>
-                  <button className="ml-2 px-2 py-0.5 text-xs border rounded text-blue-600 border-blue-300 hover:bg-blue-50" onClick={e => { e.stopPropagation(); toggleBet(bet.id); }}>{isOpen ? 'Collapse ▲' : 'Expand ▼'}</button>
-                </div>
-                {/* 펼친 상태: 배팅금, 배당율, 예상수익 */}
-                {isOpen && (
-                  <div className="mt-2">
-                    <div className="flex items-center mb-2">
-                      <span className="text-sm">🧾 Multi Bet {Array.isArray(bet.selections) ? bet.selections.length : 0} selections</span>
+                  
+                  {/* 접힘 상태에서 배팅금액과 합산배당율 정보 표시 */}
+                  {!isOpen && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <div className="flex justify-between items-center text-sm">
+                        <div className="flex items-center space-x-4">
+                          <span className="text-gray-600">
+                            배팅금액: <span className="font-medium text-black">{Math.floor(bet.stake || 0).toLocaleString()}원</span>
+                          </span>
+                          <span className="text-gray-600">
+                            배당율: <span className="font-medium text-black">{Number(bet.totalOdds).toFixed(2)}배</span>
+                          </span>
+                        </div>
+                        <button className="px-2 py-1 text-xs border rounded text-blue-600 border-blue-300 hover:bg-blue-50" onClick={e => { e.stopPropagation(); toggleBet(bet.id); }}>{isOpen ? 'Collapse ▲' : 'Expand ▼'}</button>
+                      </div>
                     </div>
-                    {expectedResultDate && (
-                      <div className="text-xs text-blue-600 font-semibold mb-2">Settlement Date: {expectedResultDate}</div>
-                    )}
-                    {/* 경기 결과 표시 (적중/미적중일 때) */}
-                    {['won', 'lost'].includes(bet.status) && Array.isArray(bet.selections) && (
-                      <div className="mb-3">
-                        <div className="text-sm font-medium text-gray-700 mb-2">📊 Result</div>
-                        <div className="space-y-2">
-                          {bet.selections.map((sel: any, idx: number) => {
+                  )}
+                  {/* 펼친 상태: 배팅금, 배당율, 예상수익 */}
+                  {isOpen && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-bold text-gray-800">상세 정보</span>
+                        <button className="px-2 py-1 text-xs border rounded text-blue-600 border-blue-300 hover:bg-blue-50" onClick={e => { e.stopPropagation(); toggleBet(bet.id); }}>접기 ▲</button>
+                      </div>
+                      {expectedResultDate && (
+                        <div className="text-xs text-blue-600 font-semibold mb-3">정산 예정일: {expectedResultDate}</div>
+                      )}
+                                {/* 경기 정보 표시 */}
+                                {Array.isArray(bet.selections) && (
+                                  <div className="mb-3">
+                                    <div className="text-sm font-medium text-gray-700 mb-2">🏟️ 경기 정보</div>
+                                    <div className="space-y-2">
+                                      {bet.selections.map((sel: any, idx: number) => {
+                                        const isOverUnder = sel.market === 'Over/Under' || sel.market === 'totals';
+                                        const isHandicap = sel.market === 'Handicap' || sel.market === 'spreads';
+                                        
+                                        return (
+                                          <div key={idx} className="border-l-2 border-gray-200 pl-3 py-1">
+                                            <div className="flex items-center justify-between text-sm">
+                                              <div className="flex items-center">
+                                                <div className="flex flex-col">
+                                                  <span className="font-medium text-gray-800">
+                                                    {isOverUnder ? (
+                                                      normalizeOverUnderOption(sel.option || sel.team, sel.desc, sel.point)
+                                                    ) : isHandicap ? (
+                                                      sel.team
+                                                    ) : (
+                                                      sel.team || sel.selection
+                                                    )}
+                                                  </span>
+                                                  {/* 경기명 표시 */}
+                                                  <span className="text-xs text-gray-500">
+                                                    {sel.desc || `${sel.team} Game`}
+                                                  </span>
+                                                  <span className="text-xs text-gray-400">
+                                                    {sel.market || '승패'}
+                                                  </span>
+                                                </div>
+                                                <span className="ml-2 text-gray-600">@ {Number(sel.odds).toFixed(2)}</span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* 경기 결과 표시 (적중/미적중일 때) */}
+                                {['won', 'lost'].includes(bet.status) && Array.isArray(bet.selections) && (
+                                  <div className="mb-3">
+                                    <div className="text-sm font-medium text-gray-700 mb-2">📊 Result</div>
+                                    <div className="space-y-2">
+                                      {bet.selections.map((sel: any, idx: number) => {
                             // 디버깅용 로그
                             console.log(`[배팅내역] 선택 ${idx}:`, {
                               result: sel.result,
@@ -476,14 +522,8 @@ else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; la
                                           })()
                                         )}
                                       </span>
-                                      {/* 경기명 표시 (무승부가 아닌 경우만) */}
-                                      {actualResult !== 'draw' && (
-                                                                              <span className="text-xs text-gray-500">
-                                        {sel.desc || `${sel.team} Game`}
-                                      </span>
-                                      )}
                                     </div>
-                                    <span className="ml-2 text-gray-600">@ {sel.odds}</span>
+                                    <span className="ml-2 text-gray-600">@ {Number(sel.odds).toFixed(2)}</span>
                                   </div>
                                   <span className={`text-xs font-medium ${color}`}>{label}</span>
                                 </div>
@@ -522,16 +562,16 @@ else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; la
                     
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between items-center">
-                        <span>💰 Stake:</span>
-                        <b className="text-black">{Number(bet.stake).toLocaleString()} KRW</b>
+                        <span>배팅금액:</span>
+                        <b className="text-black">{Math.floor(Number(bet.stake)).toLocaleString()}원</b>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span>📈 Odds:</span>
-                        <b className="text-black">{Number(bet.totalOdds).toFixed(2)}</b>
+                        <span>배당율:</span>
+                        <b className="text-black">{Number(bet.totalOdds).toFixed(2)}배</b>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span>🏆 Estimated Profit:</span>
-                        <b className="text-black">{Math.floor(Number(bet.stake) * Number(bet.totalOdds)).toLocaleString()} KRW</b>
+                        <span>예상수익:</span>
+                        <b className="text-black">{Math.floor(Number(bet.stake) * Number(bet.totalOdds)).toLocaleString()}원</b>
                       </div>
                       <div className="flex items-center justify-end pt-1">
                         {/* 배팅 취소 버튼 - 정상 조건으로 복원 */}
@@ -593,8 +633,9 @@ else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; la
                     {bet.status === 'pending' && Array.isArray(bet.selections) && !bet.selections.every((sel: any) => sel.result === 'pending' || !sel.result) && (
                       <div className="mt-2 text-xs text-gray-400">Some games have already started and cannot be cancelled.</div>
                     )}
-                  </div>
-                )}
+                    </div>
+                  )}
+                </div>
               </li>
             );
           })}

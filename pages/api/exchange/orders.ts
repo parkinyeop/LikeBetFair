@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { buildApiUrl } from '../../../config/apiConfig';
+import { buildServerApiUrl } from '../../../config/serverApiConfig';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || '3aad092c060aa49ac87be19a33431c81c6fa287c9bcdda983c1b5d5a83380a7fa816ea915bbc9aff816c78db2a39ff673ae60b5ce4bbcce50c060569d99ec1c1';
@@ -25,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     // 백엔드 서버로 프록시 (환경변수 기반)
-    const backendResponse = await fetch(buildApiUrl('/api/exchange/order'), {
+    const backendResponse = await fetch(buildServerApiUrl('/api/exchange/order'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

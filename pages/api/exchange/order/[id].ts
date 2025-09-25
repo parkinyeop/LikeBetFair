@@ -1,5 +1,4 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { buildApiUrl } from '../../../config/apiConfig';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -13,8 +12,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    // Express 서버 URL 직접 구성 (서버 사이드용)
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://likebetfair.onrender.com';
+    const url = `${baseUrl}/api/exchange/order/${id}`;
+    
     // Express 서버로 프록시
-    const response = await fetch(buildApiUrl(`/api/exchange/order/${id}`), {
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

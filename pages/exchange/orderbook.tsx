@@ -561,7 +561,7 @@ const OrderbookPage: React.FC = () => {
                         <div className="font-semibold text-gray-900">{leg?.teamName || leg?.selection || `선택 ${idx + 1}`}</div>
                         <div className="text-sm text-gray-600">
                           {(leg?.homeTeam && leg?.awayTeam) ? `${leg.homeTeam} vs ${leg.awayTeam}` : (leg?.match || '')}
-                          {leg?.odds ? ` • @${Number(leg.odds).toFixed(3)}` : ''}
+                          {leg?.odds ? ` • @${Number(leg.odds).toFixed(2)}` : ''}
                         </div>
                       </div>
                     ))}
