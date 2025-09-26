@@ -5,6 +5,7 @@ import User from '../models/userModel.js';
 import GameResult from '../models/gameResultModel.js';
 import { Op } from 'sequelize';
 import createScriptSequelize from '../config/scriptDatabase.js';
+import settlementValidation from '../utils/settlementValidation.js';
 
 // 스크립트 전용 Sequelize 인스턴스 생성
 const sequelize = createScriptSequelize();
@@ -229,13 +230,25 @@ class MultibetSettlementService {
 
       if (gameResult) {
         console.log(`✅ 경기 결과 발견: ${gameResult.result} (${gameResult.score})`);
-        
-        // 경기 결과 판정
-        const result = this.determineGameResult(gameResult, selection);
+
+        // 🛡️ GUARD CLAUSE: GameResult 데이터 무결성 검증 (Soft Validation)
+        const validationResult = await settlementValidation.softValidateGameResult(
+          gameResult,
+          { id: `multibet-${selection.homeTeam}-${selection.awayTeam}`, selections: [selection] },
+          { validateTeamNames: false }
+        );
+
+        if (validationResult.isSoftFail) {
+          console.warn(`[MULTIBET_SETTLEMENT] GameResult validation issues for ${selection.homeTeam} vs ${selection.awayTeam}, continuing with legacy logic`);
+        }
+
+        // 경기 결과 판정 (검증된 스코어 전달)
+        const result = this.determineGameResult(gameResult, selection, validationResult.score);
 
         return {
           ...gameResult.toJSON(),
-          result
+          result,
+          validatedScore: validationResult.score // 검증된 스코어 포함
         };
       } else {
         console.log(`❌ 경기 결과 없음: ${homeTeam} vs ${awayTeam}`);
@@ -253,7 +266,7 @@ class MultibetSettlementService {
    * @param {Object} selection - 선택된 팀
    * @returns {string} 경기 결과 (won/lost/cancelled/pending)
    */
-  determineGameResult(gameResult, selection) {
+  determineGameResult(gameResult, selection, validatedScore = null) {
     const { status, homeScore, awayScore, result, score } = gameResult;
     const { team: selectedTeam } = selection;
 
@@ -283,12 +296,18 @@ class MultibetSettlementService {
       }
     }
 
-    // 스코어 기반 판정 (fallback)
+    // 스코어 기반 판정 (검증된 스코어 우선 사용)
     let actualHomeScore = homeScore;
     let actualAwayScore = awayScore;
 
-    // score JSON에서 스코어 추출 시도
-    if ((actualHomeScore === null || actualHomeScore === undefined) && score) {
+    // 검증된 스코어가 있으면 우선 사용
+    if (validatedScore) {
+      actualHomeScore = validatedScore.home;
+      actualAwayScore = validatedScore.away;
+      console.log(`[MULTIBET] 검증된 스코어 사용: ${actualHomeScore}-${actualAwayScore}`);
+    }
+    // score JSON에서 스코어 추출 시도 (fallback)
+    else if ((actualHomeScore === null || actualHomeScore === undefined) && score) {
       try {
         let scoreData;
         if (typeof score === 'string') {

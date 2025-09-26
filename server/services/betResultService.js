@@ -8,6 +8,7 @@ import simplifiedOddsValidation from './simplifiedOddsValidation.js';
 import { Op, fn, col } from 'sequelize';
 import { normalizeTeamName, normalizeTeamNameForComparison, normalizeCategory, normalizeCategoryPair, normalizeOption, calculateTeamNameSimilarity, findBestTeamMatch } from '../normalizeUtils.js';
 import { ADMIN_CONFIG } from '../config/centralizedConfig.js';
+import settlementValidation from '../utils/settlementValidation.js';
 
 // 배당률 제공 카테고리만 허용 (gameResultService와 동일하게 유지)
 const allowedCategories = ['baseball', 'soccer', 'basketball'];
@@ -181,21 +182,44 @@ class BetResultService {
         order: [['createdAt', 'DESC']]
       });
 
-      // 스코어가 없으면 pending 유지
-      if (!gameResult || !gameResult.score || !Array.isArray(gameResult.score) || gameResult.score.length === 0) {
-        // 경기 시간이 지났고 스코어가 없으면 cancelled로 처리 (연기/취소 가능성)
-        const gameTime = new Date(selection.commence_time + 'Z');
-        const now = new Date();
-        const hoursSinceGame = (now - gameTime) / (1000 * 60 * 60);
-        
-        if (hoursSinceGame > 2) { // 2시간 이상 지났으면
-          selection.result = 'cancelled';
-          hasCancelled = true;
-        } else {
-          selection.result = 'pending';
-          hasPending = true;
+      // 🛡️ GUARD CLAUSE: GameResult 데이터 무결성 검증 (Soft Validation)
+      let validationResult = null;
+      let validatedScore = null;
+
+      if (gameResult) {
+        validationResult = await settlementValidation.softValidateGameResult(
+          gameResult,
+          { id: bet.id, selections: [selection] },
+          { validateTeamNames: false } // 팀명 검증은 현재 단계에서 제외
+        );
+
+        // 검증된 스코어 데이터 사용 (유효한 경우)
+        if (validationResult.score) {
+          validatedScore = validationResult.score;
+          console.log(`[SETTLEMENT] Bet ${bet.id} using validated score:`, validatedScore);
         }
-        continue;
+      }
+
+      // 검증 실패 시 기존 로직 유지 (Soft Fail)
+      if (!gameResult || (validationResult && validationResult.isSoftFail)) {
+        console.warn(`[SETTLEMENT] Bet ${bet.id} selection validation issues, falling back to legacy logic`);
+
+        // 기존 스코어 체크 로직 유지
+        if (!gameResult || !gameResult.score || !Array.isArray(gameResult.score) || gameResult.score.length === 0) {
+          // 경기 시간이 지났고 스코어가 없으면 cancelled로 처리 (연기/취소 가능성)
+          const gameTime = new Date(selection.commence_time + 'Z');
+          const now = new Date();
+          const hoursSinceGame = (now - gameTime) / (1000 * 60 * 60);
+
+          if (hoursSinceGame > 2) { // 2시간 이상 지났으면
+            selection.result = 'cancelled';
+            hasCancelled = true;
+          } else {
+            selection.result = 'pending';
+            hasPending = true;
+          }
+          continue;
+        }
       }
 
       // 취소/연기 처리
@@ -206,8 +230,8 @@ class BetResultService {
         continue;
       }
 
-      // 스코어가 있으면 결과 처리
-      const selectionResult = this.determineSelectionResult(selection, gameResult);
+      // 스코어가 있으면 결과 처리 (검증된 스코어 우선 사용)
+      const selectionResult = this.determineSelectionResult(selection, gameResult, validatedScore);
       selection.result = selectionResult;
       
       if (selection.result === 'pending') hasPending = true;
@@ -575,7 +599,7 @@ class BetResultService {
   // }
 
   // 개별 selection 결과 판정
-  determineSelectionResult(selection, gameResult) {
+  determineSelectionResult(selection, gameResult, validatedScore = null) {
     // market alias 매핑
     let marketType = selection.market;
     if (marketType === 'h2h') marketType = '승/패';
@@ -583,13 +607,13 @@ class BetResultService {
     if (marketType === 'spreads') marketType = '핸디캡';
     const resultFunction = this.marketResultMap[marketType];
     if (resultFunction) {
-      return resultFunction(selection, gameResult);
+      return resultFunction(selection, gameResult, validatedScore);
     }
     return 'pending';
   }
 
   // 승/패 결과 판정
-  determineWinLoseResult(selection, gameResult) {
+  determineWinLoseResult(selection, gameResult, validatedScore = null) {
     // 경기 취소 또는 연기 시 즉시 환불
     if (gameResult.result === 'cancelled' || gameResult.status === 'cancelled' ||
         gameResult.result === 'postponed' || gameResult.status === 'postponed') {
@@ -619,7 +643,7 @@ class BetResultService {
   }
 
   // 언더/오버 결과 판정
-  determineOverUnderResult(selection, gameResult) {
+  determineOverUnderResult(selection, gameResult, validatedScore = null) {
     // 경기 취소 또는 연기 시 즉시 환불
     if (gameResult.result === 'cancelled' || gameResult.status === 'cancelled' ||
         gameResult.result === 'postponed' || gameResult.status === 'postponed') {
@@ -652,8 +676,11 @@ class BetResultService {
       console.log(`[언더/오버 판정] option과 team이 비어있음. 기본값 'Over'로 설정`);
     }
     
-    // 스코어에서 총 점수 계산 (방어 코드 사용)
-    const totalScore = this.calculateTotalScore(gameResult.score);
+    // 스코어에서 총 점수 계산 (검증된 스코어 우선 사용)
+    const scoreToUse = validatedScore || gameResult.score;
+    const totalScore = validatedScore ?
+      (validatedScore.home + validatedScore.away) :
+      this.calculateTotalScore(scoreToUse);
 
     // point가 없으면 무효
     if (typeof point !== 'number' || isNaN(point)) {
@@ -682,7 +709,7 @@ class BetResultService {
   }
 
   // 핸디캡 결과 판정
-  determineHandicapResult(selection, gameResult) {
+  determineHandicapResult(selection, gameResult, validatedScore = null) {
     // 경기 취소 또는 연기 시 즉시 환불
     if (gameResult.result === 'cancelled' || gameResult.status === 'cancelled' ||
         gameResult.result === 'postponed' || gameResult.status === 'postponed') {
@@ -724,8 +751,17 @@ class BetResultService {
       console.log(`[핸디캡 파싱] 기본 방식, 팀명: "${selectedTeam}", 핸디캡: ${handicap}`);
     }
     
-    // 스코어 계산 (방어 코드 사용)
-    const { homeScore, awayScore } = this.extractHomeAwayScores(gameResult.score, gameResult.homeTeam, gameResult.awayTeam);
+    // 스코어 계산 (검증된 스코어 우선 사용)
+    let homeScore, awayScore;
+    if (validatedScore) {
+      homeScore = validatedScore.home;
+      awayScore = validatedScore.away;
+      console.log(`[핸디캡] 검증된 스코어 사용: ${homeScore}-${awayScore}`);
+    } else {
+      const scoreResult = this.extractHomeAwayScores(gameResult.score, gameResult.homeTeam, gameResult.awayTeam);
+      homeScore = scoreResult.homeScore;
+      awayScore = scoreResult.awayScore;
+    }
 
     // 핸디캡 적용 (팀명 비교용 정규화)
     const homeTeamNorm = normalizeTeamNameForComparison(gameResult.homeTeam);
@@ -964,7 +1000,7 @@ class BetResultService {
           if (selection.desc === target.desc && selection.commence_time === target.commence_time) {
             const gameResult = await this.getGameResultByTeams(selection);
             if (gameResult) {
-              const selectionResult = this.determineSelectionResult(selection, gameResult);
+              const selectionResult = this.determineSelectionResult(selection, gameResult, null);
               selection.result = selectionResult;
               updated = true;
               console.log(`[updateSpecificSelections] desc=${selection.desc}, commence_time=${selection.commence_time}, result=${selectionResult}`);
