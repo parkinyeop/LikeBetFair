@@ -84,18 +84,17 @@ export default function Exchange() {
   // 🆕 Exchange 배당율에 환수율 적용 (올바른 방식 - Proportional Margin Application)
   const applyExchangeReturnRate = (originalOdds: number, allOdds: number[] = []) => {
     if (!originalOdds || !oddsReturnRateSettings.enabled) return originalOdds;
-    
+
     // 단일 배당율인 경우에도 adjustOddsSophisticated 사용 (일관성)
     if (allOdds.length === 0) {
       allOdds = [originalOdds]; // 단일 배당률을 배열로 변환
     }
-    
+
     // 모든 경우에 adjustOddsSophisticated 함수 사용 (일관성 보장)
     const adjustedOdds = adjustOddsSophisticated(allOdds, oddsReturnRateSettings.returnRate);
     const originalIndex = allOdds.indexOf(originalOdds);
     const result = adjustedOdds[originalIndex] || originalOdds;
-    
-    // 디버깅 로그 제거
+
     
     return result;
   };
@@ -872,10 +871,11 @@ export default function Exchange() {
           
                      // 축구의 경우 Draw 포함, 다른 스포츠는 홈/어웨이만
            let outcomes: any[] = [];
+
            if (game.sport_key?.includes('soccer')) {
              const homeOdds = h2hOdds[game.home_team];
              const awayOdds = h2hOdds[game.away_team];
-             const drawOdds = Object.entries(h2hOdds).find(([name, _]) => 
+             const drawOdds = Object.entries(h2hOdds).find(([name, _]) =>
                name.toLowerCase().includes('draw') || name === 'Draw' || name === 'Tie'
              );
              
@@ -1574,7 +1574,20 @@ export default function Exchange() {
                 const h2hOdds = game.officialOdds?.h2h || {};
                 
                                  let outcomes: any[] = [];
-                 if (game.sport_key?.includes('soccer')) {
+                 // 축구 리그인지 확인 (League 기반 또는 sportKey 기반)
+                 const isSoccer = game.sport_key?.includes('soccer') ||
+                                 game.league === 'K League' ||
+                                 game.league === 'J League' ||
+                                 game.league === 'Serie A' ||
+                                 game.league === 'Brasileirao' ||
+                                 game.league === 'MLS' ||
+                                 game.league === 'Argentina Primera' ||
+                                 game.league === 'Chinese Super League' ||
+                                 game.league === 'La Liga' ||
+                                 game.league === 'Bundesliga' ||
+                                 game.league === 'Premier League';
+
+                 if (isSoccer) {
                    const homeOdds = h2hOdds[game.home_team];
                    const awayOdds = h2hOdds[game.away_team];
                    const drawOdds = Object.entries(h2hOdds).find(([name, _]) => 
