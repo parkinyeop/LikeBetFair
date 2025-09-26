@@ -4,6 +4,7 @@ import User from '../models/userModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
 import AdminCommission from '../models/adminCommissionModel.js';
 import CommissionSettingsService from './commissionSettingsService.js';
+import CommissionService from './commissionService.js';
 import simplifiedOddsValidation from './simplifiedOddsValidation.js';
 import { Op, fn, col } from 'sequelize';
 import { normalizeTeamName, normalizeTeamNameForComparison, normalizeCategory, normalizeCategoryPair, normalizeOption, calculateTeamNameSimilarity, findBestTeamMatch } from '../normalizeUtils.js';
@@ -340,13 +341,23 @@ class BetResultService {
       const adjustedWinnings = this.calculateAdjustedWinnings(bet);
       const hasCancelledSelections = bet.selections.some(s => s.result === 'cancelled');
       
-      // 🆕 수수료 계산 및 차감
-      const sportsbookCommissionRate = await CommissionSettingsService.getCommissionRate('sportsbook');
-      const commissionAmount = CommissionSettingsService.calculateCommission(
-        adjustedWinnings, 
-        bet.stake, 
-        sportsbookCommissionRate
-      );
+      // 🆕 통합 수수료 계산 (정책 기반)
+      const commissionCalculation = await CommissionService.calculate({
+        winnings: adjustedWinnings,
+        stake: bet.stake,
+        platform: 'sportsbook',
+        user: user,
+        bet: bet,
+        policies: {} // 향후 프로모션 코드 등 추가 가능
+      });
+
+      const commissionAmount = commissionCalculation.commissionAmount;
+
+      // 수수료 계산 상세 로깅
+      await CommissionService.logCommissionCalculation(user.id, commissionCalculation, {
+        platform: 'sportsbook',
+        betId: bet.id
+      });
       
       // 실제 지급할 금액 (수수료 차감 후)
       const netWinnings = adjustedWinnings - commissionAmount;
@@ -363,7 +374,7 @@ class BetResultService {
           exchangeOrderId: null, // 스포츠북은 exchangeOrderId 사용하지 않음
           betAmount: bet.stake,
           winAmount: adjustedWinnings,
-          commissionRate: sportsbookCommissionRate,
+          commissionRate: commissionCalculation.appliedRate,
           commissionAmount: commissionAmount,
           status: 'paid',
           paidAt: new Date(),
@@ -375,7 +386,7 @@ class BetResultService {
           userId: user.id,
           betId: bet.id,
           amount: -commissionAmount, // 음수로 수수료 차감 표시
-          memo: `스포츠북 수수료 (${(sportsbookCommissionRate * 100).toFixed(2)}%)`,
+          memo: `스포츠북 수수료 (${(commissionCalculation.appliedRate * 100).toFixed(2)}%)${commissionCalculation.savings > 0 ? ` - 할인 적용됨` : ''}`,
           paidAt: new Date(),
           balanceAfter: user.balance
         }, { transaction });

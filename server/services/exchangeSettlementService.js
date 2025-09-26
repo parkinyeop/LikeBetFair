@@ -5,6 +5,7 @@ import User from '../models/userModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
 import AdminCommission from '../models/adminCommissionModel.js';
 import CommissionSettingsService from './commissionSettingsService.js';
+import CommissionService from './commissionService.js';
 import { Op } from 'sequelize';
 import createScriptSequelize from '../config/scriptDatabase.js';
 import { ADMIN_CONFIG } from '../config/centralizedConfig.js';
@@ -714,19 +715,28 @@ class ExchangeSettlementService {
 
     // Back 주문은 승리 시에도 수수료 차감하지 않음, Lay 주문만 승리 시 수수료 차감
     if (amount > 0 && order.side === 'lay') { // Lay 주문 승리 시에만 수수료 차감
-      const exchangeCommissionRate = await CommissionSettingsService.getCommissionRate('exchange');
+      // 🆕 통합 수수료 계산 (정책 기반)
+      const commissionCalculation = await CommissionService.calculate({
+        winnings: amount + order.stakeAmount, // 총 당첨금 (수익 + 원금)
+        stake: order.stakeAmount,             // 베팅금
+        platform: 'exchange',
+        user: user,
+        bet: { id: order.id, userId: order.userId }, // Exchange order를 bet으로 전달
+        policies: {} // 향후 프로모션 코드 등 추가 가능
+      });
 
-      // Exchange에서 수수료는 순수익(amount)에 대해서만 적용
-      commissionAmount = CommissionSettingsService.calculateCommission(
-        amount + order.stakeAmount, // 총 당첨금 (수익 + 원금)
-        order.stakeAmount,          // 베팅금
-        exchangeCommissionRate
-      );
+      commissionAmount = commissionCalculation.commissionAmount;
+
+      // 수수료 계산 상세 로깅
+      await CommissionService.logCommissionCalculation(user.id, commissionCalculation, {
+        platform: 'exchange',
+        orderId: order.id
+      });
 
       // 정밀 계산으로 수수료 차감
       netAmount = PrecisionCalculation.subtract(amount, commissionAmount);
 
-      console.log(`      💰 Lay 주문 수수료 계산 (정밀연산): 수익 ${amount}원, 수수료 ${commissionAmount}원 (${(exchangeCommissionRate * 100).toFixed(2)}%), 실제 지급 ${netAmount}원`);
+      console.log(`      💰 Lay 주문 수수료 계산 (정밀연산): 수익 ${amount}원, 수수료 ${commissionAmount}원 (${(commissionCalculation.appliedRate * 100).toFixed(2)}%), 실제 지급 ${netAmount}원`);
     } else if (amount > 0 && order.side === 'back') {
       console.log(`      💰 Back 주문 승리: 수익 ${amount}원 (수수료 없음)`);
     }

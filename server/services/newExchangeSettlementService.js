@@ -4,6 +4,7 @@ import User from '../models/userModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
 import AdminCommission from '../models/adminCommissionModel.js';
 import CommissionSettingsService from './commissionSettingsService.js';
+import CommissionService from './commissionService.js';
 import { Op } from 'sequelize';
 import teamMatchingService from './teamMatchingService.js';
 import { ADMIN_CONFIG } from '../config/centralizedConfig.js';
@@ -316,12 +317,17 @@ class NewExchangeSettlementService {
 
       // Back 주문은 승리 시에도 수수료 차감하지 않음, Lay 주문만 승리 시 수수료 차감
       if (order.side === 'lay') { // Lay 주문 승리 시에만 수수료 차감
-        const exchangeCommissionRate = await CommissionSettingsService.getCommissionRate('exchange');
-        const commissionAmountFloat = CommissionSettingsService.calculateCommission(
-          winnings,
-          order.stakeAmount || order.stake,
-          exchangeCommissionRate
-        );
+        // 🆕 통합 수수료 계산 (정책 기반)
+        const commissionCalculation = await CommissionService.calculate({
+          winnings: winnings,
+          stake: order.stakeAmount || order.stake,
+          platform: 'exchange',
+          user: await User.findByPk(order.userId),
+          bet: { id: order.id, userId: order.userId },
+          policies: {}
+        });
+
+        const commissionAmountFloat = commissionCalculation.commissionAmount;
 
         commissionAmountInt = Math.round(commissionAmountFloat * DECIMAL_MULTIPLIER);
         netWinningsInt = winningsInt - commissionAmountInt;
