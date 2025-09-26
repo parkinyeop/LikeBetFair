@@ -39,4 +39,9 @@ server/archive/
 server/test-*.js
 server/debug-*.js
 server/check-*.js
-server/analyze-*.jsbackup_*.sql
+server/analyze-*.js
+backup_*.sql
+
+# 9. 개발 도구 및 SDK
+gemini/
+google-cloud-sdk/
