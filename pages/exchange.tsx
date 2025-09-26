@@ -1429,6 +1429,7 @@ export default function Exchange() {
                   setSelectedMainCategory(mainCategory);
                   setSelectedCategory('');
                   setGames([]);
+                  handleCategoryChange(mainCategory);
                 }}
                 className={`px-6 py-3 rounded-lg font-medium transition-colors ${
                   selectedMainCategory === mainCategory
@@ -2178,6 +2179,7 @@ export default function Exchange() {
               setGames([]);
               setError(null);
               setLoading(false);
+              handleCategoryChange('Soccer');
             }}
             className={`px-6 py-2 rounded-lg font-medium transition-colors ${
               viewMode === 'league'
