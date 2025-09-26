@@ -306,29 +306,45 @@ class NewExchangeSettlementService {
     if (orderResult === 'won') {
       // 승리: 잠재 수익을 실제 수익으로
       winnings = order.potentialProfit || 0;
-      
-      // 🆕 익스체인지 수수료 계산 및 차감 (Lay 주문 승리 시에만)
-      let netWinnings = Number(winnings);
-      let commissionAmount = 0;
-      
+
+      // 🔧 정수 연산 기반 수수료 계산 (부동 소수점 오차 방지)
+      const DECIMAL_MULTIPLIER = 100;
+
+      const winningsInt = Math.round(winnings * DECIMAL_MULTIPLIER);
+      let netWinningsInt = winningsInt;
+      let commissionAmountInt = 0;
+
       // Back 주문은 승리 시에도 수수료 차감하지 않음, Lay 주문만 승리 시 수수료 차감
       if (order.side === 'lay') { // Lay 주문 승리 시에만 수수료 차감
         const exchangeCommissionRate = await CommissionSettingsService.getCommissionRate('exchange');
-        commissionAmount = CommissionSettingsService.calculateCommission(
-          winnings, 
-          order.stakeAmount || order.stake, 
+        const commissionAmountFloat = CommissionSettingsService.calculateCommission(
+          winnings,
+          order.stakeAmount || order.stake,
           exchangeCommissionRate
         );
-        
-        // 실제 지급할 금액 (수수료 차감 후)
-        netWinnings = Number(winnings) - Number(commissionAmount);
-        
-        console.log(`[익스체인지 Lay 주문 수수료] 주문 ${order.id}: 수익 ${winnings}원, 수수료 ${commissionAmount}원 (${(exchangeCommissionRate * 100).toFixed(2)}%), 실제 지급 ${netWinnings}원`);
+
+        commissionAmountInt = Math.round(commissionAmountFloat * DECIMAL_MULTIPLIER);
+        netWinningsInt = winningsInt - commissionAmountInt;
+
+        const commissionAmount = commissionAmountInt / DECIMAL_MULTIPLIER;
+        const netWinnings = netWinningsInt / DECIMAL_MULTIPLIER;
+
+        console.log(`[익스체인지 Lay 주문 수수료 (정수연산)] 주문 ${order.id}: 수익 ${winnings}원, 수수료 ${commissionAmount}원 (${(exchangeCommissionRate * 100).toFixed(2)}%), 실제 지급 ${netWinnings}원`);
+        console.log(`  정수 연산 값: winnings=${winningsInt}, commission=${commissionAmountInt}, net=${netWinningsInt}`);
       } else if (order.side === 'back') {
         console.log(`[익스체인지 Back 주문 승리] 주문 ${order.id}: 수익 ${winnings}원 (수수료 없음)`);
       }
-      
-      newBalance = Number(newBalance) + Number(netWinnings);
+
+      // 잔고 계산도 정수 연산 적용
+      const currentBalanceInt = Math.round(Number(newBalance) * DECIMAL_MULTIPLIER);
+      const finalBalanceInt = currentBalanceInt + netWinningsInt;
+      newBalance = finalBalanceInt / DECIMAL_MULTIPLIER;
+
+      console.log(`  💳 잔고 업데이트 (정수연산): ${Number(user.balance)} → ${newBalance} (정수값: ${currentBalanceInt} → ${finalBalanceInt})`);
+
+      // 로컬 변수 재정의 (이후 로직에서 사용)
+      let netWinnings = netWinningsInt / DECIMAL_MULTIPLIER;
+      let commissionAmount = commissionAmountInt / DECIMAL_MULTIPLIER;
       
       // 잔액 업데이트
       await user.update({ balance: newBalance });

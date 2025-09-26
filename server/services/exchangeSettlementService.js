@@ -8,6 +8,7 @@ import CommissionSettingsService from './commissionSettingsService.js';
 import { Op } from 'sequelize';
 import createScriptSequelize from '../config/scriptDatabase.js';
 import { ADMIN_CONFIG } from '../config/centralizedConfig.js';
+import PrecisionCalculation from '../utils/precisionCalculation.js';
 
 // 스크립트 전용 Sequelize 인스턴스 생성
 const sequelize = createScriptSequelize();
@@ -471,27 +472,38 @@ class ExchangeSettlementService {
     const backStakeAmount = backOrder.partiallyFilled ? (backOrder.filledAmount || 0) : backOrder.stakeAmount;
     const layStakeAmount = layOrder.partiallyFilled ? (layOrder.filledAmount || 0) : layOrder.stakeAmount;
     
-    // ✅ 올바른 Exchange 정산 계산: 배당률이 아닌 실제 베팅금액 비율로 계산
-    
-    // Lay의 지분 계산: Lay 베팅금액 ÷ Back의 매치금액
-    // Back의 매치금액 = Back 배팅금액 × (배당률 - 1)
-    const backMatchAmount = backStakeAmount * (backOrder.price - 1);
-    const layShareRatio = backMatchAmount > 0 ? layStakeAmount / backMatchAmount : 0;
-    
-    console.log(`  💰 Exchange 정산 계산:`);
+    // ✅ 정밀 계산 유틸리티를 사용한 Exchange 정산 (부동 소수점 오차 방지)
+
+    // 1. Back 매치금액 계산
+    const backMatchAmount = PrecisionCalculation.calculateBackMatchAmount(backStakeAmount, backOrder.price);
+
+    // 2. Lay 지분비율 계산
+    const layShareRatio = PrecisionCalculation.calculateLayShareRatio(layStakeAmount, backMatchAmount);
+
+    // 3. 디버그 정보 생성
+    const debugInfo = PrecisionCalculation.getDebugInfo('exchange_settlement', {
+      backStake: backStakeAmount,
+      layStake: layStakeAmount,
+      price: backOrder.price,
+      backMatchAmount,
+      layShareRatio
+    });
+
+    console.log(`  💰 Exchange 정산 계산 (정밀 연산):`);
     console.log(`    Back 매치금액: ${backMatchAmount}원 (배당률 ${backOrder.price})`);
     console.log(`    Lay 지분비율: ${(layShareRatio * 100).toFixed(1)}%`);
-    
+    console.log(`    디버그 정보:`, debugInfo);
+
     let backWinAmount, layWinAmount;
-    
+
     if (isBackWin) {
       // Back 승리 시: Lay가 베팅한 금액만큼 Back이 획득
       backWinAmount = layStakeAmount;
       layWinAmount = -layStakeAmount;
     } else {
-      // Lay 승리 시: Lay는 자신의 베팅금액 + Back의 배팅금액 중 지분만큼 획득
+      // Lay 승리 시: 정밀 계산으로 수익 산출
       backWinAmount = -layStakeAmount;
-      layWinAmount = layStakeAmount + (backStakeAmount * layShareRatio);
+      layWinAmount = PrecisionCalculation.calculateLayWinAmount(layStakeAmount, backStakeAmount, layShareRatio);
     }
     
     console.log(`  💰 수익 계산 (올바른 Exchange 로직):`);
@@ -693,31 +705,44 @@ class ExchangeSettlementService {
     const user = await User.findByPk(userId, { transaction });
     if (!user) throw new Error(`사용자를 찾을 수 없습니다: ${userId}`);
     
-    const previousBalance = parseFloat(user.balance);
-    
+    // 🔧 정밀 계산 유틸리티를 사용한 잔고 업데이트 (부동 소수점 오차 방지)
+    const currentBalance = parseFloat(user.balance);
+
     // 🆕 수수료 계산 및 차감 (Lay 주문 승리 시에만)
     let netAmount = amount;
     let commissionAmount = 0;
-    
+
     // Back 주문은 승리 시에도 수수료 차감하지 않음, Lay 주문만 승리 시 수수료 차감
     if (amount > 0 && order.side === 'lay') { // Lay 주문 승리 시에만 수수료 차감
       const exchangeCommissionRate = await CommissionSettingsService.getCommissionRate('exchange');
-      
+
       // Exchange에서 수수료는 순수익(amount)에 대해서만 적용
       commissionAmount = CommissionSettingsService.calculateCommission(
         amount + order.stakeAmount, // 총 당첨금 (수익 + 원금)
         order.stakeAmount,          // 베팅금
         exchangeCommissionRate
       );
-      
-      netAmount = amount - commissionAmount;
-      
-      console.log(`      💰 Lay 주문 수수료 계산: 수익 ${amount}원, 수수료 ${commissionAmount}원 (${(exchangeCommissionRate * 100).toFixed(2)}%), 실제 지급 ${netAmount}원`);
+
+      // 정밀 계산으로 수수료 차감
+      netAmount = PrecisionCalculation.subtract(amount, commissionAmount);
+
+      console.log(`      💰 Lay 주문 수수료 계산 (정밀연산): 수익 ${amount}원, 수수료 ${commissionAmount}원 (${(exchangeCommissionRate * 100).toFixed(2)}%), 실제 지급 ${netAmount}원`);
     } else if (amount > 0 && order.side === 'back') {
       console.log(`      💰 Back 주문 승리: 수익 ${amount}원 (수수료 없음)`);
     }
-    
-    const newBalance = previousBalance + netAmount;
+
+    // 정밀 계산으로 새 잔고 계산
+    const newBalance = PrecisionCalculation.add(currentBalance, netAmount);
+
+    // 디버그 정보 출력
+    const balanceDebug = PrecisionCalculation.getDebugInfo('balance_update', {
+      currentBalance,
+      netAmount,
+      newBalance
+    });
+
+    console.log(`      💳 잔고 업데이트 (정밀연산): ${currentBalance} → ${newBalance}`);
+    console.log(`      디버그 정보:`, balanceDebug);
     
     await user.update({ balance: newBalance }, { transaction });
     
