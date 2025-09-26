@@ -934,7 +934,7 @@ export default function Home() {
               {/* 선택된 마켓들의 배당률 표시 */}
               {selectedMarketsForGame.has('Win/Loss') && (
                 <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="text-sm font-medium text-blue-800 mb-2">🏆 승/패 (Win/Loss)</div>
+                  <div className="text-sm font-medium text-blue-800 mb-2">🏆 승/패</div>
                   {(() => {
                     const h2hOdds = officialOdds.h2h || {};
                     // 축구 경기인지 확인
@@ -1620,9 +1620,6 @@ export default function Home() {
                             
                             return (
                               <div className="flex items-center gap-2">
-                                <div className="w-16 text-base font-bold text-gray-800 text-center">
-                                  Win/Loss
-                                </div>
                                 {(() => {
                                   // 홈팀, 무승부, 어웨이팀 순서로 정렬
                                   const sortedOutcomes = outcomes.sort((a: any, b: any) => {
