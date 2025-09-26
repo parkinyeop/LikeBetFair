@@ -662,9 +662,158 @@ export default function Exchange() {
     return leagueGameMarkets[gameId] || new Set(['승패']);
   };
 
-  const handleCategoryChange = (category: string) => {
+  const handleCategoryChange = async (category: string) => {
     setSelectedCategory(category);
-    fetchLeagueGames(category);
+
+    // 메인 카테고리인지 확인 (예: Soccer, Basketball 등)
+    if (SPORTS_TREE[category as keyof typeof SPORTS_TREE]) {
+      console.log(`📂 메인 카테고리 선택: ${category} - 하위 리그들 로딩 시작`);
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        const leagues = SPORTS_TREE[category as keyof typeof SPORTS_TREE];
+        const gamesData: Record<string, any[]> = {};
+        const allGames: any[] = [];
+
+        // 모든 하위 리그를 병렬로 처리
+        const apiPromises = leagues.map(async (leagueName: string) => {
+          const leagueConfig = SPORT_CATEGORIES[leagueName];
+          if (!leagueConfig) return null;
+
+          const apiUrl = buildApiUrl(`${API_CONFIG.ENDPOINTS.ODDS}/${leagueConfig.sportKey}`);
+
+          try {
+            console.log(`🔄 ${leagueName} 데이터 로딩 중...`);
+            const response = await fetch(apiUrl);
+
+            if (!response.ok) {
+              throw new Error(`Failed to fetch ${leagueName} data`);
+            }
+
+            const data = await response.json();
+
+            const now = getCurrentLocalTime();
+            const oneDayAgo = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
+            const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+            const bettingDeadlineMinutes = 10;
+
+            const filteredGames = data.filter((game: any) => {
+              const localGameTime = convertUtcToLocal(game.commence_time);
+              const isValid = localGameTime >= oneDayAgo && localGameTime <= sevenDaysLater;
+              return isValid;
+            });
+
+            const processedGames = filteredGames.map((game: any) => {
+              const localGameTime = convertUtcToLocal(game.commence_time);
+              const bettingDeadline = new Date(localGameTime.getTime() - bettingDeadlineMinutes * 60 * 1000);
+              const isBettable = now < bettingDeadline;
+
+              let officialOdds = game.officialOdds;
+              if (!officialOdds && game.bookmakers && Array.isArray(game.bookmakers)) {
+                officialOdds = {};
+
+                const marketData: Record<string, Record<string, { count: number; totalPrice: number }>> = {};
+
+                game.bookmakers.forEach((bookmaker: any) => {
+                  if (bookmaker.markets && Array.isArray(bookmaker.markets)) {
+                    bookmaker.markets.forEach((market: any) => {
+                      if (!marketData[market.key]) {
+                        marketData[market.key] = {};
+                      }
+
+                      if (market.outcomes && Array.isArray(market.outcomes)) {
+                        market.outcomes.forEach((outcome: any) => {
+                          const outcomeKey = outcome.name || outcome.point || outcome.value;
+                          if (outcomeKey !== undefined) {
+                            if (!marketData[market.key][outcomeKey]) {
+                              marketData[market.key][outcomeKey] = { count: 0, totalPrice: 0 };
+                            }
+                            marketData[market.key][outcomeKey].count++;
+                            marketData[market.key][outcomeKey].totalPrice += outcome.price;
+                          }
+                        });
+                      }
+                    });
+                  }
+                });
+
+                Object.keys(marketData).forEach(marketKey => {
+                  officialOdds[marketKey] = {};
+                  Object.keys(marketData[marketKey]).forEach(outcomeKey => {
+                    const { count, totalPrice } = marketData[marketKey][outcomeKey];
+                    officialOdds[marketKey][outcomeKey] = (totalPrice / count).toFixed(2);
+                  });
+                });
+              }
+
+              return {
+                ...game,
+                id: `${game.home_team}-${game.away_team}-${game.commence_time}`,
+                localGameTime: localGameTime,
+                isBettable: isBettable,
+                league: leagueName,
+                sportKey: leagueConfig.sportKey,
+                officialOdds: officialOdds || {}
+              };
+            });
+
+            console.log(`✅ ${leagueName}: ${processedGames.length}개 경기 로드 완료`);
+
+            gamesData[leagueName] = processedGames;
+            allGames.push(...processedGames);
+
+            return { leagueName, games: processedGames };
+          } catch (error) {
+            console.error(`❌ ${leagueName} 데이터 로딩 실패:`, error);
+            return null;
+          }
+        });
+
+        await Promise.all(apiPromises);
+
+        // 시간순 정렬
+        const sortedAllGames = allGames.sort((a, b) =>
+          new Date(a.localGameTime).getTime() - new Date(b.localGameTime).getTime()
+        );
+
+        setGames(sortedAllGames);
+
+        // 기본 마켓 설정
+        sortedAllGames.forEach(game => {
+          if (!leagueGameMarkets[game.id]) {
+            setLeagueGameMarkets(prev => ({
+              ...prev,
+              [game.id]: new Set(['승패'])
+            }));
+          }
+        });
+
+        const bettableGames = sortedAllGames.filter(game => game.isBettable);
+        const totalGames = sortedAllGames.length;
+
+        console.log("=== League Category 전체 통계 ===");
+        console.log("전체 경기 개수:", totalGames);
+        console.log("베팅 가능한 경기 개수:", bettableGames.length);
+        console.log("베팅 불가능한 경기 개수:", totalGames - bettableGames.length);
+
+        const leagueDataCount: Record<string, number> = {};
+        Object.entries(gamesData).forEach(([league, games]) => {
+          leagueDataCount[league] = games.length;
+        });
+        console.log("리그별 배당율 데이터 개수:", leagueDataCount);
+
+      } catch (error) {
+        console.error(`❌ ${category} 메인 카테고리 데이터 로드 실패:`, error);
+        setError(error instanceof Error ? error.message : 'Unknown error');
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // 단일 리그 처리 (기존 로직)
+      fetchLeagueGames(category);
+    }
   };
 
   // Today Betting View 컴포넌트
@@ -946,10 +1095,19 @@ export default function Exchange() {
                     });
                     
                     // 0.5 단위 포인트만 필터링 (0.25, 0.75 등 제외)
-                    const filteredTotals = Object.entries(groupedTotals).filter(([point, oddsPair]) => {
-                      const pointValue = parseFloat(point);
-                      return !isNaN(pointValue) && (pointValue % 0.5 === 0) && (pointValue % 1 === 0 || pointValue % 1 === 0.5);
-                    });
+                    // 0.5 단위 포인트만 필터링하고 Over/Under 쌍이 모두 있는 것만 표시, 포인트 값으로 정렬
+                    const filteredTotals = Object.entries(groupedTotals)
+                      .filter(([point, oddsPair]) => {
+                        const pointValue = parseFloat(point);
+                        const isValidPoint = !isNaN(pointValue) && (pointValue % 0.5 === 0) && (pointValue % 1 === 0 || pointValue % 1 === 0.5);
+                        const hasBothOdds = oddsPair.over && oddsPair.under; // Over와 Under가 모두 있어야 함
+                        return isValidPoint && hasBothOdds;
+                      })
+                      .sort(([pointA], [pointB]) => {
+                        const valueA = parseFloat(pointA);
+                        const valueB = parseFloat(pointB);
+                        return valueA - valueB; // 오름차순 정렬
+                      });
                     
                     if (filteredTotals.length === 0) {
                       return (
@@ -1601,11 +1759,19 @@ export default function Exchange() {
                             }
                           });
                           
-                          // 0.5 단위 포인트만 필터링 (0.25, 0.75 등 제외)
-                          const filteredTotals = Object.entries(groupedTotals).filter(([point, oddsPair]) => {
-                            const pointValue = parseFloat(point);
-                            return !isNaN(pointValue) && (pointValue % 0.5 === 0) && (pointValue % 1 === 0 || pointValue % 1 === 0.5);
-                          });
+                          // 0.5 단위 포인트만 필터링하고 Over/Under 쌍이 모두 있는 것만 표시, 포인트 값으로 정렬
+                          const filteredTotals = Object.entries(groupedTotals)
+                            .filter(([point, oddsPair]) => {
+                              const pointValue = parseFloat(point);
+                              const isValidPoint = !isNaN(pointValue) && (pointValue % 0.5 === 0) && (pointValue % 1 === 0 || pointValue % 1 === 0.5);
+                              const hasBothOdds = oddsPair.over && oddsPair.under; // Over와 Under가 모두 있어야 함
+                              return isValidPoint && hasBothOdds;
+                            })
+                            .sort(([pointA], [pointB]) => {
+                              const valueA = parseFloat(pointA);
+                              const valueB = parseFloat(pointB);
+                              return valueA - valueB; // 오름차순 정렬
+                            });
                           
                           if (filteredTotals.length === 0) {
                             return (
