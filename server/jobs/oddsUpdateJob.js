@@ -10,6 +10,9 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { collectPremierLeagueData } from '../scripts/collectPremierLeagueData.js';
 import createScriptSequelize from '../config/scriptDatabase.js';
+import GameResult from '../models/gameResultModel.js';
+import ExchangeOrder from '../models/exchangeOrderModel.js';
+import { Op } from 'sequelize';
 
 // 스크립트 전용 Sequelize 인스턴스 생성
 const sequelize = createScriptSequelize();
@@ -21,6 +24,11 @@ let isUpdatingOdds = false; // 배당률 업데이트 플래그
 let lastUpdateTime = null;
 let isInitializing = false; // 초기화 중복 실행 방지
 let lastInitTime = null; // 마지막 초기화 시간
+
+// ✅ 스마트 스케줄링: 효율성 추적 변수
+let totalSchedulerRuns = 0;
+let skippedRuns = 0;
+let lastEfficiencyLog = Date.now();
 
 // ✅ ORIGINAL SCHEDULER RESTORED - NEW API KEY AVAILABLE
 // 새로운 API 키가 적용되어 원래 스케줄러로 복구되었습니다.
@@ -39,10 +47,35 @@ console.log('🚀 [SCHEDULER_SYSTEM] Node Version:', process.version);
 console.log('🚀 [SCHEDULER_SYSTEM] Environment:', process.env.NODE_ENV || 'development');
 console.log('✅ [SCHEDULER_SYSTEM] ORIGINAL SCHEDULER RESTORED - NEW API KEY AVAILABLE');
 
-// 스케줄러 상태 모니터링 추가 (30분마다로 변경)
+// 스케줄러 상태 모니터링 및 효율성 리포팅 (30분마다)
 setInterval(() => {
   console.log('[SCHEDULER_STATUS] 💓 isUpdatingOdds:', isUpdatingOdds);
   console.log('[SCHEDULER_STATUS] 💓 isUpdatingResults:', isUpdatingResults);
+
+  // ✅ 효율성 리포팅
+  const currentTime = Date.now();
+  const timeSinceLastLog = (currentTime - lastEfficiencyLog) / (1000 * 60); // 분 단위
+
+  if (timeSinceLastLog >= 30) { // 30분마다 효율성 리포트
+    const efficiencyRate = totalSchedulerRuns > 0 ? ((skippedRuns / totalSchedulerRuns) * 100).toFixed(1) : 0;
+
+    console.log('📊 [SCHEDULER_EFFICIENCY] 최적화 성과 리포트:');
+    console.log(`   총 실행 횟수: ${totalSchedulerRuns}`);
+    console.log(`   건너뛴 횟수: ${skippedRuns}`);
+    console.log(`   효율성 개선율: ${efficiencyRate}%`);
+    console.log(`   리소스 절약: CPU/DB 연결 ${efficiencyRate}% 절약`);
+
+    // 로그 저장
+    saveUpdateLog('scheduler_efficiency', 'report', {
+      message: 'Scheduler efficiency report',
+      totalRuns: totalSchedulerRuns,
+      skippedRuns: skippedRuns,
+      efficiencyRate: parseFloat(efficiencyRate),
+      reportPeriod: `${timeSinceLastLog.toFixed(1)} minutes`
+    });
+
+    lastEfficiencyLog = currentTime;
+  }
 }, 30 * 60 * 1000); // 30분마다
 
 // 리그별 우선순위 설정 (API 사용량 최적화)
@@ -186,14 +219,29 @@ cron.schedule('*/30 * * * *', async () => {
       'Game results update'
     );
     
-    // 경기 결과 업데이트 후 배팅 결과도 업데이트 (2분 타임아웃)
-    console.log('[SCHEDULER_BETS] 🚀 Starting bet results update after game results');
-    saveUpdateLog('bets', 'start', { message: 'Starting bet results update after game results' });
-    const betUpdateResult = await withTimeout(
-      betResultService.updateBetResults(),
-      2 * 60 * 1000, // 2분
-      'Bet results update'
-    );
+    // --- ✅ 효율성 최적화: 경기 결과 업데이트가 있을 때만 베팅 정산 실행 ---
+    if (updateResult?.updatedCount > 0) {
+      console.log(`[SCHEDULER_BETS] 🎯 ${updateResult.updatedCount}개 경기 결과 업데이트됨 - 베팅 정산 진행`);
+      saveUpdateLog('bets', 'start', {
+        message: 'Starting bet results update after game results',
+        gameUpdates: updateResult.updatedCount
+      });
+
+      const betUpdateResult = await withTimeout(
+        betResultService.updateBetResults(),
+        2 * 60 * 1000, // 2분
+        'Bet results update'
+      );
+    } else {
+      console.log('[SCHEDULER_BETS] ⚡ 경기 결과 업데이트 없음 - 베팅 정산 건너뛰기');
+      saveUpdateLog('bets', 'skipped', {
+        message: 'Bet results update skipped (효율성 최적화)',
+        reason: 'No game results updated'
+      });
+
+      // betUpdateResult를 빈 결과로 설정
+      var betUpdateResult = { updatedCount: 0, errorCount: 0, skipped: true };
+    }
     
     lastUpdateTime = new Date();
     
@@ -237,11 +285,20 @@ cron.schedule('*/30 * * * *', async () => {
           3 * 60 * 1000, // 3분으로 단축
           'Game results retry'
         );
-        const betRetryResult = await withTimeout(
-          betResultService.updateBetResults(),
-          2 * 60 * 1000,
-          'Bet results retry'
-        );
+
+        // --- ✅ 효율성 최적화: 재시도에서도 경기 결과 업데이트가 있을 때만 베팅 정산 실행 ---
+        let betRetryResult;
+        if (retryResult?.updatedCount > 0) {
+          console.log(`[SCHEDULER_RETRY] 🎯 재시도에서 ${retryResult.updatedCount}개 경기 결과 업데이트됨 - 베팅 정산 진행`);
+          betRetryResult = await withTimeout(
+            betResultService.updateBetResults(),
+            2 * 60 * 1000,
+            'Bet results retry'
+          );
+        } else {
+          console.log('[SCHEDULER_RETRY] ⚡ 재시도에서 경기 결과 업데이트 없음 - 베팅 정산 건너뛰기');
+          betRetryResult = { updatedCount: 0, errorCount: 0, skipped: true };
+        }
         lastUpdateTime = new Date();
         
         const retrySummary = {
@@ -856,10 +913,52 @@ cron.schedule('*/10 * * * *', async () => {
   }
 });
 
-// 🎯 Exchange 주문 자동 정산 처리 - 매 5분마다 실행
+// 🎯 Exchange 주문 자동 정산 처리 - 매 5분마다 실행 (효율성 최적화 적용)
 cron.schedule('*/5 * * * *', async () => {
+  totalSchedulerRuns++; // 효율성 추적
+
   try {
-    console.log('🎯 [Exchange] 매칭된 주문 자동 정산 시작...');
+    console.log('🔍 [Exchange] 정산 필요성 검증 시작...');
+
+    // --- ✅ 효율성 최적화: 정산 필요성 사전 검증 ---
+
+    // 1. 최근 6분 내에 업데이트된 'finished' 상태의 경기 결과 확인
+    const sixMinutesAgo = new Date(Date.now() - 6 * 60 * 1000);
+    const recentFinishedGames = await GameResult.count({
+      where: {
+        status: 'finished',
+        updatedAt: { [Op.gte]: sixMinutesAgo }
+      }
+    });
+
+    // 2. 정산 대상 Exchange 주문 확인
+    const pendingExchangeOrders = await ExchangeOrder.count({
+      where: {
+        status: { [Op.in]: ['matched', 'partially_matched'] },
+        settledAt: null
+      }
+    });
+
+    // 3. 효율성 체크: 신규 경기 결과도 없고 정산 대상 주문도 없으면 건너뛰기
+    if (recentFinishedGames === 0 && pendingExchangeOrders === 0) {
+      skippedRuns++; // 효율성 추적
+      console.log('⚡ [Exchange] 정산 건너뛰기: 신규 경기 결과 없음, 정산 대상 주문 없음');
+      saveUpdateLog('exchange_settlement', 'skipped', {
+        message: 'Exchange 정산 건너뛰기 (효율성 최적화)',
+        timestamp: new Date().toISOString(),
+        reason: 'No recent game results and no pending orders',
+        efficiency: {
+          totalRuns: totalSchedulerRuns,
+          skippedRuns: skippedRuns,
+          efficiencyRate: ((skippedRuns / totalSchedulerRuns) * 100).toFixed(1)
+        }
+      });
+      return;
+    }
+
+    console.log(`🎯 [Exchange] 정산 진행: 신규 경기 ${recentFinishedGames}개, 정산 대상 주문 ${pendingExchangeOrders}개`);
+
+    // --- 기존 정산 로직 실행 ---
 
     // Exchange 개별 주문 자동 정산 실행 (직접 호출)
     const service = new ExchangeSettlementService();
@@ -871,12 +970,17 @@ cron.schedule('*/5 * * * *', async () => {
     const multibetResult = await multibetSettlementService.settleAllMultibetOrders();
     console.log('✅ [Exchange] 멀티배팅 주문 자동 정산 완료:', multibetResult);
 
-    // 정산 결과 로그 저장
+    // 정산 결과 로그 저장 (최적화 정보 포함)
     saveUpdateLog('exchange_settlement', 'success', {
       message: 'Exchange 주문 자동 정산 완료 (개별 + 멀티배팅)',
       timestamp: new Date().toISOString(),
       individualOrders: individualResult,
-      multibetOrders: multibetResult
+      multibetOrders: multibetResult,
+      optimization: {
+        recentGames: recentFinishedGames,
+        pendingOrders: pendingExchangeOrders,
+        skipped: false
+      }
     });
 
   } catch (error) {
