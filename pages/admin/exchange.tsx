@@ -314,6 +314,16 @@ interface DailyStats {
   volume: number;
 }
 
+interface MonthlyStats {
+  month: string;
+  totalOrders: number;
+  matchedOrders: number;
+  openOrders: number;
+  settledOrders: number;
+  multibets: number;
+  volume: number;
+}
+
 
 interface MonthlySummary {
   totalOrders: number;
