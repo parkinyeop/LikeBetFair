@@ -45,3 +45,5 @@ backup_*.sql
 # 9. 개발 도구 및 SDK
 gemini/
 google-cloud-sdk/
+package-lock.json
+server/package-lock.json

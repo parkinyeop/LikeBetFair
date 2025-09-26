@@ -67,15 +67,7 @@ const OddsChangeModal = ({
 const BetSelectionPanel = () => {
   const { selections, stake, setStake, removeSelection, clearAll, updateSelection } = useBetStore();
   const { isLoggedIn, setBalance, token, refreshBalance, forceRefreshBalance } = useAuth();
-  const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
-
-  // selections 변경 시 메시지 초기화
-  useEffect(() => {
-    if (message) {
-      setMessage('');
-    }
-  }, [selections]);
   
   // 배당율 변경 모달 상태
   const [oddsChangeModal, setOddsChangeModal] = useState<{
@@ -95,10 +87,7 @@ const BetSelectionPanel = () => {
     const value = e.target.value.replace(/,/g, ''); // 콤마 제거 후 숫자 변환
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
       setStake(value === '' ? 0 : parseFloat(value));
-      // 베팅금 변경 시 메시지 초기화
-      if (message) {
-        setMessage('');
-      }
+      // 베팅금 변경 시 메시지 초기화 (더 이상 사용하지 않음)
     }
   };
 
@@ -153,7 +142,19 @@ const BetSelectionPanel = () => {
       const responseData = await res.json();
       
       if (res.ok) {
-        setMessage('베팅이 성공적으로 저장되었습니다!');
+        // 베팅 성공 시 익스체인지 스타일의 메시지 표시
+        const totalStake = selections.reduce((sum, sel) => sum + (sel.stake || 0), 0);
+        const totalOdds = selections.reduce((product, sel) => product * (sel.odds || 1), 1);
+        const estimatedProfit = totalStake * (totalOdds - 1);
+        
+        alert(`🎉 베팅이 성공적으로 저장되었습니다!\n\n` +
+              `📊 베팅 정보:\n` +
+              `• 선택 항목: ${selections.length}개\n` +
+              `• 베팅 금액: ${totalStake.toLocaleString()} KRW\n` +
+              `• 총 배당률: ${totalOdds.toFixed(2)}배\n` +
+              `• 예상 수익: ${estimatedProfit.toLocaleString()} KRW\n\n` +
+              `💰 현재 잔액: ${responseData.balance ? Number(responseData.balance).toLocaleString() : '확인 중'} KRW`);
+        
         // 베팅 후 잔액 업데이트 (응답에 잔액이 있으면 우선 사용)
         if (responseData.balance !== undefined) {
           console.log('[BetSelectionPanel] 응답에서 잔액 업데이트:', responseData.balance);
@@ -167,11 +168,11 @@ const BetSelectionPanel = () => {
         window.dispatchEvent(new Event('betPlaced'));
         setLoading(false);
       } else {
-                  setMessage(responseData.message || 'Betting save failed');
+        alert(`❌ 베팅 저장 실패\n\n${responseData.message || '알 수 없는 오류가 발생했습니다.'}\n\n잠시 후 다시 시도해주세요.`);
         setLoading(false);
       }
     } catch (err) {
-      setMessage('서버 오류');
+      alert('🚨 서버 오류\n\n서버와의 연결에 문제가 발생했습니다.\n\n잠시 후 다시 시도해주세요.');
       setLoading(false);
     }
   };
@@ -179,7 +180,7 @@ const BetSelectionPanel = () => {
   // 배당율 변경 거부
   const handleRejectOddsChange = () => {
     setOddsChangeModal({ isOpen: false });
-    setMessage('베팅이 취소되었습니다. 배당율을 확인 후 다시 시도해주세요.');
+    alert('❌ 베팅이 취소되었습니다.\n\n배당률이 변경되어 베팅이 취소되었습니다.\n배당률을 확인 후 다시 시도해주세요.');
     setLoading(false);
   };
 
@@ -221,7 +222,19 @@ const BetSelectionPanel = () => {
       const data = await res.json();
       
       if (res.ok) {
-        setMessage('베팅이 성공적으로 저장되었습니다!');
+        // 베팅 성공 시 익스체인지 스타일의 메시지 표시
+        const totalStake = selections.reduce((sum, sel) => sum + (sel.stake || 0), 0);
+        const totalOdds = selections.reduce((product, sel) => product * (sel.odds || 1), 1);
+        const estimatedProfit = totalStake * (totalOdds - 1);
+        
+        alert(`🎉 베팅이 성공적으로 저장되었습니다!\n\n` +
+              `📊 베팅 정보:\n` +
+              `• 선택 항목: ${selections.length}개\n` +
+              `• 베팅 금액: ${totalStake.toLocaleString()} KRW\n` +
+              `• 총 배당률: ${totalOdds.toFixed(2)}배\n` +
+              `• 예상 수익: ${estimatedProfit.toLocaleString()} KRW\n\n` +
+              `💰 현재 잔액: ${data.balance ? Number(data.balance).toLocaleString() : '확인 중'} KRW`);
+        
         // 베팅 후 잔액 업데이트 (응답에 잔액이 있으면 우선 사용)
         if (data.balance !== undefined) {
           console.log('[BetSelectionPanel] 응답에서 잔액 업데이트:', data.balance);
@@ -251,22 +264,21 @@ const BetSelectionPanel = () => {
         }
         
         // 기타 오류
-        setMessage(data.message || 'Betting save failed');
+        alert(`❌ 베팅 저장 실패\n\n${data.message || '알 수 없는 오류가 발생했습니다.'}\n\n잠시 후 다시 시도해주세요.`);
         setLoading(false);
       }
     } catch (err) {
-      setMessage('서버 오류');
+      alert('🚨 서버 오류\n\n서버와의 연결에 문제가 발생했습니다.\n\n잠시 후 다시 시도해주세요.');
       setLoading(false);
     }
   };
 
   const handleBet = async () => {
     if (!isLoggedIn) {
-      setMessage('로그인 후 이용 가능합니다.');
+      alert('🔐 로그인이 필요합니다.\n\n베팅을 하려면 먼저 로그인해주세요.');
       return;
     }
     setLoading(true);
-    setMessage('');
     
     await submitBet();
   };
@@ -277,10 +289,7 @@ const BetSelectionPanel = () => {
         <h2 className="text-lg font-bold">Bet Selection</h2>
         <button className="text-sm text-red-500" onClick={() => {
           clearAll();
-          // 전체 삭제 시 메시지 초기화
-          if (message) {
-            setMessage('');
-          }
+          // 전체 삭제 시 메시지 초기화 (더 이상 사용하지 않음)
         }}>Clear All</button>
       </div>
       <ul className="space-y-2 mb-4">
@@ -327,10 +336,7 @@ const BetSelectionPanel = () => {
               <span className="text-sm font-semibold">{sel.odds.toFixed(2)}</span>
               <button onClick={() => {
                 removeSelection(sel.team);
-                // 선택 제거 시 메시지 초기화
-                if (message) {
-                  setMessage('');
-                }
+                // 선택 제거 시 메시지 초기화 (더 이상 사용하지 않음)
               }} className="text-red-500 text-xs">X</button>
             </div>
           </li>
@@ -360,7 +366,6 @@ const BetSelectionPanel = () => {
       {hasPastGame && (
         <div className="mt-2 text-center text-sm text-red-600">Some games have already started and cannot be bet on.</div>
       )}
-      {message && <div className="mt-2 text-center text-sm text-blue-600">{message}</div>}
 
       <OddsChangeModal
         isOpen={oddsChangeModal.isOpen}

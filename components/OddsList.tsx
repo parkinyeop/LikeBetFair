@@ -617,31 +617,32 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                         const homeOdds = homeData?.oddsData?.averagePrice;
                         const awayOdds = awayData?.oddsData?.averagePrice;
                         const pointValue = parseFloat(absPoint);
-                        // 스프레드 베팅에서는 하나의 핸디캡 값으로 양팀이 반대 방향을 가짐
-                        const homeHandicap = pointValue;
-                        const awayHandicap = -pointValue;
+                        // API에서 제공하는 실제 핸디캡 값을 사용하도록 수정
+                        const homeHandicap = homeData?.handicap;
+                        const awayHandicap = awayData?.handicap;
                         
                         return (
                           <div key={absPoint} className="flex items-center gap-2">
-                            {homeOdds != null && (
+                            {homeOdds != null && homeHandicap != null && (
                               <button
                                 onClick={() => {
                                   if (isBettable && homeOdds) {
                                     toggleSelection({
-                                      team: `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap} (vs ${game.away_team})`,
+                                      team: `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`,
                                       odds: homeOdds,
                                       desc: `${game.home_team} vs ${game.away_team}`,
                                       commence_time: game.commence_time,
                                       market: 'Handicap',
                                       gameId: game.id,
                                       sport_key: game.sport_key,
-                                      point: pointValue
+                                      // 실제 핸디캡 값을 point로 전달
+                                      point: homeHandicap
                                     });
                                     handleBettingAreaSelect();
                                   }
                                 }}
                                 className={`flex-1 p-2 rounded-lg text-center transition-colors ${
-                                  isTeamSelected(`${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap} (vs ${game.away_team})`, 'Handicap', game.id, pointValue)
+                                  isTeamSelected(`${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`, 'Handicap', game.id, homeHandicap)
                                     ? 'bg-yellow-500 hover:bg-yellow-600'
                                     : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                 } text-white text-sm`}
@@ -652,25 +653,26 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                               </button>
                             )}
                             <div className="w-12 text-sm font-medium text-blue-700 text-center">{pointValue}</div>
-                            {awayOdds != null && (
+                            {awayOdds != null && awayHandicap != null && (
                               <button
                                 onClick={() => {
                                   if (isBettable && awayOdds) {
                                     toggleSelection({
-                                      team: `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap} (vs ${game.home_team})`,
+                                      team: `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`,
                                       odds: awayOdds,
                                       desc: `${game.home_team} vs ${game.away_team}`,
                                       commence_time: game.commence_time,
                                       market: 'Handicap',
                                       gameId: game.id,
                                       sport_key: game.sport_key,
-                                      point: pointValue
+                                      // 실제 핸디캡 값을 point로 전달
+                                      point: awayHandicap
                                     });
                                     handleBettingAreaSelect();
                                   }
                                 }}
                                 className={`flex-1 p-2 rounded-lg text-center transition-colors ${
-                                  isTeamSelected(`${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap} (vs ${game.home_team})`, 'Handicap', game.id, pointValue)
+                                  isTeamSelected(`${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`, 'Handicap', game.id, awayHandicap)
                                     ? 'bg-yellow-500 hover:bg-yellow-600'
                                     : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                 } text-white text-sm`}

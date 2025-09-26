@@ -33,6 +33,23 @@ export const adjustOddsSophisticated = (oddsArray: number[], targetPayout: numbe
 };
 
 /**
+ * 익스체인지 환수율을 적용하는 함수
+ * @param odds - 원본 배당률
+ * @param oddsArray - 배당률 배열 (호환성을 위해 유지)
+ * @returns 환수율이 적용된 배당률
+ */
+export const applyExchangeReturnRate = (odds: number, oddsArray?: number[]): number => {
+  if (!odds || odds <= 0) {
+    return odds;
+  }
+  
+  // 익스체인지 환수율 (일반적으로 0.95-0.98)
+  const exchangeReturnRate = 0.95;
+  
+  return odds / exchangeReturnRate;
+};
+
+/**
  * 단일 배당률에 환수율을 적용하는 함수 (호환성 유지)
  * @param originalOdds - 원본 배당률
  * @param targetPayout - 목표 환수율

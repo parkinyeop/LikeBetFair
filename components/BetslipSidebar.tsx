@@ -251,34 +251,6 @@ function MyBetsPanel() {
                 dateStr = '날짜 정보 없음';
               }
             }
-            let expectedResultDate: string | null = null;
-            // 경기별 평균 소요 시간(분)
-            const avgGameDurationBySport: Record<string, number> = {
-              soccer: 120,
-              baseball: 180,
-              basketball: 150,
-              // 필요시 추가
-            };
-            if (Array.isArray(bet.selections)) {
-              const times = bet.selections
-                .map((sel: any) => sel.commence_time)
-                .filter((t: any) => !!t)
-                .map((t: string) => {
-                  // 🚨 수정: 하드코딩된 KST 변환 제거
-                  // 브라우저의 로컬 시간대 설정을 사용하여 자동 변환
-                  const utcDate = new Date(t);
-                  return utcDate;
-                })
-                .filter((d: Date) => !isNaN(d.getTime()));
-              if (times.length > 0) {
-                const maxDate = new Date(Math.max(...times.map(d => d.getTime())));
-                // 스포츠 종류 추출(예: soccer_epl → soccer)
-                const sportType = bet.selections[0]?.sport_key?.split('_')[0] || 'soccer';
-                const duration = avgGameDurationBySport[sportType] || 120;
-                maxDate.setMinutes(maxDate.getMinutes() + duration);
-                expectedResultDate = maxDate.toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-              }
-            }
             const isOpen = openBetIds[bet.id] || false;
             // 익스체인지 스타일로 변경
             return (
@@ -362,9 +334,6 @@ function MyBetsPanel() {
                         <span className="text-sm font-bold text-gray-800">상세 정보</span>
                         <button className="px-2 py-1 text-xs border rounded text-blue-600 border-blue-300 hover:bg-blue-50" onClick={e => { e.stopPropagation(); toggleBet(bet.id); }}>접기 ▲</button>
                       </div>
-                      {expectedResultDate && (
-                        <div className="text-xs text-blue-600 font-semibold mb-3">정산 예정일: {expectedResultDate}</div>
-                      )}
                                 {/* 경기 정보 표시 */}
                                 {Array.isArray(bet.selections) && (
                                   <div className="mb-3">
@@ -392,6 +361,17 @@ function MyBetsPanel() {
                                                   <span className="text-xs text-gray-500">
                                                     {sel.desc || `${sel.team} Game`}
                                                   </span>
+                                                  {/* 경기 시간 표시 */}
+                                                  {sel.commence_time && (
+                                                    <span className="text-xs text-blue-600 font-medium">
+                                                      🕐 {new Date(sel.commence_time).toLocaleString('ko-KR', { 
+                                                        month: '2-digit', 
+                                                        day: '2-digit', 
+                                                        hour: '2-digit', 
+                                                        minute: '2-digit' 
+                                                      })}
+                                                    </span>
+                                                  )}
                                                   <span className="text-xs text-gray-400">
                                                     {sel.market || '승패'}
                                                   </span>
