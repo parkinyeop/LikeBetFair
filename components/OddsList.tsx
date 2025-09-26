@@ -372,7 +372,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                   
                   let outcomes;
                   if (isSoccer) {
-                    // 축구: 팀A, 무, 팀B 순서로 정렬
+                    // 축구: 홈팀, 무, 원정팀 순서로 정렬 (일관된 순서)
                     const homeOdds = h2hOdds[game.home_team];
                     const awayOdds = h2hOdds[game.away_team];
                     const drawOdds = Object.entries(h2hOdds).find(([name, _]) => 
@@ -385,11 +385,14 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                       { name: game.away_team, price: (awayOdds as any)?.averagePrice }
                     ].filter(outcome => outcome.price !== undefined);
                   } else {
-                    // 다른 스포츠: 기존 순서 유지
-                    outcomes = Object.entries(h2hOdds).map(([outcomeName, oddsData]: [string, any]) => ({
-                      name: outcomeName,
-                      price: oddsData.averagePrice
-                    }));
+                    // 야구 등 다른 스포츠: 홈팀을 왼쪽에 표시하도록 순서 조정
+                    const homeOdds = h2hOdds[game.home_team];
+                    const awayOdds = h2hOdds[game.away_team];
+                    
+                    outcomes = [
+                      { name: game.home_team, price: (homeOdds as any)?.averagePrice },
+                      { name: game.away_team, price: (awayOdds as any)?.averagePrice }
+                    ].filter(outcome => outcome.price !== undefined);
                   }
                   
                   if (outcomes.length === 0) {
@@ -473,11 +476,19 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                     }
                   });
                   
-                  // 0.5 단위 포인트만 필터링 (0.25, 0.75 등 제외)
-                  const filteredTotals = Object.entries(groupedTotals).filter(([point, oddsPair]) => {
-                    const pointValue = parseFloat(point);
-                    return !isNaN(pointValue) && (pointValue % 0.5 === 0) && (pointValue % 1 === 0 || pointValue % 1 === 0.5);
-                  });
+                  // 0.5 단위 포인트만 필터링하고 Over/Under 쌍이 모두 있는 것만 표시, 포인트 값으로 정렬
+                  const filteredTotals = Object.entries(groupedTotals)
+                    .filter(([point, oddsPair]) => {
+                      const pointValue = parseFloat(point);
+                      const isValidPoint = !isNaN(pointValue) && (pointValue % 0.5 === 0) && (pointValue % 1 === 0 || pointValue % 1 === 0.5);
+                      const hasBothOdds = oddsPair.over && oddsPair.under; // Over와 Under가 모두 있어야 함
+                      return isValidPoint && hasBothOdds;
+                    })
+                    .sort(([pointA], [pointB]) => {
+                      const valueA = parseFloat(pointA);
+                      const valueB = parseFloat(pointB);
+                      return valueA - valueB; // 오름차순 정렬
+                    });
                   
                   if (filteredTotals.length === 0) {
                     return (
@@ -623,6 +634,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                         
                         return (
                           <div key={absPoint} className="flex items-center gap-2">
+                            {/* 홈팀을 왼쪽에 표시 */}
                             {homeOdds != null && homeHandicap != null && (
                               <button
                                 onClick={() => {
@@ -652,7 +664,8 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                                 <div className="text-xs">{homeOdds.toFixed(2)}</div>
                               </button>
                             )}
-                            <div className="w-12 text-sm font-medium text-blue-700 text-center">{pointValue}</div>
+                            <div className="w-12 text-sm font-medium text-blue-700 text-center">{homeHandicap != null ? (homeHandicap > 0 ? '+' : '') + homeHandicap : pointValue}</div>
+                            {/* 원정팀을 오른쪽에 표시 */}
                             {awayOdds != null && awayHandicap != null && (
                               <button
                                 onClick={() => {

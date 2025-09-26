@@ -1060,12 +1060,19 @@ export default function Home() {
                       }
                     });
                     
-                    // 0.5 단위 포인트만 필터링 (0.25, 0.75 등 제외)
-                    const filteredTotals = Object.entries(groupedTotals).filter(([point, oddsPair]) => {
-                      const pointValue = parseFloat(point);
-                      // NaN이거나 0.5 단위가 아니면 제외 (0.5, 1, 1.5, 2, 2.5... 만 허용)
-                      return !isNaN(pointValue) && (pointValue % 0.5 === 0) && (pointValue % 1 === 0 || pointValue % 1 === 0.5);
-                    });
+                    // 0.5 단위 포인트만 필터링하고 Over/Under 쌍이 모두 있는 것만 표시, 포인트 값으로 정렬
+                    const filteredTotals = Object.entries(groupedTotals)
+                      .filter(([point, oddsPair]) => {
+                        const pointValue = parseFloat(point);
+                        const isValidPoint = !isNaN(pointValue) && (pointValue % 0.5 === 0) && (pointValue % 1 === 0 || pointValue % 1 === 0.5);
+                        const hasBothOdds = oddsPair.over && oddsPair.under; // Over와 Under가 모두 있어야 함
+                        return isValidPoint && hasBothOdds;
+                      })
+                      .sort(([pointA], [pointB]) => {
+                        const valueA = parseFloat(pointA);
+                        const valueB = parseFloat(pointB);
+                        return valueA - valueB; // 오름차순 정렬
+                      });
                     
                     return filteredTotals.map(([point, oddsPair]) => {
                       const overOdds = oddsPair.over?.averagePrice;
@@ -1709,12 +1716,19 @@ export default function Home() {
                                 }
                               });
                               
-                              // 0.5 단위 포인트만 필터링 (0.25, 0.75 등 제외)
-                              const filteredTotals = Object.entries(groupedTotals).filter(([point, oddsPair]) => {
-                                const pointValue = parseFloat(point);
-                                // NaN이거나 0.5 단위가 아니면 제외 (0.5, 1, 1.5, 2, 2.5... 만 허용)
-                                return !isNaN(pointValue) && (pointValue % 0.5 === 0) && (pointValue % 1 === 0 || pointValue % 1 === 0.5);
-                              });
+                              // 0.5 단위 포인트만 필터링하고 Over/Under 쌍이 모두 있는 것만 표시, 포인트 값으로 정렬
+                              const filteredTotals = Object.entries(groupedTotals)
+                                .filter(([point, oddsPair]) => {
+                                  const pointValue = parseFloat(point);
+                                  const isValidPoint = !isNaN(pointValue) && (pointValue % 0.5 === 0) && (pointValue % 1 === 0 || pointValue % 1 === 0.5);
+                                  const hasBothOdds = oddsPair.over && oddsPair.under; // Over와 Under가 모두 있어야 함
+                                  return isValidPoint && hasBothOdds;
+                                })
+                                .sort(([pointA], [pointB]) => {
+                                  const valueA = parseFloat(pointA);
+                                  const valueB = parseFloat(pointB);
+                                  return valueA - valueB; // 오름차순 정렬
+                                });
                               
                               if (filteredTotals.length === 0) {
                                 return (
