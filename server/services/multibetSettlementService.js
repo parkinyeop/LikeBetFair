@@ -192,21 +192,59 @@ class MultibetSettlementService {
   async findGameResult(selection) {
     const { homeTeam, awayTeam, commenceTime } = selection;
 
-    // 기존 DirectMatchingService 사용
-    const directMatching = directMatchingService;
-    const gameResult = await directMatching.findMatchingGameResult(selection);
+    console.log(`🔍 경기 결과 조회: ${homeTeam} vs ${awayTeam}`);
+    console.log(`📅 경기 시간: ${commenceTime}`);
 
-    if (!gameResult) {
+    // 직접 GameResult 모델 사용 (기존 방식으로 복원)
+    try {
+      // 정확한 시간으로 먼저 검색
+      let gameResult = await GameResult.findOne({
+        where: {
+          homeTeam: homeTeam,
+          awayTeam: awayTeam,
+          commenceTime: commenceTime,
+          status: 'finished'
+        }
+      });
+
+      // 정확한 시간으로 찾지 못하면 시간 범위로 검색 (±24시간)
+      if (!gameResult) {
+        const targetTime = new Date(commenceTime);
+        const startTime = new Date(targetTime.getTime() - (24 * 60 * 60 * 1000));
+        const endTime = new Date(targetTime.getTime() + (24 * 60 * 60 * 1000));
+        
+        console.log(`⏰ 시간 범위 검색: ${startTime.toISOString()} ~ ${endTime.toISOString()}`);
+        
+        gameResult = await GameResult.findOne({
+          where: {
+            homeTeam: homeTeam,
+            awayTeam: awayTeam,
+            commenceTime: {
+              [Op.between]: [startTime, endTime]
+            },
+            status: 'finished'
+          }
+        });
+      }
+
+      if (gameResult) {
+        console.log(`✅ 경기 결과 발견: ${gameResult.result} (${gameResult.score})`);
+        
+        // 경기 결과 판정
+        const result = this.determineGameResult(gameResult, selection);
+
+        return {
+          ...gameResult.toJSON(),
+          result
+        };
+      } else {
+        console.log(`❌ 경기 결과 없음: ${homeTeam} vs ${awayTeam}`);
+        return null;
+      }
+    } catch (error) {
+      console.error(`❌ 경기 결과 조회 오류:`, error.message);
       return null;
     }
-
-    // 경기 결과 판정
-    const result = this.determineGameResult(gameResult, selection);
-
-    return {
-      ...gameResult.toJSON(),
-      result
-    };
   }
   
   /**

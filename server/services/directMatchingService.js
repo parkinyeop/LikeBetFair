@@ -159,10 +159,10 @@ class DirectMatchingService {
         // 전체 매칭 점수 (홈팀 + 어웨이팀 평균)
         const totalScore = (homeScore + awayScore) / 2;
         
-        // 로그 최적화: 매칭 점수가 높을 때만 로그 출력
-        if (totalScore >= 0.5) {
-          console.log(`🎯 경기: ${game.homeTeam} vs ${game.awayTeam} (점수: ${totalScore.toFixed(3)})`);
-        }
+        // 모든 매칭 시도 로그 출력 (디버깅 강화)
+        console.log(`🎯 경기: ${game.homeTeam} vs ${game.awayTeam} (점수: ${totalScore.toFixed(3)})`);
+        console.log(`   홈팀 매칭: "${selection.homeTeam}" vs "${game.homeTeam}" (${homeScore.toFixed(3)})`);
+        console.log(`   어웨이팀 매칭: "${selection.awayTeam}" vs "${game.awayTeam}" (${awayScore.toFixed(3)})`);
 
         if (totalScore >= minimumScore && totalScore > bestScore) {
           bestMatch = game;
