@@ -59,12 +59,86 @@ const calculateSelectionResult = (selection, gameResult) => {
       const isOver = team.includes('Over');
       const isUnder = team.includes('Under');
 
-      if (isOver && totalScore > point) {
-        return { status: 'win', reason: `Total ${totalScore} over ${point}` };
-      } else if (isUnder && totalScore < point) {
-        return { status: 'win', reason: `Total ${totalScore} under ${point}` };
+      // point 값을 숫자로 확실히 변환
+      let pointValue = Number(point);
+
+      // point가 없거나 잘못된 경우, team에서 추출 시도
+      if (isNaN(pointValue) || pointValue === 0) {
+        const teamMatch = team.match(/(Over|Under)\s+([\d.]+)/);
+        if (teamMatch) {
+          pointValue = Number(teamMatch[2]);
+        }
+      }
+
+      if (isNaN(pointValue)) {
+        return { status: 'pending', reason: 'Invalid point value' };
+      }
+
+      if (isOver && totalScore > pointValue) {
+        return { status: 'win', reason: `Total ${totalScore} over ${pointValue}` };
+      } else if (isUnder && totalScore < pointValue) {
+        return { status: 'win', reason: `Total ${totalScore} under ${pointValue}` };
       } else {
-        return { status: 'lose', reason: `Total ${totalScore}` };
+        return { status: 'lose', reason: `Total ${totalScore} vs ${pointValue}` };
+      }
+    }
+
+    // 핸디캡 마켓
+    if (market === 'Handicap' && score) {
+      const homeScore = score.home || 0;
+      const awayScore = score.away || 0;
+
+      // point 값을 숫자로 확실히 변환
+      let handicapValue = Number(point);
+
+      // point가 없거나 잘못된 경우, team에서 추출 시도
+      if (isNaN(handicapValue)) {
+        const teamMatch = team.match(/([+-]?[\d.]+)/);
+        if (teamMatch) {
+          handicapValue = Number(teamMatch[1]);
+        }
+      }
+
+      if (isNaN(handicapValue)) {
+        return { status: 'pending', reason: 'Invalid handicap value' };
+      }
+
+      // 팀명으로 홈/어웨이 판단
+      const teamMatch = selection.desc.match(/^(.+?)\s+vs\s+(.+?)$/);
+      if (teamMatch) {
+        const [, homeTeam, awayTeam] = teamMatch;
+        const isSelectedHome = team.includes(homeTeam.trim());
+        const isSelectedAway = team.includes(awayTeam.trim());
+
+        let adjustedHomeScore = homeScore;
+        let adjustedAwayScore = awayScore;
+
+        if (isSelectedHome) {
+          // 홈팀 선택 시 홈팀에 핸디캡 적용
+          adjustedHomeScore = homeScore + handicapValue;
+        } else if (isSelectedAway) {
+          // 어웨이팀 선택 시 어웨이팀에 핸디캡 적용
+          adjustedAwayScore = awayScore + handicapValue;
+        } else {
+          return { status: 'pending', reason: 'Could not determine selected team' };
+        }
+
+        if (adjustedHomeScore > adjustedAwayScore) {
+          if (isSelectedHome) {
+            return { status: 'win', reason: `Home team wins with handicap: ${adjustedHomeScore} vs ${adjustedAwayScore}` };
+          } else {
+            return { status: 'lose', reason: `Away team loses with handicap: ${adjustedHomeScore} vs ${adjustedAwayScore}` };
+          }
+        } else if (adjustedAwayScore > adjustedHomeScore) {
+          if (isSelectedAway) {
+            return { status: 'win', reason: `Away team wins with handicap: ${adjustedHomeScore} vs ${adjustedAwayScore}` };
+          } else {
+            return { status: 'lose', reason: `Home team loses with handicap: ${adjustedHomeScore} vs ${adjustedAwayScore}` };
+          }
+        } else {
+          // 무승부는 일반적으로 베팅 환불 (cancelled로 처리)
+          return { status: 'cancelled', reason: `Draw with handicap: ${adjustedHomeScore} vs ${adjustedAwayScore}` };
+        }
       }
     }
 

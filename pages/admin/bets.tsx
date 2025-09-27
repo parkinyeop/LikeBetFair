@@ -1601,7 +1601,7 @@ export default function BettingAdmin() {
                       {/* 모달 헤더 */}
                       <div className="flex justify-between items-center mb-6">
                         <h3 className="text-lg font-medium text-gray-900">
-                          베팅 상세 정보 - #{selectedBet.id.substring(0, 8)}
+                          베팅 상세 정보 - #{selectedBet.id}
                         </h3>
                         <button
                           onClick={() => setShowBetDetail(false)}
@@ -1640,9 +1640,19 @@ export default function BettingAdmin() {
                               <span className="text-sm font-medium">₩{Math.floor(selectedBet.stake).toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between">
+                              <span className="text-sm text-gray-600">예상 당첨금:</span>
+                              <span className="text-sm font-medium text-green-600">₩{Math.floor(selectedBet.potentialWinnings).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between">
                               <span className="text-sm text-gray-600">상태:</span>
-                              <span className={`text-sm font-medium px-2 py-1 rounded ${getStatusColor(selectedBet.status)}`}>
-                                {getStatusText(selectedBet.status)}
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedBet.calculatedStatus || selectedBet.status)}`}>
+                                {getStatusText(selectedBet.calculatedStatus || selectedBet.status)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-600">베팅 시간:</span>
+                              <span className="text-sm font-medium">
+                                {new Date(selectedBet.createdAt).toLocaleString('ko-KR')}
                               </span>
                             </div>
                             {selectedBet.User.balance !== undefined && (
@@ -1702,6 +1712,13 @@ export default function BettingAdmin() {
                                         {selection.desc}
                                       </div>
                                       <div className="text-xs text-gray-500 mt-1">
+                                        선택: <span className="font-medium text-blue-600">{selection.team}</span>
+                                      </div>
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        마켓: <span className="font-medium">{selection.market}</span>
+                                        {selection.point && <span> | 라인: {selection.point}</span>}
+                                      </div>
+                                      <div className="text-xs text-gray-500 mt-1">
                                         {selection.commence_time && new Date(selection.commence_time).toLocaleString('ko-KR')}
                                       </div>
                                       {/* 경기 결과 표시 */}
@@ -1737,24 +1754,6 @@ export default function BettingAdmin() {
                         </div>
                       </div>
 
-                      {/* 베팅 요약 정보 */}
-                      <div className="mt-6 bg-white p-4 rounded-lg border border-gray-200">
-                        <h4 className="text-md font-semibold text-gray-900 mb-3">베팅 요약</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-blue-600">₩{Math.floor(selectedBet.stake).toLocaleString()}</div>
-                            <div className="text-sm text-gray-500">베팅 금액</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-green-600">₩{Math.floor(selectedBet.potentialWinnings).toLocaleString()}</div>
-                            <div className="text-sm text-gray-500">당첨 금액</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-purple-600">{selectedBet.totalOdds}</div>
-                            <div className="text-sm text-gray-500">총 배당률</div>
-                          </div>
-                        </div>
-                      </div>
                       {/* 닫기 버튼 */}
                       <div className="flex justify-end mt-6">
                         <button
