@@ -1181,15 +1181,8 @@ class GameResultService {
     }
   }
 
-  async getGameResultById(gameId) {
-    try {
-      const result = await GameResult.findByPk(gameId);
-      return result;
-    } catch (error) {
-      console.error('Error fetching game result:', error);
-      throw error;
-    }
-  }
+  // ❌ DEPRECATED: getGameResultById 메서드 제거됨
+  // 팀명+날짜 기반 조회 사용: findGameResultByMatch() 사용
 
   async updateGameResult(gameId, updateData) {
     try {

@@ -143,7 +143,7 @@ const BetSelectionPanel = () => {
       
       if (res.ok) {
         // 베팅 성공 시 익스체인지 스타일의 메시지 표시
-        const totalStake = selections.reduce((sum, sel) => sum + (sel.stake || 0), 0);
+        const totalStake = stake; // useBetStore의 stake 사용
         const totalOdds = selections.reduce((product, sel) => product * (sel.odds || 1), 1);
         const estimatedProfit = totalStake * (totalOdds - 1);
         
@@ -223,7 +223,7 @@ const BetSelectionPanel = () => {
       
       if (res.ok) {
         // 베팅 성공 시 익스체인지 스타일의 메시지 표시
-        const totalStake = selections.reduce((sum, sel) => sum + (sel.stake || 0), 0);
+        const totalStake = stake; // useBetStore의 stake 사용
         const totalOdds = selections.reduce((product, sel) => product * (sel.odds || 1), 1);
         const estimatedProfit = totalStake * (totalOdds - 1);
         

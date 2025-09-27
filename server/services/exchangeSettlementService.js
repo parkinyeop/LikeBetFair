@@ -24,19 +24,24 @@ import multibetSettlementService from './multibetSettlementService.js';
 class ExchangeSettlementService {
 
   /**
-   * 🎯 [신규] ExchangeOrderMatch 기반 정산 함수
-   * @param {string} gameId - 경기 ID
+   * 🎯 [신규] 팀명+날짜 기반 ExchangeOrderMatch 정산
+   * @param {string} homeTeam - 홈팀명
+   * @param {string} awayTeam - 어웨이팀명
+   * @param {string} commenceTime - 경기 시작 시간
    * @param {Object} gameResult - 경기 결과 객체
    * @returns {Object} 정산 결과
    */
-  async settleMatchedOrdersByGame(gameId, gameResult) {
+  async settleMatchedOrdersByTeam(homeTeam, awayTeam, commenceTime, gameResult) {
     const transaction = await sequelize.transaction();
     try {
-      console.log(`🎯 [Match-Based] 경기 ${gameId} 정산 시작...`);
+      console.log(`🎯 [Team-Based] 경기 ${homeTeam} vs ${awayTeam} 매치 정산 시작...`);
 
+      // 팀명+날짜로 활성 매치 조회
       const matches = await ExchangeOrderMatch.findAll({
         where: {
-          gameId: gameId,
+          homeTeam,
+          awayTeam,
+          commenceTime,
           status: 'active'
         },
         include: [
@@ -46,7 +51,7 @@ class ExchangeSettlementService {
         transaction
       });
 
-      console.log(`[Match-Based] 정산 대상 매치 수: ${matches.length}`);
+      console.log(`[Team-Based] 정산 대상 매치 수: ${matches.length}`);
       if (matches.length === 0) {
         await transaction.commit();
         return { settledMatches: 0, totalWinnings: 0, results: [] };
@@ -61,7 +66,7 @@ class ExchangeSettlementService {
         const layOrder = match.originalSide === 'lay' ? match.originalOrder : match.matchingOrder;
 
         if (!backOrder || !layOrder) {
-          console.error(`[Match-Based] 주문 쌍을 찾을 수 없습니다: Match ID ${match.id}`);
+          console.error(`[Team-Based] 주문 쌍을 찾을 수 없습니다: Match ID ${match.id}`);
           continue;
         }
 
@@ -81,12 +86,12 @@ class ExchangeSettlementService {
       }
 
       await transaction.commit();
-      console.log(`[Match-Based] 경기 ${gameId} 정산 완료: ${settledCount}개 매치 정산됨.`);
+      console.log(`[Team-Based] 경기 ${homeTeam} vs ${awayTeam} 정산 완료: ${settledCount}개 매치 정산됨.`);
       return { settledMatches: settledCount, totalWinnings, results: settlementResults };
 
     } catch (error) {
       await transaction.rollback();
-      console.error(`[Match-Based] 경기 ${gameId} 정산 실패:`, error);
+      console.error(`[Team-Based] 경기 ${homeTeam} vs ${awayTeam} 정산 실패:`, error);
       throw error;
     }
   }
@@ -107,11 +112,11 @@ class ExchangeSettlementService {
       const gameResult = await this.findGameResultByMatch(homeTeam, awayTeam, commenceTime);
       if (!gameResult || gameResult.status !== 'finished') {
         // gameResult.id가 없으면 gameId를 생성할 수 없으므로 gameResult.id를 사용하도록 수정
-        const gameIdForLog = gameResult ? gameResult.id : `${homeTeam}-vs-${awayTeam}`;
-        console.log(`[Main Settlement] 경기 결과를 찾을 수 없거나 경기가 아직 끝나지 않았습니다: ${gameIdForLog}`);
+        const gameKey = gameResult ? `${gameResult.homeTeam}|${gameResult.awayTeam}|${gameResult.commenceTime}` : `${homeTeam}|${awayTeam}|${commenceTime}`;
+        console.log(`[Main Settlement] 경기 결과를 찾을 수 없거나 경기가 아직 끝나지 않았습니다: ${gameKey}`);
         // 오류를 던지는 대신 빈 결과를 반환하여 다른 경기 정산에 영향을 주지 않도록 처리
         return {
-          gameId: gameIdForLog,
+          gameKey: gameKey,
           settledMatches: 0,
           totalWinnings: 0,
           results: [],
@@ -119,12 +124,12 @@ class ExchangeSettlementService {
         };
       }
 
-      console.log(`🏟️ 경기 정보:${gameResult.homeTeam} vs ${gameResult.awayTeam} (ID: ${gameResult.id})`);
+      console.log(`🏟️ 경기 정보:${gameResult.homeTeam} vs ${gameResult.awayTeam}`);
       console.log(`📊 경기 결과: ${gameResult.result}, 스코어:`, gameResult.score);
 
-      // 🎯 신규 정산 로직 호출
-      const matchSettlementResult = await this.settleMatchedOrdersByGame(gameResult.id, gameResult);
-      
+      // 🎯 팀명+날짜 기반 ExchangeOrderMatch 정산
+      const matchSettlementResult = await this.settleMatchedOrdersByTeam(homeTeam, awayTeam, commenceTime, gameResult);
+
       // 🆕 정산 대상 주문들 조회 (매칭된 상태 + 부분 매칭된 상태의 주문들)
       // 수정: settledAt: null 조건을 제거하여 이미 정산된 주문도 포함하여 매칭된 쌍을 찾을 수 있도록 함
       const orders = await ExchangeOrder.findAll({
@@ -321,7 +326,7 @@ class ExchangeSettlementService {
       await transaction.commit();
       
       const summary = {
-        gameId: `${homeTeam}_${awayTeam}_${commenceTime}`,
+        gameKey: `${homeTeam}|${awayTeam}|${commenceTime}`,
         settledOrders: settledCount,
         totalWinnings,
         results: settlementResults,
@@ -817,7 +822,7 @@ class ExchangeSettlementService {
       balanceAfter: newBalance
     }, { transaction });
     
-    console.log(`      💳 ${userId}: ${previousBalance} → ${newBalance} (총 ${amount > 0 ? '+' : ''}${amount}원 → 수수료 ${commissionAmount}원 차감 → 실제 ${netAmount > 0 ? '+' : ''}${netAmount}원)`);
+    console.log(`      💳 ${userId}: ${currentBalance} → ${newBalance} (총 ${amount > 0 ? '+' : ''}${amount}원 → 수수료 ${commissionAmount}원 차감 → 실제 ${netAmount > 0 ? '+' : ''}${netAmount}원)`);
     console.log(`      📝 메모: ${memo}`);
   }
 
@@ -1249,11 +1254,11 @@ class ExchangeSettlementService {
       const gameResult = await this.findGameResultByMatch(homeTeam, awayTeam, commenceTime);
       if (!gameResult || gameResult.status !== 'finished') {
         // gameResult.id가 없으면 gameId를 생성할 수 없으므로 gameResult.id를 사용하도록 수정
-        const gameIdForLog = gameResult ? gameResult.id : `${homeTeam}-vs-${awayTeam}`;
-        console.log(`[Main Settlement] 경기 결과를 찾을 수 없거나 경기가 아직 끝나지 않았습니다: ${gameIdForLog}`);
+        const gameKey = gameResult ? `${gameResult.homeTeam}|${gameResult.awayTeam}|${gameResult.commenceTime}` : `${homeTeam}|${awayTeam}|${commenceTime}`;
+        console.log(`[Main Settlement] 경기 결과를 찾을 수 없거나 경기가 아직 끝나지 않았습니다: ${gameKey}`);
         // 오류를 던지는 대신 빈 결과를 반환하여 다른 경기 정산에 영향을 주지 않도록 처리
         return {
-          gameId: gameIdForLog,
+          gameKey: gameKey,
           settledMatches: 0,
           totalWinnings: 0,
           results: [],
@@ -1315,7 +1320,7 @@ class ExchangeSettlementService {
       await transaction.commit();
       
       const summary = {
-        gameId: `${homeTeam}_vs_${awayTeam}`,
+        gameKey: `${homeTeam}|${awayTeam}|${commenceTime}`,
         settledOrders: settledCount,
         totalWinnings,
         results: settlementResults

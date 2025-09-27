@@ -119,7 +119,7 @@ class NewExchangeSettlementService {
     
     if (gameOrders.length === 0) {
       return {
-        gameId: gameResult.id,
+        gameKey: `${gameResult.homeTeam}|${gameResult.awayTeam}|${gameResult.commenceTime}`,
         homeTeam: gameResult.homeTeam,
         awayTeam: gameResult.awayTeam,
         settledOrders: 0,
@@ -164,7 +164,7 @@ class NewExchangeSettlementService {
     }
     
     return {
-      gameId: gameResult.id,
+      gameKey: `${gameResult.homeTeam}_vs_${gameResult.awayTeam}`,
       homeTeam: gameResult.homeTeam,
       awayTeam: gameResult.awayTeam,
       commenceTime: gameResult.commenceTime,
@@ -430,12 +430,15 @@ class NewExchangeSettlementService {
   }
 
   /**
-   * 정산 가능한 주문 조회 (디버깅용)
-   * @param {string} gameResultId - 경기 ID
+   * ❌ DEPRECATED: gameResultId 사용 방식 폐기
+   * 팀명+날짜 기반 정산 가능한 주문 조회
+   * @param {string} homeTeam - 홈팀명
+   * @param {string} awayTeam - 어웨이팀명
+   * @param {string} commenceTime - 경기 시간
    * @returns {Array} 정산 가능한 주문들
    */
-  async getSettlableOrders(gameResultId) {
-    const gameResult = await GameResult.findByPk(gameResultId);
+  async getSettlableOrdersByTeam(homeTeam, awayTeam, commenceTime) {
+    const gameResult = await this.findGameResultByMatch(homeTeam, awayTeam, commenceTime);
     if (!gameResult) {
       return [];
     }

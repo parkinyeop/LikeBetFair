@@ -40,6 +40,7 @@ interface Bet {
   totalOdds: number;
   potentialWinnings: number;
   status: 'pending' | 'won' | 'lost' | 'cancelled';
+  calculatedStatus?: 'pending' | 'won' | 'lost' | 'cancelled'; // API에서 계산된 실제 상태
   createdAt: string;
   updatedAt: string;
   User: {
@@ -1222,8 +1223,8 @@ export default function BettingAdmin() {
                                 <div className="text-sm font-medium text-gray-900">₩{Math.floor(bet.potentialWinnings).toLocaleString()}</div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(bet.status)}`}>
-                                  {getStatusText(bet.status)}
+                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(bet.calculatedStatus || bet.status)}`}>
+                                  {getStatusText(bet.calculatedStatus || bet.status)}
                                 </span>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -1708,6 +1709,18 @@ export default function BettingAdmin() {
                                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${gameResult.color}`}>
                                           {gameResult.result}
                                         </span>
+                                        {/* 스코어 정보 추가 */}
+                                        {selection.gameResult && selection.gameResult.score && (
+                                          <div className="mt-1 text-xs text-gray-600">
+                                            스코어: {selection.gameResult.score.home || 0} - {selection.gameResult.score.away || 0}
+                                          </div>
+                                        )}
+                                        {/* 경기 결과 세부 정보 */}
+                                        {selection.gameResult && selection.gameResult.result && (
+                                          <div className="mt-1 text-xs text-gray-500">
+                                            결과: {selection.gameResult.result}
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                     <div className="text-right">

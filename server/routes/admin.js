@@ -22,6 +22,61 @@ import sequelize from '../models/sequelize.js';
 
 const router = express.Router();
 
+// 베팅 선택 결과 계산 함수
+const calculateSelectionResult = (selection, gameResult) => {
+  try {
+    const { market, team, point } = selection;
+    const { result: gameResultType, score } = gameResult;
+
+    // 기본적으로 pending 상태
+    if (!gameResult || gameResult.status !== 'finished') {
+      return { status: 'pending', reason: 'Game not finished' };
+    }
+
+    // Win/Loss 마켓
+    if (market === 'Win/Loss') {
+      const isHomeWin = gameResultType === 'home_win';
+      const isAwayWin = gameResultType === 'away_win';
+
+      // 팀명으로 홈/어웨이 판단 (간단한 방식)
+      const teamMatch = selection.desc.match(/^(.+?)\s+vs\s+(.+?)$/);
+      if (teamMatch) {
+        const [, homeTeam, awayTeam] = teamMatch;
+        const isSelectedHome = team.includes(homeTeam.trim());
+        const isSelectedAway = team.includes(awayTeam.trim());
+
+        if ((isSelectedHome && isHomeWin) || (isSelectedAway && isAwayWin)) {
+          return { status: 'win', reason: 'Team won' };
+        } else {
+          return { status: 'lose', reason: 'Team lost' };
+        }
+      }
+    }
+
+    // Over/Under 마켓
+    if (market === 'Over/Under' && score) {
+      const totalScore = (score.home || 0) + (score.away || 0);
+      const isOver = team.includes('Over');
+      const isUnder = team.includes('Under');
+
+      if (isOver && totalScore > point) {
+        return { status: 'win', reason: `Total ${totalScore} over ${point}` };
+      } else if (isUnder && totalScore < point) {
+        return { status: 'win', reason: `Total ${totalScore} under ${point}` };
+      } else {
+        return { status: 'lose', reason: `Total ${totalScore}` };
+      }
+    }
+
+    // 기타 마켓은 일단 pending으로
+    return { status: 'pending', reason: 'Market not supported yet' };
+
+  } catch (error) {
+    console.error('Calculate selection result error:', error);
+    return { status: 'pending', reason: 'Calculation error' };
+  }
+};
+
 // 관리자 권한 확인 미들웨어
 const requireAdmin = (minLevel = 1) => {
   return async (req, res, next) => {
@@ -1397,6 +1452,7 @@ router.get('/users/:id/referral-stats', verifyToken, requireAdmin(2), async (req
 
 // 베팅 목록 조회
 router.get('/bets', verifyToken, requireAdmin(1), async (req, res) => {
+  console.log('🔍 [ADMIN_BETS] 베팅 목록 조회 API 호출됨');
   try {
     const { 
       page = 1, 
@@ -1457,8 +1513,125 @@ router.get('/bets', verifyToken, requireAdmin(1), async (req, res) => {
       }]
     });
 
+    // 각 베팅의 selections에 경기 결과 정보 추가
+    const enrichedBets = await Promise.all(bets.map(async (bet) => {
+      const betData = bet.toJSON();
+
+      if (betData.selections && Array.isArray(betData.selections)) {
+        betData.selections = await Promise.all(betData.selections.map(async (selection) => {
+          try {
+            // desc에서 팀명 파싱 (예: "Milwaukee Brewers vs Cincinnati Reds")
+            const teamMatch = selection.desc.match(/^(.+?)\s+vs\s+(.+?)$/);
+            if (!teamMatch) {
+              return { ...selection, result: 'pending', gameResult: null };
+            }
+
+            const [, homeTeam, awayTeam] = teamMatch;
+            const commenceTime = new Date(selection.commence_time);
+
+            // 팀명+날짜로 경기 결과 조회
+            const gameResult = await GameResult.findOne({
+              where: {
+                [Op.or]: [
+                  {
+                    homeTeam: { [Op.iLike]: `%${homeTeam.trim()}%` },
+                    awayTeam: { [Op.iLike]: `%${awayTeam.trim()}%` }
+                  },
+                  {
+                    homeTeam: { [Op.iLike]: `%${awayTeam.trim()}%` },
+                    awayTeam: { [Op.iLike]: `%${homeTeam.trim()}%` }
+                  }
+                ],
+                status: 'finished',
+                commenceTime: {
+                  [Op.gte]: new Date(commenceTime.getTime() - 24 * 60 * 60 * 1000), // 1일 전
+                  [Op.lte]: new Date(commenceTime.getTime() + 24 * 60 * 60 * 1000)  // 1일 후
+                }
+              }
+            });
+
+            if (gameResult) {
+              // 베팅 결과 계산
+              const betResult = calculateSelectionResult(selection, gameResult);
+
+              // 스코어 데이터를 {home: x, away: y} 형태로 변환
+              let scoreData = null;
+              if (gameResult.score) {
+                if (Array.isArray(gameResult.score)) {
+                  // JSONB 배열 형태인 경우
+                  const homeScore = gameResult.score.find(s => s.name === homeTeam)?.score || '0';
+                  const awayScore = gameResult.score.find(s => s.name === awayTeam)?.score || '0';
+                  scoreData = {
+                    home: parseInt(homeScore) || 0,
+                    away: parseInt(awayScore) || 0
+                  };
+                } else if (typeof gameResult.score === 'string') {
+                  // 문자열 형태인 경우 (예: "5-0")
+                  const scores = gameResult.score.split('-');
+                  scoreData = {
+                    home: parseInt(scores[0]) || 0,
+                    away: parseInt(scores[1]) || 0
+                  };
+                }
+              }
+
+              return {
+                ...selection,
+                result: betResult.status,
+                gameResult: {
+                  status: gameResult.status,
+                  result: gameResult.result,
+                  score: scoreData,
+                  updatedAt: gameResult.updatedAt
+                }
+              };
+            } else {
+              return {
+                ...selection,
+                result: 'pending',
+                gameResult: null
+              };
+            }
+          } catch (error) {
+            console.error(`Selection result error for ${selection.desc}:`, error);
+            return {
+              ...selection,
+              result: 'pending',
+              gameResult: null
+            };
+          }
+        }));
+      }
+
+      // 전체 베팅 상태 계산
+      if (betData.selections && betData.selections.length > 0) {
+        const selectionResults = betData.selections.map(sel => sel.result);
+
+        // 모든 선택이 승리하면 won
+        if (selectionResults.every(result => result === 'win')) {
+          betData.calculatedStatus = 'won';
+        }
+        // 하나라도 패배하면 lost
+        else if (selectionResults.some(result => result === 'lose')) {
+          betData.calculatedStatus = 'lost';
+        }
+        // 하나라도 pending이면 pending
+        else if (selectionResults.some(result => result === 'pending')) {
+          betData.calculatedStatus = 'pending';
+        }
+        // 기타 경우
+        else {
+          betData.calculatedStatus = betData.status; // 원래 상태 유지
+        }
+      } else {
+        betData.calculatedStatus = betData.status;
+      }
+
+      return betData;
+    }));
+
     res.json({
-      bets,
+      bets: enrichedBets,
       pagination: {
         currentPage: parseInt(page),
         totalPages: Math.ceil(count / limit),
