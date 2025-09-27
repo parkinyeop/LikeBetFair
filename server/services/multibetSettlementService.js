@@ -91,23 +91,21 @@ class MultibetSettlementService {
   }
   
   /**
-   * 주문의 매치 여부 확인
+   * 주문의 매치 여부 확인 (ExchangeOrder의 matchedOrderId 사용)
    * @param {number} orderId - 주문 ID
    * @returns {boolean} 매치 여부
    */
   async checkOrderMatches(orderId) {
-    const matches = await ExchangeOrderMatch.findAll({
-      where: {
-        [Op.or]: [
-          { originalOrderId: orderId },
-          { matchingOrderId: orderId }
-        ],
-        status: 'active'
-      }
-    });
-    
-    console.log(`🔍 주문 ${orderId} 매치 확인: ${matches.length}개 매치`);
-    return matches.length > 0;
+    const order = await ExchangeOrder.findByPk(orderId);
+
+    if (!order) {
+      console.log(`❌ 주문 ${orderId}를 찾을 수 없음`);
+      return false;
+    }
+
+    const isMatched = order.matchedOrderId !== null;
+    console.log(`🔍 주문 ${orderId} 매치 확인: ${isMatched ? '매칭됨' : '매칭 안됨'} (매칭ID: ${order.matchedOrderId})`);
+    return isMatched;
   }
   
   /**

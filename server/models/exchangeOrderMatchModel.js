@@ -68,7 +68,7 @@ const ExchangeOrderMatch = sequelize.define('ExchangeOrderMatch', {
   gameId: {
     type: DataTypes.STRING,
     allowNull: false,
-    comment: '게임 ID (조회 성능 최적화)'
+    comment: '게임 ID (정산 조회용)'
   },
   market: {
     type: DataTypes.STRING,
