@@ -1233,103 +1233,80 @@ function OrderHistoryPanel() {
                         </div>
                         
                         
-                        {/* 2. 수익 정보 (정산된 경우 실제 수익, 미정산인 경우 예상 수익) */}
-                        <div className={`p-3 rounded-lg border ${
-                          order.status === 'settled' 
-                            ? 'bg-green-50 border-green-200' 
-                            : 'bg-blue-50 border-blue-200'
-                        }`}>
-                          <div className="flex justify-between items-center">
-                            <span className="text-xs text-gray-600">
-                              {order.status === 'settled' ? '실제 수익' : '예상 수익'}
-                            </span>
-                            <span className={`text-sm font-bold ${
-                              order.status === 'settled' 
-                                ? (() => {
-                                    const actualProfit = parseFloat((order as any).actualProfit || 0);
-                                    return actualProfit >= 0 ? 'text-green-600' : 'text-red-600';
-                                  })()
-                                : 'text-blue-600'
-                            }`}>
-                              {order.status === 'settled' 
-                                ? (() => {
-                                    const actualProfit = parseFloat((order as any).actualProfit || 0);
-                                    return `${actualProfit >= 0 ? '+' : ''}${actualProfit.toLocaleString()}원`;
-                                  })()
-                                : `${calculateExpectedProfit(order).toLocaleString()}원`
-                              }
-                            </span>
-                          </div>
-                          {order.status === 'settled' && (order as any).actualProfit !== undefined && (
-                            <div className="mt-2 text-xs text-gray-500">
-                              <div className="flex justify-between">
-                                <span>예상 수익:</span>
-                                <span>{calculateExpectedProfit(order).toLocaleString()}원</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>실제 수익:</span>
-                                <span className={(() => {
-                                  const actualProfit = parseFloat((order as any).actualProfit || 0);
-                                  return actualProfit >= 0 ? 'text-green-600' : 'text-red-600';
-                                })()}>
-                                  {(() => {
-                                    const actualProfit = parseFloat((order as any).actualProfit || 0);
-                                    return `${actualProfit >= 0 ? '+' : ''}${actualProfit.toLocaleString()}원`;
-                                  })()}
-                                </span>
-                              </div>
-                              <div className="flex justify-between font-medium">
-                                <span>차이:</span>
-                                <span className={(() => {
-                                  const actualProfit = parseFloat((order as any).actualProfit || 0);
-                                  const expectedProfit = calculateExpectedProfit(order);
-                                  const difference = actualProfit - expectedProfit;
-                                  return difference >= 0 ? 'text-green-600' : 'text-red-600';
-                                })()}>
-                                  {(() => {
-                                    const actualProfit = parseFloat((order as any).actualProfit || 0);
-                                    const expectedProfit = calculateExpectedProfit(order);
-                                    const difference = actualProfit - expectedProfit;
-                                    return `${difference >= 0 ? '+' : ''}${difference.toLocaleString()}원`;
-                                  })()}
-                                </span>
-                              </div>
-                            </div>
-                          )}
-                        </div>
                         
-                        {/* 3. 정산 정보 (정산된 경우만) */}
-                        {order.status === 'settled' && (() => {
-                          const actualProfit = parseFloat((order as any).actualProfit || 0);
-                          const settlementNote = (order as any).settlementNote || '';
-                          const isWinner = actualProfit > 0;
+                        {/* 2. 게임 결과 및 스코어 정보 */}
+                        {(order as any).gameResult && (() => {
+                          const gameResult = (order as any).gameResult;
+                          const isFinished = gameResult.status === 'finished';
                           
                           return (
-                            <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                            <div className={`p-3 rounded-lg border ${
+                              isFinished ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'
+                            }`}>
                               <div className="flex justify-between items-center mb-2">
-                                <span className="text-xs text-gray-600">정산 결과</span>
-                                <span className={`text-sm font-bold px-2 py-1 rounded-full ${
-                                  isWinner ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                <span className="text-xs text-gray-600">경기 결과</span>
+                                <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                                  isFinished ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
                                 }`}>
-                                  {isWinner ? '🎉 승리' : '😞 패배'}
+                                  {isFinished ? '🏁 경기 완료' : '⏳ 경기 진행중'}
                                 </span>
                               </div>
-                              {settlementNote && (
-                                <div className="text-xs text-gray-600 mt-1">
-                                  <span className="font-medium">정산 메모:</span> {settlementNote}
+                              
+                              {/* 스코어 표시 */}
+                              {gameResult.score && (() => {
+                                // 배열 형태 스코어 처리
+                                if (Array.isArray(gameResult.score)) {
+                                  return (
+                                    <div className="text-xs text-gray-700 mt-1">
+                                      <div className="flex justify-between items-center">
+                                        <span>{gameResult.homeTeam || 'Home'}</span>
+                                        <span className="font-bold text-sm">
+                                          {typeof gameResult.score[0] === 'string' 
+                                            ? gameResult.score[0] 
+                                            : gameResult.score[0]?.score ?? '-'}
+                                        </span>
+                                        <span className="text-gray-400">:</span>
+                                        <span className="font-bold text-sm">
+                                          {typeof gameResult.score[1] === 'string' 
+                                            ? gameResult.score[1] 
+                                            : gameResult.score[1]?.score ?? '-'}
+                                        </span>
+                                        <span>{gameResult.awayTeam || 'Away'}</span>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                                
+                                // 객체 형태 스코어 처리 ({"away":9,"home":10})
+                                if (gameResult.score.home !== undefined && gameResult.score.away !== undefined) {
+                                  return (
+                                    <div className="text-xs text-gray-700 mt-1">
+                                      <div className="flex justify-between items-center">
+                                        <span>{gameResult.homeTeam || 'Home'}</span>
+                                        <span className="font-bold text-sm">{gameResult.score.home}</span>
+                                        <span className="text-gray-400">:</span>
+                                        <span className="font-bold text-sm">{gameResult.score.away}</span>
+                                        <span>{gameResult.awayTeam || 'Away'}</span>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                                
+                                return null;
+                              })()}
+                              
+                              {/* 경기 결과 정보 */}
+                              {gameResult.result && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  <span className="font-medium">결과:</span> {gameResult.result}
                                 </div>
                               )}
-                              <div className="text-xs text-gray-500 mt-1">
-                                {isWinner 
-                                  ? `축하합니다! ${actualProfit.toLocaleString()}원을 획득했습니다.`
-                                  : `아쉽게도 ${Math.abs(actualProfit).toLocaleString()}원을 잃었습니다.`
-                                }
-                              </div>
                             </div>
                           );
                         })()}
 
-                        {/* 4. 매칭 정보 (Lay인 경우만) */}
+
+                        {/* 3. 매칭 정보 (Lay인 경우만) */}
                         {order.side === 'lay' && order.matchedOrderId && (() => {
                           const matchedOrder = matchedOrderInfo[order.matchedOrderId!];
                           return (
