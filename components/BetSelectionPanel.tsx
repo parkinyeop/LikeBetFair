@@ -1,8 +1,8 @@
-import { buildApiUrl } from '../config/apiConfig';
 import React, { useState, useEffect } from 'react';
 import { useBetStore } from '../stores/useBetStore';
 import { useAuth } from '../contexts/AuthContext';
 import { normalizeOption, normalizeOverUnderOption } from '../server/normalizeUtils';
+import { buildApiUrl } from '../config/apiConfig';
 
 // 배당율 변경 확인 모달
 const OddsChangeModal = ({ 
@@ -115,10 +115,7 @@ const BetSelectionPanel = () => {
     // 즉시 새로운 배당율로 베팅 요청
     try {
       // API URL 결정
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
-                    (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                     ? 'buildApiUrl' 
-                     : 'https://likebetfair.onrender.com');
+      const apiUrl = buildApiUrl('/api/bet');
       
       console.log('[BetSelectionPanel] (배당변경) 베팅 요청 body:', {
         selections: updatedSelections,
@@ -126,7 +123,7 @@ const BetSelectionPanel = () => {
         totalOdds: newTotalOdds
       });
 
-      const res = await fetch(`${apiUrl}/api/bet/`, {
+      const res = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -188,9 +185,9 @@ const BetSelectionPanel = () => {
   const submitBet = async () => {
     try {
       // API URL 결정
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
-                    (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                     ? 'buildApiUrl' 
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL ||
+                    (typeof window !== 'undefined' && window.location.hostname === 'localhost'
+                     ? 'http://localhost:5050'
                      : 'https://likebetfair.onrender.com');
       
       console.log('[BetSelectionPanel] 베팅 요청 body:', {

@@ -35,13 +35,10 @@ function MyBetsPanel() {
       }
       
       // API URL 결정
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
-                    (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                     ? 'buildApiUrl' 
-                     : 'https://likebetfair.onrender.com');
+      const apiUrl = buildApiUrl('/api/bet/history');
       
-      console.log('[클라이언트] API 요청 시작:', `${apiUrl}/api/bet/history`);
-      const res = await fetch(`${apiUrl}/api/bet/history`, {
+      console.log('[클라이언트] API 요청 시작:', apiUrl);
+      const res = await fetch(apiUrl, {
         headers: { 
           'x-auth-token': token,
           'Content-Type': 'application/json'
@@ -600,15 +597,12 @@ else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; la
                               }
                               
                               // API URL 동적 설정
-                              const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
-                                            (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                                             ? 'buildApiUrl' 
-                                             : 'https://likebetfair.onrender.com');
+                              const apiUrl = buildApiUrl(`/api/bet/${bet.id}/cancel`);
                               
-                              console.log('[배팅취소] API 요청 시작:', `${apiUrl}/api/bet/${bet.id}/cancel`);
+                              console.log('[배팅취소] API 요청 시작:', apiUrl);
                               console.log('[배팅취소] 토큰 존재:', !!token);
                               
-                              const res = await fetch(`${apiUrl}/api/bet/${bet.id}/cancel`, {
+                              const res = await fetch(apiUrl, {
                                 method: 'POST',
                                 headers: { 
                                   'x-auth-token': token || '',
