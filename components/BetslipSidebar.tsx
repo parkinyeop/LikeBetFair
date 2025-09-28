@@ -507,26 +507,60 @@ else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; la
                                   </div>
                                   <span className={`text-xs font-medium ${color}`}>{label}</span>
                                 </div>
-                                {/* 경기 결과 스코어 표시 - 조건 완화 */}
-                                {['won', 'lost'].includes(actualResult) && sel.gameResult && (
-                                  <div className="text-xs text-blue-600 mt-1 ml-6">
-                                    {sel.gameResult.score && Array.isArray(sel.gameResult.score) ? (
-                                      `Result: ${sel.gameResult.homeTeam || 'Home'} ${
-                                        typeof sel.gameResult.score[0] === 'string' 
-                                          ? sel.gameResult.score[0] 
-                                          : sel.gameResult.score[0]?.score ?? '-'
-                                                                              } : ${sel.gameResult.awayTeam || 'Away'} ${
-                                        typeof sel.gameResult.score[1] === 'string' 
-                                          ? sel.gameResult.score[1] 
-                                          : sel.gameResult.score[1]?.score ?? '-'
-                                      }`
-                                    ) : sel.gameResult.homeScore !== undefined && sel.gameResult.awayScore !== undefined ? (
-                                      `Result: ${sel.gameResult.homeTeam || 'Home'} ${sel.gameResult.homeScore} : ${sel.gameResult.awayTeam || 'Away'} ${sel.gameResult.awayScore}`
-                                    ) : (
-                                                                              `Game Result: ${JSON.stringify(sel.gameResult)}`
-                                    )}
-                                  </div>
-                                )}
+                                {/* 경기 결과 스코어 표시 - 디버깅 로그 추가 */}
+                                {(() => {
+                                  // 디버깅 로그 추가
+                                  console.log('🔍 스코어 표시 디버깅:', {
+                                    selection: sel.desc,
+                                    gameResult: sel.gameResult,
+                                    hasGameResult: !!sel.gameResult,
+                                    hasScore: !!(sel.gameResult && sel.gameResult.score),
+                                    scoreType: sel.gameResult ? typeof sel.gameResult.score : 'no gameResult',
+                                    scoreValue: sel.gameResult ? sel.gameResult.score : 'no gameResult'
+                                  });
+                                  
+                                  if (sel.gameResult && sel.gameResult.score) {
+                                    return (
+                                      <div className="text-xs text-blue-600 mt-1 ml-6">
+                                        {(() => {
+                                          // 배열 형태 스코어 처리
+                                          if (Array.isArray(sel.gameResult.score)) {
+                                            return `Result: ${sel.gameResult.homeTeam || 'Home'} ${
+                                              typeof sel.gameResult.score[0] === 'string' 
+                                                ? sel.gameResult.score[0] 
+                                                : sel.gameResult.score[0]?.score ?? '-'
+                                            } : ${sel.gameResult.awayTeam || 'Away'} ${
+                                              typeof sel.gameResult.score[1] === 'string' 
+                                                ? sel.gameResult.score[1] 
+                                                : sel.gameResult.score[1]?.score ?? '-'
+                                            }`;
+                                          }
+                                          
+              // 객체 형태 스코어 처리 ({"away":9,"home":10}) - 관리자 페이지와 동일한 로직
+              if (sel.gameResult.score.home !== undefined && sel.gameResult.score.away !== undefined) {
+                return `Result: ${sel.gameResult.homeTeam || 'Home'} ${sel.gameResult.score.home} : ${sel.gameResult.awayTeam || 'Away'} ${sel.gameResult.score.away}`;
+              }
+                                          
+                                          // 개별 스코어 필드 처리
+                                          if (sel.gameResult.homeScore !== undefined && sel.gameResult.awayScore !== undefined) {
+                                            return `Result: ${sel.gameResult.homeTeam || 'Home'} ${sel.gameResult.homeScore} : ${sel.gameResult.awayTeam || 'Away'} ${sel.gameResult.awayScore}`;
+                                          }
+                                          
+                                          // 기타 경우
+                                          return `Game Result: ${JSON.stringify(sel.gameResult.score)}`;
+                                        })()}
+                                      </div>
+                                    );
+                                  } else {
+                                    // 디버깅용 정보 표시
+                                    return (
+                                      <div className="text-xs text-gray-400 mt-1 ml-6">
+                                        Debug: {sel.gameResult ? 'gameResult exists' : 'no gameResult'} | 
+                                        {sel.gameResult && sel.gameResult.score ? 'score exists' : 'no score'}
+                                      </div>
+                                    );
+                                  }
+                                })()}
                                 {/* Over/Under 추가 정보 */}
                                 {isOverUnder && sel.point && (
                                   <div className="text-xs text-gray-400 mt-1 ml-6">

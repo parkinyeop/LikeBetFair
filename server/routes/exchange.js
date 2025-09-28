@@ -1237,12 +1237,29 @@ router.get('/orders', verifyToken, async (req, res) => {
       ]
     });
     
-    // 🆕 부분 매칭 정보 포함한 응답 + 가중치 적용
+    // 🆕 부분 매칭 정보 포함한 응답 + 가중치 적용 + 게임 결과 정보
     const ordersWithMatchInfo = await Promise.all(orders.map(async order => {
       const orderData = order.toJSON();
       
       // 환수율 조정은 프론트엔드에서 처리 (정확한 배열 기반 계산을 위해)
       let displayPrice = orderData.price;
+      
+      // 🆕 게임 결과 정보 조회
+      let gameResult = null;
+      if (order.homeTeam && order.awayTeam && order.commenceTime) {
+        try {
+          const { default: GameResult } = await import('../models/gameResultModel.js');
+          gameResult = await GameResult.findOne({
+            where: {
+              homeTeam: order.homeTeam,
+              awayTeam: order.awayTeam,
+              commenceTime: new Date(order.commenceTime)
+            }
+          });
+        } catch (error) {
+          console.error('게임 결과 조회 오류:', error);
+        }
+      }
       
       return {
         ...orderData,
@@ -1256,7 +1273,15 @@ router.get('/orders', verifyToken, async (req, res) => {
           fillPercentage: order.originalAmount ? 
             Math.round((order.filledAmount || 0) / order.originalAmount * 100) : 0,
           matchCount: (order.originalMatches?.length || 0) + (order.matchingMatches?.length || 0)
-        }
+        },
+        // 🆕 게임 결과 정보 추가
+        gameResult: gameResult ? {
+          score: gameResult.score,
+          status: gameResult.status,
+          result: gameResult.result,
+          homeTeam: gameResult.homeTeam,
+          awayTeam: gameResult.awayTeam
+        } : null
       };
     }));
     
@@ -1276,6 +1301,23 @@ router.get('/order/:id', async (req, res) => {
     
     if (!order) {
       return res.status(404).json({ message: '주문을 찾을 수 없습니다.' });
+    }
+    
+    // 🆕 게임 결과 정보 조회
+    let gameResult = null;
+    if (order.homeTeam && order.awayTeam && order.commenceTime) {
+      try {
+        const { default: GameResult } = await import('../models/gameResultModel.js');
+        gameResult = await GameResult.findOne({
+          where: {
+            homeTeam: order.homeTeam,
+            awayTeam: order.awayTeam,
+            commenceTime: new Date(order.commenceTime)
+          }
+        });
+      } catch (error) {
+        console.error('게임 결과 조회 오류:', error);
+      }
     }
     
     res.json({
@@ -1299,7 +1341,15 @@ router.get('/order/:id', async (req, res) => {
       originalAmount: order.originalAmount || order.amount,
       remainingAmount: order.remainingAmount || order.amount,
       filledAmount: order.filledAmount || 0,
-      partiallyFilled: order.partiallyFilled || false
+      partiallyFilled: order.partiallyFilled || false,
+      // 🆕 게임 결과 정보 추가
+      gameResult: gameResult ? {
+        score: gameResult.score,
+        status: gameResult.status,
+        result: gameResult.result,
+        homeTeam: gameResult.homeTeam,
+        awayTeam: gameResult.awayTeam
+      } : null
     });
   } catch (error) {
     console.error('주문 조회 오류:', error);

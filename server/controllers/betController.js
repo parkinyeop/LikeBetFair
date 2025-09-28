@@ -232,7 +232,19 @@ export async function getBetHistory(req, res) {
     const updatedBets = await Promise.all(bets.map(async (bet, betIndex) => {
       try {
         console.log(`[getBetHistory] Processing bet ${betIndex + 1}/${bets.length}: ${bet.id}`);
-        await betResultService.processBetResult(bet);
+        console.log(`[getBetHistory] Bet ${betIndex + 1} selections count: ${bet.selections ? bet.selections.length : 'undefined'}`);
+        console.log(`[getBetHistory] Bet ${betIndex + 1} selections before processBetResult:`, bet.selections ? bet.selections.map(s => ({ desc: s.desc, result: s.result })) : 'undefined');
+        
+        try {
+          await betResultService.processBetResult(bet);
+          console.log(`[getBetHistory] Bet ${betIndex + 1} processBetResult 완료`);
+        } catch (error) {
+          console.error(`[getBetHistory] Bet ${betIndex + 1} processBetResult 오류:`, error);
+          throw error;
+        }
+        
+        console.log(`[getBetHistory] Bet ${betIndex + 1} selections after processBetResult:`, bet.selections ? bet.selections.map(s => ({ desc: s.desc, result: s.result })) : 'undefined');
+        console.log(`[getBetHistory] Bet ${betIndex + 1} selections 처리 시작`);
         
         // selections에 gameResult 정보 추가
         const selectionsWithResults = await Promise.all(
@@ -244,28 +256,95 @@ export async function getBetHistory(req, res) {
               const teams = selection.desc ? selection.desc.split(' vs ') : [];
               let gameResult = null;
               
+              console.log(`[getBetHistory] Selection ${selectionIndex + 1} 팀 파싱:`, {
+                desc: selection.desc,
+                teams: teams,
+                teamsLength: teams.length
+              });
+              
               if (teams.length === 2) {
                 const homeTeam = teams[0].trim();
                 const awayTeam = teams[1].trim();
-                const commenceTime = new Date(selection.commence_time + 'Z');
+                // 시간 형식 수정: 이미 Z가 포함된 경우와 그렇지 않은 경우 처리
+                let timeString = selection.commence_time;
+                if (!timeString.includes('Z') && !timeString.includes('+') && !timeString.includes('-', 10)) {
+                  timeString = timeString + 'Z';
+                }
+                const commenceTime = new Date(timeString);
+                
+                console.log(`[getBetHistory] Selection ${selectionIndex + 1} 게임 결과 조회 시작:`, {
+                  homeTeam: homeTeam,
+                  awayTeam: awayTeam,
+                  commenceTime: commenceTime,
+                  isValidTime: !isNaN(commenceTime.getTime())
+                });
                 
                 if (!isNaN(commenceTime.getTime())) {
-                  gameResult = await GameResult.findOne({
-                    where: {
-                      homeTeam: { [Op.iLike]: `%${homeTeam}%` },
-                      awayTeam: { [Op.iLike]: `%${awayTeam}%` },
-                      commenceTime: {
-                        [Op.between]: [
-                          new Date(commenceTime.getTime() - 24 * 60 * 60 * 1000),
-                          new Date(commenceTime.getTime() + 24 * 60 * 60 * 1000)
-                        ]
-                      }
-                    },
-                    order: [['createdAt', 'DESC']]
-                  });
+                  try {
+                    // 스포츠별 시간 범위 설정 (더블헤더 고려)
+                    const sportConfigs = {
+                      'soccer': 2 * 60 * 60 * 1000,      // ±2시간
+                      'basketball': 2 * 60 * 60 * 1000,  // ±2시간
+                      'american_football': 4 * 60 * 60 * 1000, // ±4시간
+                      'baseball': 24 * 60 * 60 * 1000    // ±24시간 (더블헤더 고려)
+                    };
+                    
+                    // 스포츠 종목 추정 (팀명 기반)
+                    let estimatedSport = 'soccer'; // 기본값
+                    if (homeTeam.toLowerCase().includes('red sox') || awayTeam.toLowerCase().includes('red sox') ||
+                        homeTeam.toLowerCase().includes('yankees') || awayTeam.toLowerCase().includes('yankees') ||
+                        homeTeam.toLowerCase().includes('dodgers') || awayTeam.toLowerCase().includes('dodgers') ||
+                        homeTeam.toLowerCase().includes('giants') || awayTeam.toLowerCase().includes('giants')) {
+                      estimatedSport = 'baseball';
+                    } else if (homeTeam.toLowerCase().includes('patriots') || awayTeam.toLowerCase().includes('patriots') ||
+                               homeTeam.toLowerCase().includes('cowboys') || awayTeam.toLowerCase().includes('cowboys') ||
+                               homeTeam.toLowerCase().includes('packers') || awayTeam.toLowerCase().includes('packers')) {
+                      estimatedSport = 'american_football';
+                    }
+                    
+                    const timeWindow = sportConfigs[estimatedSport] || sportConfigs['soccer'];
+                    
+                    gameResult = await GameResult.findOne({
+                      where: {
+                        homeTeam: { [Op.iLike]: `%${homeTeam}%` },
+                        awayTeam: { [Op.iLike]: `%${awayTeam}%` },
+                        commenceTime: {
+                          [Op.between]: [
+                            new Date(commenceTime.getTime() - timeWindow),
+                            new Date(commenceTime.getTime() + timeWindow)
+                          ]
+                        }
+                      },
+                      order: [['commenceTime', 'ASC']] // 시간 순으로 정렬하여 가장 가까운 경기 선택
+                    });
+                    
+                    console.log(`[getBetHistory] Selection ${selectionIndex + 1} 게임 결과 조회 완료:`, {
+                      found: !!gameResult,
+                      gameResultId: gameResult ? gameResult.id : 'none',
+                      gameResultStatus: gameResult ? gameResult.status : 'none'
+                    });
+                  } catch (dbError) {
+                    console.error(`[getBetHistory] Selection ${selectionIndex + 1} DB 조회 오류:`, dbError);
+                  }
+                } else {
+                  console.log(`[getBetHistory] Selection ${selectionIndex + 1} 잘못된 시간 형식:`, selection.commence_time);
                 }
+              } else {
+                console.log(`[getBetHistory] Selection ${selectionIndex + 1} 팀 파싱 실패:`, {
+                  desc: selection.desc,
+                  teams: teams
+                });
               }
               
+              // 디버깅 로그 추가
+              console.log(`[getBetHistory] Selection ${selectionIndex + 1} gameResult 조회 결과:`, {
+                selection: selection.desc,
+                foundGameResult: !!gameResult,
+                gameResultStatus: gameResult ? gameResult.status : 'none',
+                gameResultScore: gameResult ? gameResult.score : 'none',
+                gameResultScoreType: gameResult ? typeof gameResult.score : 'none'
+              });
+
               return {
                 ...selection,
                 gameResult: gameResult ? {
