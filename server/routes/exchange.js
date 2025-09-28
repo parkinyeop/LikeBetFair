@@ -1248,7 +1248,8 @@ router.get('/orders', verifyToken, async (req, res) => {
       let gameResult = null;
       if (order.homeTeam && order.awayTeam && order.commenceTime) {
         try {
-          const { default: GameResult } = await import('../models/gameResultModel.js');
+          const GameResultModule = await import('../models/gameResultModel.js');
+          const GameResult = GameResultModule.default || GameResultModule;
           gameResult = await GameResult.findOne({
             where: {
               homeTeam: order.homeTeam,
@@ -1307,7 +1308,8 @@ router.get('/order/:id', async (req, res) => {
     let gameResult = null;
     if (order.homeTeam && order.awayTeam && order.commenceTime) {
       try {
-        const { default: GameResult } = await import('../models/gameResultModel.js');
+        const GameResultModule = await import('../models/gameResultModel.js');
+        const GameResult = GameResultModule.default || GameResultModule;
         gameResult = await GameResult.findOne({
           where: {
             homeTeam: order.homeTeam,
