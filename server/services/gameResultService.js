@@ -1068,11 +1068,35 @@ class GameResultService {
     }
     
     // 2. API에서 명시적으로 finished 상태이고 스코어가 있는 경우
-    if (game.status === 'finished' && game.scores && Array.isArray(game.scores) && game.scores.length === 2) {
-      const homeScoreData = game.scores.find(score => score.name === game.home_team);
-      const awayScoreData = game.scores.find(score => score.name === game.away_team);
+    if (game.status === 'finished' && game.score) {
+      let scores;
+      
+      // 스코어 데이터 파싱 (문자열이면 JSON 파싱, 배열이면 그대로 사용)
+      if (typeof game.score === 'string') {
+        try {
+          scores = JSON.parse(game.score);
+        } catch (e) {
+          console.log(`Game ID ${game.id}: Invalid score JSON format:`, game.score);
+          return 'pending';
+        }
+      } else if (Array.isArray(game.score)) {
+        scores = game.score;
+      } else {
+        console.log(`Game ID ${game.id}: Invalid score format:`, game.score);
+        return 'pending';
+      }
+      
+      if (!Array.isArray(scores) || scores.length < 2) {
+        console.log(`Game ID ${game.id}: Insufficient score data:`, scores);
+        return 'pending';
+      }
+      
+      const homeScoreData = scores.find(score => score.name === game.home_team);
+      const awayScoreData = scores.find(score => score.name === game.away_team);
       
       if (!homeScoreData || !awayScoreData) {
+        console.log(`Game ID ${game.id}: Missing team score data. Home: ${game.home_team}, Away: ${game.away_team}`);
+        console.log(`Available scores:`, scores.map(s => s.name));
         return 'pending';
       }
       
@@ -1080,8 +1104,11 @@ class GameResultService {
       const awayScore = parseInt(awayScoreData.score);
       
       if (isNaN(homeScore) || isNaN(awayScore)) {
+        console.log(`Game ID ${game.id}: Invalid score values. Home: ${homeScoreData.score}, Away: ${awayScoreData.score}`);
         return 'pending';
       }
+      
+      console.log(`Game ID ${game.id}: Determining result. Home: ${homeScore}, Away: ${awayScore}`);
       
       if (homeScore > awayScore) {
         return 'home_win';
@@ -1093,15 +1120,34 @@ class GameResultService {
     }
     
     // 3. 스코어가 있지만 status가 finished가 아닌 경우 - 개선된 시간 기반 처리
-    if (game.scores && Array.isArray(game.scores) && game.scores.length === 2) {
+    if (game.score) {
       const gameTime = new Date(game.commence_time + 'Z');
       const now = new Date();
       const hoursSinceGame = (now - gameTime) / (1000 * 60 * 60);
       
       // 스코어가 있고 경기 시간이 지났으면 완료로 처리 (더 유연한 접근)
       if (hoursSinceGame > 0) {
-        const homeScoreData = game.scores.find(score => score.name === game.home_team);
-        const awayScoreData = game.scores.find(score => score.name === game.away_team);
+        let scores;
+        
+        // 스코어 데이터 파싱
+        if (typeof game.score === 'string') {
+          try {
+            scores = JSON.parse(game.score);
+          } catch (e) {
+            return 'pending';
+          }
+        } else if (Array.isArray(game.score)) {
+          scores = game.score;
+        } else {
+          return 'pending';
+        }
+        
+        if (!Array.isArray(scores) || scores.length < 2) {
+          return 'pending';
+        }
+        
+        const homeScoreData = scores.find(score => score.name === game.home_team);
+        const awayScoreData = scores.find(score => score.name === game.away_team);
         
         if (homeScoreData && awayScoreData) {
           const homeScore = parseInt(homeScoreData.score);
