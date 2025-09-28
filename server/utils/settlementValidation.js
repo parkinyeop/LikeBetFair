@@ -179,21 +179,44 @@ class SettlementValidation {
           return result;
         }
 
-        // home, away 스코어 검증
-        if (typeof firstScore.home !== 'number' || typeof firstScore.away !== 'number') {
-          validationResult.issues.push('Score home/away values must be numbers');
+        // 스코어 데이터 형식 변환: [{"name":"팀명","score":"점수"}] -> {home: 숫자, away: 숫자}
+        let homeScore, awayScore;
+        
+        if (firstScore.home !== undefined && firstScore.away !== undefined) {
+          // 기존 형식: {home: 숫자, away: 숫자}
+          homeScore = Number(firstScore.home);
+          awayScore = Number(firstScore.away);
+        } else if (firstScore.name && firstScore.score !== undefined) {
+          // 새로운 형식: [{"name":"팀명","score":"점수"}]
+          if (score.length >= 2) {
+            homeScore = Number(score[0].score);
+            awayScore = Number(score[1].score);
+          } else {
+            validationResult.issues.push('Insufficient score data: need at least 2 teams');
+            result.isValid = false;
+            return result;
+          }
+        } else {
+          validationResult.issues.push('Invalid score format: missing home/away or name/score fields');
+          result.isValid = false;
+          return result;
+        }
+
+        // 숫자 변환 검증
+        if (isNaN(homeScore) || isNaN(awayScore)) {
+          validationResult.issues.push('Score values must be valid numbers');
           result.isValid = false;
           return result;
         }
 
         // 음수 스코어 검증
-        if (firstScore.home < 0 || firstScore.away < 0) {
-          validationResult.issues.push(`Invalid negative scores: home=${firstScore.home}, away=${firstScore.away}`);
+        if (homeScore < 0 || awayScore < 0) {
+          validationResult.issues.push(`Invalid negative scores: home=${homeScore}, away=${awayScore}`);
           result.isValid = false;
           return result;
         }
 
-        result.score = firstScore;
+        result.score = { home: homeScore, away: awayScore };
       }
       // 객체 형태 스코어 검증
       else if (typeof score === 'object' && score !== null) {
