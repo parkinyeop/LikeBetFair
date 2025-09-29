@@ -467,101 +467,42 @@ else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; la
                                     <span className={`mr-2 ${color}`}>{icon}</span>
                                     <div className="flex flex-col">
                                       <span className={`font-medium ${color}`}>
-                                        {isOverUnder ? (
-                                          ouType
-                                        ) : isHandicap ? (
-                                          sel.team
-                                        ) : actualResult === 'draw' ? (
-                                          `${sel.desc ? sel.desc.replace(' vs ', ' vs ') : sel.team} (Draw)`
-                                        ) : (
-                                          (() => {
-                                            // desc에서 홈팀과 원정팀 파악
-                                            if (sel.desc) {
-                                              const teams = sel.desc.split(' vs ');
-                                              const homeTeam = teams[0];
-                                              const awayTeam = teams[1];
-                                              
-                                              // 베팅한 팀이 홈팀인지 원정팀인지 확인
-                                              if (sel.team === homeTeam) {
-                                                return `${sel.team} Win`;
-                                              } else if (sel.team === awayTeam) {
-                                                return `${sel.team} Win`;
-                                              } else {
-                                                // 베팅한 팀이 홈/원정과 다르면 패 베팅일 가능성
-                                                if (sel.team.includes(homeTeam) || homeTeam.includes(sel.team)) {
-                                                  return `${homeTeam} Lose`;
-                                                } else if (sel.team.includes(awayTeam) || awayTeam.includes(sel.team)) {
-                                                  return `${awayTeam} Lose`;
-                                                }
-                                              }
-                                            }
-                                            return `${sel.team} Win`;
-                                          })()
-                                        )}
+                                        {isOverUnder ? ouType : sel.team}
                                       </span>
+                                      <span className="text-xs text-gray-500">@ {Number(sel.odds).toFixed(2)}</span>
                                     </div>
-                                    <span className="ml-2 text-gray-600">@ {Number(sel.odds).toFixed(2)}</span>
                                   </div>
                                   <span className={`text-xs font-medium ${color}`}>{label}</span>
                                 </div>
-                                {/* 경기 결과 스코어 표시 - 디버깅 로그 추가 */}
-                                {(() => {
-                                  // 디버깅 로그 추가
-                                  console.log('🔍 스코어 표시 디버깅:', {
-                                    selection: sel.desc,
-                                    gameResult: sel.gameResult,
-                                    hasGameResult: !!sel.gameResult,
-                                    hasScore: !!(sel.gameResult && sel.gameResult.score),
-                                    scoreType: sel.gameResult ? typeof sel.gameResult.score : 'no gameResult',
-                                    scoreValue: sel.gameResult ? sel.gameResult.score : 'no gameResult'
-                                  });
-                                  
-                                  if (sel.gameResult && sel.gameResult.score) {
-                                    return (
-                                      <div className="text-xs text-blue-600 mt-1 ml-6">
-                                        {(() => {
-                                          // 배열 형태 스코어 처리
-                                          if (Array.isArray(sel.gameResult.score)) {
-                                            return `Result: ${sel.gameResult.homeTeam || 'Home'} ${
-                                              typeof sel.gameResult.score[0] === 'string' 
-                                                ? sel.gameResult.score[0] 
-                                                : sel.gameResult.score[0]?.score ?? '-'
-                                            } : ${sel.gameResult.awayTeam || 'Away'} ${
-                                              typeof sel.gameResult.score[1] === 'string' 
-                                                ? sel.gameResult.score[1] 
-                                                : sel.gameResult.score[1]?.score ?? '-'
-                                            }`;
-                                          }
-                                          
-              // 객체 형태 스코어 처리 ({"away":9,"home":10}) - 관리자 페이지와 동일한 로직
-              if (sel.gameResult.score.home !== undefined && sel.gameResult.score.away !== undefined) {
-                return `Result: ${sel.gameResult.homeTeam || 'Home'} ${sel.gameResult.score.home} : ${sel.gameResult.awayTeam || 'Away'} ${sel.gameResult.score.away}`;
-              }
-                                          
-                                          // 개별 스코어 필드 처리
-                                          if (sel.gameResult.homeScore !== undefined && sel.gameResult.awayScore !== undefined) {
-                                            return `Result: ${sel.gameResult.homeTeam || 'Home'} ${sel.gameResult.homeScore} : ${sel.gameResult.awayTeam || 'Away'} ${sel.gameResult.awayScore}`;
-                                          }
-                                          
-                                          // 기타 경우
-                                          return `Game Result: ${JSON.stringify(sel.gameResult.score)}`;
-                                        })()}
-                                      </div>
-                                    );
-                                  } else {
-                                    // 디버깅용 정보 표시
-                                    return (
-                                      <div className="text-xs text-gray-400 mt-1 ml-6">
-                                        Debug: {sel.gameResult ? 'gameResult exists' : 'no gameResult'} | 
-                                        {sel.gameResult && sel.gameResult.score ? 'score exists' : 'no score'}
-                                      </div>
-                                    );
-                                  }
-                                })()}
-                                {/* Over/Under 추가 정보 */}
-                                {isOverUnder && sel.point && (
-                                  <div className="text-xs text-gray-400 mt-1 ml-6">
-                                    Point: {sel.point}
+                                {/* 경기 결과 스코어 표시 - 간소화 */}
+                                {sel.gameResult && sel.gameResult.score && (
+                                  <div className="text-xs text-blue-600 mt-1 ml-6">
+                                    {(() => {
+                                      // 배열 형태 스코어 처리
+                                      if (Array.isArray(sel.gameResult.score)) {
+                                        return `${sel.gameResult.homeTeam || 'Home'} ${
+                                          typeof sel.gameResult.score[0] === 'string' 
+                                            ? sel.gameResult.score[0] 
+                                            : sel.gameResult.score[0]?.score ?? '-'
+                                        } : ${sel.gameResult.awayTeam || 'Away'} ${
+                                          typeof sel.gameResult.score[1] === 'string' 
+                                            ? sel.gameResult.score[1] 
+                                            : sel.gameResult.score[1]?.score ?? '-'
+                                        }`;
+                                      }
+                                      
+                                      // 객체 형태 스코어 처리
+                                      if (sel.gameResult.score.home !== undefined && sel.gameResult.score.away !== undefined) {
+                                        return `${sel.gameResult.homeTeam || 'Home'} ${sel.gameResult.score.home} : ${sel.gameResult.awayTeam || 'Away'} ${sel.gameResult.score.away}`;
+                                      }
+                                      
+                                      // 개별 스코어 필드 처리
+                                      if (sel.gameResult.homeScore !== undefined && sel.gameResult.awayScore !== undefined) {
+                                        return `${sel.gameResult.homeTeam || 'Home'} ${sel.gameResult.homeScore} : ${sel.gameResult.awayTeam || 'Away'} ${sel.gameResult.awayScore}`;
+                                      }
+                                      
+                                      return 'Score available';
+                                    })()}
                                   </div>
                                 )}
                               </div>
@@ -597,12 +538,15 @@ else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; la
                               }
                               
                               // API URL 동적 설정
-                              const apiUrl = buildApiUrl(`/api/bet/${bet.id}/cancel`);
+                              const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
+                                            (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+                                             ? 'buildApiUrl' 
+                                             : 'https://likebetfair.onrender.com');
                               
-                              console.log('[배팅취소] API 요청 시작:', apiUrl);
+                              console.log('[배팅취소] API 요청 시작:', `${apiUrl}/api/bet/${bet.id}/cancel`);
                               console.log('[배팅취소] 토큰 존재:', !!token);
                               
-                              const res = await fetch(apiUrl, {
+                              const res = await fetch(`${apiUrl}/api/bet/${bet.id}/cancel`, {
                                 method: 'POST',
                                 headers: { 
                                   'x-auth-token': token || '',
