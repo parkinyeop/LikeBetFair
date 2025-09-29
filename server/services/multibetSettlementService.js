@@ -6,6 +6,8 @@ import GameResult from '../models/gameResultModel.js';
 import { Op } from 'sequelize';
 import createScriptSequelize from '../config/scriptDatabase.js';
 import settlementValidation from '../utils/settlementValidation.js';
+import GameResultQuery from '../utils/gameResultQuery.js';
+import { getLocationConfig } from '../config/gameResultQuery.js';
 
 // 스크립트 전용 Sequelize 인스턴스 생성
 const sequelize = createScriptSequelize();
@@ -196,34 +198,52 @@ class MultibetSettlementService {
 
     // 직접 GameResult 모델 사용 (기존 방식으로 복원)
     try {
-      // 정확한 시간으로 먼저 검색
-      let gameResult = await GameResult.findOne({
-        where: {
-          homeTeam: homeTeam,
-          awayTeam: awayTeam,
-          commenceTime: commenceTime,
-          status: 'finished'
-        }
-      });
-
-      // 정확한 시간으로 찾지 못하면 시간 범위로 검색 (±24시간)
-      if (!gameResult) {
-        const targetTime = new Date(commenceTime);
-        const startTime = new Date(targetTime.getTime() - (24 * 60 * 60 * 1000));
-        const endTime = new Date(targetTime.getTime() + (24 * 60 * 60 * 1000));
+      // 🚀 중앙화된 경기 결과 조회 사용
+      const config = getLocationConfig('multibetSettlement');
+      
+      let gameResult;
+      
+      if (config.FEATURE_FLAGS?.USE_CENTRALIZED_QUERY) {
+        console.log(`[multibetSettlement] Using centralized query`);
+        gameResult = await GameResultQuery.findByTeamsAndTime(
+          homeTeam,
+          awayTeam,
+          commenceTime,
+          'multibetSettlement'
+        );
+      } else {
+        // 레거시 로직 (Feature Flag가 비활성화된 경우)
+        console.log(`[multibetSettlement] Using legacy query`);
         
-        console.log(`⏰ 시간 범위 검색: ${startTime.toISOString()} ~ ${endTime.toISOString()}`);
-        
+        // 정확한 시간으로 먼저 검색
         gameResult = await GameResult.findOne({
           where: {
             homeTeam: homeTeam,
             awayTeam: awayTeam,
-            commenceTime: {
-              [Op.between]: [startTime, endTime]
-            },
+            commenceTime: commenceTime,
             status: 'finished'
           }
         });
+
+        // 정확한 시간으로 찾지 못하면 시간 범위로 검색 (±24시간)
+        if (!gameResult) {
+          const targetTime = new Date(commenceTime);
+          const startTime = new Date(targetTime.getTime() - (24 * 60 * 60 * 1000));
+          const endTime = new Date(targetTime.getTime() + (24 * 60 * 60 * 1000));
+          
+          console.log(`⏰ 시간 범위 검색: ${startTime.toISOString()} ~ ${endTime.toISOString()}`);
+          
+          gameResult = await GameResult.findOne({
+            where: {
+              homeTeam: homeTeam,
+              awayTeam: awayTeam,
+              commenceTime: {
+                [Op.between]: [startTime, endTime]
+              },
+              status: 'finished'
+            }
+          });
+        }
       }
 
       if (gameResult) {

@@ -10,6 +10,8 @@ import exchangeSettlementService from '../services/exchangeSettlementService.js'
 import ExchangeOddsReturnRateService from '../services/exchangeOddsReturnRateService.js';
 import { Op } from 'sequelize';
 import sequelize from '../models/sequelize.js';
+import GameResultQuery from '../utils/gameResultQuery.js';
+import { getLocationConfig } from '../config/gameResultQuery.js';
 
 const router = express.Router();
 
@@ -1244,33 +1246,48 @@ router.get('/orders', verifyToken, async (req, res) => {
       // 환수율 조정은 프론트엔드에서 처리 (정확한 배열 기반 계산을 위해)
       let displayPrice = orderData.price;
       
-      // 🆕 게임 결과 정보 조회
-      let gameResult = null;
-      if (orderData.homeTeam && orderData.awayTeam && orderData.commenceTime) {
-        try {
-          const GameResult = (await import('../models/gameResultModel.js')).default;
-          gameResult = await GameResult.findOne({
-            where: {
-              homeTeam: orderData.homeTeam,
-              awayTeam: orderData.awayTeam,
-              commenceTime: new Date(orderData.commenceTime)
+        // 🆕 게임 결과 정보 조회
+        let gameResult = null;
+        if (orderData.homeTeam && orderData.awayTeam && orderData.commenceTime) {
+          try {
+            // 🚀 중앙화된 경기 결과 조회 사용
+            const config = getLocationConfig('exchangeRoutes');
+            
+            if (config.FEATURE_FLAGS?.USE_CENTRALIZED_QUERY) {
+              console.log(`[exchangeRoutes] Using centralized query`);
+              gameResult = await GameResultQuery.findByTeamsAndTime(
+                orderData.homeTeam,
+                orderData.awayTeam,
+                orderData.commenceTime,
+                'exchangeRoutes'
+              );
+            } else {
+              // 레거시 로직 (Feature Flag가 비활성화된 경우)
+              console.log(`[exchangeRoutes] Using legacy query`);
+              const GameResult = (await import('../models/gameResultModel.js')).default;
+              gameResult = await GameResult.findOne({
+                where: {
+                  homeTeam: orderData.homeTeam,
+                  awayTeam: orderData.awayTeam,
+                  commenceTime: new Date(orderData.commenceTime)
+                }
+              });
             }
-          });
-          
-          if (gameResult) {
-            gameResult = {
-              score: gameResult.score,
-              status: gameResult.status,
-              result: gameResult.result,
-              homeTeam: gameResult.homeTeam,
-              awayTeam: gameResult.awayTeam,
-              updatedAt: gameResult.updatedAt
-            };
+            
+            if (gameResult) {
+              gameResult = {
+                score: gameResult.score,
+                status: gameResult.status,
+                result: gameResult.result,
+                homeTeam: gameResult.homeTeam,
+                awayTeam: gameResult.awayTeam,
+                updatedAt: gameResult.updatedAt
+              };
+            }
+          } catch (error) {
+            console.log('게임 결과 조회 오류:', error.message);
           }
-        } catch (error) {
-          console.log('게임 결과 조회 오류:', error.message);
         }
-      }
       
       return {
         ...orderData,

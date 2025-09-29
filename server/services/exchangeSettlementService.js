@@ -10,6 +10,8 @@ import { Op } from 'sequelize';
 import createScriptSequelize from '../config/scriptDatabase.js';
 import { ADMIN_CONFIG } from '../config/centralizedConfig.js';
 import PrecisionCalculation from '../utils/precisionCalculation.js';
+import GameResultQuery from '../utils/gameResultQuery.js';
+import { getLocationConfig } from '../config/gameResultQuery.js';
 
 // 스크립트 전용 Sequelize 인스턴스 생성
 const sequelize = createScriptSequelize();
@@ -2237,15 +2239,31 @@ class ExchangeSettlementService {
             const awayTeam = firstSelection.awayTeam;
             const commenceTime = firstSelection.commenceTime;
             
-            // GameResult 찾기
-            const gameResult = await GameResult.findOne({
-              where: {
+            // 🚀 중앙화된 경기 결과 조회 사용
+            const config = getLocationConfig('exchangeSettlement');
+            
+            let gameResult;
+            
+            if (config.FEATURE_FLAGS?.USE_CENTRALIZED_QUERY) {
+              console.log(`[exchangeSettlement] Using centralized query for multibet`);
+              gameResult = await GameResultQuery.findByTeamsAndTime(
                 homeTeam,
                 awayTeam,
-                commenceTime
-              },
-              order: [['createdAt', 'DESC']]
-            });
+                commenceTime,
+                'exchangeSettlement'
+              );
+            } else {
+              // 레거시 로직 (Feature Flag가 비활성화된 경우)
+              console.log(`[exchangeSettlement] Using legacy query for multibet`);
+              gameResult = await GameResult.findOne({
+                where: {
+                  homeTeam,
+                  awayTeam,
+                  commenceTime
+                },
+                order: [['createdAt', 'DESC']]
+              });
+            }
             
             return gameResult;
           }
@@ -2255,14 +2273,31 @@ class ExchangeSettlementService {
         const order = order1.homeTeam ? order1 : order2;
         
         if (order.homeTeam && order.awayTeam) {
-          const gameResult = await GameResult.findOne({
-            where: {
-              homeTeam: order.homeTeam,
-              awayTeam: order.awayTeam,
-              commenceTime: order.commenceTime
-            },
-            order: [['createdAt', 'DESC']]
-          });
+          // 🚀 중앙화된 경기 결과 조회 사용
+          const config = getLocationConfig('exchangeSettlement');
+          
+          let gameResult;
+          
+          if (config.FEATURE_FLAGS?.USE_CENTRALIZED_QUERY) {
+            console.log(`[exchangeSettlement] Using centralized query for single bet`);
+            gameResult = await GameResultQuery.findByTeamsAndTime(
+              order.homeTeam,
+              order.awayTeam,
+              order.commenceTime,
+              'exchangeSettlement'
+            );
+          } else {
+            // 레거시 로직 (Feature Flag가 비활성화된 경우)
+            console.log(`[exchangeSettlement] Using legacy query for single bet`);
+            gameResult = await GameResult.findOne({
+              where: {
+                homeTeam: order.homeTeam,
+                awayTeam: order.awayTeam,
+                commenceTime: order.commenceTime
+              },
+              order: [['createdAt', 'DESC']]
+            });
+          }
           
           return gameResult;
         }

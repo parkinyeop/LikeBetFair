@@ -6,6 +6,8 @@ import Bet from '../models/betModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
 import GameResult from '../models/gameResultModel.js';
 import createScriptSequelize from '../config/scriptDatabase.js';
+import GameResultQuery from '../utils/gameResultQuery.js';
+import { getLocationConfig } from '../config/gameResultQuery.js';
 
 // 스크립트 전용 Sequelize 인스턴스 생성
 const sequelize = createScriptSequelize();
@@ -268,19 +270,34 @@ export async function getBetHistory(req, res) {
                 
                 if (!isNaN(commenceTime.getTime())) {
                   try {
-                    gameResult = await GameResult.findOne({
-                      where: {
-                        homeTeam: { [Op.iLike]: `%${homeTeam}%` },
-                        awayTeam: { [Op.iLike]: `%${awayTeam}%` },
-                        commenceTime: {
-                          [Op.between]: [
-                            new Date(commenceTime.getTime() - 24 * 60 * 60 * 1000),
-                            new Date(commenceTime.getTime() + 24 * 60 * 60 * 1000)
-                          ]
-                        }
-                      },
-                      order: [['createdAt', 'DESC']]
-                    });
+                    // 🚀 중앙화된 경기 결과 조회 사용
+                    const config = getLocationConfig('betController');
+                    
+                    if (config.FEATURE_FLAGS?.USE_CENTRALIZED_QUERY) {
+                      console.log(`[getBetHistory] Using centralized query for selection ${selectionIndex + 1}`);
+                      gameResult = await GameResultQuery.findByTeamsAndTime(
+                        homeTeam,
+                        awayTeam,
+                        commenceTime,
+                        'betController'
+                      );
+                    } else {
+                      // 레거시 로직 (Feature Flag가 비활성화된 경우)
+                      console.log(`[getBetHistory] Using legacy query for selection ${selectionIndex + 1}`);
+                      gameResult = await GameResult.findOne({
+                        where: {
+                          homeTeam: { [Op.iLike]: `%${homeTeam}%` },
+                          awayTeam: { [Op.iLike]: `%${awayTeam}%` },
+                          commenceTime: {
+                            [Op.between]: [
+                              new Date(commenceTime.getTime() - 24 * 60 * 60 * 1000),
+                              new Date(commenceTime.getTime() + 24 * 60 * 60 * 1000)
+                            ]
+                          }
+                        },
+                        order: [['createdAt', 'DESC']]
+                      });
+                    }
                     
                     console.log(`[getBetHistory] Selection ${selectionIndex + 1} - 게임 결과 조회 결과:`, {
                       found: !!gameResult,
