@@ -27,7 +27,7 @@ export const API_CONFIG = {
     
     // 2. 개발환경에서 localhost 감지
     if (env.isDevelopment && env.isLocalhost) {
-      return 'http://localhost:3000';
+      return 'http://localhost:5050';
     }
     
     // 3. 기본값 (Render 서버)
