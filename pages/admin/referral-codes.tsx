@@ -21,6 +21,13 @@ interface ReferralCode {
     email: string;
     adminLevel: number;
   };
+  assignedUsers?: {
+    id: string;
+    username: string;
+    email: string;
+    createdAt: string;
+    isActive: boolean;
+  }[];
 }
 
 interface ReferralCodeStats {
@@ -125,6 +132,8 @@ export default function AdminReferralCodes() {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('🔍 추천코드 목록 응답:', data);
+        console.log('🔍 첫 번째 코드의 assignedUsers:', data.codes?.[0]?.assignedUsers);
         setCodes(data.codes || []);
         setPagination(prev => ({
           ...prev,
@@ -172,7 +181,11 @@ export default function AdminReferralCodes() {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('🔍 사용자 목록 로드됨:', data.users?.length, '명');
+        console.log('🔍 사용자 목록 상세:', data.users?.map(u => ({ id: u.id, username: u.username, email: u.email })));
         setAvailableUsers(data.users || []);
+      } else {
+        console.error('사용자 목록 로딩 실패:', response.status);
       }
     } catch (err) {
       console.error('사용자 목록 로딩 오류:', err);
@@ -207,6 +220,14 @@ export default function AdminReferralCodes() {
     try {
       const headers = getAuthHeaders();
       
+      // 선택된 사용자 정보 로그 출력
+      const selectedUser = availableUsers.find(u => u.id === createForm.assignToUserId);
+      console.log('🔍 추천코드 생성 요청:', {
+        code: createForm.code,
+        assignToUserId: createForm.assignToUserId,
+        selectedUser: selectedUser ? { id: selectedUser.id, username: selectedUser.username, email: selectedUser.email } : null
+      });
+      
       const response = await fetch(buildApiUrl('/api/admin/referral-codes'), {
         method: 'POST',
         headers,
@@ -221,6 +242,7 @@ export default function AdminReferralCodes() {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ 추천코드 생성 성공:', data.message);
         alert(data.message || '추천코드가 성공적으로 생성되었습니다.');
         setShowCreateModal(false);
         setCreateForm({ code: '', commissionRate: 0.05, maxUsers: '', expiresAt: '', assignToUserId: '' });
@@ -228,6 +250,7 @@ export default function AdminReferralCodes() {
         fetchStats();
       } else {
         const errorData = await response.json();
+        console.error('❌ 추천코드 생성 실패:', errorData.message);
         alert(errorData.message || '추천코드 생성에 실패했습니다.');
       }
     } catch (err) {
@@ -483,7 +506,21 @@ export default function AdminReferralCodes() {
                             <tr key={code.id} className="hover:bg-gray-50">
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm font-medium text-gray-900 font-mono">{code.code}</div>
-                                <div className="text-xs text-gray-500">#{code.id.substring(0, 8)}</div>
+                                {code.assignedUsers && code.assignedUsers.length > 0 ? (
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {code.assignedUsers.map((user, index) => (
+                                      <div key={user.id} className="flex items-center">
+                                        <span className="font-medium">{user.username}</span>
+                                        <span className="text-gray-400 ml-1">({user.email})</span>
+                                        {!user.isActive && (
+                                          <span className="ml-1 text-red-500 text-xs">[비활성]</span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="text-xs text-gray-400">할당된 사용자 없음</div>
+                                )}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm font-medium text-gray-900">{code.admin.username}</div>
@@ -669,6 +706,14 @@ export default function AdminReferralCodes() {
                         <p className="text-xs text-gray-500 mt-1">
                           사용자를 선택하면 추천코드가 생성과 동시에 해당 사용자에게 할당됩니다.
                         </p>
+                        {createForm.assignToUserId && (
+                          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                            <p className="text-sm text-blue-800">
+                              <strong>선택된 사용자:</strong> {availableUsers.find(u => u.id === createForm.assignToUserId)?.username} 
+                              ({availableUsers.find(u => u.id === createForm.assignToUserId)?.email})
+                            </p>
+                          </div>
+                        )}
                       </div>
                       <div className="flex justify-end space-x-3">
                         <button

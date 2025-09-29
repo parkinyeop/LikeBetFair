@@ -1091,11 +1091,11 @@ class GameResultService {
         return 'pending';
       }
       
-      const homeScoreData = scores.find(score => score.name === game.home_team);
-      const awayScoreData = scores.find(score => score.name === game.away_team);
+      const homeScoreData = scores.find(score => score.name === game.homeTeam);
+      const awayScoreData = scores.find(score => score.name === game.awayTeam);
       
       if (!homeScoreData || !awayScoreData) {
-        console.log(`Game ID ${game.id}: Missing team score data. Home: ${game.home_team}, Away: ${game.away_team}`);
+        console.log(`Game ID ${game.id}: Missing team score data. Home: ${game.homeTeam}, Away: ${game.awayTeam}`);
         console.log(`Available scores:`, scores.map(s => s.name));
         return 'pending';
       }
@@ -1121,7 +1121,7 @@ class GameResultService {
     
     // 3. 스코어가 있지만 status가 finished가 아닌 경우 - 개선된 시간 기반 처리
     if (game.score) {
-      const gameTime = new Date(game.commence_time + 'Z');
+      const gameTime = new Date(game.commenceTime + 'Z');
       const now = new Date();
       const hoursSinceGame = (now - gameTime) / (1000 * 60 * 60);
       
@@ -1146,8 +1146,8 @@ class GameResultService {
           return 'pending';
         }
         
-        const homeScoreData = scores.find(score => score.name === game.home_team);
-        const awayScoreData = scores.find(score => score.name === game.away_team);
+        const homeScoreData = scores.find(score => score.name === game.homeTeam);
+        const awayScoreData = scores.find(score => score.name === game.awayTeam);
         
         if (homeScoreData && awayScoreData) {
           const homeScore = parseInt(homeScoreData.score);

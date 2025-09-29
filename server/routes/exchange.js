@@ -1246,19 +1246,29 @@ router.get('/orders', verifyToken, async (req, res) => {
       
       // 🆕 게임 결과 정보 조회
       let gameResult = null;
-      if (order.homeTeam && order.awayTeam && order.commenceTime) {
+      if (orderData.homeTeam && orderData.awayTeam && orderData.commenceTime) {
         try {
-          const GameResultModule = await import('../models/gameResultModel.js');
-          const GameResult = GameResultModule.default || GameResultModule;
+          const GameResult = (await import('../models/gameResultModel.js')).default;
           gameResult = await GameResult.findOne({
             where: {
-              homeTeam: order.homeTeam,
-              awayTeam: order.awayTeam,
-              commenceTime: new Date(order.commenceTime)
+              homeTeam: orderData.homeTeam,
+              awayTeam: orderData.awayTeam,
+              commenceTime: new Date(orderData.commenceTime)
             }
           });
+          
+          if (gameResult) {
+            gameResult = {
+              score: gameResult.score,
+              status: gameResult.status,
+              result: gameResult.result,
+              homeTeam: gameResult.homeTeam,
+              awayTeam: gameResult.awayTeam,
+              updatedAt: gameResult.updatedAt
+            };
+          }
         } catch (error) {
-          console.error('게임 결과 조회 오류:', error);
+          console.log('게임 결과 조회 오류:', error.message);
         }
       }
       
@@ -1266,6 +1276,7 @@ router.get('/orders', verifyToken, async (req, res) => {
         ...orderData,
         price: displayPrice, // 사용자에게 표시할 환수율 적용된 배당율
         originalPrice: orderData.price, // 원본 배당율 보존
+        gameResult: gameResult, // 🆕 게임 결과 정보 추가
         matchInfo: {
           originalAmount: order.originalAmount || order.amount,
           filledAmount: order.filledAmount || 0,
@@ -1274,15 +1285,7 @@ router.get('/orders', verifyToken, async (req, res) => {
           fillPercentage: order.originalAmount ? 
             Math.round((order.filledAmount || 0) / order.originalAmount * 100) : 0,
           matchCount: (order.originalMatches?.length || 0) + (order.matchingMatches?.length || 0)
-        },
-        // 🆕 게임 결과 정보 추가
-        gameResult: gameResult ? {
-          score: gameResult.score,
-          status: gameResult.status,
-          result: gameResult.result,
-          homeTeam: gameResult.homeTeam,
-          awayTeam: gameResult.awayTeam
-        } : null
+        }
       };
     }));
     
@@ -1302,24 +1305,6 @@ router.get('/order/:id', async (req, res) => {
     
     if (!order) {
       return res.status(404).json({ message: '주문을 찾을 수 없습니다.' });
-    }
-    
-    // 🆕 게임 결과 정보 조회
-    let gameResult = null;
-    if (order.homeTeam && order.awayTeam && order.commenceTime) {
-      try {
-        const GameResultModule = await import('../models/gameResultModel.js');
-        const GameResult = GameResultModule.default || GameResultModule;
-        gameResult = await GameResult.findOne({
-          where: {
-            homeTeam: order.homeTeam,
-            awayTeam: order.awayTeam,
-            commenceTime: new Date(order.commenceTime)
-          }
-        });
-      } catch (error) {
-        console.error('게임 결과 조회 오류:', error);
-      }
     }
     
     res.json({
@@ -1343,15 +1328,7 @@ router.get('/order/:id', async (req, res) => {
       originalAmount: order.originalAmount || order.amount,
       remainingAmount: order.remainingAmount || order.amount,
       filledAmount: order.filledAmount || 0,
-      partiallyFilled: order.partiallyFilled || false,
-      // 🆕 게임 결과 정보 추가
-      gameResult: gameResult ? {
-        score: gameResult.score,
-        status: gameResult.status,
-        result: gameResult.result,
-        homeTeam: gameResult.homeTeam,
-        awayTeam: gameResult.awayTeam
-      } : null
+      partiallyFilled: order.partiallyFilled || false
     });
   } catch (error) {
     console.error('주문 조회 오류:', error);

@@ -398,7 +398,7 @@ class NewExchangeSettlementService {
       });
       
       // 🆕 추천인 수수료 지급 로직
-      if (user.referredBy) {
+      if (user.referralCode) {
         await this.processReferralCommission(user, order, winnings);
       }
       
@@ -471,13 +471,13 @@ class NewExchangeSettlementService {
       const ReferralCode = (await import('../models/referralCodeModel.js')).default;
       const referralCode = await ReferralCode.findOne({
         where: { 
-          code: user.referredBy, 
+          code: user.referralCode, 
           isActive: true 
         }
       });
 
       if (!referralCode) {
-        console.log(`[익스체인지 추천인 수수료] 추천코드 '${user.referredBy}'를 찾을 수 없거나 비활성화됨`);
+        console.log(`[익스체인지 추천인 수수료] 추천코드 '${user.referralCode}'를 찾을 수 없거나 비활성화됨`);
         return;
       }
 

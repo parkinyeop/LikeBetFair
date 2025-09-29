@@ -195,11 +195,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('[AuthContext] 잔액 새로고침 시작');
       
       // API URL 결정 (apiConfig 사용)
-      const apiUrl = buildApiUrl('/api/auth/balance');
+      const apiUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+                     ? 'buildApiUrl' 
+                     : window.location.origin;
       
       console.log('[AuthContext] API URL:', apiUrl);
       
-      const response = await fetch(apiUrl, {
+      const response = await fetch(`${apiUrl}/api/auth/balance`, {
         headers: {
           'x-auth-token': token,
           'Content-Type': 'application/json'
@@ -239,10 +241,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('[AuthContext] 강제 잔액 새로고침 시작');
       
       // API URL 결정
-      const apiUrl = buildApiUrl('/api/auth/balance');
+      const apiUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+                     ? 'buildApiUrl' 
+                     : window.location.origin;
       
       // 캐시 방지를 위한 타임스탬프 추가
-      const response = await fetch(`${apiUrl}?t=${Date.now()}`, {
+      const response = await fetch(`${apiUrl}/api/auth/balance?t=${Date.now()}`, {
         headers: {
           'x-auth-token': token,
           'Content-Type': 'application/json',

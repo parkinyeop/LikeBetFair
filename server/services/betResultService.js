@@ -96,8 +96,7 @@ class BetResultService {
   }
 
   // 개별 배팅 결과 처리 (스코어 유무 기반)
-  async processBetResult(bet, options = {}) {
-    const { transaction, dryRun = false } = options;
+  async processBetResult(bet) {
     // ✅ 이미 완료된 베팅은 건너뛰기 (중복 처리 방지)
     if (bet.status === 'won' || bet.status === 'lost' || bet.status === 'cancelled') {
       console.log(`[베팅 처리] 이미 완료된 베팅 ${bet.id} (${bet.status}) 건너뛰기`);
@@ -174,28 +173,43 @@ class BetResultService {
       console.log(`   - 팀: ${homeTeam} vs ${awayTeam}`);
       console.log(`   - 시간: ${commenceTime.toISOString()}`);
       
-      const gameResult = await GameResult.findOne({
+      // 먼저 시간 범위로 후보 경기들을 가져온 다음 메모리에서 정규화 매칭
+      const candidateGames = await GameResult.findAll({
         where: {
-          [Op.or]: [
-            {
-              homeTeam: { [Op.iLike]: `%${homeTeam.trim()}%` },
-              awayTeam: { [Op.iLike]: `%${awayTeam.trim()}%` }
-            },
-            {
-              homeTeam: { [Op.iLike]: `%${awayTeam.trim()}%` },
-              awayTeam: { [Op.iLike]: `%${homeTeam.trim()}%` }
-            }
-          ],
           commenceTime: {
             [Op.gte]: new Date(commenceTime.getTime() - 24 * 60 * 60 * 1000), // 1일 전
             [Op.lte]: new Date(commenceTime.getTime() + 24 * 60 * 60 * 1000)  // 1일 후
           }
         },
-        order: [
-          // 가장 최근에 생성된 경기 결과 우선
-          ['createdAt', 'DESC']
-        ]
+        order: [['createdAt', 'DESC']]
       });
+
+      // 메모리에서 정규화된 팀명으로 매칭
+      let gameResult = null;
+      for (const candidate of candidateGames) {
+        const dbHomeNorm = normalizeTeamNameForComparison(candidate.homeTeam);
+        const dbAwayNorm = normalizeTeamNameForComparison(candidate.awayTeam);
+
+        // 정규화된 팀명으로 매칭 (양방향)
+        if ((dbHomeNorm === normalizedHomeTeam && dbAwayNorm === normalizedAwayTeam) ||
+            (dbHomeNorm === normalizedAwayTeam && dbAwayNorm === normalizedHomeTeam)) {
+          gameResult = candidate;
+          console.log(`🎯 [매칭 성공] 정규화된 팀명으로 매칭: ${candidate.homeTeam} vs ${candidate.awayTeam}`);
+          break;
+        }
+
+        // 원본 팀명으로도 시도 (기존 로직 유지)
+        const homeMatch = candidate.homeTeam.toLowerCase().includes(homeTeam.toLowerCase()) ||
+                         homeTeam.toLowerCase().includes(candidate.homeTeam.toLowerCase());
+        const awayMatch = candidate.awayTeam.toLowerCase().includes(awayTeam.toLowerCase()) ||
+                         awayTeam.toLowerCase().includes(candidate.awayTeam.toLowerCase());
+
+        if (homeMatch && awayMatch) {
+          gameResult = candidate;
+          console.log(`🎯 [매칭 성공] 원본 팀명으로 매칭: ${candidate.homeTeam} vs ${candidate.awayTeam}`);
+          break;
+        }
+      }
 
       // 🛡️ GUARD CLAUSE: GameResult 데이터 무결성 검증 (Soft Validation)
       let validationResult = null;
@@ -333,30 +347,19 @@ class BetResultService {
     const statusChanged = betStatus !== prevStatus;
     const selectionsChanged = newSelectionsStr !== prevSelections;
     if (statusChanged || selectionsChanged) {
-      // 외부에서 전달된 트랜잭션이 있으면 사용, 없으면 새로 생성
-      const t = transaction || await Bet.sequelize.transaction();
-      const shouldCommit = !transaction; // 외부 트랜잭션이면 커밋하지 않음
-      
+      const t = await Bet.sequelize.transaction();
       try {
         bet.status = betStatus;
         bet.selections = [...selections];
         await bet.save({ transaction: t });
-        
-        if (!dryRun) {
-          if (betStatus === 'won') {
-            await this.processBetWinnings(bet, t);
-          } else if (betStatus === 'cancelled') {
-            await this.processBetRefund(bet, t);
-          }
+        if (betStatus === 'won') {
+          await this.processBetWinnings(bet, t);
+        } else if (betStatus === 'cancelled') {
+          await this.processBetRefund(bet, t);
         }
-        
-        if (shouldCommit) {
-          await t.commit();
-        }
+        await t.commit();
       } catch (err) {
-        if (shouldCommit) {
-          await t.rollback();
-        }
+        await t.rollback();
         throw err;
       }
     }
@@ -454,22 +457,26 @@ class BetResultService {
       
       // 🆕 수수료가 있는 경우 AdminCommission 기록
       if (commissionAmount > 0) {
-        // 시스템 관리자 ID (첫 번째 사용자를 시스템 관리자로 사용)
-        const systemAdminId = ADMIN_CONFIG.SYSTEM_ADMIN_ID || '6576a77d-713b-46b8-99e8-91f66a20a8cb';
-        
-        await AdminCommission.create({
-          adminId: systemAdminId, // 시스템 관리자 ID
-          userId: user.id,
-          betId: bet.id, // 스포츠북은 betId 사용
-          exchangeOrderId: null, // 스포츠북은 exchangeOrderId 사용하지 않음
-          betAmount: bet.stake,
-          winAmount: adjustedWinnings,
-          commissionRate: commissionCalculation.appliedRate,
-          commissionAmount: commissionAmount,
-          status: 'paid',
-          paidAt: new Date(),
-          type: 'sportsbook' // 스포츠북 수수료 구분
-        }, { transaction });
+        // SYSTEM_ADMIN_ID가 설정되지 않은 경우 AdminCommission 기록을 건너뛰기
+        const systemAdminId = ADMIN_CONFIG.SYSTEM_ADMIN_ID;
+
+        if (systemAdminId) {
+          await AdminCommission.create({
+            adminId: systemAdminId,
+            userId: user.id,
+            betId: bet.id, // 스포츠북은 betId 사용
+            exchangeOrderId: null, // 스포츠북은 exchangeOrderId 사용하지 않음
+            betAmount: bet.stake,
+            winAmount: adjustedWinnings,
+            commissionRate: commissionCalculation.appliedRate,
+            commissionAmount: commissionAmount,
+            status: 'paid',
+            paidAt: new Date(),
+            type: 'sportsbook' // 스포츠북 수수료 구분
+          }, { transaction });
+        } else {
+          console.log(`[수수료 기록] SYSTEM_ADMIN_ID가 설정되지 않아 AdminCommission 기록을 건너뜀`);
+        }
         
         // 🆕 수수료 차감 기록을 PaymentHistory에 저장
         await PaymentHistory.create({
@@ -485,7 +492,7 @@ class BetResultService {
       }
       
       // 🆕 추천인 수수료 지급 로직
-      if (user.referredBy) {
+      if (user.referralCode) {
         await this.processReferralCommission(user, bet, adjustedWinnings, transaction);
       }
       
@@ -708,7 +715,6 @@ class BetResultService {
     if (marketType === 'spreads') marketType = '핸디캡';
     if (marketType === 'Win/Loss') marketType = '승/패';
     if (marketType === 'Over/Under') marketType = '언더/오버';
-    if (marketType === 'Handicap') marketType = '핸디캡'; // 핸디캡 매핑 추가
     
     const resultFunction = this.marketResultMap[marketType];
     if (resultFunction) {
@@ -827,25 +833,7 @@ class BetResultService {
 
     // 핸디캡 베팅에서 팀명과 핸디캡 분리 (개선된 로직)
     let selectedTeam, handicap;
-    
-    // selection.point가 있으면 이를 우선 사용
-    if (selection.point !== undefined) {
-      handicap = selection.point;
-      // 팀명에서 핸디캡 제거
-      if (selection.team && (selection.team.includes(' -') || selection.team.includes(' +'))) {
-        const match = selection.team.match(/^(.+?)\s*([+-]+[\d.]+)$/);
-        if (match) {
-          selectedTeam = normalizeTeamNameForComparison(match[1].trim());
-          console.log(`[핸디캡 파싱] point 사용, 팀명: "${selectedTeam}", 핸디캡: ${handicap} (원본: "${selection.team}")`);
-        } else {
-          selectedTeam = normalizeTeamNameForComparison(selection.team);
-          console.log(`[핸디캡 파싱] point 사용, 정규식 매칭 실패, 팀명: "${selectedTeam}", 핸디캡: ${handicap}`);
-        }
-      } else {
-        selectedTeam = normalizeTeamNameForComparison(selection.team);
-        console.log(`[핸디캡 파싱] point 사용, 기본 방식, 팀명: "${selectedTeam}", 핸디캡: ${handicap}`);
-      }
-    } else if (selection.team && (selection.team.includes(' -') || selection.team.includes(' +'))) {
+    if (selection.team && (selection.team.includes(' -') || selection.team.includes(' +'))) {
       // "Kia Tigers -1", "Lotte Giants +1", "Ulsan Hyundai FC --0.75" 형식에서 팀명과 핸디캡 분리
       const match = selection.team.match(/^(.+?)\s*([+-]+[\d.]+)$/);
       if (match) {
@@ -861,7 +849,7 @@ class BetResultService {
         } else {
           handicap = parseFloat(handicapStr);
         }
-        console.log(`[핸디캡 파싱] 팀명 파싱, 팀명: "${selectedTeam}", 핸디캡: ${handicap} (원본: "${handicapStr}")`);
+        console.log(`[핸디캡 파싱] 팀명: "${selectedTeam}", 핸디캡: ${handicap} (원본: "${handicapStr}")`);
       } else {
         selectedTeam = normalizeTeamNameForComparison(selection.team);
         handicap = 0;
@@ -895,37 +883,19 @@ class BetResultService {
     console.log(`[핸디캡 매칭] 경기 홈팀: "${homeTeamNorm}", 원정팀: "${awayTeamNorm}"`);
     console.log(`[핸디캡 매칭] 스코어: ${homeScore}-${awayScore}`);
     
-    // 정확한 매칭 시도
     if (selectedTeam === homeTeamNorm) {
       const adjustedScore = homeScore + handicap;
       const result = adjustedScore > awayScore ? 'won' : 'lost';
-      console.log(`[핸디캡 매칭] 홈팀 정확 매칭: ${adjustedScore} vs ${awayScore} = ${result}`);
+      console.log(`[핸디캡 매칭] 홈팀 매칭: ${adjustedScore} vs ${awayScore} = ${result}`);
       return result;
     } else if (selectedTeam === awayTeamNorm) {
       const adjustedScore = awayScore + handicap;
       const result = adjustedScore > homeScore ? 'won' : 'lost';
-      console.log(`[핸디캡 매칭] 원정팀 정확 매칭: ${adjustedScore} vs ${homeScore} = ${result}`);
-      return result;
-    }
-
-    // 부분 매칭 시도 (더 유연한 매칭)
-    const homeTeamMatch = this.findBestTeamMatch(selectedTeam, gameResult.homeTeam);
-    const awayTeamMatch = this.findBestTeamMatch(selectedTeam, gameResult.awayTeam);
-    
-    if (homeTeamMatch.similarity > 0.7) {
-      const adjustedScore = homeScore + handicap;
-      const result = adjustedScore > awayScore ? 'won' : 'lost';
-      console.log(`[핸디캡 매칭] 홈팀 부분 매칭 (${homeTeamMatch.similarity}): ${adjustedScore} vs ${awayScore} = ${result}`);
-      return result;
-    } else if (awayTeamMatch.similarity > 0.7) {
-      const adjustedScore = awayScore + handicap;
-      const result = adjustedScore > homeScore ? 'won' : 'lost';
-      console.log(`[핸디캡 매칭] 원정팀 부분 매칭 (${awayTeamMatch.similarity}): ${adjustedScore} vs ${homeScore} = ${result}`);
+      console.log(`[핸디캡 매칭] 원정팀 매칭: ${adjustedScore} vs ${homeScore} = ${result}`);
       return result;
     }
 
     console.log(`[핸디캡 매칭] 팀명 매칭 실패: "${selectedTeam}" not found in ["${homeTeamNorm}", "${awayTeamNorm}"]`);
-    console.log(`[핸디캡 매칭] 부분 매칭 시도: 홈팀 ${homeTeamMatch.similarity}, 원정팀 ${awayTeamMatch.similarity}`);
     return 'pending';
   }
 
@@ -1164,14 +1134,14 @@ class BetResultService {
       const ReferralCode = (await import('../models/referralCodeModel.js')).default;
       const referralCode = await ReferralCode.findOne({
         where: { 
-          code: user.referredBy, 
+          code: user.referralCode, 
           isActive: true 
         },
         transaction
       });
 
       if (!referralCode) {
-        console.log(`[추천인 수수료] 추천코드 '${user.referredBy}'를 찾을 수 없거나 비활성화됨`);
+        console.log(`[추천인 수수료] 추천코드 '${user.referralCode}'를 찾을 수 없거나 비활성화됨`);
         return;
       }
 
