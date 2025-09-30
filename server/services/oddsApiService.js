@@ -668,16 +668,16 @@ class OddsApiService {
 
           console.log(`[DEBUG] Found ${oddsResponse.data.length} games for ${clientCategory}`);
 
-          // === 추가: UTC 기준 최근 3일 + 미래 14일 경기만 저장 (대폭 완화) ===
+          // === 수정: UTC 기준 과거 1일 + 미래 14일 경기만 저장 ===
           const now = new Date();
-          const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+          const oneDayAgo = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
           const fourteenDaysLater = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
           
           // 🆕 야구 전용 디버깅 로그 추가
           if (clientCategory.includes('KBO') || clientCategory.includes('MLB')) {
             console.log(`[야구 디버깅] ⏰ 시간 필터링 정보:`);
             console.log(`[야구 디버깅]   현재 시간: ${now.toISOString()}`);
-            console.log(`[야구 디버깅]   3일 전: ${threeDaysAgo.toISOString()}`);
+            console.log(`[야구 디버깅]   1일 전: ${oneDayAgo.toISOString()}`);
             console.log(`[야구 디버깅]   14일 후: ${fourteenDaysLater.toISOString()}`);
           }
           
@@ -724,7 +724,7 @@ class OddsApiService {
               return false;
             }
             
-            const isInRange = commence >= threeDaysAgo && commence <= fourteenDaysLater;
+            const isInRange = commence >= oneDayAgo && commence <= fourteenDaysLater;
             
             // 🆕 야구 전용 디버깅 로그 추가
             if (clientCategory.includes('KBO') || clientCategory.includes('MLB')) {
