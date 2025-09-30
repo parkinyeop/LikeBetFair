@@ -281,25 +281,37 @@ function MyBetsPanel() {
                         const isHandicap = sel.market === 'Handicap' || sel.market === 'spreads';
                         
                         return (
-                          <div key={idx} className="flex items-center justify-between text-sm">
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-800">
-                                {isOverUnder ? (
-                                  normalizeOverUnderOption(sel.option || sel.team, sel.desc, sel.point)
-                                ) : isHandicap ? (
-                                  sel.team
-                                ) : sel.result === 'draw' ? (
-                                  `Draw`
-                                ) : (
-                                  `${sel.team} (Win)`
-                                )}
+                          <div key={idx} className="text-sm">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-800">
+                                  {isOverUnder ? (
+                                    normalizeOverUnderOption(sel.option || sel.team, sel.desc, sel.point)
+                                  ) : isHandicap ? (
+                                    sel.team
+                                  ) : sel.result === 'draw' ? (
+                                    `Draw (Win)`
+                                  ) : (
+                                    `${sel.team} (Win)`
+                                  )}
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-bold text-gray-800">
+                                  @ {Number(sel.odds).toFixed(2)}
+                                </div>
                               </div>
                             </div>
-                            <div className="text-right">
-                              <div className="font-bold text-gray-800">
-                                @ {Number(sel.odds).toFixed(2)}
+                            {/* 🆕 경기 매치업 표시 (배팅네임 아래) */}
+                            {(sel.homeTeam && sel.awayTeam) ? (
+                              <div className="text-xs text-gray-500 mt-1">
+                                {sel.homeTeam} vs {sel.awayTeam}
                               </div>
-                            </div>
+                            ) : sel.desc && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                {sel.desc}
+                              </div>
+                            )}
                           </div>
                         );
                       })
