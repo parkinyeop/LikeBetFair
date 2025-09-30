@@ -2154,20 +2154,28 @@ export default function Exchange() {
       <div className="bg-black rounded shadow p-6 mb-4">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-2xl font-bold text-white">Sports Exchange</h1>
-          <div className="flex items-center space-x-3">
+          {/* 3개 탭 네비게이션 */}
+          <div className="flex items-center space-x-2">
+            <button
+              disabled
+              className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg font-medium shadow-lg cursor-not-allowed flex items-center space-x-2 ring-2 ring-blue-400"
+            >
+              <span>🏠</span>
+              <span>배팅</span>
+            </button>
             <button
               onClick={() => router.push('/exchange/live-odds')}
-              className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded hover:bg-blue-200 transition-colors flex items-center space-x-1"
+              className="px-4 py-2 bg-green-700 text-white text-sm rounded-lg font-medium hover:bg-green-500 hover:shadow-lg transition-all flex items-center space-x-2 opacity-70 hover:opacity-100"
             >
               <span>📊</span>
-              <span>실시간 호가 현황</span>
+              <span>주문현황</span>
             </button>
             <button
               onClick={() => router.push('/exchange/orderbook')}
-              className="px-3 py-1 bg-green-100 text-green-700 text-sm rounded hover:bg-green-200 transition-colors flex items-center space-x-1"
+              className="px-4 py-2 bg-pink-700 text-white text-sm rounded-lg font-medium hover:bg-pink-500 hover:shadow-lg transition-all flex items-center space-x-2 opacity-70 hover:opacity-100"
             >
               <span>📋</span>
-              <span>전체 호가보기</span>
+              <span>매치</span>
             </button>
           </div>
         </div>

@@ -178,7 +178,7 @@ export default function LiveOddsPage() {
     });
   };
 
-  // 실시간 호가 현황 로드
+  // 주문현황 로드
   useEffect(() => {
     const loadRecentOrders = async () => {
       try {
@@ -193,7 +193,7 @@ export default function LiveOddsPage() {
         
         setRecentOrders(openOrders);
       } catch (error) {
-        console.error('실시간 호가 현황 로드 실패:', error);
+        console.error('주문현황 로드 실패:', error);
       } finally {
         setOrdersLoading(false);
       }
@@ -337,23 +337,31 @@ export default function LiveOddsPage() {
         <div className="mb-6">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-white">🔥 실시간 호가 현황</h1>
+              <h1 className="text-3xl font-bold text-white">📊 주문현황</h1>
               <p className="text-gray-300 mt-2">현재 등록된 모든 호가를 실시간으로 확인하고 매칭할 수 있습니다.</p>
             </div>
-            <div className="flex items-center space-x-3">
+            {/* 3개 탭 네비게이션 */}
+            <div className="flex items-center space-x-2">
               <button
                 onClick={() => router.push('/exchange')}
-                className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors flex items-center space-x-1"
+                className="px-4 py-2 bg-blue-700 text-white text-sm rounded-lg font-medium hover:bg-blue-500 hover:shadow-lg transition-all flex items-center space-x-2 opacity-70 hover:opacity-100"
               >
-                <span>←</span>
-                <span>홈으로 돌아가기</span>
+                <span>🏠</span>
+                <span>배팅</span>
+              </button>
+              <button
+                disabled
+                className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg font-medium shadow-lg cursor-not-allowed flex items-center space-x-2 ring-2 ring-green-400"
+              >
+                <span>📊</span>
+                <span>주문현황</span>
               </button>
               <button
                 onClick={() => router.push('/exchange/orderbook')}
-                className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors flex items-center space-x-1"
+                className="px-4 py-2 bg-pink-700 text-white text-sm rounded-lg font-medium hover:bg-pink-500 hover:shadow-lg transition-all flex items-center space-x-2 opacity-70 hover:opacity-100"
               >
                 <span>📋</span>
-                <span>전체 호가보기</span>
+                <span>매치</span>
               </button>
             </div>
           </div>

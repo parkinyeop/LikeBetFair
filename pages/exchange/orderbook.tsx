@@ -141,7 +141,7 @@ const OrderbookPage: React.FC = () => {
     
     // 🆕 주문 완료 이벤트 감지하여 즉시 새로고침
     const handleOrderPlaced = () => {
-      console.log('🔄 주문 완료 이벤트 감지, 전체 호가보기 새로고침');
+      console.log('🔄 주문 완료 이벤트 감지, 매치 페이지 새로고침');
       loadOrders();
     };
     
@@ -422,23 +422,31 @@ const OrderbookPage: React.FC = () => {
       {/* 헤더 */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white mb-1">전체 호가 현황</h1>
+          <h1 className="text-2xl font-bold text-white mb-1">📋 매치</h1>
           <p className="text-gray-300 text-sm">실시간 거래소 주문 현황을 확인하세요</p>
         </div>
-        <div className="flex items-center space-x-3">
+        {/* 3개 탭 네비게이션 */}
+        <div className="flex items-center space-x-2">
           <button
             onClick={() => router.push('/exchange')}
-            className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors flex items-center space-x-1"
+            className="px-4 py-2 bg-blue-700 text-white text-sm rounded-lg font-medium hover:bg-blue-500 hover:shadow-lg transition-all flex items-center space-x-2 opacity-70 hover:opacity-100"
           >
-            <span>←</span>
-            <span>홈으로 돌아가기</span>
+            <span>🏠</span>
+            <span>배팅</span>
           </button>
           <button
             onClick={() => router.push('/exchange/live-odds')}
-            className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors flex items-center space-x-1"
+            className="px-4 py-2 bg-green-700 text-white text-sm rounded-lg font-medium hover:bg-green-500 hover:shadow-lg transition-all flex items-center space-x-2 opacity-70 hover:opacity-100"
           >
             <span>📊</span>
-            <span>실시간 호가 현황</span>
+            <span>주문현황</span>
+          </button>
+          <button
+            disabled
+            className="px-4 py-2 bg-pink-600 text-white text-sm rounded-lg font-medium shadow-lg cursor-not-allowed flex items-center space-x-2 ring-2 ring-pink-400"
+          >
+            <span>📋</span>
+            <span>매치</span>
           </button>
         </div>
       </div>
