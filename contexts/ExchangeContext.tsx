@@ -291,6 +291,13 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
     // 사이드바 탭을 주문하기로 전환
     setSidebarActiveTab('order');
     
+    // 🆕 전역 이벤트 발생으로 Layout의 사이드바 탭도 동기화
+    window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', { 
+      detail: { tab: 'order' } 
+    }));
+    
+    console.log('🔄 매칭 모드 활성화: 사이드바를 주문하기 탭으로 전환');
+    
     // 매칭 정보로 selectedBet 자동 설정
     const matchType = targetOrder.type === 'back' ? 'lay' : 'back';
     const matchOdds = targetOrder.odds;

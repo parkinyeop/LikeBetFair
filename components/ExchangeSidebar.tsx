@@ -407,13 +407,16 @@ function OrderPanel() {
             <div className="space-y-3 mb-4">
               {multiBetSelections.map((selection, index) => (
                 <div key={index} className="bg-gray-50 p-3 rounded border border-gray-200 relative">
-                  <button
-                    onClick={() => removeMultiBetSelection(selection.gameId, selection.market, selection.selection)}
-                    className="absolute top-2 right-2 text-red-600 hover:text-red-800 text-sm font-medium underline"
-                    title="개별 삭제"
-                  >
-                    삭제
-                  </button>
+                  {/* 매칭 모드가 아닐 때만 삭제 버튼 표시 */}
+                  {!isMatchMode && (
+                    <button
+                      onClick={() => removeMultiBetSelection(selection.gameId, selection.market, selection.selection)}
+                      className="absolute top-2 right-2 text-red-600 hover:text-red-800 text-sm font-medium underline"
+                      title="개별 삭제"
+                    >
+                      삭제
+                    </button>
+                  )}
                   <div className="text-sm font-medium text-gray-900 mb-1 pr-6">
                     {selection.homeTeam} vs {selection.awayTeam}
                   </div>
@@ -490,12 +493,12 @@ function OrderPanel() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-700">배팅 금액:</span>
-                        <span className="font-bold text-gray-800">{form.amount.toLocaleString()} KRW</span>
+                        <span className="font-bold text-gray-800">{Math.floor(form.amount).toLocaleString()} KRW</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-700">예상 수익:</span>
                         <span className="font-bold text-green-600">
-                          {calculateMatchOrderProfit() > 0 ? `${calculateMatchOrderProfit().toLocaleString()}` : '0'} KRW
+                          {calculateMatchOrderProfit() > 0 ? `${Math.floor(calculateMatchOrderProfit()).toLocaleString()}` : '0'} KRW
                         </span>
                       </div>
                       {selectedBet?.type === 'lay' && (

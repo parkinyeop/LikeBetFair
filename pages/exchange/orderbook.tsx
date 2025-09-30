@@ -153,7 +153,7 @@ const OrderbookPage: React.FC = () => {
     };
   }, [fetchAllOpenOrders]);
 
-  // 매치 배팅 처리 함수 - 오른쪽 사이드 주문하기 UI 사용
+  // 매치 배팅 처리 함수 - Exchange 홈으로 리다이렉트하여 사이드바 주문하기 UI 사용
   const handleMatchBet = (orderId: string) => {
     try {
       // 해당 주문 찾기
@@ -181,7 +181,7 @@ const OrderbookPage: React.FC = () => {
         return;
       }
       
-      // 매칭 모드 활성화하여 오른쪽 사이드 주문하기 UI 사용
+      // 매칭 모드 활성화
       const matchTargetOrder: MatchTargetOrder = {
         id: targetOrder.id.toString(),
         type: targetOrder.type as 'back' | 'lay',
@@ -199,6 +199,8 @@ const OrderbookPage: React.FC = () => {
       };
       
       activateMatchMode(matchTargetOrder);
+      
+      console.log('🔄 매치 버튼 클릭: 매칭 모드 활성화 완료');
       
     } catch (error) {
       console.error('매치 배팅 모드 활성화 실패:', error);
