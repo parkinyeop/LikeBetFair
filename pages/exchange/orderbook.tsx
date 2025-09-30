@@ -58,7 +58,6 @@ const OrderbookPage: React.FC = () => {
     if (router.query.search) {
       const searchFromUrl = decodeURIComponent(router.query.search as string);
       setSearchTerm(searchFromUrl);
-      console.log('🔍 URL에서 검색어 설정:', searchFromUrl);
     }
   }, [router.query.search]);
   
@@ -141,7 +140,6 @@ const OrderbookPage: React.FC = () => {
     
     // 🆕 주문 완료 이벤트 감지하여 즉시 새로고침
     const handleOrderPlaced = () => {
-      console.log('🔄 주문 완료 이벤트 감지, 매치 페이지 새로고침');
       loadOrders();
     };
     
@@ -199,8 +197,6 @@ const OrderbookPage: React.FC = () => {
       };
       
       activateMatchMode(matchTargetOrder);
-      
-      console.log('🔄 매치 버튼 클릭: 매칭 모드 활성화 완료');
       
     } catch (error) {
       console.error('매치 배팅 모드 활성화 실패:', error);
@@ -367,25 +363,41 @@ const OrderbookPage: React.FC = () => {
       
       if (filter !== 'all' && order.type !== filter) return false;
       if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
+        const searchLower = searchTerm.toLowerCase().trim();
+        
+        // 🆕 개선된 검색: 공백으로 구분된 각 단어를 개별 검색
+        const searchWords = searchLower.split(/\s+/).filter(word => word.length > 0);
+        
+        // 검색 대상 텍스트들을 하나의 문자열로 결합
+        const getSearchableText = (homeTeam?: string, awayTeam?: string, selection?: string, sportKey?: string) => {
+          return [homeTeam, awayTeam, selection, sportKey]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+        };
         
         // 🆕 멀티배팅 주문의 경우 selectionDetails.selections 내의 모든 경기 검색
         if (order.isMultibet && order.selectionDetails?.selections) {
-          return order.selectionDetails.selections.some((selection: any) => 
-            selection.homeTeam?.toLowerCase().includes(searchLower) ||
-            selection.awayTeam?.toLowerCase().includes(searchLower) ||
-            selection.team?.toLowerCase().includes(searchLower) ||
-            selection.selection?.toLowerCase().includes(searchLower)
-          );
+          return order.selectionDetails.selections.some((selection: any) => {
+            const searchableText = getSearchableText(
+              selection.homeTeam,
+              selection.awayTeam,
+              selection.team || selection.selection,
+              ''
+            );
+            return searchWords.every(word => searchableText.includes(word));
+          });
         }
         
-        // 일반 주문의 경우 기존 로직 사용
-        return (
-          order.homeTeam?.toLowerCase().includes(searchLower) ||
-          order.awayTeam?.toLowerCase().includes(searchLower) ||
-          order.selection?.toLowerCase().includes(searchLower) ||
-          order.sportKey?.toLowerCase().includes(searchLower)
+        // 일반 주문의 경우
+        const searchableText = getSearchableText(
+          order.homeTeam,
+          order.awayTeam,
+          order.selection,
+          order.sportKey
         );
+        
+        return searchWords.every(word => searchableText.includes(word));
       }
       return true;
     })
