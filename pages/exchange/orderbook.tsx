@@ -546,13 +546,36 @@ const OrderbookPage: React.FC = () => {
                 <>
                   {/* 헤더 */}
                   <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-yellow-200 text-yellow-900">
-                        🎯 멀티배팅 #{order.id}
-                      </span>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
-                        {order.status === 'open' || order.status === 'partially_matched' ? '진행중' : order.status === 'matched' ? '체결됨' : order.status === 'cancelled' ? '취소됨' : '정산됨'}
-                      </span>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-yellow-200 text-yellow-900">
+                          🎯 멀티배팅 #{order.id}
+                        </span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                          {order.status === 'open' || order.status === 'partially_matched' ? '진행중' : order.status === 'matched' ? '체결됨' : order.status === 'cancelled' ? '취소됨' : '정산됨'}
+                        </span>
+                      </div>
+                      {/* 🆕 가장 빠른 경기 시간 표시 */}
+                      {(() => {
+                        const legs = normalizeSelectionDetails(order.selectionDetails);
+                        const earliestTime = legs
+                          .map((leg: any) => leg.commenceTime)
+                          .filter(Boolean)
+                          .sort()[0];
+                        if (earliestTime) {
+                          return (
+                            <div className="text-xs text-gray-600 mt-1">
+                              ⏰ {formatRemainingTime(earliestTime)} • {new Date(earliestTime).toLocaleString('ko-KR', {
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-semibold text-gray-700">{formatCurrency(order.displayAmount || order.amount)}원</div>
@@ -585,6 +608,17 @@ const OrderbookPage: React.FC = () => {
                           {(leg?.homeTeam && leg?.awayTeam) ? `${leg.homeTeam} vs ${leg.awayTeam}` : (leg?.match || '')}
                           {leg?.odds ? ` • @${Number(leg.odds).toFixed(2)}` : ''}
                         </div>
+                        {/* 🆕 각 경기의 시간 표시 */}
+                        {leg?.commenceTime && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            ⏰ {formatRemainingTime(leg.commenceTime)} • {new Date(leg.commenceTime).toLocaleString('ko-KR', {
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -851,17 +885,33 @@ const OrderbookPage: React.FC = () => {
               </div>
               
               {/* 🆕 멀티배팅 선택 상세 */}
-              {selectedOrderDetail.isMultibet && selectedOrderDetail.selectionDetails && Array.isArray(selectedOrderDetail.selectionDetails) && (
+              {selectedOrderDetail.isMultibet && selectedOrderDetail.selectionDetails && (
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <h4 className="font-semibold text-gray-800 mb-2">🧩 멀티배팅 레그</h4>
-                  <div className="space-y-2 text-sm">
-                    {selectedOrderDetail.selectionDetails.map((leg: any, idx: number) => (
-                      <div key={idx} className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded">
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-800">{leg.teamName || leg.selection || `선택 ${idx + 1}`}</div>
-                          <div className="text-xs text-gray-500">{leg.marketType || leg.market} {leg.point ? `(${leg.point})` : ''}</div>
+                  <div className="space-y-3 text-sm">
+                    {normalizeSelectionDetails(selectedOrderDetail.selectionDetails).map((leg: any, idx: number) => (
+                      <div key={idx} className="p-3 bg-white border border-gray-200 rounded">
+                        <div className="font-medium text-gray-800 mb-1">{leg.teamName || leg.selection || `선택 ${idx + 1}`}</div>
+                        <div className="text-xs text-gray-600">
+                          {(leg?.homeTeam && leg?.awayTeam) ? `${leg.homeTeam} vs ${leg.awayTeam}` : (leg?.match || '')}
                         </div>
-                        <div className="text-right text-xs text-gray-600">@ {leg.odds ? Number(leg.odds).toFixed(2) : '-'}</div>
+                        <div className="flex items-center justify-between mt-2">
+                          <div className="text-xs text-gray-500">
+                            {leg.marketType || leg.market} {leg.point ? `(${leg.point})` : ''}
+                          </div>
+                          <div className="text-xs text-blue-600 font-semibold">@ {leg.odds ? Number(leg.odds).toFixed(2) : '-'}</div>
+                        </div>
+                        {/* 🆕 각 경기의 시간 표시 */}
+                        {leg?.commenceTime && (
+                          <div className="text-xs text-gray-500 mt-2">
+                            ⏰ {formatRemainingTime(leg.commenceTime)} • {new Date(leg.commenceTime).toLocaleString('ko-KR', {
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
