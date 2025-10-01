@@ -1,6 +1,20 @@
 // 정규화 및 매핑 유틸 함수 모듈
 
 /**
+ * Accent(diacritic) 문자를 기본 ASCII 문자로 변환
+ * NFD 정규화 + Combining Diacritical Marks 제거
+ * @param {string} str - 변환할 문자열
+ * @returns {string} Accent가 제거된 문자열
+ */
+function normalizeAccents(str) {
+  if (!str) return '';
+  
+  // NFD (Canonical Decomposition) 정규화 후 Combining Diacritical Marks 제거
+  // 예: "São" → "Sa\u0303o" → "Sao"
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+/**
  * 팀명 정규화: 영문/숫자/한글만 남기고, 공백 및 특수문자 제거, 소문자 변환
  * 아르헨티나 프리메라 디비시온 팀명을 고려한 개선된 정규화
  */
@@ -360,16 +374,33 @@ const globalTeamMapping = {
 function normalizeTeamNameForComparison(team) {
   if (!team) return '';
   
-  let normalized = team
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9가-힣]/g, '')
-    .replace(/\s+/g, '');
+  // 1. Accent 정규화 (NFD → ASCII 변환)
+  let normalized = normalizeAccents(team);
   
-  // 북메이커 접미사 제거 (FanDuel, DraftKings, BetRivers 등)
+  // 2. 소문자 변환 및 trim
+  normalized = normalized.toLowerCase().trim();
+  
+  // 3. 지역 접미사 제거 (⚠️ 공백이 있을 때 동작)
+  // 예: "Bragantino SP" → "Bragantino"
+  normalized = normalized
+    .replace(/[-\s](sp|rj|mg|ba|rs|pr|ce|pe)$/i, '')  // 브라질 주 약어
+    .replace(/\s+(ba|cordoba|sanjuan|tucuman|plata|buenos\s*aires)$/i, '');  // 아르헨티나 지역
+  
+  // 4. 확장명 제거 (⚠️ 공백이 있을 때 동작)
+  // 예: "Sport Club do Recife" → "Sport Recife"
+  normalized = normalized
+    .replace(/\b(club|clube|fc|sc|cf|ac)\b/gi, '')
+    .replace(/\b(do|de|da|del|la|el|los|las)\b/gi, '');
+  
+  // 5. 모든 공백 및 특수문자 제거 (⚠️ 반드시 마지막에)
+  normalized = normalized
+    .replace(/\s+/g, '')              // 공백 제거
+    .replace(/[^a-z0-9가-힣]/g, '');  // 특수문자 제거
+  
+  // 6. 북메이커 접미사 제거
   normalized = normalized.replace(/(fanduel|draftkings|betrivers)$/i, '');
   
-  // 글로벌 팀명 매핑 적용
+  // 7. 글로벌 팀명 매핑 적용
   if (globalTeamMapping[normalized]) {
     normalized = globalTeamMapping[normalized];
   }
@@ -655,6 +686,7 @@ function findBestTeamMatch(targetTeam, candidateTeams, threshold = 0.8) {
 }
 
 export {
+  normalizeAccents,
   normalizeTeamName,
   normalizeTeamNameForComparison,
   normalizeCategory,

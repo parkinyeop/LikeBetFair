@@ -73,7 +73,9 @@ import exchangeRoutes from './routes/exchange.js';
 import exchangeMultibetRoutes from './routes/exchangeMultibetRoutes.js';
 import manualGameResultRoutes from './routes/manualGameResult.js';
 
-
+// 🆕 정산 스케줄러 활성화
+import './jobs/settlementScheduler.js';
+console.log('✅ [Server] 정산 스케줄러가 로드되었습니다.');
 
 const app = express();
 

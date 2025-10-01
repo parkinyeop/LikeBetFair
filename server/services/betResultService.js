@@ -177,9 +177,10 @@ class BetResultService {
       const candidateGames = await GameResult.findAll({
         where: {
           commenceTime: {
-            [Op.gte]: new Date(commenceTime.getTime() - 24 * 60 * 60 * 1000), // 1일 전
-            [Op.lte]: new Date(commenceTime.getTime() + 24 * 60 * 60 * 1000)  // 1일 후
-          }
+            [Op.gte]: new Date(commenceTime.getTime() - 48 * 60 * 60 * 1000), // ✅ 2일 전
+            [Op.lte]: new Date(commenceTime.getTime() + 48 * 60 * 60 * 1000)  // ✅ 2일 후
+          },
+          status: { [Op.in]: ['finished', 'cancelled', 'postponed'] } // ✅ 검색 효율 개선
         },
         order: [['createdAt', 'DESC']]
       });
@@ -248,7 +249,14 @@ class BetResultService {
           console.error(`   - 베팅 팀: ${homeTeam} vs ${awayTeam}`);
           console.error(`   - 정규화된 팀명: ${normalizedHomeTeam} vs ${normalizedAwayTeam}`);
           console.error(`   - 베팅 시간: ${commenceTime.toISOString()}`);
-          console.error(`   - 검색 시간 범위: ${new Date(commenceTime.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()} ~ ${new Date(commenceTime.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()}`);
+          console.error(`   - 검색 시간 범위: ${new Date(commenceTime.getTime() - 48 * 60 * 60 * 1000).toISOString()} ~ ${new Date(commenceTime.getTime() + 48 * 60 * 60 * 1000).toISOString()}`);
+          console.error(`   - 후보 경기 수: ${candidateGames.length}개`);
+          if (candidateGames.length > 0) {
+            console.error(`   - 후보 경기 목록:`);
+            candidateGames.slice(0, 5).forEach((cg, idx) => {
+              console.error(`     ${idx + 1}. ${cg.homeTeam} vs ${cg.awayTeam} (${cg.commenceTime.toISOString()})`);
+            });
+          }
           
           // 매칭 실패 시, 원인 추적을 위해 유사한 경기들을 검색하여 로그에 남김
           try {
@@ -731,6 +739,42 @@ class BetResultService {
       return 'cancelled';
     }
 
+    // ✅ status가 finished이고 스코어가 있으면 result 필드를 무시하고 스코어로 직접 계산
+    if (gameResult.status === 'finished' && gameResult.score && Array.isArray(gameResult.score) && gameResult.score.length >= 2) {
+      const homeScoreData = gameResult.score.find(s => s.name === gameResult.homeTeam);
+      const awayScoreData = gameResult.score.find(s => s.name === gameResult.awayTeam);
+      
+      if (homeScoreData && awayScoreData) {
+        const homeScore = parseInt(homeScoreData.score);
+        const awayScore = parseInt(awayScoreData.score);
+        
+        if (!isNaN(homeScore) && !isNaN(awayScore)) {
+          const selectedTeam = normalizeTeamNameForComparison(selection.team);
+          const homeTeam = normalizeTeamNameForComparison(gameResult.homeTeam);
+          const awayTeam = normalizeTeamNameForComparison(gameResult.awayTeam);
+          
+          console.log(`[승/패 판정 - 스코어 기반] ${gameResult.homeTeam} ${homeScore}-${awayScore} ${gameResult.awayTeam}`);
+          
+          if (homeScore > awayScore) {
+            const result = selectedTeam === homeTeam ? 'won' : 'lost';
+            console.log(`[승/패 판정] 홈 승리 → ${selection.team} = ${result}`);
+            return result;
+          } else if (awayScore > homeScore) {
+            const result = selectedTeam === awayTeam ? 'won' : 'lost';
+            console.log(`[승/패 판정] 원정 승리 → ${selection.team} = ${result}`);
+            return result;
+          } else {
+            // ✅ 무승부: Draw 선택했으면 won, 아니면 lost
+            const isDraw = selection.team.toLowerCase() === 'draw';
+            const result = isDraw ? 'won' : 'lost';
+            console.log(`[승/패 판정] 무승부 (${homeScore}-${awayScore}) → ${selection.team} (Draw 선택: ${isDraw}) = ${result}`);
+            return result;
+          }
+        }
+      }
+    }
+
+    // result 필드가 있으면 사용 (하위 호환성)
     if (gameResult.result === 'pending') {
       return 'pending';
     }
@@ -746,8 +790,9 @@ class BetResultService {
     } else if (gameResultData === 'away_win') {
       return selectedTeam === awayTeam ? 'won' : 'lost';
     } else if (gameResultData === 'draw') {
-      // 무승부: 승/패 선택 모두 실패 (베팅에서는 lost 처리)
-      return 'lost';
+      // ✅ 무승부: Draw 선택했으면 won, 아니면 lost
+      const isDraw = selection.team.toLowerCase() === 'draw';
+      return isDraw ? 'won' : 'lost';
     }
 
     return 'pending';
@@ -761,8 +806,11 @@ class BetResultService {
       return 'cancelled';
     }
 
-    if (gameResult.result === 'pending') {
-      return 'pending';
+    // ✅ status가 finished가 아니거나 스코어가 없으면 pending
+    if (gameResult.status !== 'finished' || !gameResult.score || !Array.isArray(gameResult.score) || gameResult.score.length < 2) {
+      if (gameResult.result === 'pending') {
+        return 'pending';
+      }
     }
 
     // robust하게 옵션 추출 (예: 'Overbet365', 'UnderPinnacle', 'Over 2.5' 등)
@@ -827,8 +875,11 @@ class BetResultService {
       return 'cancelled';
     }
 
-    if (gameResult.result === 'pending') {
-      return 'pending';
+    // ✅ status가 finished가 아니거나 스코어가 없으면 pending
+    if (gameResult.status !== 'finished' || !gameResult.score || !Array.isArray(gameResult.score) || gameResult.score.length < 2) {
+      if (gameResult.result === 'pending') {
+        return 'pending';
+      }
     }
 
     // 핸디캡 베팅에서 팀명과 핸디캡 분리 (개선된 로직)

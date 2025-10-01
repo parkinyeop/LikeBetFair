@@ -41,7 +41,8 @@ const clientSportKeyMap = {
   'SerieA': 'soccer_italy_serie_a',
   'Ligue1': 'soccer_france_ligue_1',
   'JLeague': 'soccer_japan_j_league',
-  'ArgentinaPrimera': 'soccer_argentina_primera_division'
+  'ArgentinaPrimera': 'soccer_argentina_primera_division',
+  'Brasileirao': 'soccer_brazil_campeonato'  // ✅ 첫 글자만 대문자 추가
 };
 
 // TheSportsDB 리그ID 매핑 (sportKey 기준, 반드시 clientSportKeyMap 값과 일치)
@@ -300,10 +301,11 @@ class GameResultService {
   }
 
   /**
-   * 북미 리그 여부 판단
+   * 시즌 기반 리그 여부 판단 (eventsseason.php 사용)
+   * 북미 리그 + 남미 리그 포함
    */
   isNorthAmericanLeague(sportKey) {
-    const northAmericanLeagues = [
+    const seasonBasedLeagues = [
       'soccer_usa_mls',           // MLS
       'baseball_mlb',             // MLB
       'basketball_nba',           // NBA
@@ -311,9 +313,11 @@ class GameResultService {
       'americanfootball_nfl',     // NFL
       'americanfootball_ncaaf',   // NCAAF
       'icehockey_nhl',            // NHL
-      'baseball_kbo'              // KBO (한국도 단일 연도 시즌)
+      'baseball_kbo',             // KBO (한국도 단일 연도 시즌)
+      'soccer_brazil_campeonato', // ✅ 브라질 세리에 A (시즌 기반)
+      'soccer_argentina_primera_division' // ✅ 아르헨티나 프리메라 (시즌 기반)
     ];
-    return northAmericanLeagues.includes(sportKey);
+    return seasonBasedLeagues.includes(sportKey);
   }
 
   /**
