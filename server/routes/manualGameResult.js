@@ -1,5 +1,5 @@
 import express from 'express';
-import { GameResult, ExchangeOrder } from '../models/index.js';
+import { GameResult, ExchangeOrder, Bet } from '../models/index.js';
 import { Op } from 'sequelize';
 
 const router = express.Router();
@@ -10,17 +10,46 @@ const router = express.Router();
  */
 router.post('/manual-game-result', async (req, res) => {
   try {
-    const { orderId, gameResults } = req.body;
-    
-    if (!orderId || !gameResults || !Array.isArray(gameResults)) {
+    const { orderId, betId, gameResults } = req.body;
+
+    if ((!orderId && !betId) || !gameResults || !Array.isArray(gameResults)) {
       return res.status(400).json({
         success: false,
-        message: '주문 ID와 경기 결과 데이터가 필요합니다'
+        message: '주문/베팅 ID와 경기 결과 데이터가 필요합니다'
       });
     }
 
-    console.log(`🔧 수동 경기 결과 입력 시작 - 주문 ID: ${orderId}`);
+    const targetId = orderId || betId;
+    const targetType = orderId ? 'exchange' : 'sportsbook';
+
+    console.log(`🔧 수동 경기 결과 입력 시작 - ${targetType === 'exchange' ? 'Exchange 주문' : '스포츠북 베팅'} ID: ${targetId}`);
     console.log(`📊 입력할 경기 수: ${gameResults.length}개`);
+
+    // ID 유효성 검증
+    try {
+      if (targetType === 'exchange') {
+        const order = await ExchangeOrder.findByPk(targetId);
+        if (!order) {
+          return res.status(404).json({
+            success: false,
+            message: '제공된 orderId에 해당하는 Exchange 주문을 찾을 수 없습니다.'
+          });
+        }
+      } else {
+        const bet = await Bet.findByPk(targetId);
+        if (!bet) {
+          return res.status(404).json({
+            success: false,
+            message: '제공된 betId에 해당하는 스포츠북 베팅을 찾을 수 없습니다.'
+          });
+        }
+      }
+    } catch (validationError) {
+      return res.status(500).json({
+        success: false,
+        message: `ID 검증 중 오류 발생: ${validationError.message}`
+      });
+    }
 
     const savedGames = [];
     const errors = [];
@@ -48,9 +77,12 @@ router.post('/manual-game-result', async (req, res) => {
             homeTeam: gameData.homeTeam,
             awayTeam: gameData.awayTeam,
             commenceTime: new Date(gameData.commenceTime),
-            score: `${gameData.homeScore || 0}-${gameData.awayScore || 0}`,
+            score: JSON.stringify([
+              { name: gameData.homeTeam, score: String(gameData.homeScore || 0) },
+              { name: gameData.awayTeam, score: String(gameData.awayScore || 0) }
+            ]),
             status: gameData.status || 'pending',
-            result: gameData.result || null,
+            result: gameData.result || calculateGameResult(gameData.homeScore, gameData.awayScore),
             sportKey: 'soccer_argentina_primera_division',
             sportTitle: '아르헨티나 프리메라 디비시온',
             eventId: `manual_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -60,9 +92,12 @@ router.post('/manual-game-result', async (req, res) => {
         // 기존 경기인 경우 업데이트
         if (!created) {
           await gameResult.update({
-            score: `${gameData.homeScore || 0}-${gameData.awayScore || 0}`,
+            score: JSON.stringify([
+              { name: gameData.homeTeam, score: String(gameData.homeScore || 0) },
+              { name: gameData.awayTeam, score: String(gameData.awayScore || 0) }
+            ]),
             status: gameData.status || 'pending',
-            result: gameData.result || null,
+            result: gameData.result || calculateGameResult(gameData.homeScore, gameData.awayScore),
             updatedAt: new Date()
           });
           console.log(`🔄 기존 경기 업데이트: ${gameData.homeTeam} vs ${gameData.awayTeam}`);
@@ -91,38 +126,19 @@ router.post('/manual-game-result', async (req, res) => {
       }
     }
 
-    // 주문 상태 업데이트 (모든 경기가 완료된 경우)
-    let orderStatus = 'pending';
-    if (savedGames.length > 0 && errors.length === 0) {
-      try {
-        const order = await ExchangeOrder.findByPk(orderId);
-        if (order) {
-          // 모든 경기가 완료된 경우 정산 가능 상태로 변경
-          const allGamesFinished = savedGames.every(game => game.status === 'finished');
-          if (allGamesFinished) {
-            await order.update({
-              status: 'settled',
-              updatedAt: new Date()
-            });
-            orderStatus = 'settled';
-            console.log(`✅ 주문 ${orderId} 상태를 'settled'로 업데이트`);
-          }
-        }
-      } catch (error) {
-        console.error(`❌ 주문 상태 업데이트 실패:`, error.message);
-      }
-    }
+    console.log(`✅ GameResult 저장 완료. 정산 스케줄러가 자동으로 처리합니다.`);
 
     // 응답 반환
     res.json({
       success: true,
-      message: `경기 결과가 성공적으로 저장되었습니다 (성공: ${savedGames.length}개, 실패: ${errors.length}개)`,
+      message: `경기 결과가 성공적으로 저장되었습니다. 정산은 자동으로 처리됩니다. (성공: ${savedGames.length}개, 실패: ${errors.length}개)`,
       data: {
-        orderId: orderId,
+        targetId: targetId,
+        targetType: targetType,
         savedGames: savedGames,
         errors: errors,
-        orderStatus: orderStatus,
-        totalProcessed: gameResults.length
+        totalProcessed: gameResults.length,
+        note: '정산 스케줄러가 자동으로 처리합니다'
       }
     });
 
@@ -203,5 +219,20 @@ router.get('/order-game-results/:orderId', async (req, res) => {
     });
   }
 });
+
+/**
+ * 경기 결과 계산 함수
+ * @param {number} homeScore - 홈팀 스코어
+ * @param {number} awayScore - 어웨이팀 스코어
+ * @returns {string} 경기 결과 ('home_win', 'away_win', 'draw')
+ */
+function calculateGameResult(homeScore, awayScore) {
+  const home = parseInt(homeScore) || 0;
+  const away = parseInt(awayScore) || 0;
+
+  if (home > away) return 'home_win';
+  if (away > home) return 'away_win';
+  return 'draw';
+}
 
 export default router;

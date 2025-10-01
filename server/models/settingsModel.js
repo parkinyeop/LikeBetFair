@@ -36,3 +36,5 @@ const Settings = sequelize.define('Settings', {
 
 export default Settings;
 
+
+

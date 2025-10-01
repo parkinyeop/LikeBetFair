@@ -642,12 +642,53 @@ class ExchangeSettlementService {
   }
 
   /**
+   * 스코어 데이터 정규화 (다양한 형식 처리)
+   */
+  normalizeScore(scoreData) {
+    if (!scoreData) return null;
+
+    // 이미 배열인 경우
+    if (Array.isArray(scoreData)) {
+      return scoreData;
+    }
+
+    // 문자열인 경우 파싱 시도
+    if (typeof scoreData === 'string') {
+      try {
+        // 이중 이스케이프 처리
+        let normalized = scoreData;
+
+        // 외부 따옴표 제거 (이중 이스케이프의 경우)
+        if (normalized.startsWith('"') && normalized.endsWith('"')) {
+          normalized = normalized.slice(1, -1);
+        }
+
+        // 이스케이프 문자 정규화
+        normalized = normalized.replace(/\\"/g, '"');
+
+        // JSON 파싱
+        const parsed = JSON.parse(normalized);
+
+        if (Array.isArray(parsed) && parsed.length >= 2) {
+          return parsed;
+        }
+      } catch (error) {
+        console.warn('⚠️ 스코어 파싱 실패:', error.message, scoreData);
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * 핸디캡(Spread) 베팅 판정
    */
   determineSpreadWinner(order, gameResult) {
     const { line, selection } = order;
-    const { score, homeTeam } = gameResult;
-    
+    const { homeTeam } = gameResult;
+
+    const score = this.normalizeScore(gameResult.score);
+
     if (!score || !Array.isArray(score) || score.length < 2) {
       console.warn('⚠️ 스코어 정보가 부족하여 핸디캡 판정 불가');
       return false;
@@ -675,13 +716,14 @@ class ExchangeSettlementService {
    */
   determineTotalWinner(order, gameResult) {
     const { line, selection } = order;
-    const { score } = gameResult;
-    
+
+    const score = this.normalizeScore(gameResult.score);
+
     if (!score || !Array.isArray(score) || score.length < 2) {
       console.warn('⚠️ 스코어 정보가 부족하여 토탈 판정 불가');
       return false;
     }
-    
+
     const homeScore = parseInt(score[0].score) || 0;
     const awayScore = parseInt(score[1].score) || 0;
     const totalScore = homeScore + awayScore;

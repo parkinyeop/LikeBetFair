@@ -42,6 +42,23 @@ server/check-*.js
 server/analyze-*.js
 backup_*.sql
 
+# 9. 스크립트 테스트 파일들
+server/scripts/archive/
+server/scripts/test*.js
+server/scripts/check*.js
+server/scripts/explore*.js
+server/scripts/get*.js
+server/scripts/manual*.js
+server/scripts/run*.js
+server/scripts/analyze*.js
+
+# 10. 테스트 데이터 파일들
+server/data/test_archive/
+server/data/*_test_*.json
+server/data/*_sample*.json
+server/data/alternative_*.json
+server/data/mapping_*.md
+
 # 9. 개발 도구 및 SDK
 gemini/
 google-cloud-sdk/

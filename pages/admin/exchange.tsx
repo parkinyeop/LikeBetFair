@@ -669,7 +669,7 @@ export default function ExchangeAdmin() {
         };
       }) || [];
 
-      const response = await fetch('/api/admin/manual-game-result', {
+      const response = await fetch(buildApiUrl('/api/admin/manual-game-result'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2576,9 +2576,15 @@ export default function ExchangeAdmin() {
                               {(() => {
                                 const hasMissingResults = selectedOrder.selectionDetails.selections.some((selection, index) => {
                                   const gameKey = selection.homeTeam + ' vs ' + selection.awayTeam;
-                                  return !selectedOrder.gameResults || !selectedOrder.gameResults[gameKey] || 
-                                         !selectedOrder.gameResults[gameKey].status || 
-                                         selectedOrder.gameResults[gameKey].status === 'pending';
+                                  const gameResult = selectedOrder.gameResults?.[gameKey];
+                                  
+                                  // 🆕 경기 결과가 없거나, result가 없거나, score가 N/A이거나, status가 pending인 경우
+                                  return !gameResult || 
+                                         !gameResult.result || 
+                                         !gameResult.score || 
+                                         gameResult.score === 'N/A' ||
+                                         !gameResult.status || 
+                                         gameResult.status === 'pending';
                                 });
                                 
                                 return hasMissingResults ? (
@@ -2604,6 +2610,12 @@ export default function ExchangeAdmin() {
                                   }
                                   
                                   const gameResult = selectedOrder.gameResults[selection.homeTeam + ' vs ' + selection.awayTeam];
+                                  
+                                  // 🆕 경기 결과가 아직 없는 경우 (score가 N/A이거나 result가 없는 경우)
+                                  if (!gameResult.result || gameResult.score === 'N/A' || !gameResult.score) {
+                                    return { status: 'pending', result: '경기 결과 대기중', color: 'bg-yellow-100 text-yellow-800' };
+                                  }
+                                  
                                   const isHomeWin = gameResult.result === 'home_win';
                                   const isAwayWin = gameResult.result === 'away_win';
                                   const isDraw = gameResult.result === 'draw';

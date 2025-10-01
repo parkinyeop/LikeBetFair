@@ -2,6 +2,7 @@ import { buildApiUrl } from '../../config/apiConfig';
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
+import { toast } from 'react-hot-toast';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -381,6 +382,10 @@ export default function BettingAdmin() {
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   
+  // 🆕 수동 경기 결과 입력 관련 상태
+  const [showManualInputModal, setShowManualInputModal] = useState(false);
+  const [manualGameResults, setManualGameResults] = useState<any>({});
+  
   // 월별 필터 상태
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
@@ -409,6 +414,13 @@ export default function BettingAdmin() {
     }
   }, [selectedYear, selectedMonth, isLoggedIn, isAdmin]);
 
+  // 수동 입력 모달이 닫힐 때 데이터 새로고침
+  useEffect(() => {
+    if (isLoggedIn && isAdmin && !showManualInputModal) {
+      fetchBettingData();
+    }
+  }, [showManualInputModal, isLoggedIn, isAdmin]);
+
   // 인증 헤더 생성
   const getAuthHeaders = useCallback(() => {
     const tabId = sessionStorage.getItem('tabId');
@@ -423,6 +435,95 @@ export default function BettingAdmin() {
       'Content-Type': 'application/json'
     };
   }, []);
+
+  // 🆕 수동 경기 결과 입력 핸들러들
+  const handleManualScoreChange = useCallback((gameId: number, field: string, value: string) => {
+    setManualGameResults(prev => ({
+      ...prev,
+      [gameId]: {
+        ...prev[gameId],
+        [field]: value
+      }
+    }));
+  }, []);
+
+  const handleManualStatusChange = useCallback((gameId: number, status: string) => {
+    setManualGameResults(prev => ({
+      ...prev,
+      [gameId]: {
+        ...prev[gameId],
+        status: status,
+        result: status === 'finished' ? prev[gameId]?.result || '' : null
+      }
+    }));
+  }, []);
+
+  const handleManualResultChange = useCallback((gameId: number, result: string) => {
+    setManualGameResults(prev => ({
+      ...prev,
+      [gameId]: {
+        ...prev[gameId],
+        result: result
+      }
+    }));
+  }, []);
+
+  const handleManualInputSave = useCallback(async () => {
+    if (!selectedBet) return;
+
+    try {
+      const headers = getAuthHeaders();
+      
+      // 선택된 경기들에서 데이터 추출 (스포츠북 베팅용)
+      const gameResults = selectedBet.selections?.map((selection, index) => {
+        const gameId = index + 1;
+        const manualData = manualGameResults[gameId] || {};
+        
+        // desc에서 팀명 추출 (예: "LG Twins vs Doosan Bears")
+        const teams = selection.desc?.split(' vs ') || [];
+        const homeTeam = teams[0] || '';
+        const awayTeam = teams[1] || '';
+        
+        return {
+          gameId: gameId,
+          homeTeam: homeTeam,
+          awayTeam: awayTeam,
+          homeScore: parseInt(manualData.homeScore) || 0,
+          awayScore: parseInt(manualData.awayScore) || 0,
+          status: manualData.status || 'pending',
+          result: manualData.result || null,
+          commenceTime: selection.commence_time
+        };
+      }) || [];
+
+      const response = await fetch(buildApiUrl('/api/admin/manual-game-result'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers
+        },
+        body: JSON.stringify({
+          betId: selectedBet.id,
+          gameResults: gameResults
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        toast.success(result.message);
+        setShowManualInputModal(false);
+        setManualGameResults({});
+        
+        // 베팅 정보 새로고침 (모달 닫힌 후 자동으로 트리거됨)
+      } else {
+        const error = await response.json();
+        toast.error(error.message || '저장 중 오류가 발생했습니다');
+      }
+    } catch (error) {
+      console.error('수동 경기 결과 저장 오류:', error);
+      toast.error('저장 중 오류가 발생했습니다');
+    }
+  }, [selectedBet, manualGameResults, getAuthHeaders]);
 
   // 일별 통계 데이터
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
@@ -1668,26 +1769,65 @@ export default function BettingAdmin() {
                         <div className="bg-gray-50 p-4 rounded-lg">
                           <div className="flex justify-between items-center mb-3">
                             <h4 className="text-md font-semibold text-gray-900">선택된 경기들</h4>
-                            <span className="text-sm text-gray-500">{selectedBet.selections.length}개 선택</span>
+                            <div className="flex items-center space-x-3">
+                              <span className="text-sm text-gray-500">{selectedBet.selections.length}개 선택</span>
+                              {/* 🆕 경기 결과 수동 입력 버튼 */}
+                              {(() => {
+                                // 베팅이 이미 정산 완료된 경우 버튼/배지 모두 표시 안 함
+                                if (selectedBet.status === 'won' || selectedBet.status === 'lost' || selectedBet.status === 'cancelled') {
+                                  return null;
+                                }
+                                
+                                const hasMissingResults = selectedBet.selections.some((selection: any) => {
+                                  // 경기 결과가 없거나, pending이거나, gameResult가 없는 경우
+                                  if (!selection.result || selection.result === 'pending') {
+                                    return true;
+                                  }
+                                  
+                                  // gameResult 객체가 있는 경우 상세 검증
+                                  if (selection.gameResult) {
+                                    return !selection.gameResult.result || 
+                                           !selection.gameResult.score || 
+                                           selection.gameResult.score === 'N/A' ||
+                                           !selection.gameResult.status || 
+                                           selection.gameResult.status === 'pending';
+                                  }
+                                  
+                                  return false;
+                                });
+                                
+                                return hasMissingResults ? (
+                                  <button
+                                    onClick={() => setShowManualInputModal(true)}
+                                    className="px-3 py-1 bg-orange-600 text-white text-sm rounded-md hover:bg-orange-700 transition-colors"
+                                  >
+                                    경기 결과 수동 입력
+                                  </button>
+                                ) : (
+                                  <span className="px-3 py-1 bg-green-100 text-green-800 text-sm rounded-md">
+                                    모든 경기 결과 완료
+                                  </span>
+                                );
+                              })()}
+                            </div>
                           </div>
                           <div className="space-y-3">
                             {selectedBet.selections.map((selection, index) => {
-                              // 경기 결과 상태 결정
+                              // 경기 결과 상태 결정 - selection.result가 정산 시 저장된 최종 결과
                               const getGameResult = (selection) => {
+                                // selection.result가 없거나 pending이면 대기중
                                 if (!selection.result || selection.result === 'pending') {
                                   return { status: 'pending', result: '경기 결과 대기중', color: 'bg-yellow-100 text-yellow-800' };
                                 }
                                 
-                                const isWinner = selection.result === 'win';
-                                const isLoser = selection.result === 'lose';
-                                
-                                if (isWinner) {
+                                // selection.result로 승패 판정 (이미 정산 시 저장됨)
+                                if (selection.result === 'win') {
                                   return { 
                                     status: 'win', 
                                     result: `승리`, 
                                     color: 'bg-green-100 text-green-800' 
                                   };
-                                } else if (isLoser) {
+                                } else if (selection.result === 'lose') {
                                   return { 
                                     status: 'lose', 
                                     result: `패배`, 
@@ -1761,6 +1901,123 @@ export default function BettingAdmin() {
                           className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
                         >
                           닫기
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 🆕 수동 경기 결과 입력 모달 */}
+              {showManualInputModal && selectedBet && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                  <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+                    <div className="mt-3">
+                      {/* 모달 헤더 */}
+                      <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-lg font-medium text-gray-900">
+                          경기 결과 수동 입력 - 베팅 #{selectedBet.id}
+                        </h3>
+                        <button
+                          onClick={() => setShowManualInputModal(false)}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                          </svg>
+                        </button>
+                      </div>
+
+                      {/* 경기별 입력 폼 */}
+                      <div className="space-y-6">
+                        {selectedBet.selections.map((selection, index) => {
+                          const gameId = index + 1;
+                          const manualData = manualGameResults[gameId] || {};
+                          const teams = selection.desc?.split(' vs ') || [];
+                          const homeTeam = teams[0] || '';
+                          const awayTeam = teams[1] || '';
+                          
+                          return (
+                            <div key={gameId} className="border rounded-lg p-4 bg-gray-50">
+                              <h4 className="font-semibold text-lg mb-4">
+                                경기 {gameId}: {selection.desc}
+                              </h4>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    {homeTeam} 스코어
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={manualData.homeScore || ''}
+                                    onChange={(e) => handleManualScoreChange(gameId, 'homeScore', e.target.value)}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    {awayTeam} 스코어
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={manualData.awayScore || ''}
+                                    onChange={(e) => handleManualScoreChange(gameId, 'awayScore', e.target.value)}
+                                  />
+                                </div>
+                              </div>
+                              <div className="mt-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  경기 상태
+                                </label>
+                                <select
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  value={manualData.status || 'pending'}
+                                  onChange={(e) => handleManualStatusChange(gameId, e.target.value)}
+                                >
+                                  <option value="pending">대기중</option>
+                                  <option value="finished">완료</option>
+                                  <option value="cancelled">취소</option>
+                                  <option value="postponed">연기</option>
+                                </select>
+                              </div>
+                              {manualData.status === 'finished' && (
+                                <div className="mt-4">
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    경기 결과
+                                  </label>
+                                  <select
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={manualData.result || ''}
+                                    onChange={(e) => handleManualResultChange(gameId, e.target.value)}
+                                  >
+                                    <option value="">선택하세요</option>
+                                    <option value="home_win">홈팀 승리</option>
+                                    <option value="away_win">어웨이팀 승리</option>
+                                    <option value="draw">무승부</option>
+                                  </select>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* 액션 버튼 */}
+                      <div className="flex justify-end space-x-3 mt-6">
+                        <button
+                          onClick={() => setShowManualInputModal(false)}
+                          className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+                        >
+                          취소
+                        </button>
+                        <button
+                          onClick={handleManualInputSave}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                        >
+                          결과 저장
                         </button>
                       </div>
                     </div>
