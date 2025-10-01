@@ -4,6 +4,7 @@ import { useBetStore } from '../stores/useBetStore';
 import { normalizeTeamName } from '../server/normalizeUtils';
 import { convertUtcToLocal, getBettingStatus } from '../utils/timeUtils';
 import { useRouter } from "next/router";
+import HandicapOddsDisplay from './HandicapOddsDisplay';
 
 interface OddsListProps {
   sportKey: string;
@@ -571,136 +572,14 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
             {selectedMarketsForGame.has('Handicap') && (
               <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="text-sm font-medium text-blue-800 mb-2">🎯 핸디캡 (Handicap)</div>
-                {(() => {
-                  const spreadsOdds = game.officialOdds?.spreads || {};
-                  const spreadEntries = Object.entries(spreadsOdds);
-                  
-                  if (spreadEntries.length === 0) {
-                    return (
-                      <div className="text-center text-gray-500 py-3">
-                        핸디캡 배당 정보 없음
-                      </div>
-                    );
-                  }
-                  
-                  // Home/Away 쌍으로 그룹화 (팀명 기반 매칭)
-                  const groupedSpreads: { [absPoint: string]: { home?: { oddsData: any, handicap: number }, away?: { oddsData: any, handicap: number } } } = {};
-                  
-                  spreadEntries.forEach(([outcomeName, oddsData]) => {
-                    // "Team Point" 형식에서 팀명과 핸디캡 분리
-                    const parts = outcomeName.split(' ');
-                    const point = parts[parts.length - 1]; // 마지막 부분이 핸디캡
-                    const teamName = parts.slice(0, -1).join(' '); // 나머지가 팀명
-                    
-                    const handicapValue = parseFloat(point); // -1.5 또는 +1.5
-                    const absPoint = Math.abs(handicapValue).toString(); // "1.5"로 통일
-                    
-                    if (!groupedSpreads[absPoint]) groupedSpreads[absPoint] = {};
-                    
-                    // 홈팀인지 원정팀인지 판단
-                    if (teamName === game.home_team) {
-                      groupedSpreads[absPoint].home = { oddsData, handicap: handicapValue };
-                    } else if (teamName === game.away_team) {
-                      groupedSpreads[absPoint].away = { oddsData, handicap: handicapValue };
-                    }
-                  });
-                  
-                  // 0.5 단위 핸디캡만 필터링 (-1.5, -1, -0.5, 0.5, 1, 1.5 등)
-                  const filteredSpreads = Object.entries(groupedSpreads).filter(([absPoint, oddsPair]) => {
-                    const pointValue = Math.abs(parseFloat(absPoint));
-                    return pointValue % 0.5 === 0;
-                  });
-                  
-                  if (filteredSpreads.length === 0) {
-                    return (
-                      <div className="text-center text-gray-500 py-3">
-                        핸디캡 배당 정보 없음
-                      </div>
-                    );
-                  }
-                  
-                  return (
-                    <div className="space-y-2">
-                      {filteredSpreads.map(([absPoint, oddsPair]) => {
-                        const homeData = oddsPair.home;
-                        const awayData = oddsPair.away;
-                        
-                        const homeOdds = homeData?.oddsData?.averagePrice;
-                        const awayOdds = awayData?.oddsData?.averagePrice;
-                        const pointValue = parseFloat(absPoint);
-                        // API에서 제공하는 실제 핸디캡 값을 사용하도록 수정
-                        const homeHandicap = homeData?.handicap;
-                        const awayHandicap = awayData?.handicap;
-                        
-                        return (
-                          <div key={absPoint} className="flex items-center gap-2">
-                            {/* 홈팀을 왼쪽에 표시 */}
-                            {homeOdds != null && homeHandicap != null && (
-                              <button
-                                onClick={() => {
-                                  if (isBettable && homeOdds) {
-                                    toggleSelection({
-                                      team: `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`,
-                                      odds: homeOdds,
-                                      desc: `${game.home_team} vs ${game.away_team}`,
-                                      commence_time: game.commence_time,
-                                      market: 'Handicap',
-                                      gameId: game.id,
-                                      sport_key: game.sport_key,
-                                      // 실제 핸디캡 값을 point로 전달
-                                      point: homeHandicap
-                                    });
-                                    handleBettingAreaSelect();
-                                  }
-                                }}
-                                className={`flex-1 p-2 rounded-lg text-center transition-colors ${
-                                  isTeamSelected(`${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`, 'Handicap', game.id, homeHandicap)
-                                    ? 'bg-yellow-500 hover:bg-yellow-600'
-                                    : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
-                                } text-white text-sm`}
-                                disabled={!isBettable || !homeOdds}
-                              >
-                                <div className="font-medium">{game.home_team} {homeHandicap > 0 ? '+' : ''}{homeHandicap}</div>
-                                <div className="text-xs">{homeOdds.toFixed(2)}</div>
-                              </button>
-                            )}
-                            <div className="w-12 text-sm font-medium text-blue-700 text-center">{homeHandicap != null ? (homeHandicap > 0 ? '+' : '') + homeHandicap : pointValue}</div>
-                            {/* 원정팀을 오른쪽에 표시 */}
-                            {awayOdds != null && awayHandicap != null && (
-                              <button
-                                onClick={() => {
-                                  if (isBettable && awayOdds) {
-                                    toggleSelection({
-                                      team: `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`,
-                                      odds: awayOdds,
-                                      desc: `${game.home_team} vs ${game.away_team}`,
-                                      commence_time: game.commence_time,
-                                      market: 'Handicap',
-                                      gameId: game.id,
-                                      sport_key: game.sport_key,
-                                      // 실제 핸디캡 값을 point로 전달
-                                      point: awayHandicap
-                                    });
-                                    handleBettingAreaSelect();
-                                  }
-                                }}
-                                className={`flex-1 p-2 rounded-lg text-center transition-colors ${
-                                  isTeamSelected(`${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`, 'Handicap', game.id, awayHandicap)
-                                    ? 'bg-yellow-500 hover:bg-yellow-600'
-                                    : isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
-                                } text-white text-sm`}
-                                disabled={!isBettable || !awayOdds}
-                              >
-                                <div className="font-medium">{game.away_team} {awayHandicap > 0 ? '+' : ''}{awayHandicap}</div>
-                                <div className="text-xs">{awayOdds.toFixed(2)}</div>
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
+                <HandicapOddsDisplay
+                  game={game}
+                  toggleSelection={toggleSelection}
+                  isSelected={isTeamSelected}
+                  isBettable={isBettable}
+                  onBettingAreaSelect={handleBettingAreaSelect}
+                  variant="sportsbook"
+                />
               </div>
             )}
           </div>

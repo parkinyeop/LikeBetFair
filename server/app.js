@@ -33,7 +33,23 @@ const sequelize = new Sequelize({
   username: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   dialect: 'postgres',
-  logging: false
+  logging: false,
+  pool: {
+    max: 20,        // 최대 연결 수 (기본 5 → 20으로 증가)
+    min: 2,         // 최소 연결 수 유지 (항상 2개 연결 유지)
+    acquire: 60000, // 연결 획득 타임아웃 (60초)
+    idle: 30000,    // 유휴 연결 타임아웃 (30초 후 반환)
+    evict: 1000     // 연결 제거 체크 간격 (1초마다)
+  },
+  dialectOptions: {
+    connectTimeout: 60000,  // 연결 타임아웃 (60초)
+    keepAlive: true,        // Keep-Alive 활성화
+    keepAliveInitialDelayMillis: 10000  // Keep-Alive 초기 지연 (10초)
+  },
+  retry: {
+    max: 3,         // 재시도 최대 횟수
+    timeout: 3000   // 재시도 대기 시간 (3초)
+  }
 });
 
 // 글로벌 변수로 DB 연결 상태 관리

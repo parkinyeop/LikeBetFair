@@ -6,6 +6,7 @@ import { getSportKey } from '../config/sportsMapping';
 import { useExchangeGames, ExchangeGame } from '../hooks/useExchangeGames';
 import { useExchangeStore } from '../stores/useExchangeStore';
 import { adjustOddsSophisticated } from '../utils/oddsCalculator';
+import { groupHandicapsByPoint, filterHalfPointHandicaps, formatHandicap } from '../utils/handicapUtils';
 
 interface ExchangeMarketBoardProps {
   selectedCategory?: string;
@@ -613,44 +614,24 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                   <div className="text-sm font-medium text-white mb-2">🎯 핸디캡 (Handicap)</div>
                   {(() => {
                     const spreadsOdds = game.officialOdds?.spreads || {};
-                    const spreadEntries = Object.entries(spreadsOdds);
-                    
-                    if (spreadEntries.length === 0) {
+
+                    if (Object.keys(spreadsOdds).length === 0) {
                       return (
                         <div className="text-center text-gray-500 py-3">
                           핸디캡 배당 정보가 없습니다.
                         </div>
                       );
                     }
-                    
-                    // Home/Away 쌍으로 그룹화 (팀명 기반 매칭)
-                    const groupedSpreads: { [absPoint: string]: { home?: { oddsData: any, handicap: number }, away?: { oddsData: any, handicap: number } } } = {};
-                    
-                    spreadEntries.forEach(([outcomeName, oddsData]) => {
-                      // "Team Point" 형식에서 팀명과 핸디캡 분리
-                      const parts = outcomeName.split(' ');
-                      const point = parts[parts.length - 1]; // 마지막 부분이 핸디캡
-                      const teamName = parts.slice(0, -1).join(' '); // 나머지가 팀명
-                      
-                      const handicapValue = parseFloat(point); // -1.5 또는 +1.5
-                      const absPoint = Math.abs(handicapValue).toString(); // "1.5"로 통일
-                      
-                      if (!groupedSpreads[absPoint]) groupedSpreads[absPoint] = {};
-                      
-                      // 홈팀인지 원정팀인지 판단
-                      if (teamName === game.homeTeam) {
-                        groupedSpreads[absPoint].home = { oddsData, handicap: handicapValue };
-                      } else if (teamName === game.awayTeam) {
-                        groupedSpreads[absPoint].away = { oddsData, handicap: handicapValue };
-                      }
-                    });
-                    
-                    // 0.5 단위 핸디캡만 필터링 (-1.5, -1, -0.5, 0.5, 1, 1.5 등)
-                    const filteredSpreads = Object.entries(groupedSpreads).filter(([absPoint, oddsPair]) => {
-                      const pointValue = Math.abs(parseFloat(absPoint));
-                      return pointValue % 0.5 === 0;
-                    });
-                    
+
+                    // ✅ 유틸리티 함수 사용
+                    const groupedSpreads = groupHandicapsByPoint(
+                      spreadsOdds,
+                      game.homeTeam,
+                      game.awayTeam
+                    );
+
+                    const filteredSpreads = filterHalfPointHandicaps(groupedSpreads);
+
                     if (filteredSpreads.length === 0) {
                       return (
                         <div className="text-center text-gray-500 py-3">
@@ -658,34 +639,34 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                         </div>
                       );
                     }
-                    
+
                     return (
                       <div className="space-y-2">
                         {filteredSpreads.map(([absPoint, oddsPair]) => {
                           const homeData = oddsPair.home;
                           const awayData = oddsPair.away;
-                          
+
                           const homeOdds = homeData?.oddsData?.averagePrice;
                           const awayOdds = awayData?.oddsData?.averagePrice;
-                          
-                          // 🆕 환수율 적용
+
+                          // 🆕 환수율 적용 (기존 로직 유지)
                           const allSpreadsOdds = [homeOdds, awayOdds].filter(odds => odds !== undefined);
                           const adjustedHomeOdds = homeOdds ? applyExchangeReturnRate(homeOdds, allSpreadsOdds) : undefined;
                           const adjustedAwayOdds = awayOdds ? applyExchangeReturnRate(awayOdds, allSpreadsOdds) : undefined;
-                          
+
                           const pointValue = parseFloat(absPoint);
-                          // 스프레드 베팅에서는 하나의 핸디캡 값으로 양팀이 반대 방향을 가짐
+                          // ⚠️ Exchange는 핸디캡을 반대로 계산 (기존 로직 유지)
                           const homeHandicap = pointValue;
                           const awayHandicap = -pointValue;
-                          
+
                           return (
                             <div key={absPoint} className="flex items-center gap-2">
                               {homeOdds != null && (
                                 <button
-                                  onClick={() => handleBetClick(game, `${game.homeTeam} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`, adjustedHomeOdds, 'back', '핸디캡')}
+                                  onClick={() => handleBetClick(game, `${game.homeTeam} ${formatHandicap(homeHandicap)}`, adjustedHomeOdds, 'back', '핸디캡')}
                                   disabled={!isOpen}
                                   className={`flex-1 p-2 rounded-lg text-center text-white text-sm transition-colors ${
-                                    isBetSelected(game.id, '핸디캡', `${game.homeTeam} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`)
+                                    isBetSelected(game.id, '핸디캡', `${game.homeTeam} ${formatHandicap(homeHandicap)}`)
                                       ? 'bg-yellow-500 hover:bg-yellow-600'
                                       : isOpen ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'
                                   }`}
@@ -697,10 +678,10 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                               <div className="w-12 text-sm font-medium text-blue-400 text-center">{pointValue}</div>
                               {awayOdds != null && (
                                 <button
-                                  onClick={() => handleBetClick(game, `${game.awayTeam} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`, adjustedAwayOdds, 'back', '핸디캡')}
+                                  onClick={() => handleBetClick(game, `${game.awayTeam} ${formatHandicap(awayHandicap)}`, adjustedAwayOdds, 'back', '핸디캡')}
                                   disabled={!isOpen}
                                   className={`flex-1 p-2 rounded-lg text-center text-white text-sm transition-colors ${
-                                    isBetSelected(game.id, '핸디캡', `${game.awayTeam} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`)
+                                    isBetSelected(game.id, '핸디캡', `${game.awayTeam} ${formatHandicap(awayHandicap)}`)
                                       ? 'bg-yellow-500 hover:bg-yellow-600'
                                       : isOpen ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'
                                   }`}

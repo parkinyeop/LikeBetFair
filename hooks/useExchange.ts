@@ -64,7 +64,7 @@ export interface SelectedBet {
 }
 
 export const useExchange = () => {
-  const { token, balance, setBalance } = useAuth();
+  const { token, balance, setBalance, logout } = useAuth();
   const { selectedBet, setSelectedBet } = useExchangeContext();
   const [orders, setOrders] = useState<ExchangeOrder[]>([]);
   const [loading, setLoading] = useState(false);
@@ -90,6 +90,17 @@ export const useExchange = () => {
     try {
       const url = buildApiUrl('/api/exchange/balance');
       const response = await fetch(url, { headers });
+      
+      // 401 에러 시 자동 로그아웃
+      if (response.status === 401) {
+        console.warn('⚠️ 토큰 만료 또는 인증 실패, 자동 로그아웃 처리');
+        logout();
+        if (typeof window !== 'undefined') {
+          window.location.href = '/';
+        }
+        return;
+      }
+      
       if (!response.ok) throw new Error('잔고 조회 실패');
       
       const data: ExchangeBalance = await response.json();
@@ -97,7 +108,7 @@ export const useExchange = () => {
     } catch (err) {
       console.error('잔고 조회 중 오류:', err);
     }
-  }, [token, setBalance]);
+  }, [token, setBalance, logout]);
 
   // 주문 내역 조회
   const fetchOrders = useCallback(async () => {
@@ -107,6 +118,17 @@ export const useExchange = () => {
       setLoading(true);
       const url = buildApiUrl('/api/exchange/orders');
       const response = await fetch(url, { headers });
+      
+      // 401 에러 시 자동 로그아웃
+      if (response.status === 401) {
+        console.warn('⚠️ 토큰 만료 또는 인증 실패, 자동 로그아웃 처리');
+        logout();
+        if (typeof window !== 'undefined') {
+          window.location.href = '/';
+        }
+        return;
+      }
+      
       if (!response.ok) throw new Error('주문 내역 조회 실패');
       
       const data: ExchangeOrder[] = await response.json();
@@ -118,7 +140,7 @@ export const useExchange = () => {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, logout]);
 
   // 주문 등록
   const placeOrder = useCallback(async (orderData: {
