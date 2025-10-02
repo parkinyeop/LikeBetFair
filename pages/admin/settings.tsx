@@ -143,6 +143,15 @@ export default function SystemSettings() {
 
     fetchSystemData();
     loadSportsbookPayoutRate();
+
+    // 🔄 5분마다 자동 갱신
+    const intervalId = setInterval(() => {
+      console.log('[Admin Settings] 자동 갱신 실행 (5분)');
+      fetchSystemData();
+      loadSportsbookPayoutRate();
+    }, 5 * 60 * 1000); // 300,000ms = 5분
+
+    return () => clearInterval(intervalId);
   }, [isLoggedIn, isAdmin, adminLevel, router]);
 
   // 스포츠북 평균 환수율 로드

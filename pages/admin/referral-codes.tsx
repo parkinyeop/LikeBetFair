@@ -101,6 +101,15 @@ export default function AdminReferralCodes() {
 
     fetchCodes();
     fetchStats();
+
+    // 🔄 5분마다 자동 갱신
+    const intervalId = setInterval(() => {
+      console.log('[Admin ReferralCodes] 자동 갱신 실행 (5분)');
+      fetchCodes();
+      fetchStats();
+    }, 5 * 60 * 1000); // 300,000ms = 5분
+
+    return () => clearInterval(intervalId);
   }, [isLoggedIn, isAdmin, adminLevel, router, filters, pagination.currentPage]);
 
   const getAuthHeaders = useCallback(() => {

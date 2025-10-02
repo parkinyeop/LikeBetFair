@@ -405,6 +405,14 @@ export default function BettingAdmin() {
     }
 
     fetchBettingData();
+
+    // 🔄 5분마다 자동 갱신
+    const intervalId = setInterval(() => {
+      console.log('[Admin Bets] 자동 갱신 실행 (5분)');
+      fetchBettingData();
+    }, 5 * 60 * 1000); // 300,000ms = 5분
+
+    return () => clearInterval(intervalId);
   }, [isLoggedIn, isAdmin, adminLevel, router]);
 
   // 월별 필터 변경 시 일별 통계 다시 조회

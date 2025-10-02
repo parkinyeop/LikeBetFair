@@ -117,8 +117,16 @@ export function useAdminApi<T>(
   useEffect(() => {
     if (immediate) {
       fetchData();
+
+      // 🔄 5분마다 자동 갱신
+      const intervalId = setInterval(() => {
+        console.log(`[useAdminApi] 자동 갱신 실행 (5분): ${path}`);
+        fetchData();
+      }, 5 * 60 * 1000); // 300,000ms = 5분
+
+      return () => clearInterval(intervalId);
     }
-  }, [immediate, queryParams]); // queryParams가 변경될 때마다 다시 fetch
+  }, [immediate, queryParams, fetchData, path]); // queryParams가 변경될 때마다 다시 fetch
 
   return {
     data,

@@ -189,6 +189,14 @@ export default function AdminDashboard() {
     }
     
     fetchDashboardData();
+
+    // 🔄 5분마다 자동 갱신
+    const intervalId = setInterval(() => {
+      console.log('[Admin Dashboard] 자동 갱신 실행 (5분)');
+      fetchDashboardData();
+    }, 5 * 60 * 1000); // 300,000ms = 5분
+
+    return () => clearInterval(intervalId);
   }, [isLoggedIn, isAdmin, router, fetchDashboardData]);
 
   // 브라우저 알림 권한 요청

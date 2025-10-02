@@ -51,6 +51,14 @@ export default function Analytics() {
 
   useEffect(() => {
     fetchAnalyticsData();
+
+    // 🔄 5분마다 자동 갱신
+    const intervalId = setInterval(() => {
+      console.log('[Admin Analytics] 자동 갱신 실행 (5분)');
+      fetchAnalyticsData();
+    }, 5 * 60 * 1000); // 300,000ms = 5분
+
+    return () => clearInterval(intervalId);
   }, [dateRange]);
 
   const fetchAnalyticsData = async () => {

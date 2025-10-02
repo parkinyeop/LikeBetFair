@@ -76,6 +76,14 @@ export default function AdminCommissions() {
     }
 
     fetchCommissionData();
+
+    // 🔄 5분마다 자동 갱신
+    const intervalId = setInterval(() => {
+      console.log('[Admin Commissions] 자동 갱신 실행 (5분)');
+      fetchCommissionData();
+    }, 5 * 60 * 1000); // 300,000ms = 5분
+
+    return () => clearInterval(intervalId);
   }, [isLoggedIn, isAdmin, adminLevel, router, filters]);
 
   const getAuthHeaders = useCallback(() => {

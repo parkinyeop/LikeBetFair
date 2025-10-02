@@ -34,8 +34,9 @@ class ExchangeSettlementService {
    * @param {Object} gameResult - 경기 결과 객체
    * @returns {Object} 정산 결과
    */
-  async settleMatchedOrdersByTeam(homeTeam, awayTeam, commenceTime, gameResult) {
-    const transaction = await sequelize.transaction();
+  async settleMatchedOrdersByTeam(homeTeam, awayTeam, commenceTime, gameResult, externalTransaction = null) {
+    const transaction = externalTransaction || await sequelize.transaction();
+    const shouldCommit = !externalTransaction; // 외부 트랜잭션이 없을 때만 커밋
     try {
       console.log(`🎯 [Team-Based] 경기 ${homeTeam} vs ${awayTeam} 매치 정산 시작...`);
 
@@ -56,7 +57,7 @@ class ExchangeSettlementService {
 
       console.log(`[Team-Based] 정산 대상 매치 수: ${matches.length}`);
       if (matches.length === 0) {
-        await transaction.commit();
+        if (shouldCommit) await transaction.commit();
         return { settledMatches: 0, totalWinnings: 0, results: [] };
       }
 
@@ -88,12 +89,12 @@ class ExchangeSettlementService {
         totalWinnings += result.totalWinnings;
       }
 
-      await transaction.commit();
+      if (shouldCommit) await transaction.commit();
       console.log(`[Team-Based] 경기 ${homeTeam} vs ${awayTeam} 정산 완료: ${settledCount}개 매치 정산됨.`);
       return { settledMatches: settledCount, totalWinnings, results: settlementResults };
 
     } catch (error) {
-      await transaction.rollback();
+      if (shouldCommit) await transaction.rollback();
       console.error(`[Team-Based] 경기 ${homeTeam} vs ${awayTeam} 정산 실패:`, error);
       throw error;
     }
@@ -130,8 +131,8 @@ class ExchangeSettlementService {
       console.log(`🏟️ 경기 정보:${gameResult.homeTeam} vs ${gameResult.awayTeam}`);
       console.log(`📊 경기 결과: ${gameResult.status}, 스코어:`, gameResult.score);
 
-      // 🎯 팀명+날짜 기반 ExchangeOrderMatch 정산
-      const matchSettlementResult = await this.settleMatchedOrdersByTeam(homeTeam, awayTeam, commenceTime, gameResult);
+      // 🎯 팀명+날짜 기반 ExchangeOrderMatch 정산 (외부 트랜잭션 전달)
+      const matchSettlementResult = await this.settleMatchedOrdersByTeam(homeTeam, awayTeam, commenceTime, gameResult, transaction);
 
       // 🆕 정산 대상 주문들 조회 (매칭된 상태 + 부분 매칭된 상태의 주문들)
       // 🔴 CRITICAL: settledAt: null 조건 필수 (중복 정산 방지)
