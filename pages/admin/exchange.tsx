@@ -1621,6 +1621,16 @@ export default function ExchangeAdmin() {
       // 서브탭 필터 (취소 원인별 필터링 포함)
       let matchesSubTab = activeSubTab === 'all' || order.status === activeSubTab;
       
+      // 🔧 부분 매칭 주문 필터링 수정
+      if (activeSubTab === 'partially_matched') {
+        matchesSubTab = order.status === 'matched' && (order as any).partiallyFilled === true;
+      }
+      
+      // 🔧 완전 매칭 주문만 표시 (부분 매칭 제외)
+      if (activeSubTab === 'matched') {
+        matchesSubTab = order.status === 'matched' && (order as any).partiallyFilled !== true;
+      }
+      
       // 취소 원인별 서브탭 필터링
       if (activeSubTab.startsWith('cancelled_') && order.status === 'cancelled') {
         const reason = getCancellationReason((order as any).settlementNote, (order as any).paymentMemo);
