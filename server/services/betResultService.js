@@ -180,7 +180,7 @@ class BetResultService {
             [Op.gte]: new Date(commenceTime.getTime() - 48 * 60 * 60 * 1000), // ✅ 2일 전
             [Op.lte]: new Date(commenceTime.getTime() + 48 * 60 * 60 * 1000)  // ✅ 2일 후
           },
-          status: { [Op.in]: ['finished', 'cancelled', 'postponed'] } // ✅ 검색 효율 개선
+          status: { [Op.in]: ['finished', 'cancelled', 'postponed', 'scheduled'] } // ✅ scheduled 추가
         },
         order: [['createdAt', 'DESC']]
       });
@@ -359,6 +359,7 @@ class BetResultService {
       try {
         bet.status = betStatus;
         bet.selections = [...selections];
+        bet.changed('selections', true);  // ✅ Sequelize JSONB 업데이트 명시
         await bet.save({ transaction: t });
         if (betStatus === 'won') {
           await this.processBetWinnings(bet, t);
@@ -581,8 +582,78 @@ class BetResultService {
     return Math.min(adjustedWinnings, Number(bet.potentialWinnings));
   }
 
-  // 🚫 더 이상 사용하지 않는 메서드 (스코어 유무 기반으로 변경됨)
-  // async getGameResultByTeams(selection, pendingGameResultsCache = null) {
+  // 🆕 selection 기반 경기 결과 조회 (getBetDetails, 관리자 페이지용)
+  async getGameResultByTeams(selection) {
+    try {
+      if (!selection.desc || !selection.commence_time) {
+        console.log('[getGameResultByTeams] Invalid selection data:', selection);
+        return null;
+      }
+      
+      // desc에서 팀명 추출 (예: "LG Twins vs Doosan Bears")
+      const parts = selection.desc.split(' vs ');
+      if (parts.length !== 2) {
+        console.log(`[getGameResultByTeams] Invalid desc format: ${selection.desc}`);
+        return null;
+      }
+
+      const homeTeam = parts[0].trim();
+      const awayTeam = parts[1].trim();
+      const commenceTime = new Date(selection.commence_time);
+      
+      if (isNaN(commenceTime.getTime())) {
+        console.log(`[getGameResultByTeams] Invalid commence_time: ${selection.commence_time}`);
+        return null;
+      }
+      
+      // 팀명 정규화
+      const normalizedHomeTeam = normalizeTeamNameForComparison(homeTeam);
+      const normalizedAwayTeam = normalizeTeamNameForComparison(awayTeam);
+      
+      // 시간 범위로 후보 경기 조회 (±48시간)
+      const candidateGames = await GameResult.findAll({
+        where: {
+          commenceTime: {
+            [Op.gte]: new Date(commenceTime.getTime() - 48 * 60 * 60 * 1000),
+            [Op.lte]: new Date(commenceTime.getTime() + 48 * 60 * 60 * 1000)
+          },
+          status: { [Op.in]: ['finished', 'cancelled', 'postponed', 'scheduled'] }
+        },
+        order: [['createdAt', 'DESC']]
+      });
+
+      // 정규화된 팀명으로 매칭 (양방향)
+      for (const candidate of candidateGames) {
+        const dbHomeNorm = normalizeTeamNameForComparison(candidate.homeTeam);
+        const dbAwayNorm = normalizeTeamNameForComparison(candidate.awayTeam);
+
+        if ((dbHomeNorm === normalizedHomeTeam && dbAwayNorm === normalizedAwayTeam) ||
+            (dbHomeNorm === normalizedAwayTeam && dbAwayNorm === normalizedHomeTeam)) {
+          return candidate;
+        }
+      }
+      
+      // 원본 팀명으로도 시도
+      for (const candidate of candidateGames) {
+        const homeMatch = candidate.homeTeam.toLowerCase().includes(homeTeam.toLowerCase()) ||
+                         homeTeam.toLowerCase().includes(candidate.homeTeam.toLowerCase());
+        const awayMatch = candidate.awayTeam.toLowerCase().includes(awayTeam.toLowerCase()) ||
+                         awayTeam.toLowerCase().includes(candidate.awayTeam.toLowerCase());
+
+        if (homeMatch && awayMatch) {
+          return candidate;
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error('[getGameResultByTeams] Error:', error);
+      return null;
+    }
+  }
+
+  // 🚫 더 이상 사용하지 않는 메서드 (주석처리됨)
+  // async getGameResultByTeamsOLD(selection, pendingGameResultsCache = null) {
   //   try {
   //     const desc = selection.desc;
   //     const teams = desc ? desc.split(' vs ') : [];

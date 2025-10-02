@@ -490,3 +490,4 @@ class GameResultQuery {
 export default GameResultQuery;
 
 
+

@@ -19,6 +19,7 @@ import SportsbookPayoutRateService from '../services/sportsbookPayoutRateService
 import bcrypt from 'bcryptjs';
 import { Op } from 'sequelize';
 import sequelize from '../models/sequelize.js';
+import betResultService from '../services/betResultService.js';
 
 
 const router = express.Router();
@@ -1576,7 +1577,39 @@ router.get('/bets/:id', verifyToken, requireAdmin(1), async (req, res) => {
       return res.status(404).json({ message: '베팅을 찾을 수 없습니다.' });
     }
 
-    res.json({ bet });
+    // 🆕 각 selection에 gameResult 정보 추가
+    const selectionsWithResults = await Promise.all(
+      bet.selections.map(async (selection) => {
+        try {
+          // betResultService의 getGameResultByTeams 메서드 활용
+          const gameResult = await betResultService.getGameResultByTeams(selection);
+          
+          return {
+            ...selection,
+            gameResult: gameResult ? {
+              status: gameResult.status,
+              result: gameResult.result,
+              score: gameResult.score,
+              homeTeam: gameResult.homeTeam,
+              awayTeam: gameResult.awayTeam
+            } : null
+          };
+        } catch (error) {
+          console.error(`Selection gameResult 조회 오류:`, error);
+          return {
+            ...selection,
+            gameResult: null
+          };
+        }
+      })
+    );
+
+    const betWithDetails = {
+      ...bet.toJSON(),
+      selections: selectionsWithResults
+    };
+
+    res.json({ bet: betWithDetails });
   } catch (error) {
     console.error('Bet detail error:', error);
     res.status(500).json({ message: '베팅 정보를 불러오는 중 오류가 발생했습니다.' });

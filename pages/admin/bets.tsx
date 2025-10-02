@@ -858,10 +858,28 @@ export default function BettingAdmin() {
   }, []);
 
   // 베팅 클릭 핸들러
-  const handleBetClick = useCallback((bet: Bet) => {
-    setSelectedBet(bet);
-    setShowBetDetail(true);
-  }, []);
+  const handleBetClick = useCallback(async (bet: Bet) => {
+    try {
+      // 🆕 경기 결과 포함된 상세 정보 조회
+      const headers = getAuthHeaders();
+      const response = await fetch(buildApiUrl(`/api/admin/bets/${bet.id}`), { headers });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ 베팅 상세 정보 (gameResult 포함):', data.bet);
+        setSelectedBet(data.bet);
+        setShowBetDetail(true);
+      } else {
+        console.warn('⚠️ 베팅 상세 정보 조회 실패, 기본 데이터 사용');
+        setSelectedBet(bet);
+        setShowBetDetail(true);
+      }
+    } catch (error) {
+      console.error('❌ 베팅 상세 정보 조회 오류:', error);
+      setSelectedBet(bet);
+      setShowBetDetail(true);
+    }
+  }, [getAuthHeaders]);
 
 
   // 상태별 색상 함수
@@ -1813,33 +1831,63 @@ export default function BettingAdmin() {
                           </div>
                           <div className="space-y-3">
                             {selectedBet.selections.map((selection, index) => {
-                              // 경기 결과 상태 결정 - selection.result가 정산 시 저장된 최종 결과
+                              // 경기 결과 상태 결정 - selection.result 또는 selection.gameResult 기반
                               const getGameResult = (selection) => {
-                                // selection.result가 없거나 pending이면 대기중
-                                if (!selection.result || selection.result === 'pending') {
-                                  return { status: 'pending', result: '경기 결과 대기중', color: 'bg-yellow-100 text-yellow-800' };
+                                // 1. selection.result가 있으면 우선 사용 (정산 완료)
+                                if (selection.result && selection.result !== 'pending') {
+                                  if (selection.result === 'won' || selection.result === 'win') {
+                                    return { 
+                                      status: 'won', 
+                                      result: `승리`, 
+                                      color: 'bg-green-100 text-green-800' 
+                                    };
+                                  } else if (selection.result === 'lost' || selection.result === 'lose') {
+                                    return { 
+                                      status: 'lost', 
+                                      result: `패배`, 
+                                      color: 'bg-red-100 text-red-800' 
+                                    };
+                                  } else if (selection.result === 'cancelled') {
+                                    return { 
+                                      status: 'cancelled', 
+                                      result: `취소됨`, 
+                                      color: 'bg-gray-100 text-gray-800' 
+                                    };
+                                  }
                                 }
                                 
-                                // selection.result로 승패 판정 (이미 정산 시 저장됨)
-                                if (selection.result === 'win') {
-                                  return { 
-                                    status: 'win', 
-                                    result: `승리`, 
-                                    color: 'bg-green-100 text-green-800' 
-                                  };
-                                } else if (selection.result === 'lose') {
-                                  return { 
-                                    status: 'lose', 
-                                    result: `패배`, 
-                                    color: 'bg-red-100 text-red-800' 
-                                  };
-                                } else {
-                                  return { 
-                                    status: 'cancelled', 
-                                    result: `취소됨`, 
-                                    color: 'bg-gray-100 text-gray-800' 
-                                  };
+                                // 2. selection.result가 없거나 pending이면 gameResult 확인
+                                if (selection.gameResult) {
+                                  const gr = selection.gameResult;
+                                  
+                                  // 경기 완료 여부 확인
+                                  if (gr.status === 'finished' && gr.score) {
+                                    return { 
+                                      status: 'finished', 
+                                      result: `경기 완료 (정산 대기중)`, 
+                                      color: 'bg-blue-100 text-blue-800' 
+                                    };
+                                  } else if (gr.status === 'cancelled') {
+                                    return { 
+                                      status: 'cancelled', 
+                                      result: `경기 취소`, 
+                                      color: 'bg-gray-100 text-gray-800' 
+                                    };
+                                  } else if (gr.status === 'postponed') {
+                                    return { 
+                                      status: 'postponed', 
+                                      result: `경기 연기`, 
+                                      color: 'bg-orange-100 text-orange-800' 
+                                    };
+                                  }
                                 }
+                                
+                                // 3. 기본값: 대기중
+                                return { 
+                                  status: 'pending', 
+                                  result: '경기 결과 대기중', 
+                                  color: 'bg-yellow-100 text-yellow-800' 
+                                };
                               };
 
                               const gameResult = getGameResult(selection);
@@ -1866,16 +1914,65 @@ export default function BettingAdmin() {
                                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${gameResult.color}`}>
                                           {gameResult.result}
                                         </span>
-                                        {/* 스코어 정보 추가 */}
+                                        {/* 스코어 정보 표시 (개선됨) */}
                                         {selection.gameResult && selection.gameResult.score && (
                                           <div className="mt-1 text-xs text-gray-600">
-                                            스코어: {selection.gameResult.score.home || 0} - {selection.gameResult.score.away || 0}
+                                            {(() => {
+                                              const scores = selection.gameResult.score;
+                                              
+                                              // 배열 형식: [{"name":"팀명","score":"점수"}]
+                                              if (Array.isArray(scores) && scores.length >= 2) {
+                                                const homeScore = scores.find(s => s.name === selection.gameResult.homeTeam)?.score || '0';
+                                                const awayScore = scores.find(s => s.name === selection.gameResult.awayTeam)?.score || '0';
+                                                return `스코어: ${homeScore} - ${awayScore}`;
+                                              }
+                                              
+                                              // 문자열 형식: "5-0"
+                                              if (typeof scores === 'string') {
+                                                return `스코어: ${scores}`;
+                                              }
+                                              
+                                              // 객체 형식: {home: 5, away: 0}
+                                              if (scores.home !== undefined && scores.away !== undefined) {
+                                                return `스코어: ${scores.home} - ${scores.away}`;
+                                              }
+                                              
+                                              return '스코어: N/A';
+                                            })()}
                                           </div>
                                         )}
-                                        {/* 경기 결과 세부 정보 */}
-                                        {selection.gameResult && selection.gameResult.result && (
-                                          <div className="mt-1 text-xs text-gray-500">
-                                            결과: {selection.gameResult.result}
+                                        {/* 경기 결과 세부 정보 (개선됨) */}
+                                        {selection.gameResult && (
+                                          <div className="mt-1 text-xs text-gray-500 space-y-1">
+                                            {/* 경기 상태 */}
+                                            {selection.gameResult.status && (
+                                              <div>
+                                                경기 상태: 
+                                                <span className={`ml-1 font-medium ${
+                                                  selection.gameResult.status === 'finished' ? 'text-green-600' :
+                                                  selection.gameResult.status === 'cancelled' ? 'text-red-600' :
+                                                  selection.gameResult.status === 'postponed' ? 'text-orange-600' :
+                                                  'text-yellow-600'
+                                                }`}>
+                                                  {selection.gameResult.status === 'finished' ? '완료' :
+                                                   selection.gameResult.status === 'cancelled' ? '취소' :
+                                                   selection.gameResult.status === 'postponed' ? '연기' :
+                                                   '예정'}
+                                                </span>
+                                              </div>
+                                            )}
+                                            {/* 경기 결과 */}
+                                            {selection.gameResult.result && selection.gameResult.result !== 'pending' && (
+                                              <div>
+                                                경기 결과: 
+                                                <span className="ml-1 font-medium">
+                                                  {selection.gameResult.result === 'home_win' ? '홈팀 승리' :
+                                                   selection.gameResult.result === 'away_win' ? '원정팀 승리' :
+                                                   selection.gameResult.result === 'draw' ? '무승부' :
+                                                   selection.gameResult.result}
+                                                </span>
+                                              </div>
+                                            )}
                                           </div>
                                         )}
                                       </div>
