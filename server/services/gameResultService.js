@@ -80,8 +80,10 @@ const standardizedCategoryMap = {
   'soccer_argentina_primera_division': { main: 'soccer', sub: 'ARGENTINA_PRIMERA' },
   'soccer_china_superleague': { main: 'soccer', sub: 'CSL' },
   'soccer_spain_primera_division': { main: 'soccer', sub: 'LALIGA' },
+  'soccer_spain_la_liga': { main: 'soccer', sub: 'LALIGA' },  // 라리가 추가 매핑
   'soccer_germany_bundesliga': { main: 'soccer', sub: 'BUNDESLIGA' },
   'soccer_england_premier_league': { main: 'soccer', sub: 'EPL' },
+  'soccer_epl': { main: 'soccer', sub: 'EPL' },  // 프리미어리그 추가 매핑
   
   // 농구
   'basketball_nba': { main: 'basketball', sub: 'NBA' },
@@ -187,43 +189,46 @@ class GameResultService {
       const isNorthAmericanLeague = this.isNorthAmericanLeague(sportKey);
       let response;
       
+      // 🔧 시즌 형식 결정: 유럽은 2024-2025, 북미는 2025
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1; // 1-12
+      let seasonParam;
+
       if (isNorthAmericanLeague) {
-        // 북미 리그: 시즌 기반 (MLS, MLB, NBA, NFL 등)
-        const currentYear = new Date().getFullYear();
-        response = await axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsseason.php`, {
-          params: {
-            id: leagueId,
-            s: currentYear.toString() // 2025
-          },
-          timeout: 15000
-        });
-        console.log(`[GameResult] 북미 리그 시즌 API 사용: ${sportKey} (${currentYear})`);
+        // 북미 리그: 연도만 사용 (2025)
+        seasonParam = currentYear.toString();
       } else {
-        // 유럽 리그: 최근 + 예정 경기 조합으로 시간 범위 내 데이터 수집
-        const [lastResponse, nextResponse] = await Promise.all([
-          axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventslast.php`, {
-            params: { id: leagueId },
-            timeout: 15000
-          }),
-          axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsnext.php`, {
-            params: { id: leagueId },
-            timeout: 15000
-          })
-        ]);
-        
-        const lastEvents = lastResponse.data?.events || [];
-        const nextEvents = nextResponse.data?.events || [];
-        const allEvents = [...lastEvents, ...nextEvents];
-        
-        response = { data: { events: allEvents } };
-        console.log(`[GameResult] 유럽 리그 최근+예정 API 사용: ${sportKey} (${lastEvents.length}+${nextEvents.length}개)`);
+        // 유럽 리그: 시즌 형식 사용 (YYYY-YYYY+1)
+        // 시즌은 8월에 시작해서 다음해 5월에 종료
+        // 예: 2024년 8월 ~ 2025년 5월 = 2024-2025 시즌
+        if (currentMonth >= 8) {
+          // 8월~12월: 현재년-다음년 (예: 2024년 8월 = 2024-2025)
+          seasonParam = `${currentYear}-${currentYear + 1}`;
+        } else {
+          // 1월~7월: 전년-현재년 (예: 2025년 1월 = 2024-2025)
+          seasonParam = `${currentYear - 1}-${currentYear}`;
+        }
       }
+
+      console.log(`[GameResult] 시즌 파라미터: ${seasonParam} (${isNorthAmericanLeague ? '북미' : '유럽'} 리그)`);
+
+      // 모든 리그에 대해 시즌 기반 API 사용
+      response = await axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsseason.php`, {
+        params: {
+          id: leagueId,
+          s: seasonParam
+        },
+        timeout: 15000
+      });
+
+      console.log(`[GameResult] TheSportsDB eventsseason API 호출: ${sportKey} (시즌: ${seasonParam})`)
 
       const events = response.data?.events || [];
       console.log(`[GameResult] TheSportsDB API 성공: ${events.length}개 경기`);
-      
+
       // 🆕 시간 범위 수정: 과거 15일 + 미래 1일 (누락 데이터 복구용 임시 확장)
-      const now = new Date();
+      // now 변수는 이미 191번 줄에서 선언됨
       const cutoffDate = new Date(now.getTime() - daysFrom * 24 * 60 * 60 * 1000);
       const futureDate = includeFuture ? new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000) : now;
       

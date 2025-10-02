@@ -45,13 +45,15 @@ const oddsController = {
         'ARGENTINA_PRIMERA': ['soccer_argentina_primera_division'], // ARGENTINA_PRIMERA로 요청이 오면 soccer_argentina_primera_division 데이터만 반환
         'soccer_china_superleague': ['soccer_china_superleague', '중국 슈퍼리그'],
         '중국 슈퍼리그': ['soccer_china_superleague'], // 중국 슈퍼리그로 요청이 오면 soccer_china_superleague 데이터만 반환
-        'soccer_spain_primera_division': ['soccer_spain_primera_division', '라리가'],
-        '라리가': ['soccer_spain_primera_division'], // 라리가로 요청이 오면 soccer_spain_primera_division 데이터만 반환
+        'soccer_spain_primera_division': ['soccer_spain_primera_division', 'soccer_spain_la_liga', '라리가'],
+        'soccer_spain_la_liga': ['soccer_spain_la_liga', 'soccer_spain_primera_division', '라리가'], // 실제 DB 키
+        '라리가': ['soccer_spain_primera_division', 'soccer_spain_la_liga'], // 라리가로 요청이 오면 둘 다 반환
         'soccer_germany_bundesliga': ['soccer_germany_bundesliga', '분데스리가'],
         '분데스리가': ['soccer_germany_bundesliga'], // 분데스리가로 요청이 오면 soccer_germany_bundesliga 데이터만 반환
-        'soccer_england_premier_league': ['soccer_england_premier_league', '프리미어리그', 'PREMIER_LEAGUE'],
-        '프리미어리그': ['soccer_england_premier_league'], // 프리미어리그로 요청이 오면 soccer_england_premier_league 데이터만 반환
-        'PREMIER_LEAGUE': ['soccer_england_premier_league'], // PREMIER_LEAGUE로 요청이 오면 soccer_england_premier_league 데이터만 반환
+        'soccer_england_premier_league': ['soccer_england_premier_league', 'soccer_epl', '프리미어리그', 'PREMIER_LEAGUE'],
+        'soccer_epl': ['soccer_epl', 'soccer_england_premier_league', '프리미어리그', 'PREMIER_LEAGUE'], // 실제 DB 키
+        '프리미어리그': ['soccer_england_premier_league', 'soccer_epl'], // 프리미어리그로 요청이 오면 둘 다 반환
+        'PREMIER_LEAGUE': ['soccer_england_premier_league', 'soccer_epl'], // PREMIER_LEAGUE로 요청이 오면 둘 다 반환
         'soccer': [
           'soccer_usa_mls', 'MLS',
           'soccer_korea_kleague1', 'K리그',
@@ -60,9 +62,9 @@ const oddsController = {
           'soccer_brazil_campeonato', '브라질 세리에 A', 'BRASILEIRAO',
           'soccer_argentina_primera_division', '아르헨티나 프리메라', 'ARGENTINA_PRIMERA',
           'soccer_china_superleague', '중국 슈퍼리그',
-          'soccer_spain_primera_division', '라리가',
+          'soccer_spain_primera_division', 'soccer_spain_la_liga', '라리가',
           'soccer_germany_bundesliga', '분데스리가',
-          'soccer_england_premier_league', '프리미어리그', 'PREMIER_LEAGUE'
+          'soccer_england_premier_league', 'soccer_epl', '프리미어리그', 'PREMIER_LEAGUE'
         ]
       };
       

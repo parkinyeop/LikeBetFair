@@ -3,6 +3,7 @@ import schedule from 'node-schedule';
 import gameResultService from '../services/gameResultService.js';
 import betResultService from '../services/betResultService.js';
 import multibetSettlementService from '../services/multibetSettlementService.js';
+import exchangeSettlementService from '../services/exchangeSettlementService.js';
 
 console.log('⏰ [Scheduler] 정산 스케줄러가 활성화되었습니다.');
 
@@ -21,13 +22,18 @@ schedule.scheduleJob('*/30 * * * *', async () => {
 schedule.scheduleJob('*/15 * * * *', async () => {
   console.log('⚙️ [Scheduler] 베팅 정산 작업을 시작합니다...');
   try {
-    // 스포츠북 정산
+    // 1. 스포츠북 정산
     const betResult = await betResultService.updateBetResults();
     console.log(`✅ [Scheduler] 스포츠북 정산: ${betResult.updatedCount}개 완료`);
 
-    // 익스체인지 멀티베팅 정산
+    // 2. 익스체인지 일반 주문 정산
+    const exchangeService = new exchangeSettlementService();
+    const exchangeResult = await exchangeService.settleAllConnectedOrders();
+    console.log(`✅ [Scheduler] 익스체인지 일반 주문 정산: ${exchangeResult?.totalSettled || 0}개 완료`);
+
+    // 3. 익스체인지 멀티베팅 정산
     const multibetResult = await multibetSettlementService.settleAllMultibetOrders();
-    console.log(`✅ [Scheduler] 익스체인지 정산: ${multibetResult?.settledCount || 0}개 완료`);
+    console.log(`✅ [Scheduler] 익스체인지 멀티베팅 정산: ${multibetResult?.settledCount || 0}개 완료`);
   } catch (error) {
     console.error('❌ [Scheduler] 베팅 정산 중 오류 발생:', error);
   }
@@ -36,5 +42,6 @@ schedule.scheduleJob('*/15 * * * *', async () => {
 console.log('📅 [Scheduler] 스케줄 등록 완료:');
 console.log('   - 경기 결과 수집: 매 30분마다 실행');
 console.log('   - 베팅 정산: 매 15분마다 실행');
+
 
 

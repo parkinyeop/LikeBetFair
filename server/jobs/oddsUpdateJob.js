@@ -509,60 +509,56 @@ cron.schedule('0 */2 * * *', async () => {
 //   // ... 기존 코드 전체 주석 처리 ...
 // });
 
-// 🚫 TEMPORARILY DISABLED - ORIGINAL SCHEDULER RESTORED
-// 저우선순위 리그 - 24시간마다 업데이트 (원래 코드)
-// cron.schedule('0 0 */3 * * *', async () => {
-//   saveUpdateLog('odds_temp', 'start', { 
-//     message: 'Starting TEMPORARY low-priority leagues odds update (72hour interval - 500K limit)',
-//     priority: 'low_temp',
-//     leagues: Array.from(lowPriorityCategories),
-//     note: 'Temporary scheduler due to 500K API limit'
-//   });
-//   
-//   try {
-//     // 12분 타임아웃 설정 (임시)
-//     const oddsUpdateResult = await withTimeout(
-//       oddsApiService.fetchAndCacheOddsForCategories(Array.from(lowPriorityCategories), 'low'),
-//       12 * 60 * 1000, // 12분
-//       'Temporary low-priority odds update'
-//     );
-//     
-//     const oddsSummary = {
-//       totalUpdated: oddsUpdateResult?.updatedCount || 0,
-//       newOdds: oddsUpdateResult?.newCount || 0,
-//       existingOddsUpdated: oddsUpdateResult?.updatedExistingCount || 0,
-//       skippedOdds: oddsUpdateResult?.skippedCount || 0,
-//       apiCalls: oddsUpdateResult?.apiCalls || 0,
-//       categoriesProcessed: oddsUpdateResult?.categories?.length || 0
-//     };
-//     
-//     console.log('[SCHEDULER_ODDS_TEMP] 📊 Temporary Low-priority Update Summary:');
-//     console.log('[SCHEDULER_ODDS_TEMP]   - Total Updated:', oddsSummary.totalUpdated);
-//     console.log('[SCHEDULER_ODDS_TEMP]   - New Odds:', oddsSummary.newOdds);
-//     console.log('[SCHEDULER_ODDS_TEMP]   - Existing Updated:', oddsSummary.existingOddsUpdated);
-//     console.log('[SCHEDULER_ODDS_TEMP]   - Skipped:', oddsSummary.skippedOdds);
-//     console.log('[SCHEDULER_ODDS_TEMP]   - API Calls:', oddsSummary.apiCalls);
-//     console.log('[SCHEDULER_ODDS_TEMP]   - Categories Processed:', oddsSummary.categoriesProcessed);
-//     
-//     saveUpdateLog('odds_temp', 'success', { 
-//       message: 'Temporary low-priority odds update completed (72hour interval)',
-//       priority: 'low_temp',
-//       leagues: Array.from(lowPriorityCategories),
-//       oddsUpdated: oddsSummary.totalUpdated,
-//       oddsDetail: oddsSummary,
-//       note: 'Temporary scheduler due to 500K API limit'
-//     });
-//     
-//   } catch (error) {
-//     saveUpdateLog('odds_temp', 'error', { 
-//       message: 'Temporary low-priority odds update failed',
-//       priority: 'low_temp',
-//       leagues: Array.from(lowPriorityCategories),
-//       error: error.message,
-//       note: 'Temporary scheduler due to 500K API limit'
-//     });
-//   }
-// });
+// ✅ 저우선순위 리그 - 매일 자정에 업데이트 (활성화)
+cron.schedule('0 0 * * *', async () => {
+  saveUpdateLog('odds_low', 'start', {
+    message: 'Starting low-priority leagues odds update (daily)',
+    priority: 'low',
+    leagues: Array.from(lowPriorityCategories)
+  });
+
+  try {
+    const oddsUpdateResult = await withTimeout(
+      oddsApiService.fetchAndCacheOddsForCategories(Array.from(lowPriorityCategories), 'low'),
+      15 * 60 * 1000, // 15분 타임아웃
+      'Low-priority odds update'
+    );
+
+    const oddsSummary = {
+      totalUpdated: oddsUpdateResult?.updatedCount || 0,
+      newOdds: oddsUpdateResult?.newCount || 0,
+      existingOddsUpdated: oddsUpdateResult?.updatedExistingCount || 0,
+      skippedOdds: oddsUpdateResult?.skippedCount || 0,
+      apiCalls: oddsUpdateResult?.apiCalls || 0,
+      categoriesProcessed: oddsUpdateResult?.categories?.length || 0
+    };
+
+    console.log('[SCHEDULER_LOW] 📊 Low-priority Update Summary:');
+    console.log('[SCHEDULER_LOW]   - Total Updated:', oddsSummary.totalUpdated);
+    console.log('[SCHEDULER_LOW]   - New Odds:', oddsSummary.newOdds);
+    console.log('[SCHEDULER_LOW]   - Existing Updated:', oddsSummary.existingOddsUpdated);
+    console.log('[SCHEDULER_LOW]   - Skipped:', oddsSummary.skippedOdds);
+    console.log('[SCHEDULER_LOW]   - API Calls:', oddsSummary.apiCalls);
+    console.log('[SCHEDULER_LOW]   - Categories Processed:', oddsSummary.categoriesProcessed);
+
+    saveUpdateLog('odds_low', 'success', {
+      message: 'Low-priority odds update completed',
+      priority: 'low',
+      leagues: Array.from(lowPriorityCategories),
+      oddsUpdated: oddsSummary.totalUpdated,
+      oddsDetail: oddsSummary
+    });
+
+  } catch (error) {
+    console.error('[SCHEDULER_LOW] ❌ Error:', error.message);
+    saveUpdateLog('odds_low', 'error', {
+      message: 'Low-priority odds update failed',
+      priority: 'low',
+      leagues: Array.from(lowPriorityCategories),
+      error: error.message
+    });
+  }
+});
 
 // 🚫 TEMPORARILY DISABLED - 500K API LIMIT RESPONSE
 // 전체 데이터 업데이트 - 하루에 한 번만 (비용 절약) (원래 코드)

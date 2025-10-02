@@ -799,6 +799,25 @@ class BetResultService {
 
   // 개별 selection 결과 판정
   determineSelectionResult(selection, gameResult, validatedScore = null) {
+    // 🚨 강력한 방어 코드: score 데이터 무결성 검증
+    if (!validatedScore) {
+      const score = gameResult.score;
+
+      // score가 유효하지 않으면 절대 승/패 결정하지 않음
+      if (!score || !Array.isArray(score) || score.length === 0) {
+        console.log(`[SELECTION GUARD] 스코어가 없거나 비어있음 - pending 처리`);
+        return 'pending';
+      }
+
+      // score 배열 요소 검증: name과 score 필드가 모두 있어야 함
+      const hasValidElements = score.every(s => s && s.name && (s.score !== undefined && s.score !== null));
+      if (!hasValidElements) {
+        console.log(`[SELECTION GUARD] 스코어 형식이 유효하지 않음 - pending 처리`);
+        console.log(`[SELECTION GUARD] 문제 스코어:`, JSON.stringify(score));
+        return 'pending';
+      }
+    }
+
     // market alias 매핑
     let marketType = selection.market;
     if (marketType === 'h2h') marketType = '승/패';
@@ -807,7 +826,7 @@ class BetResultService {
     if (marketType === 'Win/Loss') marketType = '승/패';
     if (marketType === 'Over/Under') marketType = '언더/오버';
     if (marketType === 'Handicap') marketType = '핸디캡';
-    
+
     const resultFunction = this.marketResultMap[marketType];
     if (resultFunction) {
       return resultFunction(selection, gameResult, validatedScore);

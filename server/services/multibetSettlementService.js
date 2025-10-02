@@ -225,13 +225,13 @@ class MultibetSettlementService {
           }
         });
 
-        // 정확한 시간으로 찾지 못하면 시간 범위로 검색 (±24시간)
+        // 정확한 시간으로 찾지 못하면 시간 범위로 검색 (±6시간)
         if (!gameResult) {
           const targetTime = new Date(commenceTime);
-          const startTime = new Date(targetTime.getTime() - (24 * 60 * 60 * 1000));
-          const endTime = new Date(targetTime.getTime() + (24 * 60 * 60 * 1000));
+          const startTime = new Date(targetTime.getTime() - (6 * 60 * 60 * 1000));
+          const endTime = new Date(targetTime.getTime() + (6 * 60 * 60 * 1000));
           
-          console.log(`⏰ 시간 범위 검색: ${startTime.toISOString()} ~ ${endTime.toISOString()}`);
+          console.log(`⏰ 시간 범위 검색 (±6시간): ${startTime.toISOString()} ~ ${endTime.toISOString()}`);
           
           gameResult = await GameResult.findOne({
             where: {
@@ -674,7 +674,7 @@ class MultibetSettlementService {
           settledAt: null
         },
         order: [['createdAt', 'ASC']],
-        limit: 10 // 한 번에 최대 10개만 처리
+        limit: 50 // 한 번에 최대 50개 처리 (10에서 증대)
       });
 
       console.log(`📋 정산 대상 멀티배팅 주문: ${unsettledOrders.length}개`);
@@ -689,24 +689,32 @@ class MultibetSettlementService {
       let timeoutCount = 0;
       const results = [];
 
+      // 개별 주문 타임아웃 설정 (15초)
+      const INDIVIDUAL_TIMEOUT_MS = 15000;
+
       for (const order of unsettledOrders) {
-        // 타임아웃 체크
+        // 전체 타임아웃 체크
         if (Date.now() - startTime > TIMEOUT_MS) {
-          console.log(`⏰ 타임아웃 도달 (${TIMEOUT_MS}ms), 남은 주문 ${unsettledOrders.length - settledCount - errorCount}개 건너뜀`);
+          console.log(`⏰ 전체 타임아웃 도달 (${TIMEOUT_MS}ms), 남은 주문 ${unsettledOrders.length - settledCount - errorCount}개 건너뜀`);
           timeoutCount = unsettledOrders.length - settledCount - errorCount;
           break;
         }
 
         try {
-          // 타임아웃 제거 - 무제한 시간으로 정산 실행
-          const result = await this.settleMultibetOrder(order);
+          // 개별 주문 타임아웃 적용
+          const settlePromise = this.settleMultibetOrder(order);
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`개별 주문 타임아웃 (${order.id})`)), INDIVIDUAL_TIMEOUT_MS)
+          );
+
+          const result = await Promise.race([settlePromise, timeoutPromise]);
           results.push({ orderId: order.id, result });
           settledCount++;
           console.log(`✅ 주문 ${order.id} 정산 완료`);
         } catch (error) {
           errorCount++;
-          if (error.message === 'Settlement timeout') {
-            console.log(`⏰ 주문 ${order.id} 정산 타임아웃`);
+          if (error.message && error.message.includes('타임아웃')) {
+            console.log(`⏰ 주문 ${order.id} 정산 타임아웃 (${INDIVIDUAL_TIMEOUT_MS}ms 초과)`);
             results.push({ orderId: order.id, error: 'timeout' });
           } else {
             console.log(`❌ 주문 ${order.id} 정산 실패: ${error.message}`);
@@ -731,16 +739,9 @@ class MultibetSettlementService {
     } catch (error) {
       console.error('❌ 멀티배팅 정산 실패:', error.message);
       throw error;
-    } finally {
-      // 데이터베이스 연결 정리
-      console.log('🔌 멀티배팅 정산 서비스 데이터베이스 연결 정리 중...');
-      try {
-        await sequelize.close();
-        console.log('✅ 데이터베이스 연결 정리 완료');
-      } catch (closeError) {
-        console.error('⚠️ 데이터베이스 연결 정리 실패:', closeError.message);
-      }
     }
+    // finally 블록 제거: DB 연결은 애플리케이션 생명주기와 함께 관리되어야 합니다.
+    // sequelize.close()를 호출하면 다음 작업 시 DB 연결 오류가 발생합니다.
   }
   
 }

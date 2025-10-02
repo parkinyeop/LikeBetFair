@@ -192,10 +192,11 @@ export const SEASON_SCHEDULES: Record<string, SeasonInfo> = {
   },
   'soccer_italy_serie_a': {
     name: 'Serie A',
-    status: 'offseason',
-    currentSeason: '2025',
-    nextSeasonStart: '2025-03-01',
-    description: 'Season Off (Auto-detected: Season starting soon, early odds available)'
+    status: 'active',
+    currentSeason: '2025-26',
+    seasonStart: '2025-08-17',
+    seasonEnd: '2026-05-24',
+    description: '2025-26 Season in progress'
   },
   'soccer_brazil_campeonato': {
     name: 'Brasileirao',
@@ -227,27 +228,43 @@ export const SEASON_SCHEDULES: Record<string, SeasonInfo> = {
   },
   'soccer_spain_primera_division': {
     name: 'La Liga',
-    status: 'offseason',
-    currentSeason: '2024-25',
-    seasonEnd: '2025-05-25',
-    nextSeasonStart: '2025-08-17',
-    description: 'Season Off (Auto-detected: No recent games, no scheduled games, no odds available)'
+    status: 'active',
+    currentSeason: '2025-26',
+    seasonStart: '2025-08-17',
+    seasonEnd: '2026-05-25',
+    description: '2025-26 Season in progress'
+  },
+  'soccer_spain_la_liga': {
+    name: 'La Liga',
+    status: 'active',
+    currentSeason: '2025-26',
+    seasonStart: '2025-08-17',
+    seasonEnd: '2026-05-25',
+    description: '2025-26 Season in progress'
   },
   'soccer_germany_bundesliga': {
     name: 'Bundesliga',
-    status: 'offseason',
-    currentSeason: '2025',
-    nextSeasonStart: '2025-03-01',
-    description: 'Season Off (Auto-detected: Season starting soon, early odds available)'
+    status: 'active',
+    currentSeason: '2025-26',
+    seasonStart: '2025-08-15',
+    seasonEnd: '2026-05-15',
+    description: '2025-26 Season in progress'
   },
   'soccer_england_premier_league': {
     name: 'Premier League',
-    status: 'offseason',
+    status: 'active',
     currentSeason: '2025-26',
     seasonStart: '2025-08-15',
     seasonEnd: '2026-05-25',
-    nextSeasonStart: '2026-08-15',
-    description: '2025-26 Season starting August 15th'
+    description: '2025-26 Season in progress'
+  },
+  'soccer_epl': {
+    name: 'Premier League',
+    status: 'active',
+    currentSeason: '2025-26',
+    seasonStart: '2025-08-15',
+    seasonEnd: '2026-05-25',
+    description: '2025-26 Season in progress'
   },
 
   // 농구
@@ -288,11 +305,11 @@ export const SEASON_SCHEDULES: Record<string, SeasonInfo> = {
   // 미식축구
   'americanfootball_nfl': {
     name: 'NFL',
-    status: 'offseason',
+    status: 'active',
     currentSeason: '2025',
-    seasonEnd: '2025-02-09',
-    nextSeasonStart: '2025-09-05',
-    description: 'Season Off (Auto-detected: Season starting soon (65 days), early odds available)'
+    seasonStart: '2025-09-05',
+    seasonEnd: '2026-02-08',
+    description: '2025 NFL Season in progress'
   }
 };
 
