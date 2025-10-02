@@ -131,6 +131,46 @@ export async function placeBet(req, res) {
       }
     }
 
+    // 🔒 동일 경기 중복 마켓 검증 (Win/Loss + Handicap 동시 베팅 방지)
+    console.log('[BetController] 동일 경기 중복 마켓 검증 시작');
+    const gameSelections = {};
+
+    for (const selection of selections) {
+      // gameId 또는 desc+time 기반으로 경기 식별
+      let gameKey;
+      if (selection.gameId) {
+        gameKey = selection.gameId;
+      } else {
+        // gameId 없는 레거시 데이터 처리
+        gameKey = `${selection.desc}|${selection.commence_time}`;
+        console.warn(`[BetController] gameId 없는 selection, desc+time 기반 검증: ${selection.desc}`);
+      }
+
+      if (!gameSelections[gameKey]) {
+        gameSelections[gameKey] = { markets: [], desc: selection.desc };
+      }
+      gameSelections[gameKey].markets.push(selection.market);
+    }
+
+    for (const gameKey in gameSelections) {
+      const { markets, desc } = gameSelections[gameKey];
+
+      // 다양한 마켓 이름(영문, 한글, 약어)을 모두 포함하여 검증
+      const hasWinLoss = markets.some(m => ['Win/Loss', '승패', 'h2h'].includes(m));
+      const hasHandicap = markets.some(m => ['Handicap', '핸디캡', 'spreads'].includes(m));
+
+      if (hasWinLoss && hasHandicap) {
+        console.error(`[BetController] ❌ 검증 실패: ${desc}에 Win/Loss + Handicap 동시 베팅 시도`);
+        return res.status(400).json({
+          success: false,
+          message: '같은 경기에서 승패와 핸디캡을 동시에 베팅할 수 없습니다.',
+          game: desc,
+          code: 'DUPLICATE_MARKET_TYPE'
+        });
+      }
+    }
+    console.log('[BetController] ✅ 동일 경기 중복 마켓 검증 통과');
+
     // 베팅 가능 시간 체크 (경기 시작 10분 전 마감) - UTC 기준
     const now = new Date();
     const marginMinutes = 10;
