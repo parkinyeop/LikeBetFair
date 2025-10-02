@@ -20,6 +20,7 @@ import bcrypt from 'bcryptjs';
 import { Op } from 'sequelize';
 import sequelize from '../models/sequelize.js';
 import betResultService from '../services/betResultService.js';
+import { normalizeTeamNameForComparison } from '../normalizeUtils.js';
 
 
 const router = express.Router();
@@ -688,15 +689,18 @@ router.get('/exchange/orders/:orderId/matches', verifyToken, requireAdmin(1), as
 
     // 🆕 경기 결과 데이터 조회
     let gameResults = {};
-    
+
     if (originalOrder.isMultibet && originalOrder.selectionDetails && originalOrder.selectionDetails.selections) {
       // 멀티배팅인 경우 - 각 경기별로 결과 조회
       for (const selection of originalOrder.selectionDetails.selections) {
         try {
-          const gameResult = await GameResult.findOne({
+          // 정규화된 팀명으로 검색
+          const normalizedHomeTeam = normalizeTeamNameForComparison(selection.homeTeam);
+          const normalizedAwayTeam = normalizeTeamNameForComparison(selection.awayTeam);
+
+          // 시간대 범위 내 모든 경기 결과 조회
+          const allGameResults = await GameResult.findAll({
             where: {
-              homeTeam: selection.homeTeam,
-              awayTeam: selection.awayTeam,
               commenceTime: {
                 [Op.between]: [
                   new Date(new Date(selection.commenceTime).getTime() - 12 * 60 * 60 * 1000), // ±12시간
@@ -705,6 +709,13 @@ router.get('/exchange/orders/:orderId/matches', verifyToken, requireAdmin(1), as
               }
             },
             order: [['createdAt', 'DESC']]
+          });
+
+          // 정규화된 팀명으로 매칭
+          const gameResult = allGameResults.find(gr => {
+            const grHomeNorm = normalizeTeamNameForComparison(gr.homeTeam);
+            const grAwayNorm = normalizeTeamNameForComparison(gr.awayTeam);
+            return grHomeNorm === normalizedHomeTeam && grAwayNorm === normalizedAwayTeam;
           });
           
           if (gameResult) {
@@ -737,10 +748,13 @@ router.get('/exchange/orders/:orderId/matches', verifyToken, requireAdmin(1), as
     } else {
       // 단일 경기인 경우
       try {
-        const gameResult = await GameResult.findOne({
+        // 정규화된 팀명으로 검색
+        const normalizedHomeTeam = normalizeTeamNameForComparison(originalOrder.homeTeam);
+        const normalizedAwayTeam = normalizeTeamNameForComparison(originalOrder.awayTeam);
+
+        // 시간대 범위 내 모든 경기 결과 조회
+        const allGameResults = await GameResult.findAll({
           where: {
-            homeTeam: originalOrder.homeTeam,
-            awayTeam: originalOrder.awayTeam,
             commenceTime: {
               [Op.between]: [
                 new Date(new Date(originalOrder.commenceTime).getTime() - 12 * 60 * 60 * 1000), // ±12시간
@@ -749,6 +763,13 @@ router.get('/exchange/orders/:orderId/matches', verifyToken, requireAdmin(1), as
             }
           },
           order: [['createdAt', 'DESC']]
+        });
+
+        // 정규화된 팀명으로 매칭
+        const gameResult = allGameResults.find(gr => {
+          const grHomeNorm = normalizeTeamNameForComparison(gr.homeTeam);
+          const grAwayNorm = normalizeTeamNameForComparison(gr.awayTeam);
+          return grHomeNorm === normalizedHomeTeam && grAwayNorm === normalizedAwayTeam;
         });
         
         if (gameResult) {
