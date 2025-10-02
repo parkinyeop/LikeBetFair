@@ -57,9 +57,9 @@ async function collectKLeagueData() {
     // 각 경기 처리
     for (const event of data.events) {
       try {
-        // 기본 정보 추출
-        const homeTeam = normalizeTeamName(event.strHomeTeam, 'KLEAGUE1');
-        const awayTeam = normalizeTeamName(event.strAwayTeam, 'KLEAGUE1');
+        // 기본 정보 추출 (원본 팀명 사용)
+        const homeTeam = KLEAGUE_TEAM_MAPPING[event.strHomeTeam] || event.strHomeTeam;
+        const awayTeam = KLEAGUE_TEAM_MAPPING[event.strAwayTeam] || event.strAwayTeam;
         // strTimestamp가 UTC 시간이므로 이를 사용
         let commenceTime;
         if (event.strTimestamp) {
