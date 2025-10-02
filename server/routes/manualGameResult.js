@@ -194,7 +194,7 @@ router.get('/order-game-results/:orderId', async (req, res) => {
           gameResult: gameResult ? {
             score: gameResult.score,
             status: gameResult.status,
-            result: gameResult.result,
+            result: gameResult.status, // 호환성을 위해 status를 result로 복사
             updatedAt: gameResult.updatedAt
           } : null
         });

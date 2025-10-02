@@ -224,7 +224,7 @@ async function collectMissingLeagueResults() {
                   { name: event.strHomeTeam, score: homeScore.toString() },
                   { name: event.strAwayTeam, score: awayScore.toString() }
                 ] : null,
-                result: result,
+                // result 필드 제거 - status로 대체
                 lastUpdated: new Date()
               });
               

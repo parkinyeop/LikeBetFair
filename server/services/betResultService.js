@@ -11,6 +11,7 @@ import sequelize from '../models/sequelize.js';
 import { normalizeTeamName, normalizeTeamNameForComparison, normalizeCategory, normalizeCategoryPair, normalizeOption, calculateTeamNameSimilarity, findBestTeamMatch } from '../normalizeUtils.js';
 import { ADMIN_CONFIG } from '../config/centralizedConfig.js';
 import settlementValidation from '../utils/settlementValidation.js';
+import { isGameCancelledOrPostponed, isGameFinished, isGamePending } from '../utils/gameStatusHelpers.js';
 
 // 배당률 제공 카테고리만 허용 (gameResultService와 동일하게 유지)
 const allowedCategories = ['baseball', 'soccer', 'basketball'];
@@ -185,6 +186,19 @@ class BetResultService {
         order: [['createdAt', 'DESC']]
       });
 
+      // 정산을 위해 finished 상태 경기를 우선 정렬
+      const statusPriority = { 'finished': 1, 'cancelled': 2, 'postponed': 3, 'scheduled': 4, 'live': 5 };
+      candidateGames.sort((a, b) => {
+        const priorityA = statusPriority[a.status] || 99;
+        const priorityB = statusPriority[b.status] || 99;
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB; // finished가 가장 먼저
+        }
+        // 같은 우선순위면 시간이 가까운 것 우선
+        return Math.abs(new Date(a.commenceTime).getTime() - commenceTime.getTime()) - 
+               Math.abs(new Date(b.commenceTime).getTime() - commenceTime.getTime());
+      });
+
       // 메모리에서 정규화된 팀명으로 매칭
       let gameResult = null;
       for (const candidate of candidateGames) {
@@ -311,8 +325,7 @@ class BetResultService {
       }
 
       // 취소/연기 처리
-      if (gameResult.status === 'cancelled' || gameResult.result === 'cancelled' ||
-          gameResult.status === 'postponed' || gameResult.result === 'postponed') {
+      if (isGameCancelledOrPostponed(gameResult)) {
         selection.result = 'cancelled';
         hasCancelled = true;
         continue;
@@ -325,7 +338,6 @@ class BetResultService {
       console.log(`   - 팀/옵션: ${selection.team}`);
       console.log(`   - 포인트: ${selection.point}`);
       console.log(`   - 경기 결과 상태: ${gameResult.status}`);
-      console.log(`   - 경기 결과: ${gameResult.result}`);
       console.log(`   - 스코어: ${JSON.stringify(gameResult.score)}`);
       
       const selectionResult = this.determineSelectionResult(selection, gameResult, validatedScore);
@@ -794,24 +806,25 @@ class BetResultService {
     if (marketType === 'spreads') marketType = '핸디캡';
     if (marketType === 'Win/Loss') marketType = '승/패';
     if (marketType === 'Over/Under') marketType = '언더/오버';
+    if (marketType === 'Handicap') marketType = '핸디캡';
     
     const resultFunction = this.marketResultMap[marketType];
     if (resultFunction) {
       return resultFunction(selection, gameResult, validatedScore);
     }
+    console.log(`[경고] 알 수 없는 마켓 타입: ${selection.market} → 변환 후: ${marketType}`);
     return 'pending';
   }
 
   // 승/패 결과 판정
   determineWinLoseResult(selection, gameResult, validatedScore = null) {
     // 경기 취소 또는 연기 시 즉시 환불
-    if (gameResult.result === 'cancelled' || gameResult.status === 'cancelled' ||
-        gameResult.result === 'postponed' || gameResult.status === 'postponed') {
+    if (isGameCancelledOrPostponed(gameResult)) {
       return 'cancelled';
     }
 
-    // ✅ status가 finished이고 스코어가 있으면 result 필드를 무시하고 스코어로 직접 계산
-    if (gameResult.status === 'finished' && gameResult.score && Array.isArray(gameResult.score) && gameResult.score.length >= 2) {
+    // ✅ status가 finished이고 스코어가 있으면 스코어로 직접 계산
+    if (isGameFinished(gameResult) && gameResult.score && Array.isArray(gameResult.score) && gameResult.score.length >= 2) {
       const homeScoreData = gameResult.score.find(s => s.name === gameResult.homeTeam);
       const awayScoreData = gameResult.score.find(s => s.name === gameResult.awayTeam);
       
@@ -845,22 +858,21 @@ class BetResultService {
       }
     }
 
-    // result 필드가 있으면 사용 (하위 호환성)
-    if (gameResult.result === 'pending') {
+    // status로 결과 판정
+    if (isGamePending(gameResult)) {
       return 'pending';
     }
 
     // team 정규화 적용 (비교용)
     const selectedTeam = normalizeTeamNameForComparison(selection.team);
-    const gameResultData = gameResult.result;
     const homeTeam = normalizeTeamNameForComparison(gameResult.homeTeam);
     const awayTeam = normalizeTeamNameForComparison(gameResult.awayTeam);
 
-    if (gameResultData === 'home_win') {
+    if (gameResult.status === 'home_win') {
       return selectedTeam === homeTeam ? 'won' : 'lost';
-    } else if (gameResultData === 'away_win') {
+    } else if (gameResult.status === 'away_win') {
       return selectedTeam === awayTeam ? 'won' : 'lost';
-    } else if (gameResultData === 'draw') {
+    } else if (gameResult.status === 'draw') {
       // ✅ 무승부: Draw 선택했으면 won, 아니면 lost
       const isDraw = selection.team.toLowerCase() === 'draw';
       return isDraw ? 'won' : 'lost';
@@ -872,16 +884,13 @@ class BetResultService {
   // 언더/오버 결과 판정
   determineOverUnderResult(selection, gameResult, validatedScore = null) {
     // 경기 취소 또는 연기 시 즉시 환불
-    if (gameResult.result === 'cancelled' || gameResult.status === 'cancelled' ||
-        gameResult.result === 'postponed' || gameResult.status === 'postponed') {
+    if (isGameCancelledOrPostponed(gameResult)) {
       return 'cancelled';
     }
 
-    // ✅ status가 finished가 아니거나 스코어가 없으면 pending
-    if (gameResult.status !== 'finished' || !gameResult.score || !Array.isArray(gameResult.score) || gameResult.score.length < 2) {
-      if (gameResult.result === 'pending') {
-        return 'pending';
-      }
+    // ✅ 경기가 종료되지 않았거나 스코어가 없으면 pending
+    if (!isGameFinished(gameResult) || !gameResult.score || !Array.isArray(gameResult.score) || gameResult.score.length < 2) {
+      return 'pending';
     }
 
     // robust하게 옵션 추출 (예: 'Overbet365', 'UnderPinnacle', 'Over 2.5' 등)
@@ -941,47 +950,46 @@ class BetResultService {
   // 핸디캡 결과 판정
   determineHandicapResult(selection, gameResult, validatedScore = null) {
     // 경기 취소 또는 연기 시 즉시 환불
-    if (gameResult.result === 'cancelled' || gameResult.status === 'cancelled' ||
-        gameResult.result === 'postponed' || gameResult.status === 'postponed') {
+    if (isGameCancelledOrPostponed(gameResult)) {
       return 'cancelled';
     }
 
-    // ✅ status가 finished가 아니거나 스코어가 없으면 pending
-    if (gameResult.status !== 'finished' || !gameResult.score || !Array.isArray(gameResult.score) || gameResult.score.length < 2) {
-      if (gameResult.result === 'pending') {
-        return 'pending';
-      }
+    // ✅ 경기가 종료되지 않았거나 스코어가 없으면 pending
+    if (!isGameFinished(gameResult) || !gameResult.score || !Array.isArray(gameResult.score) || gameResult.score.length < 2) {
+      return 'pending';
     }
 
     // 핸디캡 베팅에서 팀명과 핸디캡 분리 (개선된 로직)
     let selectedTeam, handicap;
-    if (selection.team && (selection.team.includes(' -') || selection.team.includes(' +'))) {
-      // "Kia Tigers -1", "Lotte Giants +1", "Ulsan Hyundai FC --0.75" 형식에서 팀명과 핸디캡 분리
-      const match = selection.team.match(/^(.+?)\s*([+-]+[\d.]+)$/);
-      if (match) {
-        selectedTeam = normalizeTeamNameForComparison(match[1].trim());
-        // 핸디캡 값 파싱 (예: "--0.75" -> -0.75, "+1" -> 1)
-        const handicapStr = match[2];
-        if (handicapStr.startsWith('--')) {
-          handicap = -parseFloat(handicapStr.substring(2));
-        } else if (handicapStr.startsWith('-')) {
-          handicap = -parseFloat(handicapStr.substring(1));
-        } else if (handicapStr.startsWith('+')) {
-          handicap = parseFloat(handicapStr.substring(1));
-        } else {
-          handicap = parseFloat(handicapStr);
-        }
-        console.log(`[핸디캡 파싱] 팀명: "${selectedTeam}", 핸디캡: ${handicap} (원본: "${handicapStr}")`);
+    
+    // 핸디캡 파싱 개선: "Sport Recife 0", "Miami Dolphins -3" 등 모든 형식 지원
+    // 정규식: 팀명 + 공백 + (부호 선택적) + 숫자
+    const handicapMatch = selection.team.match(/^(.+?)\s+([+-]?)(\d+(?:\.\d+)?)$/);
+    
+    if (handicapMatch) {
+      // 매칭 성공: 팀명과 핸디캡 분리
+      selectedTeam = normalizeTeamNameForComparison(handicapMatch[1].trim());
+      const sign = handicapMatch[2] === '-' ? -1 : 1;
+      const value = parseFloat(handicapMatch[3]);
+      handicap = sign * value;
+      console.log(`[핸디캡 파싱] 팀명: "${selectedTeam}", 핸디캡: ${handicap} (원본: "${selection.team}")`);
+    } else if (selection.team && (selection.team.includes('--'))) {
+      // 특수 케이스: "--0.75" 형식 (예: "Ulsan Hyundai FC --0.75")
+      const specialMatch = selection.team.match(/^(.+?)\s*(--[\d.]+)$/);
+      if (specialMatch) {
+        selectedTeam = normalizeTeamNameForComparison(specialMatch[1].trim());
+        handicap = -parseFloat(specialMatch[2].substring(2));
+        console.log(`[핸디캡 파싱] 특수 형식, 팀명: "${selectedTeam}", 핸디캡: ${handicap} (원본: "${specialMatch[2]}")`);
       } else {
         selectedTeam = normalizeTeamNameForComparison(selection.team);
-        handicap = 0;
-        console.log(`[핸디캡 파싱] 정규식 매칭 실패, 팀명: "${selectedTeam}", 핸디캡: ${handicap}`);
+        handicap = selection.handicap || 0;
+        console.log(`[핸디캡 파싱] 특수 형식 매칭 실패, 팀명: "${selectedTeam}", 핸디캡: ${handicap}`);
       }
     } else {
-      // 기존 방식 (selection.team이 팀명만 있는 경우)
+      // 핸디캡이 포함되지 않은 경우 (selection.handicap 필드 사용)
       selectedTeam = normalizeTeamNameForComparison(selection.team);
-      handicap = selection.handicap || 0;
-      console.log(`[핸디캡 파싱] 기본 방식, 팀명: "${selectedTeam}", 핸디캡: ${handicap}`);
+      handicap = selection.handicap || selection.point || 0;
+      console.log(`[핸디캡 파싱] 별도 필드 사용, 팀명: "${selectedTeam}", 핸디캡: ${handicap}`);
     }
     
     // 스코어 계산 (검증된 스코어 우선 사용)
@@ -1190,7 +1198,7 @@ class BetResultService {
           ...selection,
           gameResult: gameResult ? {
             status: gameResult.status,
-            result: gameResult.result,
+            result: gameResult.status, // 호환성을 위해 status를 result로 복사
             score: gameResult.score,
             homeTeam: gameResult.homeTeam,
             awayTeam: gameResult.awayTeam

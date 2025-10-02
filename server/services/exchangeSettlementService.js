@@ -12,6 +12,7 @@ import { ADMIN_CONFIG } from '../config/centralizedConfig.js';
 import PrecisionCalculation from '../utils/precisionCalculation.js';
 import GameResultQuery from '../utils/gameResultQuery.js';
 import { getLocationConfig } from '../config/gameResultQuery.js';
+import { isGameFinished, isGameCancelledOrPostponed } from '../utils/gameStatusHelpers.js';
 
 // 스크립트 전용 Sequelize 인스턴스 생성
 const sequelize = createScriptSequelize();
@@ -112,7 +113,7 @@ class ExchangeSettlementService {
       console.log(`🎯 경기 ${homeTeam} vs ${awayTeam} 자동 정산 시작...`);
 
       const gameResult = await this.findGameResultByMatch(homeTeam, awayTeam, commenceTime);
-      if (!gameResult || gameResult.status !== 'finished') {
+      if (!gameResult || !isGameFinished(gameResult)) {
         // gameResult.id가 없으면 gameId를 생성할 수 없으므로 gameResult.id를 사용하도록 수정
         const gameKey = gameResult ? `${gameResult.homeTeam}|${gameResult.awayTeam}|${gameResult.commenceTime}` : `${homeTeam}|${awayTeam}|${commenceTime}`;
         console.log(`[Main Settlement] 경기 결과를 찾을 수 없거나 경기가 아직 끝나지 않았습니다: ${gameKey}`);
@@ -127,7 +128,7 @@ class ExchangeSettlementService {
       }
 
       console.log(`🏟️ 경기 정보:${gameResult.homeTeam} vs ${gameResult.awayTeam}`);
-      console.log(`📊 경기 결과: ${gameResult.result}, 스코어:`, gameResult.score);
+      console.log(`📊 경기 결과: ${gameResult.status}, 스코어:`, gameResult.score);
 
       // 🎯 팀명+날짜 기반 ExchangeOrderMatch 정산
       const matchSettlementResult = await this.settleMatchedOrdersByTeam(homeTeam, awayTeam, commenceTime, gameResult);
@@ -854,7 +855,7 @@ class ExchangeSettlementService {
     memo += ` - ${order.side.toUpperCase()}: ${order.selection}, ` +
             `경기: ${gameResult.homeTeam} vs ${gameResult.awayTeam}, ` +
             `배당: ${order.price}배, ` +
-            `결과: ${gameResult.result}`;
+            `결과: ${gameResult.status}`;
     
     // 🆕 실제 상금 지급 기록
     await PaymentHistory.create({
@@ -890,7 +891,7 @@ class ExchangeSettlementService {
     
     return `${market} 베팅 ${result}${partialMatchInfo} - 선택: ${selection}, ` +
            `경기: ${gameResult.homeTeam} vs ${gameResult.awayTeam}, ` +
-           `결과: ${gameResult.result}`;
+           `결과: ${gameResult.status}`;
   }
 
   /**
@@ -1310,7 +1311,7 @@ class ExchangeSettlementService {
         };
       }
       
-      console.log(`🏟️ 경기 결과: ${gameResult.result}, 스코어:`, gameResult.score);
+      console.log(`🏟️ 경기 결과: ${gameResult.status}, 스코어:`, gameResult.score);
       
       // 정산 대상 주문들 조회
       const orders = await this.getSettlableOrdersByMatch(homeTeam, awayTeam, commenceTime);
@@ -1741,13 +1742,13 @@ class ExchangeSettlementService {
     
     // 승패 마켓의 경우
     if (selection.market === '승패' || selection.market === 'h2h') {
-      if (gameResult.result === 'home_win' && selectedTeam === homeTeam) {
+      if (gameResult.status === 'home_win' && selectedTeam === homeTeam) {
         return true;
       }
-      if (gameResult.result === 'away_win' && selectedTeam === awayTeam) {
+      if (gameResult.status === 'away_win' && selectedTeam === awayTeam) {
         return true;
       }
-      if (gameResult.result === 'draw' && selectedTeam === 'Draw') {
+      if (gameResult.status === 'draw' && selectedTeam === 'Draw') {
         return true;
       }
       return false;
@@ -2147,7 +2148,7 @@ class ExchangeSettlementService {
           }
           
           console.log(`\n🏟️ 경기 정산 시작: ${gameResult.homeTeam} vs ${gameResult.awayTeam}`);
-          console.log(`   📊 결과: ${gameResult.result}, 스코어: ${JSON.stringify(gameResult.score)}`);
+          console.log(`   📊 결과: ${gameResult.status}, 스코어: ${JSON.stringify(gameResult.score)}`);
           console.log(`   🤝 정산할 쌍 수: ${pairs.length}개`);
           
           // 각 쌍에 대해 정산 실행
@@ -2217,7 +2218,7 @@ class ExchangeSettlementService {
             
             if (gameResult) {
               console.log(`   🏟️ 경기 찾음: ${gameResult.homeTeam} vs ${gameResult.awayTeam}`);
-              console.log(`   📊 결과: ${gameResult.result}, 스코어: ${JSON.stringify(gameResult.score)}`);
+              console.log(`   📊 결과: ${gameResult.status}, 스코어: ${JSON.stringify(gameResult.score)}`);
               
               const result = await this.settlePair(pair, gameResult, null);
               totalSettled += 2; // back + lay 주문

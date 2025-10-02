@@ -2578,9 +2578,9 @@ export default function ExchangeAdmin() {
                                   const gameKey = selection.homeTeam + ' vs ' + selection.awayTeam;
                                   const gameResult = selectedOrder.gameResults?.[gameKey];
                                   
-                                  // 🆕 경기 결과가 없거나, result가 없거나, score가 N/A이거나, status가 pending인 경우
+                                  // 🆕 경기 결과가 없거나, status가 없거나, score가 N/A이거나, status가 pending인 경우
                                   return !gameResult || 
-                                         !gameResult.result || 
+                                         !gameResult.status || 
                                          !gameResult.score || 
                                          gameResult.score === 'N/A' ||
                                          !gameResult.status || 
@@ -2611,14 +2611,14 @@ export default function ExchangeAdmin() {
                                   
                                   const gameResult = selectedOrder.gameResults[selection.homeTeam + ' vs ' + selection.awayTeam];
                                   
-                                  // 🆕 경기 결과가 아직 없는 경우 (score가 N/A이거나 result가 없는 경우)
-                                  if (!gameResult.result || gameResult.score === 'N/A' || !gameResult.score) {
+                                  // 🆕 경기 결과가 아직 없는 경우 (score가 N/A이거나 status가 없는 경우)
+                                  if (!gameResult.status || gameResult.score === 'N/A' || !gameResult.score) {
                                     return { status: 'pending', result: '경기 결과 대기중', color: 'bg-yellow-100 text-yellow-800' };
                                   }
                                   
-                                  const isHomeWin = gameResult.result === 'home_win';
-                                  const isAwayWin = gameResult.result === 'away_win';
-                                  const isDraw = gameResult.result === 'draw';
+                                  const isHomeWin = gameResult.status === 'home_win';
+                                  const isAwayWin = gameResult.status === 'away_win';
+                                  const isDraw = gameResult.status === 'draw';
                                   
                                   // 선택한 팀이 승리했는지 확인
                                   const selectedTeam = selection.selection;
@@ -2664,7 +2664,7 @@ export default function ExchangeAdmin() {
                                         {/* 경기 결과 표시 */}
                                         <div className="mt-2">
                                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${gameResult.color}`}>
-                                            {gameResult.result}
+                                            {gameResult.status}
                                           </span>
                                         </div>
                                       </div>
@@ -2711,16 +2711,16 @@ export default function ExchangeAdmin() {
                                 <div className="flex justify-between">
                                   <span className="text-sm text-gray-600">경기 결과:</span>
                                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                    selectedOrder.gameResult.result === 'home_win' && selectedOrder.selection === selectedOrder.homeTeam ? 'bg-green-100 text-green-800' :
-                                    selectedOrder.gameResult.result === 'away_win' && selectedOrder.selection === selectedOrder.awayTeam ? 'bg-green-100 text-green-800' :
-                                    selectedOrder.gameResult.result === 'draw' && selectedOrder.selection === 'Draw' ? 'bg-green-100 text-green-800' :
-                                    selectedOrder.gameResult.result === 'home_win' || selectedOrder.gameResult.result === 'away_win' || selectedOrder.gameResult.result === 'draw' ? 'bg-red-100 text-red-800' :
+                                    selectedOrder.gameResult.status === 'home_win' && selectedOrder.selection === selectedOrder.homeTeam ? 'bg-green-100 text-green-800' :
+                                    selectedOrder.gameResult.status === 'away_win' && selectedOrder.selection === selectedOrder.awayTeam ? 'bg-green-100 text-green-800' :
+                                    selectedOrder.gameResult.status === 'draw' && selectedOrder.selection === 'Draw' ? 'bg-green-100 text-green-800' :
+                                    selectedOrder.gameResult.status === 'home_win' || selectedOrder.gameResult.status === 'away_win' || selectedOrder.gameResult.status === 'draw' ? 'bg-red-100 text-red-800' :
                                     'bg-yellow-100 text-yellow-800'
                                   }`}>
-                                    {selectedOrder.gameResult.result === 'home_win' && selectedOrder.selection === selectedOrder.homeTeam ? `승리 (${selectedOrder.gameResult.score})` :
-                                     selectedOrder.gameResult.result === 'away_win' && selectedOrder.selection === selectedOrder.awayTeam ? `승리 (${selectedOrder.gameResult.score})` :
-                                     selectedOrder.gameResult.result === 'draw' && selectedOrder.selection === 'Draw' ? `승리 (${selectedOrder.gameResult.score})` :
-                                     selectedOrder.gameResult.result === 'home_win' || selectedOrder.gameResult.result === 'away_win' || selectedOrder.gameResult.result === 'draw' ? `패배 (${selectedOrder.gameResult.score})` :
+                                    {selectedOrder.gameResult.status === 'home_win' && selectedOrder.selection === selectedOrder.homeTeam ? `승리 (${selectedOrder.gameResult.score})` :
+                                     selectedOrder.gameResult.status === 'away_win' && selectedOrder.selection === selectedOrder.awayTeam ? `승리 (${selectedOrder.gameResult.score})` :
+                                     selectedOrder.gameResult.status === 'draw' && selectedOrder.selection === 'Draw' ? `승리 (${selectedOrder.gameResult.score})` :
+                                     selectedOrder.gameResult.status === 'home_win' || selectedOrder.gameResult.status === 'away_win' || selectedOrder.gameResult.status === 'draw' ? `패배 (${selectedOrder.gameResult.score})` :
                                      '경기 결과 대기중'}
                                   </span>
                                 </div>

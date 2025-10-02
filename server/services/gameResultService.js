@@ -553,7 +553,7 @@ class GameResultService {
           commenceTime: new Date(event.commence_time + 'Z'), // UTC 명시
           status: this.determineGameStatus(event),
           score: event.scores,
-          result: this.determineGameResult(event),
+          // result 필드 제거 - status로 대체
           lastUpdated: new Date()
         }, {
           where: {
@@ -636,7 +636,7 @@ class GameResultService {
           commenceTime,
           status: this.determineGameStatus(matchingGame),
           score: matchingGame.scores,
-          result: this.determineGameResult(matchingGame),
+          // result 필드 제거 - status로 대체
           lastUpdated: new Date()
         }, {
           where: {
@@ -810,7 +810,7 @@ class GameResultService {
                   commenceTime: new Date(event.commence_time + 'Z'), // UTC 명시
                   status: this.determineGameStatus(event),
                   score: validatedScore,
-                  result: this.determineGameResult(event),
+                  // result 필드 제거 - status로 대체
                   eventId: event.id,
                   lastUpdated: new Date()
                 };
@@ -982,7 +982,7 @@ class GameResultService {
                 commenceTime: new Date(game.commence_time + 'Z'), // UTC 명시
                 status: this.determineGameStatus(game),
                 score: validatedScore,
-                result: this.determineGameResult(game),
+                // result 필드 제거 - status로 대체
                 lastUpdated: new Date()
               }, {
                 where: {

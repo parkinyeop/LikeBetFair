@@ -143,7 +143,14 @@ class SettlementValidation {
   }
 
   /**
-   * 스코어 데이터 검증 및 파싱
+   * 스코어 데이터 검증 및 파싱 (다양한 형식 지원)
+   * 
+   * 지원 형식:
+   * 1. [{name: "팀명", score: "1"}] - 팀명과 스코어 배열 (문자열 점수)
+   * 2. [{name: "팀명", score: 1}] - 팀명과 스코어 배열 (숫자 점수)
+   * 3. [{home: 1, away: 2}] - home/away 형식
+   * 4. {home: 1, away: 2} - home/away 객체
+   * 5. "1-2" - 간단한 점수 문자열
    */
   validateAndParseScore(gameResult, validationResult) {
     const result = { isValid: true, score: null };
@@ -155,10 +162,22 @@ class SettlementValidation {
     }
 
     try {
-      // 스코어 파싱 (문자열이면 JSON 파싱, 객체면 그대로 사용)
+      // 스코어 파싱 (문자열이면 JSON 파싱 시도)
       let score;
       if (typeof gameResult.score === 'string') {
-        score = JSON.parse(gameResult.score);
+        try {
+          score = JSON.parse(gameResult.score);
+        } catch (e) {
+          // JSON 파싱 실패 시 간단한 점수 문자열로 처리 (예: "1-2")
+          const match = gameResult.score.match(/^(\d+)-(\d+)$/);
+          if (match) {
+            result.score = { home: parseInt(match[1]), away: parseInt(match[2]) };
+            return result;
+          }
+          validationResult.issues.push(`Score parsing failed: ${e.message}`);
+          result.isValid = false;
+          return result;
+        }
       } else {
         score = gameResult.score;
       }
@@ -171,7 +190,28 @@ class SettlementValidation {
           return result;
         }
 
-        // 첫 번째 스코어 요소 검증
+        // 형식 1, 2: [{name: "팀명", score: "1"}] 형식 처리
+        if (score.length >= 2 && score[0].name && score[0].score !== undefined) {
+          const homeScore = this.parseScoreValue(score[0].score);
+          const awayScore = this.parseScoreValue(score[1].score);
+          
+          if (homeScore === null || awayScore === null) {
+            validationResult.issues.push('Invalid score values in name/score format');
+            result.isValid = false;
+            return result;
+          }
+
+          if (homeScore < 0 || awayScore < 0) {
+            validationResult.issues.push(`Invalid negative scores: home=${homeScore}, away=${awayScore}`);
+            result.isValid = false;
+            return result;
+          }
+
+          result.score = { home: homeScore, away: awayScore };
+          return result;
+        }
+
+        // 형식 3: [{home: 1, away: 2}] 형식 처리
         const firstScore = score[0];
         if (!firstScore || typeof firstScore !== 'object') {
           validationResult.issues.push('Invalid score array element format');
@@ -179,50 +219,82 @@ class SettlementValidation {
           return result;
         }
 
-        // home, away 스코어 검증
-        if (typeof firstScore.home !== 'number' || typeof firstScore.away !== 'number') {
-          validationResult.issues.push('Score home/away values must be numbers');
-          result.isValid = false;
+        if (firstScore.home !== undefined && firstScore.away !== undefined) {
+          const homeScore = this.parseScoreValue(firstScore.home);
+          const awayScore = this.parseScoreValue(firstScore.away);
+
+          if (homeScore === null || awayScore === null) {
+            validationResult.issues.push('Score home/away values must be numbers');
+            result.isValid = false;
+            return result;
+          }
+
+          if (homeScore < 0 || awayScore < 0) {
+            validationResult.issues.push(`Invalid negative scores: home=${homeScore}, away=${awayScore}`);
+            result.isValid = false;
+            return result;
+          }
+
+          result.score = { home: homeScore, away: awayScore };
           return result;
         }
 
-        // 음수 스코어 검증
-        if (firstScore.home < 0 || firstScore.away < 0) {
-          validationResult.issues.push(`Invalid negative scores: home=${firstScore.home}, away=${firstScore.away}`);
-          result.isValid = false;
-          return result;
-        }
-
-        result.score = firstScore;
+        validationResult.issues.push('Unknown score array format');
+        result.isValid = false;
+        return result;
       }
-      // 객체 형태 스코어 검증
+      // 형식 4: {home: 1, away: 2} 객체 형태 스코어 검증
       else if (typeof score === 'object' && score !== null) {
-        if (typeof score.home !== 'number' || typeof score.away !== 'number') {
-          validationResult.issues.push('Score object must have numeric home/away properties');
-          result.isValid = false;
+        if (score.home !== undefined && score.away !== undefined) {
+          const homeScore = this.parseScoreValue(score.home);
+          const awayScore = this.parseScoreValue(score.away);
+
+          if (homeScore === null || awayScore === null) {
+            validationResult.issues.push('Score object must have numeric home/away properties');
+            result.isValid = false;
+            return result;
+          }
+
+          if (homeScore < 0 || awayScore < 0) {
+            validationResult.issues.push(`Invalid negative scores: home=${homeScore}, away=${awayScore}`);
+            result.isValid = false;
+            return result;
+          }
+
+          result.score = { home: homeScore, away: awayScore };
           return result;
         }
 
-        if (score.home < 0 || score.away < 0) {
-          validationResult.issues.push(`Invalid negative scores: home=${score.home}, away=${score.away}`);
-          result.isValid = false;
-          return result;
-        }
-
-        result.score = score;
+        validationResult.issues.push('Score object missing home/away properties');
+        result.isValid = false;
+        return result;
       } else {
         validationResult.issues.push('Score must be an array or object');
         result.isValid = false;
         return result;
       }
 
-      return result;
-
     } catch (error) {
       validationResult.issues.push(`Score parsing error: ${error.message}`);
       result.isValid = false;
       return result;
     }
+  }
+
+  /**
+   * 스코어 값 파싱 헬퍼 (문자열 숫자 → 숫자 변환)
+   * @param {any} value - 파싱할 값
+   * @returns {number|null} 파싱된 숫자 또는 null
+   */
+  parseScoreValue(value) {
+    if (typeof value === 'number') {
+      return isNaN(value) ? null : value;
+    }
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value);
+      return isNaN(parsed) ? null : parsed;
+    }
+    return null;
   }
 
   /**

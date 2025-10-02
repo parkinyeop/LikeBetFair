@@ -321,7 +321,7 @@ export async function getBetHistory(req, res) {
                 ...selection,
                 gameResult: gameResult ? {
                   status: gameResult.status,
-                  result: gameResult.result,
+                  result: gameResult.status, // 호환성을 위해 status를 result로 복사
                   score: gameResult.score ? (typeof gameResult.score === 'string' ? 
                     (() => {
                       try {

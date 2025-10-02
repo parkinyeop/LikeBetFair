@@ -1804,7 +1804,7 @@ export default function BettingAdmin() {
                                   
                                   // gameResult 객체가 있는 경우 상세 검증
                                   if (selection.gameResult) {
-                                    return !selection.gameResult.result || 
+                                    return !selection.gameResult.status || 
                                            !selection.gameResult.score || 
                                            selection.gameResult.score === 'N/A' ||
                                            !selection.gameResult.status || 
@@ -1912,7 +1912,7 @@ export default function BettingAdmin() {
                                       {/* 경기 결과 표시 */}
                                       <div className="mt-2">
                                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${gameResult.color}`}>
-                                          {gameResult.result}
+                                          {gameResult.status}
                                         </span>
                                         {/* 스코어 정보 표시 (개선됨) */}
                                         {selection.gameResult && selection.gameResult.score && (
@@ -1962,14 +1962,14 @@ export default function BettingAdmin() {
                                               </div>
                                             )}
                                             {/* 경기 결과 */}
-                                            {selection.gameResult.result && selection.gameResult.result !== 'pending' && (
+                                            {selection.gameResult.status && selection.gameResult.status !== 'pending' && (
                                               <div>
                                                 경기 결과: 
                                                 <span className="ml-1 font-medium">
-                                                  {selection.gameResult.result === 'home_win' ? '홈팀 승리' :
-                                                   selection.gameResult.result === 'away_win' ? '원정팀 승리' :
-                                                   selection.gameResult.result === 'draw' ? '무승부' :
-                                                   selection.gameResult.result}
+                                                  {selection.gameResult.status === 'home_win' ? '홈팀 승리' :
+                                                   selection.gameResult.status === 'away_win' ? '원정팀 승리' :
+                                                   selection.gameResult.status === 'draw' ? '무승부' :
+                                                   selection.gameResult.status}
                                                 </span>
                                               </div>
                                             )}

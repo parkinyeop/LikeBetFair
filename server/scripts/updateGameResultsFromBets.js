@@ -237,7 +237,7 @@ async function updateGameResultsFromBets() {
           commenceTime: gameInfo.commenceTime,
           status: 'scheduled',
           score: score,
-          result: result,
+          // result 필드 제거 - status로 대체
           lastUpdated: new Date()
         });
         

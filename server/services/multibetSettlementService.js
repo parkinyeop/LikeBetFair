@@ -247,7 +247,7 @@ class MultibetSettlementService {
       }
 
       if (gameResult) {
-        console.log(`✅ 경기 결과 발견: ${gameResult.result} (${gameResult.score})`);
+        console.log(`✅ 경기 결과 발견: ${gameResult.status} (${gameResult.score})`);
 
         // 🛡️ GUARD CLAUSE: GameResult 데이터 무결성 검증 (Soft Validation)
         const validationResult = await settlementValidation.softValidateGameResult(

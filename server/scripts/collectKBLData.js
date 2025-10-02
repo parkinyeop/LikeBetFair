@@ -135,7 +135,7 @@ async function collectKBLSeasonData() {
               commenceTime: commenceTime,
               status: status,
               score: score,
-              result: result,
+              // result 필드 제거 - status로 대체
               eventId: event.idEvent,
               lastUpdated: new Date()
             });

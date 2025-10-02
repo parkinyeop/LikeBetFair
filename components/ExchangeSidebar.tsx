@@ -1299,9 +1299,9 @@ function OrderHistoryPanel() {
                               })()}
                               
                               {/* 경기 결과 정보 */}
-                              {gameResult.result && (
+                              {gameResult.status && (
                                 <div className="text-xs text-gray-500 mt-1">
-                                  <span className="font-medium">결과:</span> {gameResult.result}
+                                  <span className="font-medium">결과:</span> {gameResult.status}
                                 </div>
                               )}
                             </div>

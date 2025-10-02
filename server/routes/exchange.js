@@ -1278,7 +1278,7 @@ router.get('/orders', verifyToken, async (req, res) => {
               gameResult = {
                 score: gameResult.score,
                 status: gameResult.status,
-                result: gameResult.result,
+                result: gameResult.status, // 호환성을 위해 status를 result로 복사
                 homeTeam: gameResult.homeTeam,
                 awayTeam: gameResult.awayTeam,
                 updatedAt: gameResult.updatedAt

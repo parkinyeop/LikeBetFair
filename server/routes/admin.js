@@ -725,7 +725,7 @@ router.get('/exchange/orders/:orderId/matches', verifyToken, requireAdmin(1), as
             }
             
             gameResults[gameKey] = {
-              result: gameResult.result,
+              result: gameResult.status, // 호환성을 위해 status를 result로 복사
               score: scoreString,
               status: gameResult.status
             };
@@ -768,7 +768,7 @@ router.get('/exchange/orders/:orderId/matches', verifyToken, requireAdmin(1), as
           
           // 단일 경기 결과를 gameResult 형태로 설정
           originalOrder.gameResult = {
-            result: gameResult.result,
+            result: gameResult.status, // 호환성을 위해 status를 result로 복사
             score: scoreString,
             status: gameResult.status
           };
@@ -1588,7 +1588,7 @@ router.get('/bets/:id', verifyToken, requireAdmin(1), async (req, res) => {
             ...selection,
             gameResult: gameResult ? {
               status: gameResult.status,
-              result: gameResult.result,
+              result: gameResult.status, // 호환성을 위해 status를 result로 복사
               score: gameResult.score,
               homeTeam: gameResult.homeTeam,
               awayTeam: gameResult.awayTeam
