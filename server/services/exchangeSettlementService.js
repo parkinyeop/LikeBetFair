@@ -134,13 +134,14 @@ class ExchangeSettlementService {
       const matchSettlementResult = await this.settleMatchedOrdersByTeam(homeTeam, awayTeam, commenceTime, gameResult);
 
       // 🆕 정산 대상 주문들 조회 (매칭된 상태 + 부분 매칭된 상태의 주문들)
-      // 수정: settledAt: null 조건을 제거하여 이미 정산된 주문도 포함하여 매칭된 쌍을 찾을 수 있도록 함
+      // 🔴 CRITICAL: settledAt: null 조건 필수 (중복 정산 방지)
       const orders = await ExchangeOrder.findAll({
         where: {
           homeTeam,
           awayTeam,
           commenceTime,
-          status: { [Op.in]: ['matched', 'partially_matched', 'active'] }  // 🆕 active 상태도 포함
+          status: { [Op.in]: ['matched', 'partially_matched', 'active'] },
+          settledAt: null  // 🔴 아직 정산되지 않은 주문만
         },
         transaction
       });
@@ -170,13 +171,14 @@ class ExchangeSettlementService {
       orders = regularOrders;
       
       // 🆕 연결된 주문들도 함께 조회 (matchedOrderId가 있는 주문들 + 부분 매칭된 주문들)
-      // 수정: settledAt: null 조건을 제거하여 이미 정산된 주문도 포함
+      // 🔴 CRITICAL: settledAt: null 조건 필수 (중복 정산 방지)
       const connectedOrders = await ExchangeOrder.findAll({
         where: {
           homeTeam,
           awayTeam,
           commenceTime,
-          status: { [Op.in]: ['matched', 'partially_matched', 'active', 'settled'] }  // 🆕 settled 상태도 포함
+          status: { [Op.in]: ['matched', 'partially_matched', 'active'] },
+          settledAt: null  // 🔴 아직 정산되지 않은 주문만
         },
         transaction
       });
@@ -806,21 +808,89 @@ class ExchangeSettlementService {
     
     await user.update({ balance: newBalance }, { transaction });
     
-    // 🆕 수수료가 있는 경우 AdminCommission 기록
+    // 🆕 수수료가 있는 경우 AdminCommission 기록 및 지급
     if (commissionAmount > 0) {
-      await AdminCommission.create({
-        adminId: ADMIN_CONFIG.SYSTEM_ADMIN_ID, // 시스템 관리자 ID
-        userId: user.id,
-        betId: null, // 익스체인지는 betId 사용하지 않음
-        exchangeOrderId: order.id, // Exchange 주문 ID
-        betAmount: order.stakeAmount,
-        winAmount: amount + order.stakeAmount, // 총 당첨금
-        commissionRate: await CommissionSettingsService.getCommissionRate('exchange'),
-        commissionAmount: commissionAmount,
-        status: 'paid',
-        paidAt: new Date(),
-        type: 'exchange' // 익스체인지 수수료 구분
-      }, { transaction });
+      // 추천인 확인
+      const ReferralCode = (await import('../models/referralCodeModel.js')).default;
+      const referralCode = user.referralCode ? await ReferralCode.findOne({
+        where: { 
+          code: user.referralCode, 
+          isActive: true 
+        },
+        transaction
+      }) : null;
+
+      let commissionRecipientId = ADMIN_CONFIG.SYSTEM_ADMIN_ID; // 기본: 시스템 관리자
+      let commissionType = 'exchange'; // 기본: exchange 수수료
+
+      // 추천인이 있는 경우 → 추천인에게 실제 지급
+      if (referralCode) {
+        const findOptions = { transaction };
+        if (transaction) {
+          findOptions.lock = transaction.LOCK.UPDATE;
+        }
+        const referrerUser = await User.findByPk(referralCode.adminId, findOptions);
+
+        if (referrerUser) {
+          // 추천인 수수료 계산 (승리 금액의 일정 비율)
+          const referralCommissionRate = referralCode.commissionRate || 0.05;
+          const referralCommissionAmount = Math.floor((amount + order.stakeAmount) * referralCommissionRate);
+
+          if (referralCommissionAmount > 0) {
+            // 추천인 잔액에 실제 입금
+            const referrerNewBalance = PrecisionCalculation.add(referrerUser.balance, referralCommissionAmount);
+            await referrerUser.update({ balance: referrerNewBalance }, { transaction });
+
+            // AdminCommission 기록 (type: 'referral')
+            await AdminCommission.create({
+              adminId: referrerUser.id,
+              userId: user.id,
+              betId: null,
+              exchangeOrderId: order.id,
+              betAmount: order.stakeAmount,
+              winAmount: amount + order.stakeAmount,
+              commissionRate: referralCommissionRate,
+              commissionAmount: referralCommissionAmount,
+              status: 'paid',
+              paidAt: new Date(),
+              type: 'referral' // 추천인 수수료
+            }, { transaction });
+
+            // 추천인에게 지급된 수수료 기록
+            await PaymentHistory.create({
+              userId: referrerUser.id,
+              betId: `EXCHANGE_${order.id}`,
+              amount: referralCommissionAmount,
+              memo: `익스체인지 추천인 수수료 (${user.email} 주문 승리, ${(referralCommissionRate * 100).toFixed(2)}%)`,
+              paidAt: new Date(),
+              balanceAfter: referrerNewBalance
+            }, { transaction });
+
+            console.log(`      💰 추천인 수수료: ${referrerUser.email}에게 ${referralCommissionAmount}원 지급 (${(referralCommissionRate * 100).toFixed(2)}%)`);
+
+            // 추천인에게 지급했으므로 시스템 관리자에게는 기록하지 않음
+            commissionRecipientId = referrerUser.id;
+            commissionType = 'referral';
+          }
+        }
+      } else {
+        // 추천인이 없는 경우 → 시스템 관리자에게 기록만 (회계용)
+        await AdminCommission.create({
+          adminId: ADMIN_CONFIG.SYSTEM_ADMIN_ID,
+          userId: user.id,
+          betId: null,
+          exchangeOrderId: order.id,
+          betAmount: order.stakeAmount,
+          winAmount: amount + order.stakeAmount,
+          commissionRate: await CommissionSettingsService.getCommissionRate('exchange'),
+          commissionAmount: commissionAmount,
+          status: 'paid',
+          paidAt: new Date(),
+          type: 'exchange' // 익스체인지 수수료 (회계용)
+        }, { transaction });
+
+        console.log(`      💰 수수료 기록: ${commissionAmount}원 (시스템 회계 기록)`);
+      }
       
       // 🆕 수수료 차감 기록을 PaymentHistory에 저장
       await PaymentHistory.create({

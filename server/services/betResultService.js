@@ -837,11 +837,17 @@ class BetResultService {
 
   // 승/패 결과 판정
   determineWinLoseResult(selection, gameResult, validatedScore = null) {
-    // 경기 취소 또는 연기 시 즉시 환불
+    // 🔴 1순위: 취소/연기 (환불 정책 - 최우선 처리)
     if (isGameCancelledOrPostponed(gameResult)) {
       return 'cancelled';
     }
 
+    // 🟡 2순위: 예정/진행중 (대기 - 경기 결과 전)
+    if (isGamePending(gameResult)) {
+      return 'pending';
+    }
+
+    // 🟢 3순위: 경기 종료 (결과 판정 - 스코어 확인 필수)
     // ✅ status가 finished이고 스코어가 있으면 스코어로 직접 계산
     if (isGameFinished(gameResult) && gameResult.score && Array.isArray(gameResult.score) && gameResult.score.length >= 2) {
       const homeScoreData = gameResult.score.find(s => s.name === gameResult.homeTeam);
@@ -877,38 +883,26 @@ class BetResultService {
       }
     }
 
-    // status로 결과 판정
-    if (isGamePending(gameResult)) {
-      return 'pending';
-    }
-
-    // team 정규화 적용 (비교용)
-    const selectedTeam = normalizeTeamNameForComparison(selection.team);
-    const homeTeam = normalizeTeamNameForComparison(gameResult.homeTeam);
-    const awayTeam = normalizeTeamNameForComparison(gameResult.awayTeam);
-
-    if (gameResult.status === 'home_win') {
-      return selectedTeam === homeTeam ? 'won' : 'lost';
-    } else if (gameResult.status === 'away_win') {
-      return selectedTeam === awayTeam ? 'won' : 'lost';
-    } else if (gameResult.status === 'draw') {
-      // ✅ 무승부: Draw 선택했으면 won, 아니면 lost
-      const isDraw = selection.team.toLowerCase() === 'draw';
-      return isDraw ? 'won' : 'lost';
-    }
-
+    // 🔴 스코어 없이 finished 상태인 경우: pending 유지 (안전장치)
+    console.warn(`[승/패 판정] 경기 종료 상태이지만 스코어 없음 - pending 유지`);
     return 'pending';
   }
 
   // 언더/오버 결과 판정
   determineOverUnderResult(selection, gameResult, validatedScore = null) {
-    // 경기 취소 또는 연기 시 즉시 환불
+    // 🔴 1순위: 취소/연기 (환불 정책 - 최우선 처리)
     if (isGameCancelledOrPostponed(gameResult)) {
       return 'cancelled';
     }
 
-    // ✅ 경기가 종료되지 않았거나 스코어가 없으면 pending
+    // 🟡 2순위: 예정/진행중 (대기 - 경기 결과 전)
+    if (isGamePending(gameResult)) {
+      return 'pending';
+    }
+
+    // 🟢 3순위: 경기 종료 (결과 판정 - 스코어 확인 필수)
     if (!isGameFinished(gameResult) || !gameResult.score || !Array.isArray(gameResult.score) || gameResult.score.length < 2) {
+      console.warn(`[언더/오버 판정] 경기 종료 상태이지만 스코어 없음 - pending 유지`);
       return 'pending';
     }
 
@@ -968,13 +962,19 @@ class BetResultService {
 
   // 핸디캡 결과 판정
   determineHandicapResult(selection, gameResult, validatedScore = null) {
-    // 경기 취소 또는 연기 시 즉시 환불
+    // 🔴 1순위: 취소/연기 (환불 정책 - 최우선 처리)
     if (isGameCancelledOrPostponed(gameResult)) {
       return 'cancelled';
     }
 
-    // ✅ 경기가 종료되지 않았거나 스코어가 없으면 pending
+    // 🟡 2순위: 예정/진행중 (대기 - 경기 결과 전)
+    if (isGamePending(gameResult)) {
+      return 'pending';
+    }
+
+    // 🟢 3순위: 경기 종료 (결과 판정 - 스코어 확인 필수)
     if (!isGameFinished(gameResult) || !gameResult.score || !Array.isArray(gameResult.score) || gameResult.score.length < 2) {
+      console.warn(`[핸디캡 판정] 경기 종료 상태이지만 스코어 없음 - pending 유지`);
       return 'pending';
     }
 
