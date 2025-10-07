@@ -92,7 +92,7 @@ const OrderbookPage: React.FC = () => {
             gameId: order.gameId,
             userId: order.userId.toString(),
             type: order.side,
-            odds: order.price,
+            odds: order.isMultibet ? (order.totalOdds || order.price) : order.price, // ✅ 멀티베팅 배당률 수정
             amount: order.displayAmount || order.amount, // 🆕 displayAmount 우선 사용
             status: order.status,
             createdAt: order.createdAt,
@@ -140,6 +140,7 @@ const OrderbookPage: React.FC = () => {
     
     // 🆕 주문 완료 이벤트 감지하여 즉시 새로고침
     const handleOrderPlaced = () => {
+      console.log('🔄 [Orderbook] exchangeOrderPlaced 이벤트 감지 - 오더북 즉시 갱신');
       loadOrders();
     };
     
@@ -305,7 +306,7 @@ const OrderbookPage: React.FC = () => {
     return amount.toLocaleString('ko-KR');
   };
 
-  // 🆕 멀티배팅 총 배당 계산(백엔드 값이 없을 때 레그 배당 곱으로 보조 계산) - 환수율 적용
+  // 🆕 멀티배팅 총 배당 계산(백엔드 값이 없을 때 레그 배당 곱으로 보조 계산) - 환수율 적용 제거
   const computeTotalOdds = (order: Order) => {
     let totalOdds;
     if (order.totalOdds) {
@@ -322,8 +323,8 @@ const OrderbookPage: React.FC = () => {
       }
     }
     
-    // 🆕 환수율 적용
-    return applyExchangeReturnRate(totalOdds, [totalOdds]);
+    // ✅ 환수율 적용 제거 (백엔드에서 이미 적용됨)
+    return totalOdds;
   };
 
   // 🆕 매칭 시 사용자가 실제로 베팅해야 하는 금액 계산
@@ -352,14 +353,18 @@ const OrderbookPage: React.FC = () => {
   // 필터링 및 정렬
   const filteredOrders = orders
     .filter(order => {
-      // 🆕 'open' 또는 'partially_matched' 상태의 주문만 포함
-      if (order.status !== 'open' && order.status !== 'partially_matched') return false;
+      // ✅ 'open', 'partially_matched', 'matched', 'active' 상태의 주문만 포함 (정산 안 된 주문)
+      const validStatuses = ['open', 'partially_matched', 'matched', 'active'];
+      if (!validStatuses.includes(order.status)) return false;
       
-      // 🆕 매치 배팅 주문 제외 (matchedOrderId가 있는 주문은 매치 배팅 주문)
-      if (order.matchedOrderId) return false;
+      // 🆕 매치 배팅 주문 제외 (부분 매칭된 원본 주문은 표시해야 함!)
+      // matchedOrderId가 있어도 remainingAmount가 있으면 부분 매칭된 원본 주문
+      if (order.matchedOrderId && (!order.remainingAmount || order.remainingAmount <= 0)) {
+        return false;
+      }
       
-      // 🆕 부분 매칭된 주문의 경우 남은 금액이 있어야 함
-      if (order.status === 'partially_matched' && (!order.remainingAmount || order.remainingAmount <= 0)) return false;
+      // 🆕 남은 금액이 0인 주문 제외
+      if (!order.remainingAmount || order.remainingAmount <= 0) return false;
       
       if (filter !== 'all' && order.type !== filter) return false;
       if (searchTerm) {
@@ -414,10 +419,10 @@ const OrderbookPage: React.FC = () => {
     });
 
   const stats = {
-    total: orders.filter(o => o.status === 'open' || o.status === 'partially_matched').length,
-    back: orders.filter(o => (o.status === 'open' || o.status === 'partially_matched') && o.type === 'back').length,
-    lay: orders.filter(o => (o.status === 'open' || o.status === 'partially_matched') && o.type === 'lay').length,
-    totalAmount: orders.filter(o => o.status === 'open' || o.status === 'partially_matched').reduce((sum, o) => sum + (o.displayAmount || o.amount), 0)
+    total: orders.filter(o => ['open', 'partially_matched', 'matched', 'active'].includes(o.status)).length,
+    back: orders.filter(o => ['open', 'partially_matched', 'matched', 'active'].includes(o.status) && o.type === 'back').length,
+    lay: orders.filter(o => ['open', 'partially_matched', 'matched', 'active'].includes(o.status) && o.type === 'lay').length,
+    totalAmount: orders.filter(o => ['open', 'partially_matched', 'matched', 'active'].includes(o.status)).reduce((sum, o) => sum + (o.displayAmount || o.amount), 0)
   };
 
   if (loading) {

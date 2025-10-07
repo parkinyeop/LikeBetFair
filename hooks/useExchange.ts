@@ -312,11 +312,14 @@ export const useExchange = () => {
   // 전체 오픈 주문 조회 (공개 API - 토큰 불필요)
   const fetchAllOpenOrders = useCallback(async () => {
     try {
+      console.log('🔄 [useExchange] fetchAllOpenOrders 호출됨');
       const url = buildApiUrl('/api/exchange/all-orders');
       const response = await fetch(url, {
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        // ✅ 캐시 방지: 매칭 후 즉시 최신 데이터 가져오기
+        cache: 'no-store'
       });
       
       if (!response.ok) {
@@ -325,10 +328,10 @@ export const useExchange = () => {
       }
       
       const data: ExchangeOrder[] = await response.json();
-      console.log('fetchAllOpenOrders 성공:', data.length, '개 주문');
+      console.log('✅ [useExchange] fetchAllOpenOrders 성공:', data.length, '개 주문');
       return data;
     } catch (err) {
-      console.error('fetchAllOpenOrders 에러:', err);
+      console.error('❌ [useExchange] fetchAllOpenOrders 에러:', err);
       setError(err instanceof Error ? err.message : '전체 주문 조회 중 오류 발생');
       return [];
     }
@@ -345,15 +348,21 @@ export const useExchange = () => {
   // Exchange 주문 완료 이벤트 리스너
   useEffect(() => {
     const handleExchangeOrderPlaced = () => {
+      console.log('🔄 [useExchange] exchangeOrderPlaced 이벤트 감지 - 내 주문 갱신');
       if (token) {
+        console.log('✅ [useExchange] fetchOrders() 및 fetchBalance() 호출 시작');
         fetchOrders();
         fetchBalance();
+      } else {
+        console.warn('⚠️ [useExchange] 토큰 없음, 주문 갱신 건너뜀');
       }
     };
 
+    console.log('🎯 [useExchange] exchangeOrderPlaced 이벤트 리스너 등록');
     window.addEventListener('exchangeOrderPlaced', handleExchangeOrderPlaced);
     
     return () => {
+      console.log('🗑️ [useExchange] exchangeOrderPlaced 이벤트 리스너 제거');
       window.removeEventListener('exchangeOrderPlaced', handleExchangeOrderPlaced);
     };
   }, [token, fetchOrders, fetchBalance]);

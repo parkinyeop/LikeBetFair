@@ -156,7 +156,12 @@ class ExchangeMultibetController {
         return acc * (parseFloat(selection.odds) || 1);
       }, 1);
       
-      console.log(`📊 totalOdds 계산: 프론트엔드 ${totalOdds} vs 백엔드 ${calculatedTotalOdds}`);
+      // ✅ 환수율 적용 (일관성 보장)
+      const exchangeReturnRate = 0.95; // 익스체인지 환수율
+      const adjustedTotalOdds = calculatedTotalOdds / exchangeReturnRate;
+      
+      console.log(`📊 totalOdds 계산: 원본 ${calculatedTotalOdds} → 환수율 적용 ${adjustedTotalOdds}`);
+      console.log(`📊 프론트엔드 ${totalOdds} vs 백엔드 ${adjustedTotalOdds}`);
       
       // 6. 멀티배팅 주문 생성 (기존 ExchangeOrders 테이블 사용)
       console.log('🔍 [MultibetController] ExchangeOrder.create 시작...');
@@ -166,14 +171,14 @@ class ExchangeMultibetController {
         market: 'multibet',
         line: 0,
         side: 'back', // 멀티배팅은 항상 back (사용자 베팅)
-        price: calculatedTotalOdds, // 계산된 totalOdds 사용
+        price: adjustedTotalOdds, // ✅ 환수율 적용된 totalOdds 사용
         amount: stake,
         status: 'open',
         stakeAmount: stake,
-        potentialProfit: parseFloat((stake * calculatedTotalOdds - stake).toFixed(2)), // 🆕 소수점 처리
+        potentialProfit: parseFloat((stake * adjustedTotalOdds - stake).toFixed(2)), // ✅ 환수율 적용된 수익 계산
         isMultibet: true,
-        totalOdds: calculatedTotalOdds, // 계산된 totalOdds 사용
-        potentialWinnings: parseFloat((stake * calculatedTotalOdds).toFixed(2)), // 🆕 소수점 처리
+        totalOdds: adjustedTotalOdds, // ✅ 환수율 적용된 totalOdds 사용
+        potentialWinnings: parseFloat((stake * adjustedTotalOdds).toFixed(2)), // ✅ 환수율 적용된 수익 계산
         selectionCount: selections.length,
         selectionDetails: {
           selections: selections.map(s => ({

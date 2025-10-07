@@ -75,7 +75,7 @@ export default function LiveOddsPage() {
       selection: selection,
       team: selection, // 🆕 team 필드 추가
       side: side,
-      odds: order.price,
+      odds: order.isMultibet ? (order.totalOdds || order.price) : order.price, // ✅ 멀티베팅 배당률 수정
       amount: order.amount,
       commenceTime: order.commenceTime || '',
       sportKey: order.sportKey || '',
@@ -185,11 +185,20 @@ export default function LiveOddsPage() {
         setOrdersLoading(true);
         const orders = await fetchAllOpenOrders();
         
-        // 열린 주문과 부분 매칭된 주문만 표시
-        const openOrders = orders.filter(order => 
-          order.status === 'open' || 
-          (order.status === 'partially_matched' && (order.remainingAmount || 0) > 0)
-        );
+        // ✅ 열린 주문, 부분 매칭, 매칭, active 상태 주문 모두 표시 (정산 안 된 주문)
+        const openOrders = orders.filter(order => {
+          // 상태 필터
+          if (!['open', 'partially_matched', 'matched', 'active'].includes(order.status)) return false;
+          
+          // 매치 배팅 주문 제외 (부분 매칭된 원본 주문은 표시해야 함!)
+          // matchedOrderId가 있어도 remainingAmount가 있으면 부분 매칭된 원본 주문
+          if (order.matchedOrderId && (!order.remainingAmount || order.remainingAmount <= 0)) return false;
+          
+          // 남은 금액이 0인 주문 제외
+          if (!order.remainingAmount || order.remainingAmount <= 0) return false;
+          
+          return true;
+        });
         
         setRecentOrders(openOrders);
       } catch (error) {

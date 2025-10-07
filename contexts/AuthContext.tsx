@@ -240,13 +240,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log('[AuthContext] 강제 잔액 새로고침 시작');
       
-      // API URL 결정
-      const apiUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                     ? 'buildApiUrl' 
-                     : window.location.origin;
+      // ✅ buildApiUrl 함수 사용 (문자열이 아님!)
+      const url = buildApiUrl(`/api/auth/balance?t=${Date.now()}`);
+      console.log('[AuthContext] API URL:', url);
       
       // 캐시 방지를 위한 타임스탬프 추가
-      const response = await fetch(`${apiUrl}/api/auth/balance?t=${Date.now()}`, {
+      const response = await fetch(url, {
         headers: {
           'x-auth-token': token,
           'Content-Type': 'application/json',

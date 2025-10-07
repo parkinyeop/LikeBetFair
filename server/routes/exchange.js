@@ -270,6 +270,10 @@ router.post('/match-order', verifyToken, async (req, res) => {
       selection: targetOrder.selection,
       selectionDetails: targetOrder.selectionDetails,
       isMultibet: targetOrder.isMultibet, // 🆕 멀티배팅 정보 추가
+      // ✅ 멀티베팅 필드 복사 (버그 수정)
+      totalOdds: targetOrder.totalOdds,
+      selectionCount: targetOrder.selectionCount,
+      potentialWinnings: targetOrder.potentialWinnings,
       stakeAmount: stakeAmount, // 🆕 올바른 리스크 금액 사용
       potentialProfit: matchType === 'back' ? Math.floor(targetOrder.price * actualMatchAmount) : actualMatchAmount,
       autoSettlement: true,
@@ -709,8 +713,19 @@ router.get('/orderbook', verifyToken, async (req, res) => {
   try {
     const { gameId, market, line } = req.query;
     
+    // ✅ 현재 시간보다 미래 경기만 조회
+    const now = new Date();
+    
     // Where 조건을 동적으로 구성
-    const whereCondition = { gameId, market, status: 'open' };
+    const whereCondition = { 
+      gameId, 
+      market, 
+      status: 'open',
+      // ✅ 경기 시작 시간 필터 추가 (10분 여유)
+      commenceTime: {
+        [Op.gt]: new Date(now.getTime() - 10 * 60 * 1000)
+      }
+    };
     if (line !== undefined && line !== null && line !== '') {
       whereCondition.line = line;
     }
@@ -1214,10 +1229,25 @@ router.get('/orders', verifyToken, async (req, res) => {
     const userId = req.user.userId;
     const { status } = req.query;
     
+    // ✅ 현재 시간보다 미래 경기만 조회 (open/partially_matched 상태만)
+    const now = new Date();
+    
     // Where 조건 구성
     const whereCondition = { userId };
     if (status) {
       whereCondition.status = status;
+    } else {
+      // ✅ status 파라미터가 없으면 open/partially_matched만 조회하고 경기 시간 필터 적용
+      whereCondition[Op.or] = [
+        { status: 'open' },
+        { status: 'partially_matched' },
+        { status: 'matched' },
+        { status: 'active' }
+      ];
+      // ✅ 오픈/매칭 주문만 경기 시간 필터 적용 (정산된 주문은 과거 내역도 표시)
+      whereCondition.commenceTime = {
+        [Op.gt]: new Date(now.getTime() - 10 * 60 * 1000)
+      };
     }
     
     const orders = await ExchangeOrder.findAll({
@@ -1294,6 +1324,12 @@ router.get('/orders', verifyToken, async (req, res) => {
         price: displayPrice, // 사용자에게 표시할 환수율 적용된 배당율
         originalPrice: orderData.price, // 원본 배당율 보존
         gameResult: gameResult, // 🆕 게임 결과 정보 추가
+        // ✅ 멀티배팅 필드 추가
+        isMultibet: order.isMultibet || false,
+        totalOdds: order.totalOdds,
+        selectionCount: order.selectionCount,
+        selectionDetails: order.selectionDetails,
+        potentialWinnings: order.potentialWinnings,
         matchInfo: {
           originalAmount: order.originalAmount || order.amount,
           filledAmount: order.filledAmount || 0,
@@ -1345,7 +1381,13 @@ router.get('/order/:id', async (req, res) => {
       originalAmount: order.originalAmount || order.amount,
       remainingAmount: order.remainingAmount || order.amount,
       filledAmount: order.filledAmount || 0,
-      partiallyFilled: order.partiallyFilled || false
+      partiallyFilled: order.partiallyFilled || false,
+      // ✅ 멀티배팅 필드 추가
+      isMultibet: order.isMultibet || false,
+      totalOdds: order.totalOdds,
+      selectionCount: order.selectionCount,
+      selectionDetails: order.selectionDetails,
+      potentialWinnings: order.potentialWinnings
     });
   } catch (error) {
     console.error('주문 조회 오류:', error);
@@ -1356,14 +1398,36 @@ router.get('/order/:id', async (req, res) => {
 // 전체 오픈 주문 조회 (공개 API - 토큰 불필요)
 router.get('/all-orders', async (req, res) => {
   try {
-    // 🆕 부분 매칭된 주문도 포함하여 조회
+    // ✅ 현재 시간보다 미래 경기만 조회 (이미 지난 경기 제외)
+    const now = new Date();
+    
+    // 🆕 부분 매칭된 주문도 포함하여 조회 (matched, active 포함)
     const orders = await ExchangeOrder.findAll({
       where: {
-        [Op.or]: [
-          { status: 'open' },
-          { 
-            status: 'partially_matched',
-            remainingAmount: { [Op.gt]: 0 }
+        [Op.and]: [
+          {
+            [Op.or]: [
+              { status: 'open' },
+              { 
+                status: 'partially_matched',
+                remainingAmount: { [Op.gt]: 0 }
+              },
+              // ✅ matched/active 상태도 remainingAmount가 있으면 포함 (부분 매칭)
+              { 
+                status: 'matched',
+                remainingAmount: { [Op.gt]: 0 }
+              },
+              { 
+                status: 'active',
+                remainingAmount: { [Op.gt]: 0 }
+              }
+            ]
+          },
+          // ✅ 경기 시작 시간이 현재보다 미래인 주문만 (10분 여유)
+          {
+            commenceTime: {
+              [Op.gt]: new Date(now.getTime() - 10 * 60 * 1000)
+            }
           }
         ]
       },

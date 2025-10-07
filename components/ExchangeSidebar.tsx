@@ -252,6 +252,20 @@ function OrderPanel() {
         const result = await response.json();
         
         if (result.success) {
+          console.log('✅ [ExchangeSidebar] 매칭 배팅 성공, 이벤트 발생 시작');
+          
+          // 주문 내역 새로고침 (이벤트 발생)
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('exchangeOrderPlaced'));
+            console.log('🎯 [ExchangeSidebar] exchangeOrderPlaced 이벤트 발생 완료');
+            
+            // ✅ 약간의 지연 후 한 번 더 발생 (React 렌더링 타이밍 이슈 방지)
+            setTimeout(() => {
+              window.dispatchEvent(new Event('exchangeOrderPlaced'));
+              console.log('🎯 [ExchangeSidebar] exchangeOrderPlaced 이벤트 재발생 완료 (타이밍 보정)');
+            }, 100);
+          }
+          
           alert('🎉 매칭 배팅이 성공적으로 처리되었습니다!');
           
           // 매칭 모드 비활성화
@@ -263,11 +277,6 @@ function OrderPanel() {
           
           // 🆕 매칭 배팅에서는 멀티배팅 선택 유지 (초기화하지 않음)
           // clearMultiBet();
-          
-          // 주문 내역 새로고침
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new Event('exchangeOrderPlaced'));
-          }
           
           return; // 매칭 배팅 완료 후 함수 종료
         } else {
@@ -489,7 +498,12 @@ function OrderPanel() {
                     <>
                       <div className="flex justify-between">
                         <span className="text-gray-700">배당률:</span>
-                        <span className="font-bold text-blue-600">{(selectedBet?.price || 0).toFixed(2)}</span>
+                        <span className="font-bold text-blue-600">
+                          {(selectedBet?.isMultibet ? 
+                            Number(selectedBet?.totalOdds || selectedBet?.price || 0) : 
+                            Number(selectedBet?.price || 0)
+                          ).toFixed(2)}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-700">배팅 금액:</span>
@@ -1118,7 +1132,10 @@ function OrderHistoryPanel() {
                             )}
                           </div>
                           <div className="font-bold text-gray-800">
-                            @{(typeof order.price === 'string' ? parseFloat(order.price) : order.price || 0).toFixed(2)}
+                            @{(order.isMultibet ? 
+                              Number(order.totalOdds || order.price || 0) : 
+                              Number(order.price || 0)
+                            ).toFixed(2)}
                           </div>
                         </div>
                       </div>
