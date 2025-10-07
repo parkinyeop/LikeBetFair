@@ -47,6 +47,14 @@ console.log('🚀 [SCHEDULER_SYSTEM] Node Version:', process.version);
 console.log('🚀 [SCHEDULER_SYSTEM] Environment:', process.env.NODE_ENV || 'development');
 console.log('✅ [SCHEDULER_SYSTEM] ORIGINAL SCHEDULER RESTORED - NEW API KEY AVAILABLE');
 
+// 🔧 데드락 방지: 서버 시작 시 플래그 강제 리셋
+console.log(`[SCHEDULER_SYSTEM_FLAG] 🔧 Server startup - Force resetting flags to prevent deadlock`);
+console.log(`[SCHEDULER_SYSTEM_FLAG] 🔧 Previous isUpdatingOdds: ${isUpdatingOdds}`);
+console.log(`[SCHEDULER_SYSTEM_FLAG] 🔧 Previous isUpdatingResults: ${isUpdatingResults}`);
+isUpdatingOdds = false;
+isUpdatingResults = false;
+console.log(`[SCHEDULER_SYSTEM_FLAG] ✅ Flags reset - isUpdatingOdds: ${isUpdatingOdds}, isUpdatingResults: ${isUpdatingResults}`);
+
 // 스케줄러 상태 모니터링 및 효율성 리포팅 (30분마다)
 setInterval(() => {
   console.log('[SCHEDULER_STATUS] 💓 isUpdatingOdds:', isUpdatingOdds);
@@ -348,9 +356,12 @@ cron.schedule('*/30 * * * *', async () => {
   // 타임아웃 설정
   const timeoutId = setTimeout(() => {
     console.log('[SCHEDULER_ODDS] ⚠️ Odds update timeout detected, forcing reset');
+    console.log(`[SCHEDULER_ODDS_FLAG] ⚠️ Forcing isUpdatingOdds to false due to timeout. Previous value: ${isUpdatingOdds}`);
     isUpdatingOdds = false;
   }, maxUpdateTime);
   
+  // 플래그 설정 직전/직후 로그 추가
+  console.log(`[SCHEDULER_ODDS_FLAG] 🟢 Setting isUpdatingOdds to true. Previous value: ${isUpdatingOdds}`);
   isUpdatingOdds = true;
   console.log('[SCHEDULER_ODDS] 🚀 Starting high-priority leagues odds update (30min interval)');
   console.log('[SCHEDULER_ODDS] 📋 Target leagues:', Array.from(highPriorityCategories));
@@ -433,9 +444,11 @@ cron.schedule('*/30 * * * *', async () => {
     });
   } finally {
     clearTimeout(timeoutId); // 타임아웃 클리어
+    // 플래그 해제 직전/직후 로그 추가
+    console.log(`[SCHEDULER_ODDS_FLAG] 🔴 Setting isUpdatingOdds to false. Previous value: ${isUpdatingOdds}`);
     isUpdatingOdds = false;
     console.log('[SCHEDULER_ODDS] ✅ High-priority odds update process completed at:', new Date().toISOString());
-    console.log('[SCHEDULER_ODDS] ✅ isUpdatingOdds flag reset to:', isUpdatingOdds);
+    console.log(`[SCHEDULER_ODDS_FLAG] ✅ isUpdatingOdds flag is now: ${isUpdatingOdds}`);
   }
 });
 

@@ -185,18 +185,18 @@ class GameResultService {
         throw new Error(`No TheSportsDB league ID for ${sportKey}`);
       }
 
-      // MLS, MLB 등 북미 리그는 eventsseason.php 사용, 유럽 리그는 eventsround.php 사용
-      const isNorthAmericanLeague = this.isNorthAmericanLeague(sportKey);
+      // 연도 기반 시즌 리그는 eventsseason.php 사용, 유럽 리그는 시즌 형식 사용
+      const isYearBasedSeason = this.isYearBasedSeasonLeague(sportKey);
       let response;
       
-      // 🔧 시즌 형식 결정: 유럽은 2024-2025, 북미는 2025
+      // 🔧 시즌 형식 결정: 유럽은 2024-2025, 북미/아시아는 2025
       const now = new Date();
       const currentYear = now.getFullYear();
       const currentMonth = now.getMonth() + 1; // 1-12
       let seasonParam;
 
-      if (isNorthAmericanLeague) {
-        // 북미 리그: 연도만 사용 (2025)
+      if (isYearBasedSeason) {
+        // 연도 기반 리그: 연도만 사용 (2025)
         seasonParam = currentYear.toString();
       } else {
         // 유럽 리그: 시즌 형식 사용 (YYYY-YYYY+1)
@@ -211,7 +211,7 @@ class GameResultService {
         }
       }
 
-      console.log(`[GameResult] 시즌 파라미터: ${seasonParam} (${isNorthAmericanLeague ? '북미' : '유럽'} 리그)`);
+      console.log(`[GameResult] 시즌 파라미터: ${seasonParam} (${isYearBasedSeason ? '연도기반' : '유럽'} 리그)`);
 
       // 모든 리그에 대해 시즌 기반 API 사용
       response = await axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsseason.php`, {
@@ -306,11 +306,11 @@ class GameResultService {
   }
 
   /**
-   * 시즌 기반 리그 여부 판단 (eventsseason.php 사용)
-   * 북미 리그 + 남미 리그 포함
+   * 연도 기반 시즌 형식을 사용하는 리그 판단
+   * 북미, 아시아 리그는 연도만 사용 (2025), 유럽 리그는 시즌 형식 사용 (2024-2025)
    */
-  isNorthAmericanLeague(sportKey) {
-    const seasonBasedLeagues = [
+  isYearBasedSeasonLeague(sportKey) {
+    const yearBasedLeagues = [
       'soccer_usa_mls',           // MLS
       'baseball_mlb',             // MLB
       'basketball_nba',           // NBA
@@ -319,10 +319,12 @@ class GameResultService {
       'americanfootball_ncaaf',   // NCAAF
       'icehockey_nhl',            // NHL
       'baseball_kbo',             // KBO (한국도 단일 연도 시즌)
+      'soccer_korea_kleague1',    // ✅ K리그 (연도 형식 사용)
+      'soccer_japan_j_league',    // ✅ J리그 (연도 형식 사용)
       'soccer_brazil_campeonato', // ✅ 브라질 세리에 A (시즌 기반)
       'soccer_argentina_primera_division' // ✅ 아르헨티나 프리메라 (시즌 기반)
     ];
-    return seasonBasedLeagues.includes(sportKey);
+    return yearBasedLeagues.includes(sportKey);
   }
 
   /**

@@ -858,19 +858,67 @@ class BetResultService {
         const awayScore = parseInt(awayScoreData.score);
         
         if (!isNaN(homeScore) && !isNaN(awayScore)) {
+          // 🆕 Draw 선택 처리 (무승부 베팅)
+          if (selection.team && selection.team.toLowerCase() === 'draw') {
+            console.log(`[승/패 판정 - Draw 선택] 무승부 베팅: ${homeScore}-${awayScore}`);
+            if (homeScore === awayScore) {
+              console.log(`[승/패 판정 - Draw 결과] 무승부 성공!`);
+              return 'won';
+            } else {
+              console.log(`[승/패 판정 - Draw 결과] 무승부 실패 (${homeScore}-${awayScore})`);
+              return 'lost';
+            }
+          }
+          
           const selectedTeam = normalizeTeamNameForComparison(selection.team);
           const homeTeam = normalizeTeamNameForComparison(gameResult.homeTeam);
           const awayTeam = normalizeTeamNameForComparison(gameResult.awayTeam);
           
           console.log(`[승/패 판정 - 스코어 기반] ${gameResult.homeTeam} ${homeScore}-${awayScore} ${gameResult.awayTeam}`);
+          console.log(`[승/패 판정 - 팀명 매칭] 선택팀: "${selectedTeam}", 홈팀: "${homeTeam}", 원정팀: "${awayTeam}"`);
+          
+          // 팀명 매칭 검증 로그 추가
+          const homeMatch = selectedTeam === homeTeam;
+          const awayMatch = selectedTeam === awayTeam;
+          console.log(`[승/패 판정 - 매칭 결과] 홈팀 매칭: ${homeMatch}, 원정팀 매칭: ${awayMatch}`);
+          
+          // 팀명 매칭이 실패한 경우 추가 검증
+          if (!homeMatch && !awayMatch) {
+            console.warn(`[승/패 판정 - 매칭 실패] 팀명 매칭 실패, 추가 검증 시도`);
+            
+            // 원본 팀명으로 부분 매칭 시도
+            const originalSelectedTeam = selection.team.toLowerCase();
+            const originalHomeTeam = gameResult.homeTeam.toLowerCase();
+            const originalAwayTeam = gameResult.awayTeam.toLowerCase();
+            
+            const partialHomeMatch = originalSelectedTeam.includes(originalHomeTeam.split(' ')[0]) || 
+                                   originalHomeTeam.includes(originalSelectedTeam.split(' ')[0]);
+            const partialAwayMatch = originalSelectedTeam.includes(originalAwayTeam.split(' ')[0]) || 
+                                   originalAwayTeam.includes(originalSelectedTeam.split(' ')[0]);
+            
+            console.log(`[승/패 판정 - 부분 매칭] 홈팀 부분 매칭: ${partialHomeMatch}, 원정팀 부분 매칭: ${partialAwayMatch}`);
+            
+            if (partialHomeMatch && !partialAwayMatch) {
+              const result = homeScore > awayScore ? 'won' : 'lost';
+              console.log(`[승/패 판정] 부분 매칭으로 홈팀 승리 판정: ${result}`);
+              return result;
+            } else if (partialAwayMatch && !partialHomeMatch) {
+              const result = awayScore > homeScore ? 'won' : 'lost';
+              console.log(`[승/패 판정] 부분 매칭으로 원정팀 승리 판정: ${result}`);
+              return result;
+            } else {
+              console.warn(`[승/패 판정] 팀명 매칭 완전 실패 - pending 처리`);
+              return 'pending';
+            }
+          }
           
           if (homeScore > awayScore) {
-            const result = selectedTeam === homeTeam ? 'won' : 'lost';
-            console.log(`[승/패 판정] 홈 승리 → ${selection.team} = ${result}`);
+            const result = homeMatch ? 'won' : 'lost';
+            console.log(`[승/패 판정] 홈 승리 (${homeScore}-${awayScore}) → ${selection.team} = ${result} (홈팀 매칭: ${homeMatch})`);
             return result;
           } else if (awayScore > homeScore) {
-            const result = selectedTeam === awayTeam ? 'won' : 'lost';
-            console.log(`[승/패 판정] 원정 승리 → ${selection.team} = ${result}`);
+            const result = awayMatch ? 'won' : 'lost';
+            console.log(`[승/패 판정] 원정 승리 (${homeScore}-${awayScore}) → ${selection.team} = ${result} (원정팀 매칭: ${awayMatch})`);
             return result;
           } else {
             // ✅ 무승부: Draw 선택했으면 won, 아니면 lost
@@ -936,15 +984,18 @@ class BetResultService {
 
     // point가 없으면 무효
     if (typeof point !== 'number' || isNaN(point)) {
+      console.log(`[언더/오버 판정] 포인트 없음: ${point} → cancelled`);
       return 'cancelled';
     }
 
     // 무효 조건: totalScore와 point가 같으면 push/cancel 처리
     if (totalScore === point) {
+      console.log(`[언더/오버 판정] Push 조건: 총점 ${totalScore} = 기준 ${point} → cancelled`);
       return 'cancelled';
     }
 
     console.log(`[언더/오버 판정] 총점: ${totalScore}, 기준: ${point}, 타입: ${option}`);
+    console.log(`[언더/오버 판정] 스코어 데이터: ${JSON.stringify(scoreToUse)}`);
     
     if (option === 'Over') {
       const result = totalScore > point ? 'won' : 'lost';
