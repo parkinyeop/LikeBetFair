@@ -162,20 +162,22 @@ class MultibetSettlementService {
         
         gameResults.push({
           selection,
-          gameResult,
+          // ✅ [Phase 1] Null 방어: gameResult가 null이면 pending 상태 객체로 대체
+          gameResult: gameResult || { result: 'pending', status: 'scheduled' },
           index: index + 1
         });
         
         // 로그 최적화: 결과가 없을 때만 로그 출력
         if (!gameResult) {
-          console.log(`❌ 경기 ${index + 1}/${selections.length}: ${selection.homeTeam} vs ${selection.awayTeam} - 결과 없음`);
+          console.log(`❌ 경기 ${index + 1}/${selections.length}: ${selection.homeTeam} vs ${selection.awayTeam} - 결과 없음 (pending 처리)`);
         }
         
       } catch (error) {
         console.error(`   오류: ${error.message}`);
         gameResults.push({
           selection,
-          gameResult: null,
+          // ✅ [Phase 1] 오류 시에도 pending 상태 객체로 대체
+          gameResult: { result: 'pending', status: 'scheduled', error: error.message },
           error: error.message,
           index: index + 1
         });
@@ -384,57 +386,67 @@ class MultibetSettlementService {
    * @returns {Object} 정산 결과
    */
   determineMultibetResult(gameResults) {
-    const results = gameResults.map(gr => gr.gameResult?.result || gr.result);
-
-    // pending을 취소로 처리 (finished + pending 패턴은 실제로 취소된 경기)
-    const normalizedResults = results.map(result => {
-      if (result === 'pending') {
-        console.log(`   📋 pending 결과를 cancelled로 처리 (취소된 경기)`);
-        return 'cancelled';
-      }
-      return result;
-    });
-
-    const hasPending = normalizedResults.includes('pending');
-    const hasCancelled = normalizedResults.includes('cancelled');
-    const hasLost = normalizedResults.includes('lost');
-    const allWon = normalizedResults.every(r => r === 'won');
-
+    // ✅ [Phase 2] 각 선택의 최종 결과 추출
+    const results = gameResults.map(gr => gr.gameResult?.result || 'pending');
+    console.log(`[Multibet] 📊 경기별 결과 집계: ${results.join(', ')}`);
+  
+    // ✅ [Phase 2 핵심 수정] pending인 경기가 하나라도 있으면 즉시 반환
+    if (results.includes('pending')) {
+      console.log(`[Multibet] ⏳ pending 경기가 포함되어 있어 정산을 대기합니다.`);
+      return {
+        finalResult: 'pending',
+        reason: '일부 경기가 아직 완료되지 않았습니다.',
+        gameResults,
+        summary: this.generateSummary(results)
+      };
+    }
+  
+    // ✅ [Phase 2] pending이 없을 때만 최종 결과 판정
+    const hasLost = results.includes('lost');
+    const allWon = results.every(r => r === 'won');
+    const hasCancelled = results.includes('cancelled');
+  
     let finalResult;
     let reason;
-
-    if (hasPending) {
-      finalResult = 'pending';
-      reason = '일부 경기가 아직 완료되지 않음';
-    } else if (hasCancelled) {
-      finalResult = 'cancelled';
-      reason = '일부 경기가 취소됨 (pending 결과 포함)';
-    } else if (hasLost) {
+  
+    if (hasLost) {
       finalResult = 'lost';
-      reason = '일부 경기에서 패배';
+      reason = '하나 이상의 경기에서 패배했습니다.';
     } else if (allWon) {
       finalResult = 'won';
-      reason = '모든 경기에서 승리';
+      reason = '모든 경기에서 승리했습니다.';
+    } else if (hasCancelled) {
+      // 패배 없이, 승리 또는 취소만 있는 경우
+      finalResult = 'cancelled';
+      reason = '패배한 경기는 없으나, 일부 경기가 취소되었습니다.';
     } else {
+      // 예외적인 경우 (e.g., 모든 경기가 draw인데 처리 로직이 없는 경우)
       finalResult = 'pending';
-      reason = '결과 판정 불가';
+      reason = '최종 결과를 판정할 수 없습니다.';
     }
-
-    console.log(`🎯 멀티배팅 판정: ${finalResult} (${reason})`);
-    console.log(`   원본 경기별 결과: ${results.join(', ')}`);
-    console.log(`   정규화된 결과: ${normalizedResults.join(', ')}`);
-
+  
+    console.log(`[Multibet] 🎯 최종 판정: ${finalResult} (사유: ${reason})`);
+  
     return {
       finalResult,
       reason,
       gameResults,
-      summary: {
-        total: normalizedResults.length,
-        won: normalizedResults.filter(r => r === 'won').length,
-        lost: normalizedResults.filter(r => r === 'lost').length,
-        cancelled: normalizedResults.filter(r => r === 'cancelled').length,
-        pending: normalizedResults.filter(r => r === 'pending').length
-      }
+      summary: this.generateSummary(results)
+    };
+  }
+  
+  /**
+   * ✅ [Phase 2] Summary 생성 헬퍼 함수
+   * @param {Array} results - 경기 결과 배열
+   * @returns {Object} 요약 정보
+   */
+  generateSummary(results) {
+    return {
+      total: results.length,
+      won: results.filter(r => r === 'won').length,
+      lost: results.filter(r => r === 'lost').length,
+      cancelled: results.filter(r => r === 'cancelled').length,
+      pending: results.filter(r => r === 'pending').length
     };
   }
   
@@ -448,11 +460,22 @@ class MultibetSettlementService {
   async processMultibetSettlement(order, settlementResult, transaction) {
     const { finalResult } = settlementResult;
     
+    // ✅ [Phase 3] 이중 안전장치: pending이면 즉시 반환 (정산하지 않음)
+    if (finalResult === 'pending') {
+      console.log(`⏳ 주문 ${order.id}: 경기 완료 대기 중 - 정산하지 않음`);
+      return {
+        orderId: order.id,
+        finalResult: 'pending',
+        profit: 0,
+        message: '경기 완료 대기 중',
+        gameResults: settlementResult.gameResults,
+        summary: settlementResult.summary
+      };
+    }
+    
     // 주문 상태 업데이트
     let orderStatus;
-    if (finalResult === 'pending') {
-      orderStatus = 'open'; // pending 대신 open 사용
-    } else if (finalResult === 'cancelled') {
+    if (finalResult === 'cancelled') {
       orderStatus = 'cancelled';
     } else {
       orderStatus = 'settled';
@@ -462,15 +485,13 @@ class MultibetSettlementService {
 
     await order.update({
       status: orderStatus,
-      settledAt: finalResult !== 'pending' ? new Date() : null,
+      settledAt: new Date(),
       actualProfit: profit,
       profitLoss: profit
     }, { transaction });
     
     // 정산 결과에 따른 결제 처리
-    if (finalResult !== 'pending') {
-      await this.processPayment(order, finalResult, settlementResult, transaction);
-    }
+    await this.processPayment(order, finalResult, settlementResult, transaction);
 
     return {
       orderId: order.id,

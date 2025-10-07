@@ -1,6 +1,6 @@
 import betResultService from '../services/betResultService.js';
 import simplifiedOddsValidation from '../services/simplifiedOddsValidation.js';
-// import seasonValidationService from '../services/seasonValidationService.js'; // 시즌 검증 주석처리
+import seasonValidationService from '../services/seasonValidationService.js'; // ✅ 시즌 검증 재활성화
 import User from '../models/userModel.js';
 import Bet from '../models/betModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
@@ -52,41 +52,39 @@ export async function placeBet(req, res) {
       return res.status(400).json({ message: 'Missing required bet information' });
     }
 
-    // 🆕 시즌 상태 검증 주석처리 (배당율 정보가 있다는 것은 이미 시즌 진행 중을 의미)
-    // console.log(`[BetController] 시즌 상태 검증 시작: ${selections.length}개 선택`);
-    // for (const selection of selections) {
-    //   const sportKey = selection.sport_key;
-    //   if (sportKey) {
-    //     try {
-    //       const seasonValidation = await seasonValidationService.validateBettingEligibility(sportKey);
-    //       if (!seasonValidation.isEligible) {
-    //         console.log(`[BetController] 시즌 상태 검증 실패: ${selection.desc} - ${seasonValidation.reason}`);
-    //         
-    //         // 시즌 검증 실패 시 베팅 거부
-    //         return res.status(400).json({ 
-    //           message: `베팅 불가능한 리그: ${selection.desc}`,
-    //           reason: seasonValidation.reason,
-    //           status: seasonValidation.status,
-    //           dataSource: seasonValidation.seasonStatus?.dataSource || 'Unknown',
-    //           code: 'SEASON_OFFSEASON'
-    //         });
-    //       } else {
-    //         // 시즌 상태 로깅
-    //         console.log(`[BetController] 시즌 상태 검증 통과: ${selection.desc} - ${seasonValidation.reason} (${seasonValidation.seasonStatus?.dataSource || 'Unknown'})`);
-    //       }
-    //     } catch (seasonError) {
-    //       console.log(`[BetController] 시즌 상태 검증 오류: ${selection.desc} - ${seasonError.message}`);
-    //       return res.status(500).json({ 
-    //         message: `시즌 상태 확인 중 오류 발생: ${selection.desc}`,
-    //         error: seasonError.message
-    //       });
-    //     }
-    //   } else {
-    //     console.log(`[BetController] sport_key 없음 (시즌 검증 건너뜀): ${selection.desc}`);
-    //   }
-    // }
+    // ✅ 시즌 상태 검증 (1순위: 시즌 검증 → 2순위: 배당율 검증)
+    console.log(`[BetController] 시즌 상태 검증 시작: ${selections.length}개 선택`);
+    for (const selection of selections) {
+      const sportKey = selection.sport_key;
+      if (sportKey) {
+        try {
+          const seasonValidation = await seasonValidationService.validateBettingEligibility(sportKey);
+          if (!seasonValidation.isEligible) {
+            console.log(`[BetController] 시즌 상태 검증 실패: ${selection.desc} - ${seasonValidation.reason}`);
+            
+            // 시즌 검증 실패 시 베팅 거부
+            return res.status(400).json({ 
+              message: `베팅 불가능한 리그: ${selection.desc}`,
+              reason: seasonValidation.reason,
+              status: seasonValidation.status,
+              dataSource: seasonValidation.seasonStatus?.dataSource || 'Unknown',
+              code: 'SEASON_OFFSEASON'
+            });
+          } else {
+            // 시즌 상태 로깅
+            console.log(`[BetController] 시즌 상태 검증 통과: ${selection.desc} - ${seasonValidation.reason} (${seasonValidation.seasonStatus?.dataSource || 'Unknown'})`);
+          }
+        } catch (seasonError) {
+          console.log(`[BetController] 시즌 상태 검증 오류: ${selection.desc} - ${seasonError.message}`);
+          // ⚠️ 시즌 검증 오류는 경고만 하고 배당율 검증으로 진행 (안전장치)
+          console.warn(`[BetController] 시즌 검증 실패, 배당율 검증으로 진행: ${selection.desc}`);
+        }
+      } else {
+        console.log(`[BetController] sport_key 없음 (시즌 검증 건너뜀): ${selection.desc}`);
+      }
+    }
 
-    // 🔒 배당율 검증 추가 (개선된 버전)
+    // 🔒 배당율 검증 (2순위: 시즌 검증 통과 후 배당율 검증)
     console.log(`[BetController] 베팅 요청 배당율 검증 시작: ${selections.length}개 선택`);
     for (const selection of selections) {
       try {
