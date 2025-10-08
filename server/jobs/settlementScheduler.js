@@ -39,9 +39,22 @@ schedule.scheduleJob('*/15 * * * *', async () => {
   }
 });
 
+// 매 5분마다 고아 주문 정산 (제미나이 제안)
+schedule.scheduleJob('*/5 * * * *', async () => {
+  console.log('⚙️ [Scheduler] 고아 주문 정산 작업을 시작합니다...');
+  try {
+    const exchangeService = new exchangeSettlementService();
+    const result = await exchangeService.settleOrphanedOrders();
+    console.log(`✅ [Scheduler] 고아 주문 정산: ${result.settledCount}개 완료`);
+  } catch (error) {
+    console.error('❌ [Scheduler] 고아 주문 정산 중 오류 발생:', error);
+  }
+});
+
 console.log('📅 [Scheduler] 스케줄 등록 완료:');
 console.log('   - 경기 결과 수집: 매 30분마다 실행');
 console.log('   - 베팅 정산: 매 15분마다 실행');
+console.log('   - 고아 주문 정산: 매 5분마다 실행');
 
 
 
