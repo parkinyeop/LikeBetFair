@@ -1237,17 +1237,16 @@ router.get('/orders', verifyToken, async (req, res) => {
     if (status) {
       whereCondition.status = status;
     } else {
-      // ✅ status 파라미터가 없으면 open/partially_matched만 조회하고 경기 시간 필터 적용
+      // ✅ status 파라미터가 없으면 모든 상태 조회 (과거 주문도 포함)
       whereCondition[Op.or] = [
         { status: 'open' },
         { status: 'partially_matched' },
         { status: 'matched' },
-        { status: 'active' }
+        { status: 'active' },
+        { status: 'settled' },
+        { status: 'cancelled' }
       ];
-      // ✅ 오픈/매칭 주문만 경기 시간 필터 적용 (정산된 주문은 과거 내역도 표시)
-      whereCondition.commenceTime = {
-        [Op.gt]: new Date(now.getTime() - 10 * 60 * 1000)
-      };
+      // ✅ 사용자 주문 내역은 과거 주문도 포함하도록 commenceTime 필터 제거
     }
     
     const orders = await ExchangeOrder.findAll({

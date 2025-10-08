@@ -16,6 +16,9 @@ import { isGameCancelledOrPostponed, isGameFinished, isGamePending } from '../ut
 // 배당률 제공 카테고리만 허용 (gameResultService와 동일하게 유지)
 const allowedCategories = ['baseball', 'soccer', 'basketball'];
 
+// 🔒 중복 정산 방지 플래그
+let isSettling = false;
+
 class BetResultService {
   constructor() {
     this.marketResultMap = {
@@ -27,6 +30,16 @@ class BetResultService {
 
   // 배팅 결과 업데이트 메인 함수
   async updateBetResults() {
+    // 🔒 중복 실행 방지
+    if (isSettling) {
+      console.log('⏭️ [SETTLEMENT_LOCK] 이미 정산이 진행 중입니다. 건너뜁니다.');
+      return { updatedCount: 0, errorCount: 0, skipped: true };
+    }
+    
+    isSettling = true;
+    const startTime = Date.now();
+    console.log('🔒 [SETTLEMENT_LOCK] 정산 잠금 획득');
+    
     try {
       console.log('Starting bet results update...');
       // GameResult status 자동 보정: score/result가 있고 status가 finished가 아니면 finished로 변경
@@ -93,6 +106,11 @@ class BetResultService {
     } catch (error) {
       console.error('Error updating bet results:', error);
       throw error;
+    } finally {
+      // 🔓 정산 잠금 해제
+      const duration = Date.now() - startTime;
+      isSettling = false;
+      console.log(`🔓 [SETTLEMENT_LOCK] 정산 잠금 해제 (소요 시간: ${duration}ms)`);
     }
   }
 
@@ -428,20 +446,22 @@ class BetResultService {
 
   // 🆕 베팅 적중 시 상금 지급 (수수료 차감 포함)
   async processBetWinnings(bet, transaction) {
-    // 이미 지급된 베팅인지 확인
+    // 🔒 비관적 락으로 중복 체크 (트랜잭션 격리 수준 강화)
     const existingPayment = await PaymentHistory.findOne({
       where: {
         betId: bet.id,
         memo: { [Op.like]: '%베팅 적중 지급%' }
       },
-      transaction
+      transaction,
+      lock: transaction.LOCK.UPDATE // 🔒 비관적 락 추가
     });
     
     if (existingPayment) {
-      console.log(`[적중 지급] 이미 지급된 베팅 ${bet.id} 건너뛰기`);
+      console.log(`[적중 지급] 🔒 이미 지급된 베팅 ${bet.id} 건너뛰기 (중복 방지)`);
       return;
     }
     
+    // 🔒 사용자 레코드에도 비관적 락 적용
     const user = await User.findByPk(bet.userId, { 
       transaction, 
       lock: transaction.LOCK.UPDATE 

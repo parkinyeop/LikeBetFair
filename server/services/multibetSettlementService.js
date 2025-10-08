@@ -265,8 +265,13 @@ class MultibetSettlementService {
         // 경기 결과 판정 (검증된 스코어 전달)
         const result = this.determineGameResult(gameResult, selection, validationResult.score);
 
+        // 🔧 Sequelize 인스턴스인지 확인 후 처리
+        const gameResultData = typeof gameResult.toJSON === 'function' 
+          ? gameResult.toJSON() 
+          : gameResult;
+
         return {
-          ...gameResult.toJSON(),
+          ...gameResultData,
           result,
           validatedScore: validationResult.score // 검증된 스코어 포함
         };
@@ -276,6 +281,14 @@ class MultibetSettlementService {
       }
     } catch (error) {
       console.error(`❌ 경기 결과 조회 오류:`, error.message);
+      console.error(`   경기: ${homeTeam} vs ${awayTeam}`);
+      console.error(`   오류 스택:`, error.stack);
+      
+      // 🔧 gameResult가 있었는지 확인
+      if (gameResult) {
+        console.warn(`⚠️ 경기 결과는 있었으나 처리 중 오류 발생 - 안전하게 pending 처리`);
+      }
+      
       return null;
     }
   }
