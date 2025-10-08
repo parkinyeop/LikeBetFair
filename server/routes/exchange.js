@@ -317,9 +317,9 @@ router.post('/match-order', verifyToken, async (req, res) => {
       targetOrder.filledAmount = (targetOrder.filledAmount || 0) + actualMatchAmount;
       targetOrder.remainingAmount = (targetOrder.remainingAmount || targetOrder.amount) - actualMatchAmount;
       
-      // 🆕 멀티베팅 주문은 부분 매칭 시에도 matched 상태로 설정
+      // ✅ 수정: 멀티베팅 주문도 부분 매칭 시 partially_matched 상태로 설정
       if (targetOrder.isMultibet) {
-        targetOrder.status = 'matched'; // 멀티베팅 주문은 부분 매칭되어도 matched 상태
+        targetOrder.status = 'partially_matched'; // ✅ 부분 매칭 시 partially_matched 상태
       } else {
         // 일반 주문: Back과 Lay 구분 상태 설정
         if (targetOrder.side === 'lay') {
@@ -335,7 +335,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
         targetOrder.remainingAmount = 0;
         targetOrder.partiallyFilled = false;
         
-        // 🆕 멀티베팅 주문은 잔액 정리 후에도 matched 상태로 설정
+        // ✅ 수정: 잔액 정리 후에는 완전 매칭 상태로 설정
         if (targetOrder.isMultibet) {
           targetOrder.status = 'matched'; // 멀티베팅 주문은 matched 상태
         } else {

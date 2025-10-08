@@ -184,15 +184,18 @@ class ExchangeSettlementService {
         transaction
       });
       
-      // 🆕 상대방이 이미 정산된 주문들을 별도 조회 (단순한 방법)
-      const potentialOrphanedOrders = orders.filter(order => order.matchedOrderId !== null);
+      // 🆕 상대방이 이미 정산된 주문들을 별도 조회 (확장된 범위)
+      // ✅ FIX: connectedOrders를 사용하여 모든 연결된 주문 확인
+      const potentialOrphanedOrders = connectedOrders.filter(order => order.matchedOrderId !== null);
       const orphanedOrders = [];
+      
+      console.log(`🔍 고아 주문 탐지 시작: ${potentialOrphanedOrders.length}개 후보 주문 확인`);
       
       for (const order of potentialOrphanedOrders) {
         const matchedOrder = await ExchangeOrder.findByPk(order.matchedOrderId, { transaction });
         if (matchedOrder && matchedOrder.settledAt !== null) {
           orphanedOrders.push(order);
-          console.log(`🔄 고아 주문 발견: ${order.id} (상대방 ${order.matchedOrderId}은 이미 정산됨)`);
+          console.log(`🔄 고아 주문 발견: ${order.id} (타입: ${order.side}, 금액: ${order.amount}, 상대방 ${order.matchedOrderId}은 이미 정산됨)`);
         }
       }
       
