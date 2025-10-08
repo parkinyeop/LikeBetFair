@@ -459,6 +459,18 @@ class ExchangeSettlementService {
   async settlePair(pair, gameResult, transaction) {
     const [order1, order2] = pair;
     
+    // 🛡️ CRITICAL GUARD CLAUSE (제미나이 제안)
+    if (!gameResult || gameResult.status !== 'finished' || !gameResult.score) {
+      const errorMessage = `🚨 치명적 오류: 유효한 경기 결과 없이 정산 시도. ` +
+        `GameResult Status: ${gameResult?.status}, Score: ${gameResult?.score ? 'exists' : 'null'}`;
+      console.error(errorMessage, { 
+        orderIds: pair.map(o => o.id),
+        homeTeam: gameResult?.homeTeam,
+        awayTeam: gameResult?.awayTeam
+      });
+      throw new Error(errorMessage);
+    }
+    
     // back과 lay 주문 구분
     const backOrder = order1.side === 'back' ? order1 : order2;
     const layOrder = order1.side === 'lay' ? order1 : order2;

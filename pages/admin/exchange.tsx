@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { formatToLocalDateTime } from '../../utils/timeUtils';
 import { toast } from 'react-hot-toast';
 import { buildApiUrl } from '../../config/apiConfig';
+import { parseScore, getScoreDisplay } from '../../utils/scoreParser';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -2655,97 +2656,21 @@ export default function ExchangeAdmin() {
                                   console.log(`🟢 [경기 ${index + 1}] gameResult.score:`, gameResult.score);
                                   console.log(`🟢 [경기 ${index + 1}] gameResult.status:`, gameResult.status);
 
-                                  // 🆕 경기 결과가 아직 없는 경우 (score가 N/A이거나 status가 없는 경우)
-                                  if (!gameResult.status || gameResult.score === 'N/A' || !gameResult.score) {
+                                  // 🆕 경기 결과가 아직 없는 경우 (score가 N/A이거나 status가 없거나 scheduled인 경우)
+                                  if (!gameResult.status || gameResult.status === 'scheduled' || gameResult.score === 'N/A' || !gameResult.score) {
                                     console.log(`🟢 [경기 ${index + 1}] ⚠️ status 또는 score 없음 - pending 처리`);
                                     return { status: 'pending', result: '경기 결과 대기중', color: 'bg-yellow-100 text-yellow-800' };
                                   }
 
-                                  // 스코어 파싱 함수 (향상된 팀명 매칭)
-                                  const getScoreDisplay = (score: any, homeTeam: string, awayTeam: string) => {
-                                    console.log(`🟢 [경기 ${index + 1}] [스코어 파싱] score:`, score);
-                                    console.log(`🟢 [경기 ${index + 1}] [스코어 파싱] homeTeam:`, homeTeam, 'awayTeam:', awayTeam);
-
-                                    if (!score) {
-                                      console.log(`🟢 [경기 ${index + 1}] [스코어 파싱] ⚠️ score 없음`);
-                                      return '';
-                                    }
-
-                                    // 문자열 형식 - "5-2" 같은 단순 스코어 문자열
-                                    if (typeof score === 'string') {
-                                      console.log(`🟢 [경기 ${index + 1}] [스코어 파싱] 문자열 형식:`, score);
-
-                                      // 이미 "5-2" 형식이면 그대로 반환
-                                      if (/^\d+-\d+$/.test(score)) {
-                                        console.log(`🟢 [경기 ${index + 1}] [스코어 파싱] ✅ 단순 스코어 형식 - 그대로 반환`);
-                                        return score;
-                                      }
-
-                                      // JSON 배열 문자열이면 파싱 시도
-                                      try {
-                                        const parsed = JSON.parse(score);
-                                        if (Array.isArray(parsed)) {
-                                          console.log(`🟢 [경기 ${index + 1}] [스코어 파싱] JSON 배열 파싱 성공`);
-                                          // 배열 처리로 이동
-                                          score = parsed;
-                                        }
-                                      } catch (e) {
-                                        console.log(`🟢 [경기 ${index + 1}] [스코어 파싱] JSON 파싱 불가 - 원본 반환:`, score);
-                                        return score;
-                                      }
-                                    }
-
-                                    // 배열 형식 처리
-                                    if (Array.isArray(score)) {
-                                      console.log(`🟢 [경기 ${index + 1}] [스코어 파싱] 배열 형식 처리:`, score);
-
-                                      if (score.length < 2) {
-                                        console.log(`🟢 [경기 ${index + 1}] [스코어 파싱] ⚠️ 배열 길이 부족`);
-                                        return '';
-                                      }
-
-                                      // 1차: 정확한 팀명 매칭
-                                      let home = score.find((s: any) => s.name === homeTeam)?.score;
-                                      let away = score.find((s: any) => s.name === awayTeam)?.score;
-                                      console.log(`🟢 [경기 ${index + 1}] [1차 매칭] home:`, home, 'away:', away);
-
-                                      // 2차: 부분 매칭 (대소문자 무시)
-                                      if (!home || !away) {
-                                        const homeLower = homeTeam.toLowerCase();
-                                        const awayLower = awayTeam.toLowerCase();
-
-                                        home = score.find((s: any) =>
-                                          s.name.toLowerCase().includes(homeLower) ||
-                                          homeLower.includes(s.name.toLowerCase())
-                                        )?.score;
-
-                                        away = score.find((s: any) =>
-                                          s.name.toLowerCase().includes(awayLower) ||
-                                          awayLower.includes(s.name.toLowerCase())
-                                        )?.score;
-
-                                        console.log(`🟢 [경기 ${index + 1}] [2차 매칭] home:`, home, 'away:', away);
-                                      }
-
-                                      // 3차: 배열 순서 폴백 (Home=첫번째, Away=두번째)
-                                      if (!home || !away) {
-                                        home = score[0]?.score;
-                                        away = score[1]?.score;
-                                        console.log(`🟢 [경기 ${index + 1}] [3차 폴백] home:`, home, 'away:', away);
-                                      }
-
-                                      const finalScore = home && away ? `${home}-${away}` : '';
-                                      console.log(`🟢 [경기 ${index + 1}] [최종 스코어] finalScore:`, finalScore);
-                                      return finalScore;
-                                    }
-
-                                    console.log(`🟢 [경기 ${index + 1}] [스코어 파싱] ⚠️ 알 수 없는 형식`);
-                                    return '';
-                                  };
-
-                                  const scoreDisplay = getScoreDisplay(gameResult.score, selection.homeTeam, selection.awayTeam);
+                                  // 스코어 파싱 (중앙화된 유틸리티 사용)
+                                  const scoreDisplay = getScoreDisplay(
+                                    gameResult.score,
+                                    selection.homeTeam,
+                                    selection.awayTeam,
+                                    'dash' // 하이픈 형식 사용
+                                  );
                                   console.log(`🟢 [경기 ${index + 1}] [최종] scoreDisplay:`, scoreDisplay);
-                                  const scoreText = scoreDisplay ? ` (${scoreDisplay})` : '';
+                                  const scoreText = scoreDisplay !== 'N/A' ? ` (${scoreDisplay})` : '';
                                   
                                   const isHomeWin = gameResult.status === 'home_win';
                                   const isAwayWin = gameResult.status === 'away_win';
@@ -2851,36 +2776,14 @@ export default function ExchangeAdmin() {
                                     'bg-yellow-100 text-yellow-800'
                                   }`}>
                                     {(() => {
-                                      // 스코어 파싱 함수
-                                      const getScoreDisplay = (gameResult: any) => {
-                                        if (!gameResult.score) return '';
-
-                                        // 배열 형식: [{"name":"팀명","score":"점수"}]
-                                        if (Array.isArray(gameResult.score) && gameResult.score.length >= 2) {
-                                          const homeScore = gameResult.score.find((s: any) => s.name === gameResult.homeTeam)?.score || '?';
-                                          const awayScore = gameResult.score.find((s: any) => s.name === gameResult.awayTeam)?.score || '?';
-                                          return `${homeScore}-${awayScore}`;
-                                        }
-
-                                        // 문자열 형식 (레거시)
-                                        if (typeof gameResult.score === 'string') {
-                                          try {
-                                            const parsed = JSON.parse(gameResult.score);
-                                            if (Array.isArray(parsed) && parsed.length >= 2) {
-                                              const homeScore = parsed.find((s: any) => s.name === gameResult.homeTeam)?.score || '?';
-                                              const awayScore = parsed.find((s: any) => s.name === gameResult.awayTeam)?.score || '?';
-                                              return `${homeScore}-${awayScore}`;
-                                            }
-                                          } catch (e) {
-                                            return '';
-                                          }
-                                        }
-
-                                        return '';
-                                      };
-
-                                      const scoreDisplay = getScoreDisplay(selectedOrder.gameResult);
-                                      const scoreText = scoreDisplay ? ` (${scoreDisplay})` : '';
+                                      // 스코어 파싱 (중앙화된 유틸리티 사용)
+                                      const scoreDisplay = getScoreDisplay(
+                                        selectedOrder.gameResult?.score,
+                                        selectedOrder.gameResult?.homeTeam,
+                                        selectedOrder.gameResult?.awayTeam,
+                                        'dash' // 하이픈 형식 사용
+                                      );
+                                      const scoreText = scoreDisplay !== 'N/A' ? ` (${scoreDisplay})` : '';
 
                                       // 승패 판정
                                       if (selectedOrder.gameResult.status === 'home_win' && selectedOrder.selection === selectedOrder.homeTeam) {

@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { useExchange, ExchangeOrder, OrderForm } from '../hooks/useExchange';
 import { useAuth } from '../contexts/AuthContext';
 import { useExchangeContext } from '../contexts/ExchangeContext';
+import { parseScore } from '../utils/scoreParser';
 
 // 🗑️ 불필요한 GameResults 관련 코드 제거 완료
 // ExchangeOrder 자체에 필요한 모든 정보가 이미 포함되어 있음
@@ -1258,6 +1259,10 @@ function OrderHistoryPanel() {
                         {(order as any).gameResult && (() => {
                           const gameResult = (order as any).gameResult;
                           const isFinished = gameResult.status === 'finished';
+                          const isPending = gameResult.status === 'scheduled' || !gameResult.score;
+                          
+                          // 스코어가 없거나 scheduled 상태면 표시하지 않음
+                          if (isPending) return null;
                           
                           return (
                             <div className={`p-3 rounded-lg border ${
@@ -1272,47 +1277,27 @@ function OrderHistoryPanel() {
                                 </span>
                               </div>
                               
-                              {/* 스코어 표시 */}
-                              {gameResult.score && (() => {
-                                // 배열 형태 스코어 처리
-                                if (Array.isArray(gameResult.score)) {
-                                  return (
-                                    <div className="text-xs text-gray-700 mt-1">
-                                      <div className="flex justify-between items-center">
-                                        <span>{gameResult.homeTeam || 'Home'}</span>
-                                        <span className="font-bold text-sm">
-                                          {typeof gameResult.score[0] === 'string' 
-                                            ? gameResult.score[0] 
-                                            : gameResult.score[0]?.score ?? '-'}
-                                        </span>
-                                        <span className="text-gray-400">:</span>
-                                        <span className="font-bold text-sm">
-                                          {typeof gameResult.score[1] === 'string' 
-                                            ? gameResult.score[1] 
-                                            : gameResult.score[1]?.score ?? '-'}
-                                        </span>
-                                        <span>{gameResult.awayTeam || 'Away'}</span>
-                                      </div>
-                                    </div>
-                                  );
-                                }
+                              {/* 스코어 표시 - 중앙화된 파싱 로직 사용 */}
+                              {(() => {
+                                const parsed = parseScore(
+                                  gameResult.score,
+                                  gameResult.homeTeam,
+                                  gameResult.awayTeam
+                                );
                                 
-                                // 객체 형태 스코어 처리 ({"away":9,"home":10})
-                                if (gameResult.score.home !== undefined && gameResult.score.away !== undefined) {
-                                  return (
-                                    <div className="text-xs text-gray-700 mt-1">
-                                      <div className="flex justify-between items-center">
-                                        <span>{gameResult.homeTeam || 'Home'}</span>
-                                        <span className="font-bold text-sm">{gameResult.score.home}</span>
-                                        <span className="text-gray-400">:</span>
-                                        <span className="font-bold text-sm">{gameResult.score.away}</span>
-                                        <span>{gameResult.awayTeam || 'Away'}</span>
-                                      </div>
-                                    </div>
-                                  );
-                                }
+                                if (!parsed.isValid) return null;
                                 
-                                return null;
+                                return (
+                                  <div className="text-xs text-gray-700 mt-1">
+                                    <div className="flex justify-between items-center">
+                                      <span>{gameResult.homeTeam || 'Home'}</span>
+                                      <span className="font-bold text-sm">{parsed.home}</span>
+                                      <span className="text-gray-400">:</span>
+                                      <span className="font-bold text-sm">{parsed.away}</span>
+                                      <span>{gameResult.awayTeam || 'Away'}</span>
+                                    </div>
+                                  </div>
+                                );
                               })()}
                               
                               {/* 경기 결과 정보 */}

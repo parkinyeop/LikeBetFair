@@ -3,6 +3,7 @@ import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
 import { toast } from 'react-hot-toast';
+import { parseScore, getScoreDisplay } from '../../utils/scoreParser';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -1922,33 +1923,23 @@ export default function BettingAdmin() {
                                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${gameResult.color}`}>
                                           {gameResult.status}
                                         </span>
-                                        {/* 스코어 정보 표시 (개선됨) */}
-                                        {selection.gameResult && selection.gameResult.score && (
-                                          <div className="mt-1 text-xs text-gray-600">
-                                            {(() => {
-                                              const scores = selection.gameResult.score;
-                                              
-                                              // 배열 형식: [{"name":"팀명","score":"점수"}]
-                                              if (Array.isArray(scores) && scores.length >= 2) {
-                                                const homeScore = scores.find(s => s.name === selection.gameResult.homeTeam)?.score || '0';
-                                                const awayScore = scores.find(s => s.name === selection.gameResult.awayTeam)?.score || '0';
-                                                return `스코어: ${homeScore} - ${awayScore}`;
-                                              }
-                                              
-                                              // 문자열 형식: "5-0"
-                                              if (typeof scores === 'string') {
-                                                return `스코어: ${scores}`;
-                                              }
-                                              
-                                              // 객체 형식: {home: 5, away: 0}
-                                              if (scores.home !== undefined && scores.away !== undefined) {
-                                                return `스코어: ${scores.home} - ${scores.away}`;
-                                              }
-                                              
-                                              return '스코어: N/A';
-                                            })()}
-                                          </div>
-                                        )}
+                                        {/* 스코어 정보 표시 - 중앙화된 파싱 로직 사용 */}
+                                        {(() => {
+                                          const scoreDisplay = getScoreDisplay(
+                                            selection.gameResult?.score,
+                                            selection.gameResult?.homeTeam,
+                                            selection.gameResult?.awayTeam,
+                                            'labeled' // "스코어: 10 - 9" 형식
+                                          );
+                                          
+                                          if (scoreDisplay === 'N/A') return null;
+                                          
+                                          return (
+                                            <div className="mt-1 text-xs text-gray-600">
+                                              {scoreDisplay}
+                                            </div>
+                                          );
+                                        })()}
                                         {/* 경기 결과 세부 정보 (개선됨) */}
                                         {selection.gameResult && (
                                           <div className="mt-1 text-xs text-gray-500 space-y-1">

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import BetSelectionPanel from "./BetSelectionPanel";
 import { useAuth } from '../contexts/AuthContext';
 import { normalizeOption, normalizeOverUnderOption } from '../server/normalizeUtils';
+import { parseScore, calculateTotalScore } from '../utils/scoreParser';
 
 interface BetslipSidebarProps {
   activeTab?: 'betslip' | 'mybets';
@@ -418,20 +419,9 @@ function MyBetsPanel() {
                             // sel.result가 없거나 pending인 경우, 경기 결과를 직접 계산
                             if (!actualResult || actualResult === 'pending') {
                               if (sel.gameResult && sel.gameResult.score) {
-                                // Over/Under 베팅의 경우 점수 계산
+                                // Over/Under 베팅의 경우 점수 계산 (중앙화된 유틸리티 사용)
                                 if (sel.market === 'Over/Under' || sel.market === 'totals') {
-                                  const scores = sel.gameResult.score;
-                                  let totalScore = 0;
-                                  
-                                  if (Array.isArray(scores)) {
-                                    totalScore = scores.reduce((sum, score) => {
-                                      const scoreValue = typeof score === 'string' ? parseInt(score) : (score?.score ? parseInt(score.score) : 0);
-                                      return sum + (isNaN(scoreValue) ? 0 : scoreValue);
-                                    }, 0);
-                                  } else if (sel.gameResult.homeScore !== undefined && sel.gameResult.awayScore !== undefined) {
-                                    totalScore = parseInt(sel.gameResult.homeScore) + parseInt(sel.gameResult.awayScore);
-                                  }
-                                  
+                                  const totalScore = calculateTotalScore(sel.gameResult.score);
                                   const betPoint = parseFloat(sel.point) || 0;
                                   const isOver = (sel.option || sel.team || '').toLowerCase().includes('over');
                                   
@@ -486,37 +476,22 @@ else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; la
                                   </div>
                                   <span className={`text-xs font-medium ${color}`}>{label}</span>
                                 </div>
-                                {/* 경기 결과 스코어 표시 - 간소화 */}
-                                {sel.gameResult && sel.gameResult.score && (
-                                  <div className="text-xs text-blue-600 mt-1 ml-6">
-                                    {(() => {
-                                      // 배열 형태 스코어 처리
-                                      if (Array.isArray(sel.gameResult.score)) {
-                                        return `${sel.gameResult.homeTeam || 'Home'} ${
-                                          typeof sel.gameResult.score[0] === 'string' 
-                                            ? sel.gameResult.score[0] 
-                                            : sel.gameResult.score[0]?.score ?? '-'
-                                        } : ${sel.gameResult.awayTeam || 'Away'} ${
-                                          typeof sel.gameResult.score[1] === 'string' 
-                                            ? sel.gameResult.score[1] 
-                                            : sel.gameResult.score[1]?.score ?? '-'
-                                        }`;
-                                      }
-                                      
-                                      // 객체 형태 스코어 처리
-                                      if (sel.gameResult.score.home !== undefined && sel.gameResult.score.away !== undefined) {
-                                        return `${sel.gameResult.homeTeam || 'Home'} ${sel.gameResult.score.home} : ${sel.gameResult.awayTeam || 'Away'} ${sel.gameResult.score.away}`;
-                                      }
-                                      
-                                      // 개별 스코어 필드 처리
-                                      if (sel.gameResult.homeScore !== undefined && sel.gameResult.awayScore !== undefined) {
-                                        return `${sel.gameResult.homeTeam || 'Home'} ${sel.gameResult.homeScore} : ${sel.gameResult.awayTeam || 'Away'} ${sel.gameResult.awayScore}`;
-                                      }
-                                      
-                                      return 'Score available';
-                                    })()}
-                                  </div>
-                                )}
+                                {/* 경기 결과 스코어 표시 - 중앙화된 파싱 로직 사용 */}
+                                {(() => {
+                                  const parsed = parseScore(
+                                    sel.gameResult?.score,
+                                    sel.gameResult?.homeTeam,
+                                    sel.gameResult?.awayTeam
+                                  );
+                                  
+                                  if (!parsed.isValid) return null;
+                                  
+                                  return (
+                                    <div className="text-xs text-blue-600 mt-1 ml-6">
+                                      {sel.gameResult?.homeTeam || 'Home'} {parsed.home} : {sel.gameResult?.awayTeam || 'Away'} {parsed.away}
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             );
                           })}
