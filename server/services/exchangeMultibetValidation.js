@@ -116,12 +116,16 @@ class ExchangeMultibetValidationService {
   static async validateSelection(selection) {
     try {
       // 필수 필드 검증
+      // gameId가 없으면 자동 생성 (멀티배팅용)
       if (!selection.gameId) {
-        return { isValid: false, reason: '경기 ID가 없습니다.' };
+        selection.gameId = `multibet_${selection.homeTeam}_${selection.awayTeam}_${Date.now()}`.replace(/\s+/g, '_');
+        console.log(`🔧 [MultibetValidation] gameId 자동 생성: ${selection.gameId}`);
       }
 
+      // market이 없으면 기본값 설정
       if (!selection.market) {
-        return { isValid: false, reason: '마켓 타입이 없습니다.' };
+        selection.market = 'multibet';
+        console.log(`🔧 [MultibetValidation] market 기본값 설정: multibet`);
       }
 
       if (!selection.selection) {

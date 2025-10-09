@@ -517,6 +517,11 @@ class MultibetSettlementService {
   
   /**
    * 익스체인지 방식 수익/손실 계산 (매칭 테이블 기반)
+   * 
+   * ⚠️ 중요: 이 함수는 ExchangeOrderMatch 테이블의 originalSide를 사용합니다.
+   * ExchangeOrder.side 필드가 아닌 ExchangeOrderMatch.originalSide를 기준으로 정산하므로,
+   * 멀티배팅 주문의 side 필드가 'back'으로 저장되어도 정산에는 영향을 주지 않습니다.
+   * 
    * @param {Object} order - 주문
    * @param {string} result - 최종 결과
    * @returns {number} 수익/손실 금액
@@ -536,7 +541,8 @@ class MultibetSettlementService {
       return effectiveAmount;
     }
 
-    // 매칭된 주문들을 조회하여 실제 수익/손실 계산 (양방향 조회)
+    // ✅ 매칭된 주문들을 조회하여 실제 수익/손실 계산 (양방향 조회)
+    // ExchangeOrderMatch 테이블의 originalSide를 사용하여 Back/Lay 구분
     const matches = await ExchangeOrderMatch.findAll({
       where: {
         [Op.or]: [
@@ -556,6 +562,8 @@ class MultibetSettlementService {
 
     for (const match of matches) {
       const matchedAmount = match.matchedAmount;
+      // ✅ 핵심: ExchangeOrderMatch.originalSide를 사용하여 Back/Lay 구분
+      // ExchangeOrder.side가 아닌 Match 테이블의 originalSide를 기준으로 정산
       const isBackSide = match.originalSide === 'back';
 
       if (result === 'won') {

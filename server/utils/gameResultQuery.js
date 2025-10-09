@@ -263,7 +263,7 @@ class GameResultQuery {
       }
       
       const result = { [Op.or]: conditions };
-      console.log(`🔍 [buildTeamConditions] 생성된 조건:`, JSON.stringify(result, null, 2));
+      console.log(`🔍 [buildTeamConditions] 생성된 조건 (${conditions.length}개):`, conditions);
       return result;
     } else {
       const result = {

@@ -1,6 +1,7 @@
 import { ExchangeOrder, User } from '../models/index.js';
 import { ExchangeMultibetValidationService } from '../services/exchangeMultibetValidation.js';
 import BettingAmountSettingsService from '../services/bettingAmountSettingsService.js';
+import balanceService from '../services/balanceService.js';
 import createScriptSequelize from '../config/scriptDatabase.js';
 
 // 스크립트 전용 Sequelize 인스턴스 생성
@@ -170,6 +171,9 @@ class ExchangeMultibetController {
         gameId: 'multibet_' + Date.now(), // 멀티배팅용 고유 ID
         market: 'multibet',
         line: 0,
+        // ⚠️ 중요: 멀티배팅은 항상 'back'으로 생성됩니다.
+        // Lay 멀티배팅은 매칭을 통해서만 생성되며, 정산 시에는 ExchangeOrderMatch.originalSide를 사용하므로
+        // 이 필드가 'back'이어도 정산에는 영향을 주지 않습니다.
         side: 'back', // 멀티배팅은 항상 back (사용자 베팅)
         price: adjustedTotalOdds, // ✅ 환수율 적용된 totalOdds 사용
         amount: stake,
@@ -214,7 +218,6 @@ class ExchangeMultibetController {
 
       // 6. 사용자 잔액 차감 (✅ balanceService 사용)
       console.log('🔍 [MultibetController] 사용자 잔액 차감 시작...');
-      const balanceService = require('../services/balanceService');
       await balanceService.deductBalance(
         userId,
         stake,

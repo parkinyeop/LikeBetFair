@@ -8,6 +8,7 @@ import exchangeWebSocketService from '../services/exchangeWebSocketService.js';
 import exchangeGameMappingService from '../services/exchangeGameMappingService.js';
 import exchangeSettlementService from '../services/exchangeSettlementService.js';
 import ExchangeOddsReturnRateService from '../services/exchangeOddsReturnRateService.js';
+import balanceService from '../services/balanceService.js';
 import { Op } from 'sequelize';
 import sequelize from '../models/sequelize.js';
 import GameResultQuery from '../utils/gameResultQuery.js';
@@ -241,7 +242,6 @@ router.post('/match-order', verifyToken, async (req, res) => {
     });
     
     // ✅ 중앙화된 잔액 관리 서비스 사용
-    const balanceService = require('../services/balanceService');
     const transaction = await sequelize.transaction();
     
     try {
@@ -390,7 +390,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
       market: targetOrder.market,
       line: targetOrder.line,
       status: 'active'
-    });
+    }, { transaction });
     
       console.log('✅ ExchangeOrderMatch 생성 완료:', exchangeOrderMatch.id);
 
@@ -495,7 +495,6 @@ router.post('/order', verifyToken, async (req, res) => {
     const finalPrice = price;
     
     // ✅ 중앙화된 잔액 관리 서비스 사용
-    const balanceService = require('../services/balanceService');
     const transaction = await sequelize.transaction();
     
     try {
