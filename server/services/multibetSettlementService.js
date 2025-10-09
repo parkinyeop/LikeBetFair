@@ -709,10 +709,11 @@ class MultibetSettlementService {
       console.log('🎯 모든 멀티배팅 주문 정산 시작...');
       
       // 정산 가능한 멀티배팅 주문들 조회
+      // ⚠️ 'active' 상태 추가: 레거시 Lay 멀티배팅 주문들이 active 상태로 남아있을 수 있음
       const unsettledOrders = await ExchangeOrder.findAll({
         where: {
           isMultibet: true,
-          status: { [Op.in]: ['matched', 'partially_matched'] },
+          status: { [Op.in]: ['matched', 'partially_matched', 'active'] }, // ✅ 'active' 추가
           settledAt: null
         },
         order: [['createdAt', 'ASC']],
