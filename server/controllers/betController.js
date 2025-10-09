@@ -235,9 +235,88 @@ export async function placeBet(req, res) {
     // Create bet with precise decimal calculation
     const potentialWinnings = Math.round(stake * totalOdds * 100) / 100; // 소수점 2자리로 반올림
     
+    // ✅ selections 데이터 검증 및 정규화
+    console.log('🔍 [PlaceBet] selections 데이터 검증 시작');
+    
+    /**
+     * @typedef {Object} NormalizedSelection
+     * @property {string} desc - 경기 설명
+     * @property {string} commence_time - 경기 시작 시간 (ISO 8601)
+     * @property {number} odds - 배당율
+     * @property {string} market - 마켓 타입
+     * @property {string} selection - 선택한 항목
+     * @property {string} homeTeam - 홈 팀 이름
+     * @property {string} awayTeam - 어웨이 팀 이름
+     * @property {string} commenceTime - 정규화된 경기 시작 시간
+     */
+    
+    /** @type {NormalizedSelection[]} */
+    const normalizedSelections = selections.map((selection, index) => {
+      // 필수 필드 검증
+      if (!selection.desc) {
+        throw new Error(`Selection ${index + 1}: 경기 설명(desc)이 없습니다.`);
+      }
+      if (!selection.commence_time) {
+        throw new Error(`Selection ${index + 1}: 경기 시작 시간(commence_time)이 없습니다.`);
+      }
+      if (!selection.odds) {
+        throw new Error(`Selection ${index + 1}: 배당율(odds)이 없습니다.`);
+      }
+      if (!selection.market) {
+        throw new Error(`Selection ${index + 1}: 마켓(market)이 없습니다.`);
+      }
+      if (!selection.selection && !selection.team) {
+        throw new Error(`Selection ${index + 1}: 선택(selection 또는 team)이 없습니다.`);
+      }
+      
+      // ✅ 제미나이 제안: 정규식을 사용한 유연한 팀 이름 파싱
+      // ' vs ', ' VS ', ' v ', ' v. ' 등 다양한 형식 지원
+      const teams = selection.desc.split(/\s+vs?\s+|\s+v\.\s+/i);
+      
+      if (teams.length !== 2) {
+        console.error(`[PlaceBet] 팀 파싱 실패:`, {
+          desc: selection.desc,
+          parsedTeams: teams,
+          length: teams.length
+        });
+        throw new Error(
+          `Selection ${index + 1}: 경기 설명 형식이 올바르지 않습니다. ` +
+          `(예: Team A vs Team B, 현재: ${selection.desc})`
+        );
+      }
+      
+      const homeTeam = teams[0].trim();
+      const awayTeam = teams[1].trim();
+      
+      // 팀 이름 유효성 검증
+      if (!homeTeam || !awayTeam) {
+        throw new Error(
+          `Selection ${index + 1}: 팀 이름이 비어있습니다. ` +
+          `(홈: "${homeTeam}", 어웨이: "${awayTeam}")`
+        );
+      }
+      
+      console.log(`[PlaceBet] Selection ${index + 1} 파싱 성공:`, {
+        desc: selection.desc,
+        homeTeam,
+        awayTeam
+      });
+      
+      // 정규화된 selection 반환
+      return {
+        ...selection,
+        homeTeam,
+        awayTeam,
+        commenceTime: selection.commence_time,
+        selection: selection.selection || selection.team // ✅ selection 필드 보정
+      };
+    });
+    
+    console.log('✅ [PlaceBet] selections 데이터 검증 완료:', normalizedSelections.length);
+    
     const bet = await Bet.create({
       userId,
-      selections,
+      selections: normalizedSelections, // ✅ 정규화된 데이터 저장
       stake,
       totalOdds,
       potentialWinnings,

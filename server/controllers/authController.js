@@ -197,44 +197,72 @@ const authController = {
 
       console.log('[Register] 사용자 생성 중...');
 
-      // Create new user
-      const user = await User.create({
-        username,
-        email,
-        password: hashedPassword,
-        balance: 0.00, // 기본 잔액
-        isAdmin: false,
-        adminLevel: 0,
-        isActive: true
-      });
+      // ✅ 트랜잭션 시작
+      const { sequelize } = require('../config/database');
+      const balanceService = require('../services/balanceService');
+      const registerTransaction = await sequelize.transaction();
+      
+      try {
+        // Create new user (초기 잔액 0으로 시작)
+        const user = await User.create({
+          username,
+          email,
+          password: hashedPassword,
+          balance: 0.00, // ✅ 0으로 시작
+          isAdmin: false,
+          adminLevel: 0,
+          isActive: true
+        }, { transaction: registerTransaction });
 
-      console.log('[Register] 사용자 생성 완료:', user.id);
+        console.log('[Register] 사용자 생성 완료:', user.id);
+        
+        // ✅ 초기 잔액 설정 (PaymentHistory 자동 기록)
+        const initialBalance = 100000; // 초기 지급 금액
+        await balanceService.setInitialBalance(
+          user.id,
+          initialBalance,
+          registerTransaction
+        );
+        
+        console.log(`[Register] 초기 잔액 설정 완료: ${initialBalance.toLocaleString()}원 (PaymentHistory 기록됨)`);
 
-      // Create token
-      const token = jwt.sign(
-        { userId: user.id },
-        process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
-      );
+        // Create token
+        const token = jwt.sign(
+          { userId: user.id },
+          process.env.JWT_SECRET,
+          { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
+        );
 
-      console.log('[Register] 토큰 생성 완료');
-      console.log('[Register] 회원가입 성공:', { 
-        userId: user.id, 
-        username: user.username, 
-        email: user.email 
-      });
-
-      res.status(201).json({ 
-        success: true,
-        token,
-        message: '회원가입이 완료되었습니다',
-        user: { 
-          id: user.id, 
+        console.log('[Register] 토큰 생성 완료');
+        
+        // 트랜잭션 커밋
+        await registerTransaction.commit();
+        
+        console.log('[Register] 회원가입 성공:', { 
+          userId: user.id, 
           username: user.username, 
           email: user.email,
-          balance: Number(user.balance)
-        }
-      });
+          initialBalance: initialBalance
+        });
+
+        res.status(201).json({ 
+          success: true,
+          token,
+          message: '회원가입이 완료되었습니다',
+          user: { 
+            id: user.id, 
+            username: user.username, 
+            email: user.email,
+            balance: initialBalance // ✅ 초기 잔액 반환
+          }
+        });
+        
+      } catch (innerError) {
+        // 트랜잭션 롤백
+        await registerTransaction.rollback();
+        console.error('[Register] 회원가입 트랜잭션 실패:', innerError);
+        throw innerError;
+      }
       
     } catch (err) {
       console.error('[Register] 서버 오류:', err);

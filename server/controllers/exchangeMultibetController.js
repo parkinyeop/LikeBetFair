@@ -212,11 +212,17 @@ class ExchangeMultibetController {
       }, { transaction });
       console.log('✅ [MultibetController] ExchangeOrder.create 성공:', multibetOrder.id);
 
-      // 6. 사용자 잔액 차감
+      // 6. 사용자 잔액 차감 (✅ balanceService 사용)
       console.log('🔍 [MultibetController] 사용자 잔액 차감 시작...');
-      user.balance -= stake;
-      await user.save({ transaction });
-      console.log('✅ [MultibetController] 사용자 잔액 차감 완료:', user.balance);
+      const balanceService = require('../services/balanceService');
+      await balanceService.deductBalance(
+        userId,
+        stake,
+        `익스체인지 멀티배팅 주문 생성 (${selections.length}개 경기)`,
+        null, // 주문 생성 시점에는 betId 없음
+        transaction
+      );
+      console.log('✅ [MultibetController] 사용자 잔액 차감 완료 (PaymentHistory 기록됨)');
 
       // 7. 거래 커밋
       console.log('🔍 [MultibetController] 트랜잭션 커밋 시작...');
@@ -244,7 +250,7 @@ class ExchangeMultibetController {
             createdAt: multibetOrder.createdAt
           },
           selections: multibetOrder.selectionDetails.selections,
-          balance: user.balance
+          balance: multibetOrder.stakeAmount // ✅ 차감 후 잔액은 user를 다시 조회해야 정확함
         }
       });
 

@@ -193,11 +193,12 @@ class BetResultService {
       console.log(`   - 시간: ${commenceTime.toISOString()}`);
       
       // 먼저 시간 범위로 후보 경기들을 가져온 다음 메모리에서 정규화 매칭
+      // ✅ 시간 범위 축소: ±48시간 → ±3시간 (다른 날짜 경기와 매칭 방지)
       const candidateGames = await GameResult.findAll({
         where: {
           commenceTime: {
-            [Op.gte]: new Date(commenceTime.getTime() - 48 * 60 * 60 * 1000), // ✅ 2일 전
-            [Op.lte]: new Date(commenceTime.getTime() + 48 * 60 * 60 * 1000)  // ✅ 2일 후
+            [Op.gte]: new Date(commenceTime.getTime() - 3 * 60 * 60 * 1000), // ✅ 3시간 전
+            [Op.lte]: new Date(commenceTime.getTime() + 3 * 60 * 60 * 1000)  // ✅ 3시간 후
           },
           status: { [Op.in]: ['finished', 'cancelled', 'postponed', 'scheduled'] } // ✅ scheduled 추가
         },
