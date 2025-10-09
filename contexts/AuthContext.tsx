@@ -73,6 +73,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setAdminLevel(storedAdminLevel ? Number(storedAdminLevel) : 0);
             if (storedUserId) setUserId(storedUserId);
             else setUserId(null);
+            
+            // ✅ 페이지 로드 시 서버에서 최신 정보 가져오기 (비동기)
+            setTimeout(async () => {
+              try {
+                console.log('[AuthContext] 페이지 로드 후 사용자 정보 동기화 시작');
+                const url = buildApiUrl(`/api/auth/balance?t=${Date.now()}`);
+                const response = await fetch(url, {
+                  headers: {
+                    'x-auth-token': storedToken,
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                  }
+                });
+                
+                if (response.ok) {
+                  const data = await response.json();
+                  console.log('[AuthContext] 최신 사용자 정보 동기화 완료:', data);
+                  
+                  // 잔액 업데이트
+                  const newBalance = Number(data.balance);
+                  setBalance(newBalance);
+                  sessionStorage.setItem(`balance_${tabId}`, newBalance.toString());
+                  
+                  // 관리자 레벨 업데이트
+                  if (data.isAdmin !== undefined) {
+                    setIsAdmin(data.isAdmin);
+                    setAdminLevel(data.adminLevel || 0);
+                    sessionStorage.setItem(`isAdmin_${tabId}`, data.isAdmin.toString());
+                    sessionStorage.setItem(`adminLevel_${tabId}`, (data.adminLevel || 0).toString());
+                    console.log('[AuthContext] 관리자 레벨 동기화:', {
+                      isAdmin: data.isAdmin,
+                      adminLevel: data.adminLevel
+                    });
+                  }
+                } else {
+                  console.log('[AuthContext] 사용자 정보 동기화 실패, 캐시된 데이터 사용');
+                }
+              } catch (error) {
+                console.error('[AuthContext] 사용자 정보 동기화 오류:', error);
+              }
+            }, 100); // 100ms 후 실행
           } else {
             console.log('[AuthContext] 저장된 인증 정보 없음 (tabId:', tabId, ')');
           }

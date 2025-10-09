@@ -71,7 +71,12 @@ export function useAdminApi<T>(
       
       const requestOptions: RequestInit = {
         method,
-        headers: getAuthHeaders(),
+        headers: {
+          ...getAuthHeaders(),
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
       };
 
       if (body && method !== 'GET') {
