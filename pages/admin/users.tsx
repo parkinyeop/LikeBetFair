@@ -4,6 +4,7 @@ import AdminTable from '../../components/admin/AdminTable';
 import FilterBar from '../../components/admin/FilterBar';
 import ConfirmationModal from '../../components/admin/ConfirmationModal';
 import { useAdminApi, useAdminApiMutation } from '../../hooks/useAdminApi';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface User {
   id: string;
@@ -18,6 +19,7 @@ interface User {
 }
 
 export default function UsersManagement() {
+  const { userId, forceRefreshBalance } = useAuth();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -238,6 +240,15 @@ export default function UsersManagement() {
       
       alert(`사용자 정보가 성공적으로 수정되었습니다.${changeMessage}`);
       setShowEditModal(false);
+      
+      // ✅ 현재 로그인한 사용자 자신의 정보가 변경된 경우 자동 새로고침
+      if (editUser.id === userId) {
+        console.log('[UsersManagement] 현재 사용자 정보 변경 감지, 자동 새로고침 시작');
+        setTimeout(async () => {
+          await forceRefreshBalance();
+          console.log('[UsersManagement] 사용자 정보 새로고침 완료');
+        }, 500);
+      }
     } else if (updateError) {
       alert(`사용자 수정 실패: ${updateError}`);
     }

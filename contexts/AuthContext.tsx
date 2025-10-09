@@ -216,6 +216,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const newBalance = Number(data.balance);
         setBalance(newBalance);
         sessionStorage.setItem(`balance_${tabId}`, newBalance.toString());
+        
+        // ✅ 관리자 레벨도 함께 업데이트
+        if (data.isAdmin !== undefined) {
+          console.log('[AuthContext] 관리자 정보 업데이트:', {
+            isAdmin: data.isAdmin,
+            adminLevel: data.adminLevel
+          });
+          setIsAdmin(data.isAdmin);
+          setAdminLevel(data.adminLevel || 0);
+          sessionStorage.setItem(`isAdmin_${tabId}`, data.isAdmin.toString());
+          sessionStorage.setItem(`adminLevel_${tabId}`, (data.adminLevel || 0).toString());
+        }
       } else {
         const errorText = await response.text();
         console.error('[AuthContext] 잔액 새로고침 실패:', response.status, errorText);
@@ -262,6 +274,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const newBalance = Number(data.balance);
         setBalance(newBalance);
         sessionStorage.setItem(`balance_${tabId}`, newBalance.toString());
+        
+        // ✅ 관리자 레벨도 함께 업데이트
+        if (data.isAdmin !== undefined) {
+          console.log('[AuthContext] 관리자 정보 업데이트:', {
+            isAdmin: data.isAdmin,
+            adminLevel: data.adminLevel
+          });
+          setIsAdmin(data.isAdmin);
+          setAdminLevel(data.adminLevel || 0);
+          sessionStorage.setItem(`isAdmin_${tabId}`, data.isAdmin.toString());
+          sessionStorage.setItem(`adminLevel_${tabId}`, (data.adminLevel || 0).toString());
+        }
       } else {
         const errorText = await response.text();
         console.error('[AuthContext] 강제 잔액 새로고침 실패:', response.status, errorText);

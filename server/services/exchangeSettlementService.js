@@ -2765,55 +2765,49 @@ class ExchangeSettlementService {
    * 제미나이 제안: 별도 함수로 분리하여 주기적으로 실행
    */
   async settleOrphanedOrders() {
-    const transaction = await sequelize.transaction();
+    console.log('\n🔍 [ORPHAN_SETTLEMENT] 고아 주문 탐지 시작...');
     
-    try {
-      console.log('\n🔍 [ORPHAN_SETTLEMENT] 고아 주문 탐지 시작...');
-      
-      // 1. active 상태이면서 matchedOrderId가 있는 주문들 조회
-      const activeOrders = await ExchangeOrder.findAll({
-        where: {
-          status: { [Op.in]: ['active', 'partially_matched'] },
-          matchedOrderId: { [Op.ne]: null },
-          settledAt: null
-        },
-        transaction
-      });
-      
-      console.log(`📋 active 상태 매칭 주문: ${activeOrders.length}개`);
-      
-      if (activeOrders.length === 0) {
-        await transaction.commit();
-        return { settledCount: 0, results: [] };
+    // 1. active/partially_matched/matched 상태이면서 matchedOrderId가 있는 주문들 조회
+    // ✅ 'matched' 상태 추가: 트랜잭션 부분 실패로 인한 고아 주문 탐지
+    const activeOrders = await ExchangeOrder.findAll({
+      where: {
+        status: { [Op.in]: ['active', 'partially_matched', 'matched'] }, // ✅ 'matched' 추가
+        matchedOrderId: { [Op.ne]: null },
+        settledAt: null
       }
+    });
+    
+    console.log(`📋 미정산 매칭 주문: ${activeOrders.length}개 (active/partially_matched/matched)`);
+    
+    if (activeOrders.length === 0) {
+      return { settledCount: 0, results: [] };
+    }
+    
+    // 2. 매칭된 주문들을 한 번에 조회 (제미나이 제안: N+1 방지)
+    const matchedOrderIds = activeOrders.map(o => o.matchedOrderId);
+    const matchedOrders = await ExchangeOrder.findAll({
+      where: { id: { [Op.in]: matchedOrderIds } }
+    });
+    
+    const matchedOrderMap = new Map(matchedOrders.map(o => [o.id, o]));
+    
+    // 3. 고아 주문 필터링
+    const orphanedOrders = [];
+    
+    for (const order of activeOrders) {
+      const matchedOrder = matchedOrderMap.get(order.matchedOrderId);
       
-      // 2. 매칭된 주문들을 한 번에 조회 (제미나이 제안: N+1 방지)
-      const matchedOrderIds = activeOrders.map(o => o.matchedOrderId);
-      const matchedOrders = await ExchangeOrder.findAll({
-        where: { id: { [Op.in]: matchedOrderIds } },
-        transaction
-      });
-      
-      const matchedOrderMap = new Map(matchedOrders.map(o => [o.id, o]));
-      
-      // 3. 고아 주문 필터링
-      const orphanedOrders = [];
-      
-      for (const order of activeOrders) {
-        const matchedOrder = matchedOrderMap.get(order.matchedOrderId);
-        
-        if (matchedOrder && matchedOrder.settledAt !== null) {
-          orphanedOrders.push({ order, matchedOrder });
-          console.log(`🔄 고아 주문 발견: ${order.id} (${order.side}, 매칭: ${order.matchedOrderId})`);
-        }
+      if (matchedOrder && matchedOrder.settledAt !== null) {
+        orphanedOrders.push({ order, matchedOrder });
+        console.log(`🔄 고아 주문 발견: ${order.id} (${order.side}, 매칭: ${order.matchedOrderId})`);
       }
-      
-      console.log(`🔄 발견된 고아 주문: ${orphanedOrders.length}개`);
-      
-      if (orphanedOrders.length === 0) {
-        await transaction.commit();
-        return { settledCount: 0, results: [] };
-      }
+    }
+    
+    console.log(`🔄 발견된 고아 주문: ${orphanedOrders.length}개`);
+    
+    if (orphanedOrders.length === 0) {
+      return { settledCount: 0, results: [] };
+    }
       
       // 4. 경기 결과들을 한 번에 조회 (제미나이 제안: N+1 방지)
       const nonMultibetOrphans = orphanedOrders.filter(({ order }) => !order.isMultibet);
@@ -2845,11 +2839,14 @@ class ExchangeSettlementService {
         );
       }
       
-      // 5. 고아 주문들 정산
+      // 5. 고아 주문들 정산 (✅ 각 주문마다 독립적인 트랜잭션 사용)
       let settledCount = 0;
       const results = [];
       
       for (const { order: orphanOrder, matchedOrder: settledMatchedOrder } of orphanedOrders) {
+        // ✅ 각 고아 주문마다 독립적인 트랜잭션 생성
+        const orphanTransaction = await sequelize.transaction();
+        
         try {
           console.log(`\n🔄 고아 주문 ${orphanOrder.id} 정산 시작...`);
           
@@ -2870,7 +2867,7 @@ class ExchangeSettlementService {
               orphanOrder,
               settledMatchedOrder,
               null,
-              transaction
+              orphanTransaction  // ✅ 독립적인 트랜잭션 사용
             );
           } else {
             // 일반 주문 고아 정산
@@ -2881,14 +2878,20 @@ class ExchangeSettlementService {
               orphanOrder,
               settledMatchedOrder,
               gameResult,
-              transaction
+              orphanTransaction  // ✅ 독립적인 트랜잭션 사용
             );
           }
+          
+          // ✅ 성공 시 트랜잭션 커밋
+          await orphanTransaction.commit();
           
           results.push(result);
           settledCount++;
           console.log(`✅ 고아 주문 ${orphanOrder.id} 정산 완료`);
         } catch (error) {
+          // ✅ 실패 시 트랜잭션 롤백
+          await orphanTransaction.rollback();
+          
           console.error(`❌ 고아 주문 ${orphanOrder.id} 정산 실패:`, error.message);
           results.push({ 
             success: false, 
@@ -2898,16 +2901,9 @@ class ExchangeSettlementService {
         }
       }
       
-      await transaction.commit();
       console.log(`\n🎉 고아 주문 정산 완료: ${settledCount}/${orphanedOrders.length}개`);
       
       return { settledCount, results };
-      
-    } catch (error) {
-      await transaction.rollback();
-      console.error('❌ 고아 주문 정산 실패:', error);
-      throw error;
-    }
   }
 }
 
