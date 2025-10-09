@@ -65,7 +65,8 @@ export const LOCATION_CONFIGS = {
   },
   
   multibetSettlement: {
-    usePartialMatch: false,
+    usePartialMatch: true,  // ✅ false → true (부분 매칭 활성화)
+    useNormalizeUtils: true,  // ✅ 추가 (팀명 정규화 활성화)
     timeRange: 24,
     statusFilter: 'finished',
     orderBy: null,

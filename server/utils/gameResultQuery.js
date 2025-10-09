@@ -215,8 +215,7 @@ class GameResultQuery {
     // 1단계: 정확한 시간으로 검색
     let gameResult = await GameResult.findOne({
       where: {
-        homeTeam: teams.home,
-        awayTeam: teams.away,
+        ...this.buildTeamConditions(teams, options), // ✅ 팀명 조건 함수 사용
         commenceTime: time,
         ...this.buildStatusConditions(options.statusFilter)
       }
@@ -228,8 +227,7 @@ class GameResultQuery {
       
       gameResult = await GameResult.findOne({
         where: {
-          homeTeam: teams.home,
-          awayTeam: teams.away,
+          ...this.buildTeamConditions(teams, options), // ✅ 팀명 조건 함수 사용
           ...timeConditions,
           ...this.buildStatusConditions(options.statusFilter)
         }
@@ -243,6 +241,9 @@ class GameResultQuery {
    * 팀명 조건 구성
    */
   static buildTeamConditions(teams, options) {
+    console.log(`🔍 [buildTeamConditions] 팀명:`, teams);
+    console.log(`🔍 [buildTeamConditions] 옵션:`, { usePartialMatch: options.usePartialMatch, enableReverseMatch: options.enableReverseMatch });
+    
     if (options.usePartialMatch) {
       const conditions = [];
       
@@ -252,20 +253,25 @@ class GameResultQuery {
         awayTeam: { [Op.iLike]: `%${teams.away}%` }
       });
       
-      // 역방향 매칭 (홈/어웨이 바뀐 경우)
-      if (options.enableReverseMatch) {
+      // 역방향 매칭 (홈/어웨이 바뀐 경우) - 기본적으로 활성화
+      const enableReverse = options.enableReverseMatch !== false; // undefined도 true로 처리
+      if (enableReverse) {
         conditions.push({
           homeTeam: { [Op.iLike]: `%${teams.away}%` },
           awayTeam: { [Op.iLike]: `%${teams.home}%` }
         });
       }
       
-      return { [Op.or]: conditions };
+      const result = { [Op.or]: conditions };
+      console.log(`🔍 [buildTeamConditions] 생성된 조건:`, JSON.stringify(result, null, 2));
+      return result;
     } else {
-      return {
+      const result = {
         homeTeam: teams.home,
         awayTeam: teams.away
       };
+      console.log(`🔍 [buildTeamConditions] 정확한 매칭 조건:`, result);
+      return result;
     }
   }
 

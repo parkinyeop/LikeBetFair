@@ -32,7 +32,7 @@ const User = sequelize.define('User', {
     }
   },
   balance: {
-    type: DataTypes.DECIMAL(10, 2),
+    type: DataTypes.DECIMAL(12, 2),  // 최대 10억원 (999,999,999.99)
     allowNull: false,
     defaultValue: 0.00
   },
