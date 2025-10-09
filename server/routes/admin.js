@@ -21,6 +21,7 @@ import { Op } from 'sequelize';
 import sequelize from '../models/sequelize.js';
 import betResultService from '../services/betResultService.js';
 import { normalizeTeamNameForComparison } from '../normalizeUtils.js';
+import balanceService from '../services/balanceService.js';
 
 
 const router = express.Router();
@@ -1029,32 +1030,57 @@ router.get('/users/detail/:id', verifyToken, requireAdmin(2), async (req, res) =
 
 // 사용자 잔액 수정
 router.patch('/users/detail/:id/balance', verifyToken, requireAdmin(4), async (req, res) => {
+  const transaction = await sequelize.transaction();
+  
   try {
     const { balance, reason } = req.body;
     
     if (typeof balance !== 'number' || balance < 0) {
+      await transaction.rollback();
       return res.status(400).json({ message: '올바른 잔액을 입력해주세요.' });
     }
 
-    const user = await User.findByPk(req.params.id);
+    const user = await User.findByPk(req.params.id, { transaction });
     if (!user) {
+      await transaction.rollback();
       return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
     }
 
-    const oldBalance = user.balance;
-    await user.update({ balance });
+    const oldBalance = parseFloat(user.balance);
+    const newBalance = parseFloat(balance);
+    const difference = newBalance - oldBalance;
 
-    console.log(`Balance updated by admin ${req.admin.username}: User ${user.username} ${oldBalance} -> ${balance}. Reason: ${reason}`);
+    // ✅ balanceService를 사용하여 잔액 변경 (PaymentHistory 자동 기록)
+    if (difference !== 0) {
+      await balanceService.updateBalance(
+        user.id,
+        difference,
+        `관리자 잔액 수정 (${req.admin.username}): ${reason || '사유 없음'}`,
+        null,
+        transaction
+      );
+    }
+
+    await transaction.commit();
+
+    console.log(`💰 [Admin] 잔액 수정: ${user.username} ${oldBalance} -> ${newBalance} (차이: ${difference > 0 ? '+' : ''}${difference}) by ${req.admin.username}. Reason: ${reason || '사유 없음'}`);
 
     res.json({ 
       message: '잔액이 성공적으로 수정되었습니다.',
-      oldBalance: parseFloat(oldBalance),
-      newBalance: parseFloat(balance)
+      oldBalance,
+      newBalance
     });
 
   } catch (error) {
-    console.error('Balance update error:', error);
-    res.status(500).json({ message: '잔액 수정 중 오류가 발생했습니다.' });
+    await transaction.rollback();
+    console.error('❌ [Admin] Balance update error:', error);
+    console.error('❌ [Admin] Error stack:', error.stack);
+    console.error('❌ [Admin] Error name:', error.name);
+    res.status(500).json({ 
+      message: '잔액 수정 중 오류가 발생했습니다.',
+      error: error.name,
+      details: error.message
+    });
   }
 });
 
@@ -1223,35 +1249,46 @@ router.post('/users', verifyToken, requireAdmin(3), async (req, res) => {
 
 // 사용자 수정
 router.put('/users', verifyToken, requireAdmin(3), async (req, res) => {
+  const transaction = await sequelize.transaction();
+  
   try {
     const { id, username, email, admin_level, balance, is_active } = req.body;
 
     if (!id) {
+      await transaction.rollback();
       return res.status(400).json({ message: '사용자 ID는 필수입니다.' });
     }
 
-    const user = await User.findByPk(id);
+    const user = await User.findByPk(id, { transaction });
     if (!user) {
+      await transaction.rollback();
       return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
     }
 
     // 이메일 중복 확인 (자신 제외)
     if (email && email !== user.email) {
-      const existingUser = await User.findOne({ where: { email } });
+      const existingUser = await User.findOne({ where: { email }, transaction });
       if (existingUser) {
+        await transaction.rollback();
         return res.status(400).json({ message: '이미 존재하는 이메일입니다.' });
       }
     }
 
     // 사용자명 중복 확인 (자신 제외)
     if (username && username !== user.username) {
-      const existingUsername = await User.findOne({ where: { username } });
+      const existingUsername = await User.findOne({ where: { username }, transaction });
       if (existingUsername) {
+        await transaction.rollback();
         return res.status(400).json({ message: '이미 존재하는 사용자명입니다.' });
       }
     }
 
-    // 사용자 정보 업데이트
+    // 잔액 변경 여부 확인
+    const oldBalance = parseFloat(user.balance);
+    const newBalance = balance !== undefined ? parseFloat(balance) : oldBalance;
+    const balanceDifference = newBalance - oldBalance;
+
+    // 사용자 정보 업데이트 (잔액 제외)
     const updateData = {};
     if (username !== undefined) updateData.username = username;
     if (email !== undefined) updateData.email = email;
@@ -1259,10 +1296,24 @@ router.put('/users', verifyToken, requireAdmin(3), async (req, res) => {
       updateData.adminLevel = admin_level;
       updateData.isAdmin = admin_level > 0;
     }
-    if (balance !== undefined) updateData.balance = balance;
     if (is_active !== undefined) updateData.isActive = is_active;
 
-    await user.update(updateData);
+    await user.update(updateData, { transaction });
+
+    // ✅ 잔액이 변경된 경우 balanceService 사용 (PaymentHistory 자동 기록)
+    if (balanceDifference !== 0) {
+      await balanceService.updateBalance(
+        user.id,
+        balanceDifference,
+        `관리자 정보 수정 시 잔액 변경 (${req.admin.username})`,
+        null,
+        transaction
+      );
+      
+      console.log(`💰 [Admin] 사용자 수정 시 잔액 변경: ${user.username} ${oldBalance} -> ${newBalance} (차이: ${balanceDifference > 0 ? '+' : ''}${balanceDifference}) by ${req.admin.username}`);
+    }
+
+    await transaction.commit();
 
     // 업데이트된 사용자 정보 반환
     const updatedUser = await User.findByPk(id, {
@@ -1285,8 +1336,15 @@ router.put('/users', verifyToken, requireAdmin(3), async (req, res) => {
       user: userResponse
     });
   } catch (error) {
-    console.error('User update error:', error);
-    res.status(500).json({ message: '사용자 정보 수정 중 오류가 발생했습니다.' });
+    await transaction.rollback();
+    console.error('❌ [Admin] User update error:', error);
+    console.error('❌ [Admin] Error stack:', error.stack);
+    console.error('❌ [Admin] Error name:', error.name);
+    res.status(500).json({ 
+      message: '사용자 정보 수정 중 오류가 발생했습니다.',
+      error: error.name,
+      details: error.message
+    });
   }
 });
 

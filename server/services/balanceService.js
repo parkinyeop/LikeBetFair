@@ -1,6 +1,7 @@
-const { User, PaymentHistory } = require('../models');
-const { Op } = require('sequelize');
-const sequelize = require('../config/database');
+import User from '../models/userModel.js';
+import PaymentHistory from '../models/paymentHistoryModel.js';
+import { Op, QueryTypes } from 'sequelize';
+import sequelize from '../models/sequelize.js';
 
 /**
  * 중앙화된 잔액 관리 서비스
@@ -57,7 +58,8 @@ class BalanceService {
         amount: changeAmount,
         balanceAfter: newBalance,
         memo,
-        betId
+        betId,
+        paidAt: new Date() // ✅ paidAt 필드 추가
       }, { transaction });
 
       console.log(
@@ -112,7 +114,7 @@ class BalanceService {
         WHERE "userId" = :userId
       `, {
         replacements: { userId },
-        type: sequelize.QueryTypes.SELECT
+        type: QueryTypes.SELECT
       });
 
       const calculatedBalance = parseFloat(result.total);
@@ -196,5 +198,5 @@ class BalanceService {
   }
 }
 
-module.exports = new BalanceService();
+export default new BalanceService();
 

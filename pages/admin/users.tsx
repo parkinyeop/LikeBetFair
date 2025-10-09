@@ -69,9 +69,9 @@ export default function UsersManagement() {
   });
   
   // API 뮤테이션 (성공 후 자동 새로고침)
-  const { mutate: addUser, loading: addLoading } = useAdminApiMutation('/api/admin/users', 'POST', refetchUsers);
-  const { mutate: updateUser, loading: updateLoading } = useAdminApiMutation('/api/admin/users', 'PUT', refetchUsers);
-  const { mutate: deleteUser, loading: deleteLoading } = useAdminApiMutation('/api/admin/users', 'DELETE', refetchUsers);
+  const { mutate: addUser, loading: addLoading, error: addError } = useAdminApiMutation('/api/admin/users', 'POST', refetchUsers);
+  const { mutate: updateUser, loading: updateLoading, error: updateError } = useAdminApiMutation('/api/admin/users', 'PUT', refetchUsers);
+  const { mutate: deleteUser, loading: deleteLoading, error: deleteError } = useAdminApiMutation('/api/admin/users', 'DELETE', refetchUsers);
 
   const users = usersData?.users || [];
 
@@ -206,9 +206,40 @@ export default function UsersManagement() {
 
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // 수정 전 데이터 저장
+    const originalUser = users.find(u => u.id === editUser.id);
+    
     const result = await updateUser(editUser);
     if (result) {
+      // ✅ 수정 내용 표시
+      const changes = [];
+      if (originalUser) {
+        if (originalUser.username !== editUser.username) {
+          changes.push(`사용자명: ${originalUser.username} → ${editUser.username}`);
+        }
+        if (originalUser.email !== editUser.email) {
+          changes.push(`이메일: ${originalUser.email} → ${editUser.email}`);
+        }
+        if (originalUser.admin_level !== editUser.admin_level) {
+          changes.push(`관리자 레벨: ${originalUser.admin_level} → ${editUser.admin_level}`);
+        }
+        if (originalUser.balance !== editUser.balance) {
+          changes.push(`잔액: ${originalUser.balance.toLocaleString()}원 → ${editUser.balance.toLocaleString()}원`);
+        }
+        if (originalUser.is_active !== editUser.is_active) {
+          changes.push(`상태: ${originalUser.is_active ? '활성' : '비활성'} → ${editUser.is_active ? '활성' : '비활성'}`);
+        }
+      }
+      
+      const changeMessage = changes.length > 0 
+        ? `\n\n수정된 내용:\n${changes.join('\n')}`
+        : '';
+      
+      alert(`사용자 정보가 성공적으로 수정되었습니다.${changeMessage}`);
       setShowEditModal(false);
+    } else if (updateError) {
+      alert(`사용자 수정 실패: ${updateError}`);
     }
   };
 

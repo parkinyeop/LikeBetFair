@@ -97,7 +97,10 @@ export function useAdminApi<T>(
           return;
         }
         
-        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+        // ✅ 에러 타입 포함
+        const errorType = errorData.error || errorData.type || 'Unknown';
+        const errorMessage = errorData.message || `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(`[${errorType}] ${errorMessage}`);
       }
 
       const result = await response.json();
@@ -117,16 +120,22 @@ export function useAdminApi<T>(
   useEffect(() => {
     if (immediate) {
       fetchData();
-
-      // 🔄 5분마다 자동 갱신
-      const intervalId = setInterval(() => {
-        console.log(`[useAdminApi] 자동 갱신 실행 (5분): ${path}`);
-        fetchData();
-      }, 5 * 60 * 1000); // 300,000ms = 5분
-
-      return () => clearInterval(intervalId);
     }
-  }, [immediate, queryParams, fetchData, path]); // queryParams가 변경될 때마다 다시 fetch
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [immediate, path, JSON.stringify(queryParams)]); // ✅ queryParams를 JSON 문자열로 비교
+
+  // 🔄 5분마다 자동 갱신 (별도 useEffect로 분리)
+  useEffect(() => {
+    if (!immediate) return;
+
+    const intervalId = setInterval(() => {
+      console.log(`[useAdminApi] 자동 갱신 실행 (5분): ${path}`);
+      fetchData();
+    }, 5 * 60 * 1000); // 300,000ms = 5분
+
+    return () => clearInterval(intervalId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [immediate, path]); // ✅ 자동 갱신은 path만 의존
 
   return {
     data,
@@ -185,7 +194,10 @@ export function useAdminApiMutation<T, R = any>(
           return null;
         }
         
-        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+        // ✅ 에러 타입 포함
+        const errorType = errorData.error || errorData.type || 'Unknown';
+        const errorMessage = errorData.message || `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(`[${errorType}] ${errorMessage}`);
       }
 
       const result = await response.json();
