@@ -163,7 +163,7 @@ class MultibetSettlementService {
         gameResults.push({
           selection,
           // ✅ [Phase 1] Null 방어: gameResult가 null이면 pending 상태 객체로 대체
-          gameResult: gameResult || { result: 'pending', status: 'scheduled' },
+          gameResult: gameResult || { status: 'scheduled' },
           index: index + 1
         });
         
@@ -177,7 +177,7 @@ class MultibetSettlementService {
         gameResults.push({
           selection,
           // ✅ [Phase 1] 오류 시에도 pending 상태 객체로 대체
-          gameResult: { result: 'pending', status: 'scheduled', error: error.message },
+          gameResult: { status: 'scheduled', error: error.message },
           error: error.message,
           index: index + 1
         });
@@ -263,16 +263,19 @@ class MultibetSettlementService {
         }
 
         // 경기 결과 판정 (검증된 스코어 전달)
-        const result = this.determineGameResult(gameResult, selection, validationResult.score);
+        const determinedResult = this.determineGameResult(gameResult, selection, validationResult.score);
 
         // 🔧 Sequelize 인스턴스인지 확인 후 처리
         const gameResultData = typeof gameResult.toJSON === 'function' 
           ? gameResult.toJSON() 
           : gameResult;
 
+        // ✅ 정책: GameResult의 result 필드 제거 후 우리가 판정한 결과만 사용
+        const { result: _unused, ...cleanGameResultData } = gameResultData;
+
         return {
-          ...gameResultData,
-          result,
+          ...cleanGameResultData,
+          result: determinedResult, // 우리가 판정한 결과 (won/lost/cancelled/pending)
           validatedScore: validationResult.score // 검증된 스코어 포함
         };
       } else {
@@ -300,7 +303,7 @@ class MultibetSettlementService {
    * @returns {string} 경기 결과 (won/lost/cancelled/pending)
    */
   determineGameResult(gameResult, selection, validatedScore = null) {
-    const { status, homeScore, awayScore, result, score } = gameResult;
+    const { status, homeScore, awayScore, score } = gameResult;
     const { team: selectedTeam } = selection;
 
     // 경기 취소/연기
@@ -308,26 +311,8 @@ class MultibetSettlementService {
       return 'cancelled';
     }
 
-    // finished + pending 패턴은 실제로 취소된 경기
-    if (status === 'finished' && result === 'pending') {
-      return 'pending'; // determineMultibetResult에서 cancelled로 변환됨
-    }
-
-    // 결과가 이미 판정된 경우 직접 사용
-    if (status === 'finished' && result && result !== 'pending') {
-      // 선택한 팀이 홈팀인지 어웨이팀인지 확인
-      const isHomeTeam = selectedTeam === gameResult.homeTeam ||
-                        selectedTeam.includes(gameResult.homeTeam) ||
-                        gameResult.homeTeam.includes(selectedTeam);
-
-      if (result === 'home_win') {
-        return isHomeTeam ? 'won' : 'lost';
-      } else if (result === 'away_win') {
-        return isHomeTeam ? 'lost' : 'won';
-      } else if (result === 'draw') {
-        return 'lost'; // 익스체인지에서 무승부는 보통 패배 처리
-      }
-    }
+    // ✅ 정책: result 필드 사용 금지 - 항상 스코어 기반 판정
+    console.log(`[MULTIBET] 스코어 기반 판정 시작 - status: ${status}`);
 
     // 스코어 기반 판정 (검증된 스코어 우선 사용)
     let actualHomeScore = homeScore;
@@ -350,11 +335,20 @@ class MultibetSettlementService {
         }
 
         if (Array.isArray(scoreData) && scoreData.length >= 2) {
-          actualHomeScore = parseInt(scoreData[0].score);
-          actualAwayScore = parseInt(scoreData[1].score);
+          // ✅ 수정: name으로 팀을 찾아서 스코어 추출
+          const homeScoreEntry = scoreData.find(s => s.name === gameResult.homeTeam);
+          const awayScoreEntry = scoreData.find(s => s.name === gameResult.awayTeam);
+          
+          if (homeScoreEntry && awayScoreEntry) {
+            actualHomeScore = parseInt(homeScoreEntry.score);
+            actualAwayScore = parseInt(awayScoreEntry.score);
+            console.log(`[MULTIBET] 스코어 파싱 성공: ${gameResult.homeTeam} ${actualHomeScore}-${actualAwayScore} ${gameResult.awayTeam}`);
+          } else {
+            console.log(`[MULTIBET] 스코어 파싱 실패: 팀명 매칭 안됨`, { homeTeam: gameResult.homeTeam, awayTeam: gameResult.awayTeam, scoreData });
+          }
         }
       } catch (e) {
-        // 스코어 파싱 실패시 silent fail
+        console.log(`[MULTIBET] 스코어 파싱 오류:`, e.message);
       }
     }
 
@@ -399,8 +393,18 @@ class MultibetSettlementService {
    * @returns {Object} 정산 결과
    */
   determineMultibetResult(gameResults) {
-    // ✅ [Phase 2] 각 선택의 최종 결과 추출
-    const results = gameResults.map(gr => gr.gameResult?.result || 'pending');
+    // ✅ [Phase 2] 각 선택의 최종 결과 추출 - result 필드 대신 내부 판정 결과 사용
+    const results = gameResults.map(gr => {
+      if (!gr.gameResult) return 'pending';
+      
+      // gameResult 내부에 이미 판정된 result가 있으면 사용 (determineGameResult의 반환값)
+      if (gr.gameResult.result) {
+        return gr.gameResult.result;
+      }
+      
+      // 없으면 status 기반으로 pending 여부만 확인
+      return gr.gameResult.status === 'finished' ? 'pending' : 'pending';
+    });
     console.log(`[Multibet] 📊 경기별 결과 집계: ${results.join(', ')}`);
   
     // ✅ [Phase 2 핵심 수정] pending인 경기가 하나라도 있으면 즉시 반환

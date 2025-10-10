@@ -207,33 +207,71 @@ class GameResultQuery {
   }
 
   /**
-   * 2단계 쿼리 실행 (multibetSettlement 방식)
+   * 2단계 쿼리 실행 (multibetSettlement 방식) - 관리자 페이지 방식 적용 + 시간 조건 추가
    */
   static async executeTwoStageQuery(teams, time, options) {
     const GameResult = (await import('../models/gameResultModel.js')).default;
+    const { normalizeTeamNameForComparison } = await import('../normalizeUtils.js');
     
-    // 1단계: 정확한 시간으로 검색
-    let gameResult = await GameResult.findOne({
-      where: {
-        ...this.buildTeamConditions(teams, options), // ✅ 팀명 조건 함수 사용
-        commenceTime: time,
-        ...this.buildStatusConditions(options.statusFilter)
+    console.log(`🔍 [executeTwoStageQuery] 더블헤더 고려한 시간 조건 매칭 시작`);
+    console.log(`🔍 [executeTwoStageQuery] 팀명:`, teams);
+    console.log(`🔍 [executeTwoStageQuery] 시간:`, time);
+    
+    // 🆕 시간 조건 추가 (더블헤더 고려)
+    const timeBuffer = options.timeBuffer || 2; // 2시간 버퍼 (더블헤더 대응)
+    const timeConditions = {
+      commenceTime: {
+        [Op.between]: [
+          new Date(new Date(time).getTime() - timeBuffer * 60 * 60 * 1000),
+          new Date(new Date(time).getTime() + timeBuffer * 60 * 60 * 1000)
+        ]
       }
+    };
+    
+    // 시간 조건 + 상태 조건으로 조회
+    const allGameResults = await GameResult.findAll({
+      where: {
+        ...timeConditions,
+        ...this.buildStatusConditions(options.statusFilter)
+      },
+      order: [['createdAt', 'DESC']]
     });
-
-    // 2단계: 시간 범위로 검색
-    if (!gameResult && options.timeRange > 0) {
-      const timeConditions = this.buildTimeConditions(time, options.timeRange);
+    
+    console.log(`🔍 [executeTwoStageQuery] 시간 범위 내 경기 결과 조회: ${allGameResults.length}개`);
+    
+    // 정규화된 팀명으로 정확한 매칭 (관리자 페이지 방식)
+    const normalizedHomeTeam = normalizeTeamNameForComparison(teams.home);
+    const normalizedAwayTeam = normalizeTeamNameForComparison(teams.away);
+    
+    console.log(`🔍 [executeTwoStageQuery] 정규화된 팀명: ${normalizedHomeTeam} vs ${normalizedAwayTeam}`);
+    
+    // 🆕 더블헤더 처리: 모든 매칭되는 경기 찾기
+    const matchingResults = allGameResults.filter(gr => {
+      const grHomeNorm = normalizeTeamNameForComparison(gr.homeTeam);
+      const grAwayNorm = normalizeTeamNameForComparison(gr.awayTeam);
       
-      gameResult = await GameResult.findOne({
-        where: {
-          ...this.buildTeamConditions(teams, options), // ✅ 팀명 조건 함수 사용
-          ...timeConditions,
-          ...this.buildStatusConditions(options.statusFilter)
-        }
-      });
+      const forwardMatch = grHomeNorm === normalizedHomeTeam && grAwayNorm === normalizedAwayTeam;
+      const reverseMatch = grHomeNorm === normalizedAwayTeam && grAwayNorm === normalizedHomeTeam;
+      
+      return forwardMatch || reverseMatch;
+    });
+    
+    if (matchingResults.length === 0) {
+      console.log(`❌ [executeTwoStageQuery] 매칭되는 경기 결과 없음`);
+      return null;
     }
-
+    
+    // 🆕 더블헤더 처리: 가장 가까운 시간의 경기 선택
+    const gameResult = matchingResults.reduce((closest, current) => {
+      const closestTimeDiff = Math.abs(new Date(closest.commenceTime) - new Date(time));
+      const currentTimeDiff = Math.abs(new Date(current.commenceTime) - new Date(time));
+      return currentTimeDiff < closestTimeDiff ? current : closest;
+    });
+    
+    console.log(`🎯 [executeTwoStageQuery] 매칭 성공: ${gameResult.homeTeam} vs ${gameResult.awayTeam}`);
+    console.log(`🎯 [executeTwoStageQuery] 선택된 경기 시간: ${gameResult.commenceTime}`);
+    console.log(`✅ [executeTwoStageQuery] 상태: ${gameResult.status}, 스코어:`, gameResult.score);
+    
     return gameResult;
   }
 
@@ -242,23 +280,46 @@ class GameResultQuery {
    */
   static buildTeamConditions(teams, options) {
     console.log(`🔍 [buildTeamConditions] 팀명:`, teams);
-    console.log(`🔍 [buildTeamConditions] 옵션:`, { usePartialMatch: options.usePartialMatch, enableReverseMatch: options.enableReverseMatch });
+    console.log(`🔍 [buildTeamConditions] 옵션:`, { usePartialMatch: options.usePartialMatch, enableReverseMatch: options.enableReverseMatch, useNormalizeUtils: options.useNormalizeUtils });
     
     if (options.usePartialMatch) {
       const conditions = [];
       
+      // 정규화된 팀명을 받았을 때 검색어 추출
+      const getSearchTerm = (teamName) => {
+        if (!options.useNormalizeUtils) {
+          return teamName;
+        }
+        
+        // 짧은 팀명 (10글자 이하): 전체 사용
+        if (teamName.length <= 10) {
+          return teamName;
+        }
+        
+        // 긴 팀명: 전체 길이의 80% 사용 (최소 10글자)
+        // 예: 'atleticomineiro' (14글자) → 'atleticomine' (12글자)
+        //     'sportrecife' (11글자) → 'sportrecif' (10글자)
+        const minLength = Math.max(10, Math.floor(teamName.length * 0.8));
+        return teamName.substring(0, minLength);
+      };
+      
+      const homeSearch = getSearchTerm(teams.home);
+      const awaySearch = getSearchTerm(teams.away);
+      
+      console.log(`🔍 [buildTeamConditions] 검색어: home='${homeSearch}', away='${awaySearch}'`);
+      
       // 정방향 매칭
       conditions.push({
-        homeTeam: { [Op.iLike]: `%${teams.home}%` },
-        awayTeam: { [Op.iLike]: `%${teams.away}%` }
+        homeTeam: { [Op.iLike]: `%${homeSearch}%` },
+        awayTeam: { [Op.iLike]: `%${awaySearch}%` }
       });
       
       // 역방향 매칭 (홈/어웨이 바뀐 경우) - 기본적으로 활성화
       const enableReverse = options.enableReverseMatch !== false; // undefined도 true로 처리
       if (enableReverse) {
         conditions.push({
-          homeTeam: { [Op.iLike]: `%${teams.away}%` },
-          awayTeam: { [Op.iLike]: `%${teams.home}%` }
+          homeTeam: { [Op.iLike]: `%${awaySearch}%` },
+          awayTeam: { [Op.iLike]: `%${homeSearch}%` }
         });
       }
       

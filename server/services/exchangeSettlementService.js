@@ -610,7 +610,8 @@ class ExchangeSettlementService {
    */
   determineWinner(order, gameResult) {
     const { market, line, selectionDetails } = order;
-    const { result, score } = gameResult;
+    // ✅ 정책: result 필드 사용 금지
+    const { score } = gameResult;
     
     console.log(`    🎯 판정 기준: market=${market}, line=${line}, selection=${order.selection}`);
     
@@ -640,23 +641,58 @@ class ExchangeSettlementService {
    */
   determineMoneylineWinner(order, gameResult) {
     const { selection } = order;
-    const { result, homeTeam, awayTeam } = gameResult;
+    // ✅ 정책: result 필드 사용 금지 - score로 판정
+    const { homeTeam, awayTeam, score, homeScore, awayScore } = gameResult;
     
     // 선택한 팀이 홈팀인지 확인
     const isHomeSelection = selection.includes(homeTeam) || 
                            selection.toLowerCase().includes('home');
     
-    console.log(`      선택팀: ${selection}, 홈팀여부: ${isHomeSelection}, 경기결과: ${result}`);
+    // 스코어에서 홈/어웨이 점수 추출
+    let actualHomeScore = homeScore;
+    let actualAwayScore = awayScore;
     
-    switch (result) {
-      case 'home_win':
-        return isHomeSelection;
-      case 'away_win':
-        return !isHomeSelection;
-      case 'draw':
-        return false; // 무승부는 일반적으로 패배 처리
-      default:
+    // score JSON에서 추출
+    if ((actualHomeScore === null || actualHomeScore === undefined) && score) {
+      try {
+        const scoreData = typeof score === 'string' ? JSON.parse(score) : score;
+        if (Array.isArray(scoreData) && scoreData.length >= 2) {
+          const homeScoreEntry = scoreData.find(s => s.name === homeTeam);
+          const awayScoreEntry = scoreData.find(s => s.name === awayTeam);
+          
+          if (homeScoreEntry && awayScoreEntry) {
+            actualHomeScore = parseInt(homeScoreEntry.score);
+            actualAwayScore = parseInt(awayScoreEntry.score);
+          }
+        }
+      } catch (e) {
+        console.error(`[EXCHANGE_SETTLEMENT] 스코어 파싱 오류:`, e.message);
         return false;
+      }
+    }
+    
+    // 스코어가 없으면 판정 불가
+    if (actualHomeScore === null || actualHomeScore === undefined || 
+        actualAwayScore === null || actualAwayScore === undefined) {
+      console.log(`      선택팀: ${selection}, 스코어 없음 - 판정 불가`);
+      return false;
+    }
+    
+    // 승패 판정
+    const homeWin = actualHomeScore > actualAwayScore;
+    const awayWin = actualAwayScore > actualHomeScore;
+    const isDraw = actualHomeScore === actualAwayScore;
+    
+    console.log(`      선택팀: ${selection}, 홈팀여부: ${isHomeSelection}, 스코어: ${actualHomeScore}-${actualAwayScore}`);
+    
+    if (isDraw) {
+      return false; // 무승부는 일반적으로 패배 처리
+    }
+    
+    if (isHomeSelection) {
+      return homeWin;
+    } else {
+      return awayWin;
     }
   }
 

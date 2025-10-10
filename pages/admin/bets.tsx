@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
 import { toast } from 'react-hot-toast';
 import { parseScore, getScoreDisplay } from '../../utils/scoreParser';
+import BetCancelModal from '../../components/admin/BetCancelModal';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -386,6 +387,10 @@ export default function BettingAdmin() {
   // 🆕 수동 경기 결과 입력 관련 상태
   const [showManualInputModal, setShowManualInputModal] = useState(false);
   const [manualGameResults, setManualGameResults] = useState<any>({});
+  
+  // 베팅 취소 모달 상태
+  const [showBetCancelModal, setShowBetCancelModal] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
   
   // 월별 필터 상태
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -867,6 +872,45 @@ export default function BettingAdmin() {
   }, []);
 
   // 베팅 클릭 핸들러
+  // 베팅 취소 함수
+  const handleBetCancel = useCallback(async (reason: string) => {
+    if (!selectedBet) return;
+    
+    setCancelLoading(true);
+    try {
+      const headers = getAuthHeaders();
+      const response = await fetch(buildApiUrl(`/api/admin/bets/${selectedBet.id}/cancel`), {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reason }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast.success('베팅이 성공적으로 취소되었습니다.');
+        console.log('베팅 취소 완료:', data);
+        
+        // 베팅 목록 새로고침
+        fetchBettingData();
+        setShowBetCancelModal(false);
+        setShowBetDetail(false);
+        setSelectedBet(null);
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.message || '베팅 취소에 실패했습니다.');
+        console.error('베팅 취소 실패:', errorData);
+      }
+    } catch (error) {
+      console.error('베팅 취소 오류:', error);
+      toast.error('베팅 취소 중 오류가 발생했습니다.');
+    } finally {
+      setCancelLoading(false);
+    }
+  }, [selectedBet, getAuthHeaders, fetchBettingData]);
+
   const handleBetClick = useCallback(async (bet: Bet) => {
     try {
       // 🆕 경기 결과 포함된 상세 정보 조회
@@ -1798,6 +1842,25 @@ export default function BettingAdmin() {
                             <h4 className="text-md font-semibold text-gray-900">선택된 경기들</h4>
                             <div className="flex items-center space-x-3">
                               <span className="text-sm text-gray-500">{selectedBet.selections.length}개 선택</span>
+                              
+                              {/* 🆕 베팅 취소 버튼 */}
+                              {(() => {
+                                // 취소 가능한 상태인지 확인
+                                const isCancellable = selectedBet.status === 'pending' || selectedBet.status === 'open';
+                                
+                                if (isCancellable) {
+                                  return (
+                                    <button
+                                      onClick={() => setShowBetCancelModal(true)}
+                                      className="px-3 py-1 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition-colors"
+                                    >
+                                      베팅 취소
+                                    </button>
+                                  );
+                                }
+                                return null;
+                              })()}
+                              
                               {/* 🆕 경기 결과 수동 입력 버튼 */}
                               {(() => {
                                 // 베팅이 이미 정산 완료된 경우 버튼/배지 모두 표시 안 함
@@ -2119,6 +2182,23 @@ export default function BettingAdmin() {
                     </div>
                   </div>
                 </div>
+              )}
+
+              {/* 🆕 베팅 취소 모달 */}
+              {showBetCancelModal && selectedBet && (
+                <BetCancelModal
+                  isOpen={showBetCancelModal}
+                  onClose={() => setShowBetCancelModal(false)}
+                  onConfirm={handleBetCancel}
+                  betId={selectedBet.id}
+                  betInfo={{
+                    userId: selectedBet.userId,
+                    stake: selectedBet.stake,
+                    status: selectedBet.status,
+                    selections: selectedBet.selections
+                  }}
+                  loading={cancelLoading}
+                />
               )}
             </div>
           </div>

@@ -42,17 +42,23 @@ class BetResultService {
     
     try {
       console.log('Starting bet results update...');
-      // GameResult status 자동 보정: score/result가 있고 status가 finished가 아니면 finished로 변경
+      // ✅ 정책: GameResult의 result 필드 사용 금지
+      // GameResult status 자동 보정: score가 있고 status가 finished가 아니면 finished로 변경
       const unfinished = await GameResult.findAll({ where: { status: { [Op.not]: 'finished' } } });
       let fixedCount = 0;
       for (const gr of unfinished) {
-        if (gr.result && gr.result !== 'pending' && gr.score && Array.isArray(gr.score) && gr.score.length > 0) {
-          await gr.update({ status: 'finished' });
-          fixedCount++;
+        // score가 있고 유효한 데이터가 있으면 finished로 보정
+        if (gr.score && Array.isArray(gr.score) && gr.score.length > 0) {
+          // score 배열에 유효한 점수 데이터가 있는지 확인
+          const hasValidScore = gr.score.some(s => s && s.score !== null && s.score !== undefined);
+          if (hasValidScore) {
+            await gr.update({ status: 'finished' });
+            fixedCount++;
+          }
         }
       }
       if (fixedCount > 0) {
-        console.log(`[자동보정] status가 finished가 아닌데 결과/스코어가 있는 GameResult ${fixedCount}건을 finished로 보정함`);
+        console.log(`[자동보정] status가 finished가 아닌데 스코어가 있는 GameResult ${fixedCount}건을 finished로 보정함`);
       }
       
       // pending 상태의 배팅들 조회

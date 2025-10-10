@@ -56,5 +56,38 @@ console.log('   - 경기 결과 수집: 매 30분마다 실행');
 console.log('   - 베팅 정산: 매 15분마다 실행');
 console.log('   - 고아 주문 정산: 매 5분마다 실행');
 
+// 🆕 서버 시작 시 즉시 정산 실행 (1분 후)
+console.log('⏰ [Scheduler] 서버 시작 후 1분 뒤 초기 정산 실행 예약...');
+setTimeout(async () => {
+  console.log('🚀 [Scheduler] 초기 정산 시작...');
+  
+  try {
+    // 1. 스포츠북 정산
+    console.log('⚙️ [초기정산] 스포츠북 정산 시작...');
+    const betResult = await betResultService.updateBetResults();
+    console.log(`✅ [초기정산] 스포츠북 정산: ${betResult.updatedCount}개 완료`);
+
+    // 2. 익스체인지 일반 주문 정산
+    console.log('⚙️ [초기정산] 익스체인지 일반 주문 정산 시작...');
+    const exchangeService = new exchangeSettlementService();
+    const exchangeResult = await exchangeService.settleAllConnectedOrders();
+    console.log(`✅ [초기정산] 익스체인지 일반 주문 정산: ${exchangeResult?.totalSettled || 0}개 완료`);
+
+    // 3. 익스체인지 멀티베팅 정산
+    console.log('⚙️ [초기정산] 익스체인지 멀티베팅 정산 시작...');
+    const multibetResult = await multibetSettlementService.settleAllMultibetOrders();
+    console.log(`✅ [초기정산] 익스체인지 멀티베팅 정산: ${multibetResult?.settledCount || 0}개 완료`);
+    
+    // 4. 고아 주문 정산
+    console.log('⚙️ [초기정산] 고아 주문 정산 시작...');
+    const orphanResult = await exchangeService.settleOrphanedOrders();
+    console.log(`✅ [초기정산] 고아 주문 정산: ${orphanResult.settledCount}개 완료`);
+    
+    console.log('🎉 [초기정산] 모든 초기 정산 완료!');
+  } catch (error) {
+    console.error('❌ [초기정산] 초기 정산 중 오류 발생:', error);
+  }
+}, 60000); // 1분 = 60,000ms
+
 
 
