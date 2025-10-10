@@ -636,12 +636,9 @@ function OrderHistoryPanel() {
 
   // 통합배당률 계산
   const calculateTotalOdds = (order: ExchangeOrder) => {
-    if ((order as any).isMultibet && (order as any).selectionDetails && (order as any).selectionDetails.selections) {
-      // 멀티배팅인 경우: 모든 선택의 배당률을 곱함
-      const selections = (order as any).selectionDetails.selections || [];
-      return selections.reduce((total: number, selection: any) => {
-        return total * (selection.odds || 1);
-      }, 1);
+    if ((order as any).isMultibet) {
+      // 멀티배팅인 경우: DB에 저장된 totalOdds 또는 price 사용 (환수율이 이미 적용됨)
+      return (order as any).totalOdds || order.price || 1;
     } else {
       // 단일 배팅인 경우: 해당 배당률 반환
       return order.price || 1;
@@ -1165,7 +1162,7 @@ function OrderHistoryPanel() {
                       <div className="flex items-center space-x-2">
                         <span className="text-gray-500">배당률</span>
                         <span className="text-sm font-bold text-blue-600">
-                          @{totalOdds.toFixed(2)}
+                          @{Number(totalOdds || 0).toFixed(2)}
                         </span>
                       </div>
                     </div>

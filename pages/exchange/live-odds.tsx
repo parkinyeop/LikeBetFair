@@ -560,7 +560,7 @@ export default function LiveOddsPage() {
                         </span>
                       </div>
                       <div className="text-xs text-gray-400">
-                        {(multibetOrder as any).stakeAmount?.toLocaleString()}원 • {applyExchangeReturnRate(parseFloat((multibetOrder as any).totalOdds), [parseFloat((multibetOrder as any).totalOdds)]).toFixed(2)}배당
+                        {(multibetOrder as any).stakeAmount?.toLocaleString()}원 • {parseFloat((multibetOrder as any).totalOdds).toFixed(2)}배당
                       </div>
                     </div>
 
@@ -577,7 +577,7 @@ export default function LiveOddsPage() {
                           {selection.commenceTime ? formatToLocalDateTime(selection.commenceTime) : '시간 미정'}
                         </div>
                         <div className="text-gray-300 text-sm mb-3">
-                          {selection.selection} • {selection.side === 'back' ? '🎯 Back' : '📉 Lay'} • {selection.odds ? applyExchangeReturnRate(selection.odds, [selection.odds]).toFixed(2) : 'N/A'}배당
+                          {selection.selection} • {selection.side === 'back' ? '🎯 Back' : '📉 Lay'} • {selection.odds ? Number(selection.odds).toFixed(2) : 'N/A'}배당
                         </div>
                         
                         {/* Lay 버튼들 추가 */}
@@ -612,7 +612,7 @@ export default function LiveOddsPage() {
                                       <div className="font-medium">{selection.selection}</div>
                                       <div className="text-xs mt-1 opacity-90">🎯 Back</div>
                                       <div className="text-xs mt-1 text-white font-medium">
-                                        배당률: {selection.odds ? applyExchangeReturnRate(selection.odds, [selection.odds]).toFixed(2) : 'N/A'}
+                                        배당률: {selection.odds ? Number(selection.odds).toFixed(2) : 'N/A'}
                                       </div>
                                     </button>
                                     
@@ -642,7 +642,7 @@ export default function LiveOddsPage() {
                                       <div className="font-medium">{selection.selection}</div>
                                       <div className="text-xs mt-1 opacity-90">🎯 Back</div>
                                       <div className="text-xs mt-1 text-white font-medium">
-                                        배당률: {selection.odds ? applyExchangeReturnRate(selection.odds, [selection.odds]).toFixed(2) : 'N/A'}
+                                        배당률: {selection.odds ? Number(selection.odds).toFixed(2) : 'N/A'}
                                       </div>
                                     </button>
                                     
