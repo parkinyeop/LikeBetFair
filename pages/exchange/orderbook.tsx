@@ -69,6 +69,22 @@ const OrderbookPage: React.FC = () => {
   // 상세보기 상태
   const [selectedOrderDetail, setSelectedOrderDetail] = useState<Order | null>(null);
 
+  // 🆕 매칭 금액 및 비율 계산 함수
+  const calculateMatchingInfo = (order: ExchangeOrder) => {
+    const originalAmount = order.amount || 0;
+    const remainingAmount = order.remainingAmount || order.amount || 0;
+    const filledAmount = order.filledAmount || 0;
+    const totalMatched = originalAmount - remainingAmount;
+    const matchPercentage = originalAmount > 0 ? Math.round((totalMatched / originalAmount) * 100) : 0;
+    
+    return {
+      totalAmount: originalAmount,
+      matchedAmount: totalMatched,
+      remainingAmount: remainingAmount,
+      matchPercentage: matchPercentage
+    };
+  };
+
   useEffect(() => {
     const loadOrders = async () => {
       try {
@@ -560,31 +576,22 @@ const OrderbookPage: React.FC = () => {
                           {order.status === 'open' || order.status === 'partially_matched' ? '진행중' : order.status === 'matched' ? '체결됨' : order.status === 'cancelled' ? '취소됨' : '정산됨'}
                         </span>
                       </div>
-                      {/* 🆕 가장 빠른 경기 시간 표시 */}
-                      {(() => {
-                        const legs = normalizeSelectionDetails(order.selectionDetails);
-                        const earliestTime = legs
-                          .map((leg: any) => leg.commenceTime)
-                          .filter(Boolean)
-                          .sort()[0];
-                        if (earliestTime) {
-                          return (
-                            <div className="text-xs text-gray-600 mt-1">
-                              ⏰ {formatRemainingTime(earliestTime)} • {new Date(earliestTime).toLocaleString('ko-KR', {
-                                month: '2-digit',
-                                day: '2-digit',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
+                      {/* 주문시간 표시 */}
+                      <div className="flex items-center gap-1 mt-2 text-xs">
+                        <span>📅</span>
+                        <span className="text-gray-500">주문시간:</span>
+                        <span className="text-gray-700">{order.createdAt ? new Date(order.createdAt).toLocaleString('ko-KR', {
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        }) : 'N/A'}</span>
+                      </div>
                     </div>
                     <div className="text-right">
+                      <div className="text-sm text-gray-600 mb-1">주문금액:</div>
                       <div className="text-lg font-semibold text-gray-700">{formatCurrency(order.displayAmount || order.amount)}원</div>
-                      <div className="text-sm text-gray-500">{computeTotalOdds(order).toFixed(2)}배당</div>
+                      <div className="text-sm text-gray-500 mt-1">{computeTotalOdds(order).toFixed(2)}배당</div>
                     </div>
                   </div>
 
@@ -599,10 +606,6 @@ const OrderbookPage: React.FC = () => {
                     })()}
                   </div>
 
-                  {/* 매칭 금액 표시 (반드시 실제 매칭되는 금액) */}
-                  <div className="mt-1 text-sm text-orange-600 font-semibold">
-                    매칭 금액: {formatCurrency(computeMatchingAmount(order))}원
-                  </div>
 
                   {/* 레그 리스트 */}
                   <div className="mt-3 space-y-3">
@@ -613,15 +616,17 @@ const OrderbookPage: React.FC = () => {
                           {(leg?.homeTeam && leg?.awayTeam) ? `${leg.homeTeam} vs ${leg.awayTeam}` : (leg?.match || '')}
                           {leg?.odds ? ` • @${Number(leg.odds).toFixed(2)}` : ''}
                         </div>
-                        {/* 🆕 각 경기의 시간 표시 */}
+                        {/* 각 경기의 시간 표시 */}
                         {leg?.commenceTime && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            ⏰ {formatRemainingTime(leg.commenceTime)} • {new Date(leg.commenceTime).toLocaleString('ko-KR', {
+                          <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
+                            <span>⏰</span>
+                            <span>경기시간:</span>
+                            <span>{new Date(leg.commenceTime).toLocaleString('ko-KR', {
                               month: '2-digit',
                               day: '2-digit',
                               hour: '2-digit',
                               minute: '2-digit'
-                            })}
+                            })}</span>
                           </div>
                         )}
                       </div>
@@ -638,9 +643,13 @@ const OrderbookPage: React.FC = () => {
                           ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 text-gray-600 cursor-not-allowed'
                       }`}
                     >
-                      {order.type === 'back'
-                        ? `📉 Lay로 매칭 (${formatCurrency(computeMatchingAmount(order))}원)`
-                        : `🎯 Back으로 매칭 (${formatCurrency(computeMatchingAmount(order))}원)`}
+                      {(() => {
+                        const matchInfo = calculateMatchingInfo(order);
+                        const displayAmount = formatCurrency(order.displayAmount || order.amount);
+                        return order.type === 'back'
+                          ? `📉 Lay로 매칭 (${displayAmount}원, 총 ${formatCurrency(matchInfo.totalAmount)}원 중 ${matchInfo.matchPercentage}%)`
+                          : `🎯 Back으로 매칭 (${displayAmount}원, 총 ${formatCurrency(matchInfo.totalAmount)}원 중 ${matchInfo.matchPercentage}%)`;
+                      })()}
                     </button>
                     <button
                       onClick={() => setSelectedOrderDetail(order)}

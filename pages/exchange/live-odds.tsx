@@ -64,6 +64,22 @@ export default function LiveOddsPage() {
     return leagueMap[sportKey] || sportKey;
   };
 
+  // 🆕 매칭 금액 및 비율 계산 함수
+  const calculateMatchingInfo = (order: ExchangeOrder) => {
+    const originalAmount = order.amount || 0;
+    const remainingAmount = order.remainingAmount || order.amount || 0;
+    const filledAmount = order.filledAmount || 0;
+    const totalMatched = originalAmount - remainingAmount;
+    const matchPercentage = originalAmount > 0 ? Math.round((totalMatched / originalAmount) * 100) : 0;
+    
+    return {
+      totalAmount: originalAmount,
+      matchedAmount: totalMatched,
+      remainingAmount: remainingAmount,
+      matchPercentage: matchPercentage
+    };
+  };
+
   // 🆕 멀티배팅 선택 토글
   const toggleMultiBetSelection = (order: ExchangeOrder, side: 'back' | 'lay', selection: string) => {
     const multiBetSelection: MultiBetSelection = {
@@ -560,9 +576,18 @@ export default function LiveOddsPage() {
                         </span>
                       </div>
                       <div className="text-xs text-gray-400">
-                        {(multibetOrder as any).stakeAmount?.toLocaleString()}원 • {parseFloat((multibetOrder as any).totalOdds).toFixed(2)}배당
+                        <div className="mb-1">주문금액: {(multibetOrder as any).stakeAmount?.toLocaleString()}원</div>
+                        <div>총 배당: {parseFloat((multibetOrder as any).totalOdds).toFixed(2)}배당</div>
                       </div>
                     </div>
+
+                    {/* 주문시간 표시 */}
+                    <div className="flex items-center gap-1 mb-3 p-2 bg-gray-700 rounded text-xs">
+                      <span>📅</span>
+                      <span className="text-gray-400">주문시간:</span>
+                      <span className="text-white">{multibetOrder.createdAt ? formatToLocalDateTime(multibetOrder.createdAt) : 'N/A'}</span>
+                    </div>
+
 
                     {/* 멀티배팅 선택들 */}
                     {multibetOrder.selections?.map((selection: any, idx: number) => (
@@ -573,12 +598,17 @@ export default function LiveOddsPage() {
                         <div className="text-blue-300 text-sm mb-2">
                           {getLeagueFromSportKey(selection.sportKey || '')}
                         </div>
-                        <div className="text-white mb-2">
-                          {selection.commenceTime ? formatToLocalDateTime(selection.commenceTime) : '시간 미정'}
-                        </div>
-                        <div className="text-gray-300 text-sm mb-3">
+                        <div className="text-gray-300 text-sm mb-2">
                           {selection.selection} • {selection.side === 'back' ? '🎯 Back' : '📉 Lay'} • {selection.odds ? Number(selection.odds).toFixed(2) : 'N/A'}배당
                         </div>
+                        {/* 각 경기의 시간 표시 */}
+                        {selection.commenceTime && (
+                          <div className="flex items-center gap-1 text-xs text-gray-400 mb-3">
+                            <span>⏰</span>
+                            <span>경기시간:</span>
+                            <span>{formatToLocalDateTime(selection.commenceTime)}</span>
+                          </div>
+                        )}
                         
                         {/* Lay 버튼들 추가 */}
                         <div className="flex space-x-4">
@@ -600,7 +630,10 @@ export default function LiveOddsPage() {
                                       <div className="font-medium">승리</div>
                                       <div className="text-xs mt-1 opacity-90">📉 Lay 가능</div>
                                       <div className="text-xs mt-1 opacity-90">
-                                        매칭 가능: {((multibetOrder as any).remainingAmount || (multibetOrder as any).amount || 0).toLocaleString()}원
+                                        {(() => {
+                                          const matchInfo = calculateMatchingInfo(multibetOrder as any);
+                                          return `매칭금액: ${matchInfo.remainingAmount.toLocaleString()}원 (${matchInfo.matchPercentage}%)`;
+                                        })()}
                                       </div>
                                     </button>
                                     
@@ -624,7 +657,10 @@ export default function LiveOddsPage() {
                                       <div className="font-medium">패배</div>
                                       <div className="text-xs mt-1 opacity-90">📉 Lay 가능</div>
                                       <div className="text-xs mt-1 opacity-90">
-                                        매칭 가능: {((multibetOrder as any).remainingAmount || (multibetOrder as any).amount || 0).toLocaleString()}원
+                                        {(() => {
+                                          const matchInfo = calculateMatchingInfo(multibetOrder as any);
+                                          return `매칭금액: ${matchInfo.remainingAmount.toLocaleString()}원 (${matchInfo.matchPercentage}%)`;
+                                        })()}
                                       </div>
                                     </button>
                                   </>
@@ -654,7 +690,10 @@ export default function LiveOddsPage() {
                                       <div className="font-medium">무승부</div>
                                       <div className="text-xs mt-1 opacity-90">📉 Lay 가능</div>
                                       <div className="text-xs mt-1 opacity-90">
-                                        매칭 가능: {((multibetOrder as any).remainingAmount || (multibetOrder as any).amount || 0).toLocaleString()}원
+                                        {(() => {
+                                          const matchInfo = calculateMatchingInfo(multibetOrder as any);
+                                          return `매칭금액: ${matchInfo.remainingAmount.toLocaleString()}원 (${matchInfo.matchPercentage}%)`;
+                                        })()}
                                       </div>
                                     </button>
                                     
@@ -666,7 +705,10 @@ export default function LiveOddsPage() {
                                       <div className="font-medium">{oppositeSelection}</div>
                                       <div className="text-xs mt-1 opacity-90">📉 Lay 가능</div>
                                       <div className="text-xs mt-1 opacity-90">
-                                        매칭 가능: {((multibetOrder as any).remainingAmount || (multibetOrder as any).amount || 0).toLocaleString()}원
+                                        {(() => {
+                                          const matchInfo = calculateMatchingInfo(multibetOrder as any);
+                                          return `매칭금액: ${matchInfo.remainingAmount.toLocaleString()}원 (${matchInfo.matchPercentage}%)`;
+                                        })()}
                                       </div>
                                     </button>
                                   </>
@@ -724,7 +766,7 @@ export default function LiveOddsPage() {
                                     </div>
                                     <div className="text-xs mt-1 opacity-90">📉 Lay 가능</div>
                                     <div className="text-xs mt-1 opacity-90">
-                                      매칭 가능: {((multibetOrder as any).remainingAmount || (multibetOrder as any).amount || 0).toLocaleString()}원
+                                      매칭금액: {((multibetOrder as any).remainingAmount || (multibetOrder as any).amount || 0).toLocaleString()}원
                                     </div>
                                   </button>
                                 </>
@@ -797,12 +839,22 @@ export default function LiveOddsPage() {
                               <button onClick={() => handleButtonClick(String(order.id), `lay_무승부`)} className={getButtonStyle(true, false, isButtonSelected(String(order.id), `lay_무승부`), false)}>
                                 <div className="font-medium">무승부</div>
                                 <div className="text-xs mt-1 opacity-90">📉 Lay 가능</div>
-                                <div className="text-xs mt-1 opacity-90">매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원</div>
+                                <div className="text-xs mt-1 opacity-90">
+                                  {(() => {
+                                    const matchInfo = calculateMatchingInfo(order);
+                                    return `매칭금액: ${matchInfo.remainingAmount.toLocaleString()}원 (${matchInfo.matchPercentage}%)`;
+                                  })()}
+                                </div>
                               </button>
                               <button onClick={() => handleButtonClick(String(order.id), `lay_${oppositeSelection}`)} className={getButtonStyle(true, false, false, false)}>
                                 <div className="font-medium">{oppositeSelection}</div>
                                 <div className="text-xs mt-1 opacity-90">📉 Lay 가능</div>
-                                <div className="text-xs mt-1 opacity-90">매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원</div>
+                                <div className="text-xs mt-1 opacity-90">
+                                  {(() => {
+                                    const matchInfo = calculateMatchingInfo(order);
+                                    return `매칭금액: ${matchInfo.remainingAmount.toLocaleString()}원 (${matchInfo.matchPercentage}%)`;
+                                  })()}
+                                </div>
                               </button>
                             </>
                           );
@@ -820,7 +872,12 @@ export default function LiveOddsPage() {
                                   { order.market === 'h2h' ? (order.selection === order.homeTeam ? order.awayTeam : order.homeTeam) : `반대`}
                                 </div>
                                 <div className="text-xs mt-1 opacity-90">📉 Lay 가능</div>
-                                <div className="text-xs mt-1 opacity-90">매칭 가능: {(order.remainingAmount || order.amount).toLocaleString()}원</div>
+                                <div className="text-xs mt-1 opacity-90">
+                                  {(() => {
+                                    const matchInfo = calculateMatchingInfo(order);
+                                    return `매칭금액: ${matchInfo.remainingAmount.toLocaleString()}원 (${matchInfo.matchPercentage}%)`;
+                                  })()}
+                                </div>
                               </button>
                             </>
                           );
