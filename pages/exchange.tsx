@@ -303,20 +303,7 @@ export default function Exchange() {
             
             const filteredGames = data.filter((game: any) => {
               const localGameTime = convertUtcToLocal(game.commence_time);
-              const isValid = localGameTime >= oneDayAgo && localGameTime <= sevenDaysLater;
-              
-              // 🆕 KBO 경기 시간 추가 검증
-              if (game.sport_key === 'baseball_kbo' || game.sport_key === 'KBO' || config.sportKey === 'baseball_kbo') {
-                const hour = localGameTime.getHours();
-                const isKBOValidTime = hour >= 18 && hour <= 21; // KBO는 18:00~21:00에 진행
-                
-                if (!isKBOValidTime) {
-                  console.log(`[KBO 시간 검증] 부정확한 경기 시간 제외: ${game.home_team} vs ${game.away_team} - ${localGameTime.toLocaleString()} (${hour}시)`);
-                  return false;
-                }
-              }
-              
-              return isValid;
+              return localGameTime >= oneDayAgo && localGameTime <= sevenDaysLater;
             });
             
             const uniqueGamesMap = new Map();
