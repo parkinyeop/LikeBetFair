@@ -403,12 +403,19 @@ class ExchangeMultibetController {
         multibet.status = 'cancelled';
         await multibet.save({ transaction });
 
-        // 사용자 잔액 환불
-        const user = await User.findByPk(userId, { transaction });
-        user.balance += multibet.stakeAmount;
-        await user.save({ transaction });
+        // ✅ balanceService를 사용하여 사용자 잔액 환불
+        await balanceService.addBalance(
+          userId,
+          multibet.stakeAmount,
+          `익스체인지 멀티배팅 취소 환불 (${multibet.selectionCount}개 경기)`,
+          `EXCHANGE_MULTIBET_${multibet.id}`,
+          transaction
+        );
 
         await transaction.commit();
+
+        // 환불 후 최신 잔액 조회
+        const user = await User.findByPk(userId);
 
         res.json({
           success: true,

@@ -394,24 +394,9 @@ router.post('/match-order', verifyToken, async (req, res) => {
     
       console.log('✅ ExchangeOrderMatch 생성 완료:', exchangeOrderMatch.id);
 
-      // ✅ 거래 내역 기록 (balanceService 사용)
-      // targetOrder 사용자에게 매칭 금액 입금
-      await balanceService.addBalance(
-        targetOrder.userId,
-        actualMatchAmount,
-        `매칭 배팅 체결: ${targetOrder.homeTeam} vs ${targetOrder.awayTeam}`,
-        `EXCHANGE_${targetOrder.id}`,
-        transaction
-      );
-      
-      // 현재 사용자에게도 매칭 금액 입금 (이미 차감된 금액 반환)
-      await balanceService.addBalance(
-        userId,
-        actualMatchAmount,
-        `매칭 배팅 체결: ${targetOrder.homeTeam} vs ${targetOrder.awayTeam}`,
-        `EXCHANGE_${matchOrder.id}`,
-        transaction
-      );
+      // ✅ 매칭 시에는 추가 입금 없음
+      // 각자 이미 차감된 금액이 있으므로 정산 시까지 묶어둠
+      console.log('💰 매칭 완료 - 정산 시까지 금액 묶임 (추가 입금 없음)');
     
       // WebSocket으로 실시간 업데이트
       exchangeWebSocketService.broadcastOrderUpdate({
@@ -1017,27 +1002,34 @@ async function findMatchedBackOrder(layOrderId, transaction) {
   return null;
 }
 
-// 🆕 매칭된 Lay 주문 취소 처리
+// 🆕 매칭된 Lay 주문 취소 처리 (Back 주문 취소 시만 호출)
 async function cancelMatchedLayOrder(layOrder, transaction) {
-  console.log(`    🔄 Lay 주문 취소: ID ${layOrder.id}`);
+  console.log(`    🔄 Lay 주문 취소: ID ${layOrder.id}, 현재 상태: ${layOrder.status}`);
   
-  // Lay 주문 환불 (남은 금액만)
-  const refundableAmount = layOrder.remainingAmount || layOrder.amount;
-  const refundAmount = Math.floor((layOrder.price - 1) * refundableAmount);
+  // ⭐️ 핵심: 이미 취소된 주문은 스킵 (이중 환불 방지)
+  if (layOrder.status === 'cancelled') {
+    console.log(`    ⏭️  이미 취소된 주문, 환불 스킵 (이중 환불 방지)`);
+    return;
+  }
   
-  const user = await User.findByPk(layOrder.userId, { transaction });
-  user.balance += refundAmount;
-  await user.save({ transaction });
+  // ⭐️ active 상태가 아닌 주문도 스킵 (matched, settled 등)
+  if (layOrder.status !== 'active') {
+    console.log(`    ⏭️  취소 불가능한 상태 (${layOrder.status}), 환불 스킵`);
+    return;
+  }
   
-  // PaymentHistory 기록
-  await PaymentHistory.create({
-    userId: layOrder.userId,
-    betId: `EXCHANGE_${layOrder.id}`,
-    amount: refundAmount,
-    memo: `Exchange Lay 매치 취소 환불 (Back 주문 취소로 인한)`,
-    paidAt: new Date(),
-    balanceAfter: user.balance
-  }, { transaction });
+  // ✅ 간단명료: 본인이 낸 담보금만 환불
+  const refundAmount = layOrder.stakeAmount || Math.floor((layOrder.price - 1) * layOrder.amount);
+  
+  console.log(`    💰 LAY 환불: ${refundAmount}원 (본인이 낸 담보금)`);
+  
+  await balanceService.addBalance(
+    layOrder.userId,
+    refundAmount,
+    `Exchange Lay 매치 취소 환불 (Back 주문 취소로 인한)`,
+    `EXCHANGE_${layOrder.id}`,
+    transaction
+  );
   
   // Lay 주문 상태 변경
   layOrder.status = 'cancelled';
@@ -1083,34 +1075,53 @@ async function restoreBackOrderToOpen(backOrder, cancelledLayOrder, transaction)
 
 // 🆕 원래 주문 취소 처리
 async function cancelOriginalOrder(order, transaction) {
-  console.log(`    🔄 원래 주문 취소: ID ${order.id}, 타입: ${order.side}`);
+  console.log(`    🔄 원래 주문 취소: ID ${order.id}, 타입: ${order.side}, 현재 상태: ${order.status}`);
   
-  // 환불 금액 계산 (남은 금액만)
-  const refundableAmount = order.remainingAmount || order.amount;
-  const refundAmount = order.side === 'back' ? 
-    refundableAmount : 
-    Math.floor((order.price - 1) * refundableAmount);
+  // ⭐️ 이미 취소된 주문은 스킵 (이중 환불 방지)
+  if (order.status === 'cancelled') {
+    console.log(`    ⏭️  이미 취소된 주문, 환불 스킵 (이중 환불 방지)`);
+    return;
+  }
   
-  // 사용자 잔액 업데이트
-  const user = await User.findByPk(order.userId, { transaction });
-  user.balance += refundAmount;
-  await user.save({ transaction });
+  // ⭐️ 취소 가능한 상태 확인
+  if (order.side === 'back') {
+    if (order.status !== 'open' && order.status !== 'partially_matched') {
+      console.log(`    ⏭️  Back 주문 취소 불가 상태 (${order.status}), 환불 스킵`);
+      return;
+    }
+  } else {
+    // Lay 주문
+    if (order.status !== 'active' && order.status !== 'open' && order.status !== 'partially_matched') {
+      console.log(`    ⏭️  Lay 주문 취소 불가 상태 (${order.status}), 환불 스킵`);
+      return;
+    }
+  }
   
-  // PaymentHistory 기록
-  await PaymentHistory.create({
-    userId: order.userId,
-    betId: `EXCHANGE_${order.id}`,
-    amount: refundAmount,
-    memo: `Exchange ${order.side} 주문 취소 환불`,
-    paidAt: new Date(),
-    balanceAfter: user.balance
-  }, { transaction });
+  // ✅ 간단명료한 환불 로직: 본인이 낸 돈만 환불
+  let refundAmount;
+  if (order.side === 'back') {
+    // BACK: 베팅 금액 환불
+    refundAmount = order.amount;
+    console.log(`    💰 BACK 환불: ${refundAmount}원 (본인이 낸 돈)`);
+  } else {
+    // LAY: 담보금 환불
+    refundAmount = order.stakeAmount || Math.floor((order.price - 1) * order.amount);
+    console.log(`    💰 LAY 환불: ${refundAmount}원 (본인이 낸 담보금)`);
+  }
+  
+  await balanceService.addBalance(
+    order.userId,
+    refundAmount,
+    `Exchange ${order.side} 주문 취소 환불`,
+    `EXCHANGE_${order.id}`,
+    transaction
+  );
   
   // 주문 상태 변경
   order.status = 'cancelled';
   await order.save({ transaction });
   
-  console.log(`    ✅ 원래 주문 취소 완료: ID ${order.id}, 환불: ${refundAmount}원`);
+  console.log(`    ✅ 주문 취소 완료: ID ${order.id}, 환불: ${refundAmount}원`);
 }
 
 // 🆕 매칭 기록들을 cancelled 상태로 변경
