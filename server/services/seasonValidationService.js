@@ -124,10 +124,12 @@ class SeasonValidationService {
       
       const upcomingScheduled = events.filter(event => {
         const gameDate = new Date(event.dateEvent);
-        return gameDate >= now && 
+        const isNotFinished = event.strStatus !== 'FT' && 
+                             event.strStatus !== 'Match Finished' &&
+                             event.intHomeScore === null;
+        return gameDate > now && 
                gameDate <= thirtyDaysLater &&
-               event.strStatus !== 'FT' && 
-               event.strStatus !== 'Match Finished';
+               isNotFinished;
       });
 
       console.log(`📊 [SportsDB] ${sportKey} 분석 결과:`, {
@@ -216,7 +218,27 @@ class SeasonValidationService {
 
       console.log(`🔍 [SeasonValidation] ${sportKey} 시즌 상태 체크 시작...`);
       
-      // 1단계: TheSportsDB API 시도
+      // 🎯 1단계 (최우선): OddsAPI 배당율 확인 - 배당율이 있으면 무조건 시즌 활성!
+      console.log(`🎯 [SeasonValidation] ${sportKey} OddsAPI 배당율 확인 (최우선)...`);
+      const oddsData = await this.checkRecentOddsData(sportKey);
+      
+      if (oddsData.oddsCount > 0) {
+        console.log(`✅ [SeasonValidation] ${sportKey} OddsAPI 배당율 존재 (${oddsData.oddsCount}개) → 시즌 활성!`);
+        return {
+          isActive: true,
+          status: 'active',
+          reason: `배당율 제공 중 (${oddsData.oddsCount}개 경기)`,
+          recentGamesCount: 0,
+          upcomingGamesCount: oddsData.oddsCount,
+          oddsCount: oddsData.oddsCount,
+          seasonInfo: seasonInfo,
+          dataSource: 'OddsAPI'
+        };
+      }
+      
+      console.log(`ℹ️ [SeasonValidation] ${sportKey} OddsAPI 배당율 없음, TheSportsDB 확인...`);
+      
+      // 2단계: TheSportsDB API 시도 (OddsAPI에 배당율이 없을 때만)
       const sportsDbStatus = await this.checkSeasonStatusWithSportsDB(sportKey);
       
       if (sportsDbStatus.status !== 'unknown' && sportsDbStatus.status !== 'error') {
@@ -228,13 +250,13 @@ class SeasonValidationService {
           reason: sportsDbStatus.reason,
           recentGamesCount: sportsDbStatus.recentGamesCount || 0,
           upcomingGamesCount: sportsDbStatus.upcomingGamesCount || 0,
-          oddsCount: sportsDbStatus.oddsCount || 0,
+          oddsCount: 0,
           seasonInfo: seasonInfo,
           dataSource: 'TheSportsDB'
         };
       }
 
-      // 2단계: 로컬 GameResult 데이터로 폴백
+      // 3단계: 로컬 GameResult 데이터로 폴백 (최후의 수단)
       console.log(`🔄 [SeasonValidation] ${sportKey} TheSportsDB 실패, 로컬 데이터로 폴백...`);
       
       const recentResults = await this.getRecentGameResults(sportKey, 7);
@@ -263,16 +285,13 @@ class SeasonValidationService {
       // 실제 데이터 기반 시즌 상태 판단
       const realStatus = this.determineRealSeasonStatus(seasonInfo, recentResults, upcomingGames);
       
-      // odds 데이터 확인
-      const oddsData = await this.checkRecentOddsData(sportKey);
-      
       return {
         isActive: realStatus.status === 'active',
         status: realStatus.status,
         reason: realStatus.reason,
         recentGamesCount: recentResults.length,
         upcomingGamesCount: upcomingGames.length,
-        oddsCount: oddsData.oddsCount || 0,
+        oddsCount: 0,
         seasonInfo: seasonInfo,
         dataSource: 'Local'
       };

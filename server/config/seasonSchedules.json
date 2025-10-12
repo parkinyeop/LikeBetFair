@@ -122,7 +122,7 @@
     "status": "active",
     "currentSeason": "2025",
     "nextSeasonStart": "2025-09-01",
-    "description": "2025시즌 진행 중 (자동 감지: 배당율 제공 중 (1경기))",
+    "description": "2025시즌 진행 중 (배당율 기반 활성 판단)",
     "manualOverride": false
   }
 }

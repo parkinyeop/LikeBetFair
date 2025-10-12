@@ -756,12 +756,30 @@ router.get('/orderbook', verifyToken, async (req, res) => {
       // 환수율 조정은 프론트엔드에서 처리 (정확한 배열 기반 계산을 위해)
       let displayPrice = orderData.price;
       
+      // ✅ 오더북: 매칭하는 사람이 낼 금액 표시
+      // - Back 주문 → LAY 매처가 낼 담보금
+      // - LAY 주문 → Back 매처가 낼 배팅금
+      const remainingAmt = order.remainingAmount || order.amount;
+      const displayAmount = order.side === 'back'
+        ? Math.floor(remainingAmt * (order.price - 1)) // LAY 담보금
+        : remainingAmt; // Back 배팅금
+      
+      console.log(`🔍 [ALL-ORDERS] 주문 ${order.id} displayAmount 계산:`, {
+        side: order.side,
+        amount: order.amount,
+        remainingAmt: remainingAmt,
+        price: order.price,
+        계산: order.side === 'back' ? `${remainingAmt} × (${order.price} - 1) = ${displayAmount}` : remainingAmt,
+        displayAmount: displayAmount
+      });
+      
       return {
         ...orderData,
         price: displayPrice, // 사용자에게 표시할 환수율 적용된 배당율
         originalPrice: orderData.price, // 원본 배당율 보존
-        displayAmount: order.remainingAmount || order.amount, // 화면에 표시할 금액
+        displayAmount: displayAmount, // ✅ 매칭할 사람이 낼 금액
         originalAmount: order.originalAmount || order.amount,
+        remainingAmount: order.remainingAmount || order.amount,
         filledAmount: order.filledAmount || 0,
         partiallyFilled: order.partiallyFilled || false
       };
@@ -1354,10 +1372,19 @@ router.get('/orders', verifyToken, async (req, res) => {
           }
         }
       
+      // ✅ 내 주문 목록: 매칭하는 사람이 낼 금액 표시
+      // - Back 주문 → LAY 매처가 낼 담보금
+      // - LAY 주문 → Back 매처가 낼 배팅금
+      const remainingAmt = order.remainingAmount || order.amount;
+      const displayAmount = order.side === 'back'
+        ? Math.floor(remainingAmt * (order.price - 1)) // LAY 담보금
+        : remainingAmt; // Back 배팅금
+
       return {
         ...orderData,
         price: displayPrice, // 사용자에게 표시할 환수율 적용된 배당율
         originalPrice: orderData.price, // 원본 배당율 보존
+        displayAmount: displayAmount, // ✅ 매칭할 사람이 낼 금액
         gameResult: gameResult, // 🆕 게임 결과 정보 추가
         // ✅ 멀티배팅 필드 추가
         isMultibet: order.isMultibet || false,
@@ -1470,14 +1497,24 @@ router.get('/all-orders', async (req, res) => {
       limit: 100
     });
     
-    // 🆕 표시 금액 계산 로직
+    // ✅ 올바른 표시 금액 로직: amount는 항상 원래 베팅금
     const ordersWithGameInfo = orders.map(order => {
-      let displayAmount = order.amount;
+      // ✅ 오더북: 매칭하는 사람이 낼 금액 표시
+      // - Back 주문 → LAY 매처가 낼 담보금
+      // - LAY 주문 → Back 매처가 낼 배팅금
+      const remainingAmt = order.remainingAmount || order.amount;
+      const displayAmount = order.side === 'back'
+        ? Math.floor(remainingAmt * (order.price - 1)) // LAY 담보금
+        : remainingAmt; // Back 배팅금
       
-      if (order.partiallyFilled && order.remainingAmount > 0) {
-        // 부분 매칭된 경우 남은 금액을 표시
-        displayAmount = order.remainingAmount;
-      }
+      console.log(`🔍 [ALL-ORDERS-v2] 주문 ${order.id} displayAmount 계산:`, {
+        side: order.side,
+        amount: order.amount,
+        remainingAmt: remainingAmt,
+        price: order.price,
+        계산: order.side === 'back' ? `${remainingAmt} × (${order.price} - 1) = ${displayAmount}` : remainingAmt,
+        displayAmount: displayAmount
+      });
       
       return {
         id: order.id,
@@ -1485,7 +1522,7 @@ router.get('/all-orders', async (req, res) => {
         userId: order.userId,
         side: order.side,
         price: order.price,
-        amount: order.amount,
+        amount: order.amount, // ✅ 원래 베팅금 (절대 변경 안 됨!)
         status: order.status,
         createdAt: order.createdAt,
         selection: order.selection,
@@ -1507,7 +1544,7 @@ router.get('/all-orders', async (req, res) => {
         remainingAmount: order.remainingAmount || order.amount,
         filledAmount: order.filledAmount || 0,
         partiallyFilled: order.partiallyFilled || false,
-        displayAmount: displayAmount,
+        displayAmount: displayAmount, // ✅ 매칭할 사람이 낼 금액!
         // 🆕 멀티배팅 필드 추가
         isMultibet: order.isMultibet || false,
         totalOdds: order.totalOdds,

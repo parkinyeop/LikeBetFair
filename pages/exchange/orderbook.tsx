@@ -71,16 +71,18 @@ const OrderbookPage: React.FC = () => {
 
   // 🆕 매칭 금액 및 비율 계산 함수
   const calculateMatchingInfo = (order: ExchangeOrder) => {
-    const originalAmount = order.amount || 0;
-    const remainingAmount = order.remainingAmount || order.amount || 0;
-    const filledAmount = order.filledAmount || 0;
-    const totalMatched = originalAmount - remainingAmount;
-    const matchPercentage = originalAmount > 0 ? Math.round((totalMatched / originalAmount) * 100) : 0;
+    // ✅ 매칭 금액 기준으로 계산 (displayAmount 기준!)
+    const totalMatchAmount = order.displayAmount || order.amount || 0; // 전체 매칭 금액
+    const remainingMatchAmount = order.type === 'back' 
+      ? Math.floor((order.remainingAmount || 0) * ((order.odds || 1) - 1)) // Back: LAY 담보금
+      : (order.remainingAmount || 0); // Lay: Back 배팅금
+    const matchedAmount = totalMatchAmount - remainingMatchAmount;
+    const matchPercentage = totalMatchAmount > 0 ? Math.round((matchedAmount / totalMatchAmount) * 100) : 0;
     
     return {
-      totalAmount: originalAmount,
-      matchedAmount: totalMatched,
-      remainingAmount: remainingAmount,
+      totalAmount: totalMatchAmount, // 전체 매칭 금액
+      matchedAmount: matchedAmount,
+      remainingAmount: remainingMatchAmount,
       matchPercentage: matchPercentage
     };
   };
@@ -90,17 +92,19 @@ const OrderbookPage: React.FC = () => {
       try {
         const allOrders = await fetchAllOpenOrders();
         console.log('🔍 원본 주문 데이터:', allOrders);
+        console.log('🔍 원본 주문 JSON:', JSON.stringify(allOrders, null, 2));
         
         // 🆕 부분 매칭 정보를 포함한 변환
         const convertedOrders: Order[] = allOrders.map(order => {
-          console.log('🔍 개별 주문 변환:', {
+          console.log('🔍 개별 주문 변환 (상세):', {
             id: order.id,
             side: order.side,
             amount: order.amount,
+            displayAmount: order.displayAmount,
             status: order.status,
-            partiallyFilled: order.partiallyFilled,
+            price: order.price,
             remainingAmount: order.remainingAmount,
-            displayAmount: order.displayAmount
+            '계산 확인': order.side === 'back' ? `${order.amount} × (${order.price} - 1) = ${order.amount * (order.price - 1)}` : '-'
           });
           
           return {
@@ -109,7 +113,7 @@ const OrderbookPage: React.FC = () => {
             userId: order.userId.toString(),
             type: order.side,
             odds: order.isMultibet ? (order.totalOdds || order.price) : order.price, // ✅ 멀티베팅 배당률 수정
-            amount: order.displayAmount || order.amount, // 🆕 displayAmount 우선 사용
+            amount: order.amount, // ✅ 원본 배팅금액 (카드 상단 표시용)
             status: order.status,
             createdAt: order.createdAt,
             selection: order.selection,
@@ -124,7 +128,7 @@ const OrderbookPage: React.FC = () => {
             oddsSource: order.oddsSource,
             oddsUpdatedAt: order.oddsUpdatedAt,
             // 🆕 부분 매칭 필드들 추가
-            displayAmount: order.displayAmount || order.amount,
+            displayAmount: order.displayAmount, // ✅ 매칭 금액 (버튼 표시용)
             originalAmount: order.originalAmount || order.amount,
             filledAmount: order.filledAmount || 0,
             remainingAmount: order.remainingAmount || order.amount,
@@ -590,7 +594,7 @@ const OrderbookPage: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <div className="text-sm text-gray-600 mb-1">주문금액:</div>
-                      <div className="text-lg font-semibold text-gray-700">{formatCurrency(order.displayAmount || order.amount)}원</div>
+                      <div className="text-lg font-semibold text-gray-700">{formatCurrency(order.amount)}원</div>
                       <div className="text-sm text-gray-500 mt-1">{computeTotalOdds(order).toFixed(2)}배당</div>
                     </div>
                   </div>
@@ -645,10 +649,17 @@ const OrderbookPage: React.FC = () => {
                     >
                       {(() => {
                         const matchInfo = calculateMatchingInfo(order);
-                        const displayAmount = formatCurrency(order.displayAmount || order.amount);
+                        // ✅ 남은 매칭 금액 = displayAmount
+                        const remainingMatchAmt = formatCurrency(order.displayAmount || order.amount);
+                        // ✅ 전체 매칭 금액 = amount × (odds - 1) for Back, amount for Lay
+                        const totalMatchAmt = order.type === 'back' 
+                          ? formatCurrency(Math.floor(order.amount * (order.odds - 1)))
+                          : formatCurrency(order.amount);
+                        const matchPercentage = matchInfo.matchPercentage;
+                        
                         return order.type === 'back'
-                          ? `📉 Lay로 매칭 (${displayAmount}원, 총 ${formatCurrency(matchInfo.totalAmount)}원 중 ${matchInfo.matchPercentage}%)`
-                          : `🎯 Back으로 매칭 (${displayAmount}원, 총 ${formatCurrency(matchInfo.totalAmount)}원 중 ${matchInfo.matchPercentage}%)`;
+                          ? `📉 Lay로 매칭 (${remainingMatchAmt}원, 총 ${totalMatchAmt}원 중 ${100 - matchPercentage}%)`
+                          : `🎯 Back으로 매칭 (${remainingMatchAmt}원, 총 ${totalMatchAmt}원 중 ${100 - matchPercentage}%)`;
                       })()}
                     </button>
                     <button
@@ -701,7 +712,7 @@ const OrderbookPage: React.FC = () => {
                         {order.odds ? applyExchangeReturnRate(order.odds, [order.odds]).toFixed(2) : 'N/A'}
                       </div>
                       <div className="text-sm text-gray-500">
-                        베팅: {formatCurrency(order.displayAmount || order.amount)}원
+                        베팅: {formatCurrency(order.amount)}원
                       </div>
                       {/* 🆕 부분 매칭 정보 표시 */}
                       {order.partiallyFilled && (
@@ -717,9 +728,9 @@ const OrderbookPage: React.FC = () => {
                       )}
                       {/* 매칭 금액 계산 */}
                       <div className="text-sm text-orange-600 font-medium">
-                        매칭 금액: {formatCurrency(order.type === 'back' ? 
-                          Math.floor((order.displayAmount || order.amount) * (order.odds - 1)) : 
-                          Math.floor(order.displayAmount || order.amount)
+                        매칭 금액: {formatCurrency(order.displayAmount || (order.type === 'back' ? 
+                          Math.floor(order.remainingAmount * (order.odds - 1)) : 
+                          order.remainingAmount)
                         )}원
                       </div>
                       {/* 상태 표시 */}
@@ -746,8 +757,8 @@ const OrderbookPage: React.FC = () => {
                     >
                       {(order.status === 'open' || order.status === 'partially_matched') && order.userId !== userId 
                         ? (order.type === 'back' ? 
-                            `📉 Lay로 매칭 (${formatCurrency(Math.floor((order.displayAmount || order.amount) * (order.odds - 1)))}원)` : 
-                            `🎯 Back으로 매칭 (${formatCurrency(Math.floor(order.displayAmount || order.amount))}원)`)
+                            `📉 Lay로 매칭 (${formatCurrency(order.displayAmount || Math.floor(order.remainingAmount * (order.odds - 1)))}원)` : 
+                            `🎯 Back으로 매칭 (${formatCurrency(order.displayAmount || order.remainingAmount)}원)`)
                         : order.userId === userId 
                           ? '내 주문' 
                           : '매칭 불가'}
@@ -841,7 +852,7 @@ const OrderbookPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-gray-600">베팅 금액:</span>
-                    <span className="ml-2 font-medium">{formatCurrency(selectedOrderDetail.displayAmount || selectedOrderDetail.amount)}원</span>
+                    <span className="ml-2 font-medium">{formatCurrency(selectedOrderDetail.amount)}원</span>
                   </div>
                   {/* 🆕 부분 매칭 정보 표시 */}
                   {selectedOrderDetail.partiallyFilled && (
@@ -863,9 +874,9 @@ const OrderbookPage: React.FC = () => {
                   <div>
                     <span className="text-gray-600">매칭 금액:</span>
                     <span className="ml-2 font-medium text-orange-600">
-                      {formatCurrency(selectedOrderDetail.type === 'back' ? 
-                        Math.floor((selectedOrderDetail.displayAmount || selectedOrderDetail.amount) * (selectedOrderDetail.odds - 1)) : 
-                        Math.floor(selectedOrderDetail.displayAmount || selectedOrderDetail.amount)
+                      {formatCurrency(selectedOrderDetail.displayAmount || (selectedOrderDetail.type === 'back' ? 
+                        Math.floor(selectedOrderDetail.remainingAmount * (selectedOrderDetail.odds - 1)) : 
+                        selectedOrderDetail.remainingAmount)
                       )}원
                     </span>
                   </div>
