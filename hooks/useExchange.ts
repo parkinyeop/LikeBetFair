@@ -142,15 +142,18 @@ export const useExchange = () => {
     }
   }, [token, logout]);
 
-  // 주문 등록
+  // 주문 등록 (Phase 2: price 파라미터 제거)
   const placeOrder = useCallback(async (orderData: {
     gameId: string;
     market: string;
     line: number;
     side: 'back' | 'lay';
-    price: number;
+    // price: number;  // ✅ 제거: 서버에서 결정
     amount: number;
     selection?: string; // 선택한 팀/선수명
+    homeTeam?: string;
+    awayTeam?: string;
+    commenceTime?: string;
   }) => {
     if (!token) {
       throw new Error('로그인이 필요합니다.');
@@ -160,7 +163,7 @@ export const useExchange = () => {
     setError(null);
 
     try {
-      console.log('📝 주문 생성:', orderData);
+      console.log('📝 주문 생성 (price 제거됨):', orderData);
       const response = await fetch('/api/exchange/orders', {
         method: 'POST',
         headers: {

@@ -42,21 +42,11 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
     loadOddsReturnRateSettings();
   }, []);
 
-  // 🆕 Exchange 배당율에 환수율 적용
+  // ✅ Phase 2: 환수율 적용 제거 (서버에서 처리)
+  // 프론트엔드에서는 원본 배당률을 그대로 표시
   const applyExchangeReturnRate = (originalOdds: number, allOdds: number[] = []) => {
-    if (!originalOdds || !oddsReturnRateSettings.enabled) return originalOdds;
-    
-    // 단일 배당율인 경우에도 adjustOddsSophisticated 사용 (일관성)
-    if (allOdds.length === 0) {
-      allOdds = [originalOdds]; // 단일 배당률을 배열로 변환
-    }
-    
-    // 모든 경우에 adjustOddsSophisticated 함수 사용 (일관성 보장)
-    const adjustedOdds = adjustOddsSophisticated(allOdds, oddsReturnRateSettings.returnRate);
-    const originalIndex = allOdds.indexOf(originalOdds);
-    const result = adjustedOdds[originalIndex] || originalOdds;
-    
-    return result;
+    // 서버에서 환수율을 적용하므로 프론트엔드에서는 원본 그대로 반환
+    return originalOdds;
   };
 
   // 선택된 카테고리에서 스포츠 키 추출

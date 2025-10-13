@@ -157,11 +157,11 @@ class ExchangeMultibetController {
         return acc * (parseFloat(selection.odds) || 1);
       }, 1);
       
-      // ✅ 환수율 적용 (일관성 보장)
-      const exchangeReturnRate = 0.95; // 익스체인지 환수율
-      const adjustedTotalOdds = calculatedTotalOdds / exchangeReturnRate;
+      // ✅ 환수율 적용 제거 (각 레그의 배당률에 이미 적용되어 있음)
+      // 프론트엔드에서 이미 환수율이 적용된 배당률을 받으므로 백엔드에서 중복 적용하지 않음
+      const adjustedTotalOdds = calculatedTotalOdds;
       
-      console.log(`📊 totalOdds 계산: 원본 ${calculatedTotalOdds} → 환수율 적용 ${adjustedTotalOdds}`);
+      console.log(`📊 totalOdds 계산: ${calculatedTotalOdds} (환수율 이미 적용됨)`);
       console.log(`📊 프론트엔드 ${totalOdds} vs 백엔드 ${adjustedTotalOdds}`);
       
       // 6. 멀티배팅 주문 생성 (기존 ExchangeOrders 테이블 사용)

@@ -150,6 +150,15 @@ app.use('/api/admin', (req, res, next) => {
   next();
 });
 
+// 🔍 Exchange API 요청 로깅 추가
+app.use('/api/exchange', (req, res, next) => {
+  console.log(`🔍 [Exchange API] ${req.method} ${req.url}`);
+  if (req.method === 'POST') {
+    console.log(`📦 [Exchange API] Request Body:`, JSON.stringify(req.body));
+  }
+  next();
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/bet', betRoutes);
 app.use('/api/admin', adminRoutes);

@@ -9,6 +9,7 @@ import exchangeGameMappingService from '../services/exchangeGameMappingService.j
 import exchangeSettlementService from '../services/exchangeSettlementService.js';
 import ExchangeOddsReturnRateService from '../services/exchangeOddsReturnRateService.js';
 import balanceService from '../services/balanceService.js';
+import { adjustOddsPayout } from '../utils/oddsUtils.js';
 import { Op } from 'sequelize';
 import sequelize from '../models/sequelize.js';
 import GameResultQuery from '../utils/gameResultQuery.js';
@@ -458,14 +459,64 @@ router.post('/match-order', verifyToken, async (req, res) => {
 // 주문 등록 (게임 데이터 연동 포함)
 router.post('/order', verifyToken, async (req, res) => {
   try {
-    const { gameId, market, line, side, price, amount, selection } = req.body;
+    console.log('🚨🚨🚨 [DEBUG] /order 엔드포인트 진입!');
+    console.log('🚨🚨🚨 [DEBUG] req.body:', JSON.stringify(req.body));
+    
+    // ✅ Phase 2: price 파라미터 제거!
+    const { gameId, market, line, side, amount, selection } = req.body;
     const userId = req.user.userId;
     
-    console.log('🎯 Exchange 주문 생성 요청:', { gameId, market, line, side, price, amount, selection });
+    console.log('🎯 Exchange 주문 생성 요청:', { gameId, market, line, side, amount, selection });
+    console.log('🔍 [DEBUG] req.body에 price 필드 존재:', 'price' in req.body);
+    console.log('🔍 [DEBUG] req.body.price 값:', req.body.price);
     
-    // 게임 데이터 매핑
+    // ========================================
+    // 🏗️ Phase 2: 서버 중심 배당률 결정
+    // ========================================
+    
+    // 1️⃣ OddsCache에서 원본 배당률 조회
+    const oddsCacheData = await exchangeGameMappingService.getOddsCacheData(
+      gameId,
+      selection,
+      side
+    );
+
+    if (!oddsCacheData || !oddsCacheData.backOdds || !oddsCacheData.layOdds) {
+      return res.status(404).json({
+        success: false,
+        error: '배당률 정보를 찾을 수 없습니다.',
+        gameId,
+        selection
+      });
+    }
+
+    // 2️⃣ 환수율 설정 조회
+    const returnRateSettings = await ExchangeOddsReturnRateService.getOddsReturnRateSettings();
+
+    // 3️⃣ 서버에서 배당률 결정 (환수율 적용)
+    let finalPrice;
+
+    if (returnRateSettings.enabled) {
+      // 환수율 적용됨
+      const allOdds = [oddsCacheData.backOdds, oddsCacheData.layOdds];
+      const adjustedOdds = adjustOddsPayout(allOdds, returnRateSettings.returnRate);
+      finalPrice = side === 'back' ? adjustedOdds[0] : adjustedOdds[1];
+
+      console.log('📊 서버 배당률 결정:', {
+        원본: allOdds,
+        환수율: returnRateSettings.returnRate,
+        조정후: adjustedOdds,
+        최종배당: finalPrice
+      });
+    } else {
+      // 환수율 비활성화 - 원본 배당 사용
+      finalPrice = side === 'back' ? oddsCacheData.backOdds : oddsCacheData.layOdds;
+      console.log('📊 서버 배당률 결정 (환수율 비활성화):', finalPrice);
+    }
+    
+    // 게임 데이터 매핑 (서버 계산된 배당률 사용)
     const orderData = await exchangeGameMappingService.mapGameDataToOrder({
-      gameId, market, line, side, price, amount, selection, userId
+      gameId, market, line, side, price: finalPrice, amount, selection, userId
     });
     
     console.log('📊 매핑된 게임 데이터:', {
@@ -473,11 +524,9 @@ router.post('/order', verifyToken, async (req, res) => {
       awayTeam: orderData.awayTeam,
       sportKey: orderData.sportKey,
       originalPrice: price,
+      serverCalculatedPrice: finalPrice,
       adjustedPrice: orderData.adjustedPrice
     });
-    
-    // 🆕 원본 배당율 사용 (환수율은 프론트엔드에서 적용)
-    const finalPrice = price;
     
     // ✅ 중앙화된 잔액 관리 서비스 사용
     const transaction = await sequelize.transaction();
@@ -638,10 +687,11 @@ router.post('/order', verifyToken, async (req, res) => {
       // 트랜잭션 커밋
       await orderTransaction.commit();
       
-      // 🆕 부분 매칭 결과 포함한 응답
+      // 🆕 부분 매칭 결과 포함한 응답 (확정된 배당률 포함)
       res.json({ 
         success: true,
         order: order ? order.toJSON() : null,
+        confirmedPrice: finalPrice, // ✅ 서버가 확정한 배당률
         matchingResult: {
           totalMatched: partialMatchResult.totalMatched,
           remainingAmount: partialMatchResult.remainingAmount,
@@ -1718,18 +1768,63 @@ router.get('/markets/:gameId', verifyToken, async (req, res) => {
 
 // 새로운 주문 생성 (기존 주문과 즉시 매칭 시도)
 router.post('/match-order', verifyToken, async (req, res) => {
-  const { gameId, market, line, side, price, amount, selection } = req.body;
+  // ✅ Phase 2: price 파라미터 제거!
+  const { gameId, market, line, side, amount, selection } = req.body;
   const userId = req.user.userId; // 수정: userId 사용
 
   try {
-    console.log(`🎯 매치 주문 요청: ${side} ${price} (${amount}원) - User: ${userId}`);
-    console.log(`📊 요청 데이터:`, { gameId, market, line, side, price, amount, selection });
+    console.log(`🎯 매치 주문 요청: ${side} (${amount}원) - User: ${userId}`);
+    console.log(`📊 요청 데이터:`, { gameId, market, line, side, amount, selection });
 
-    // 1. 매칭 가능한 반대편 주문 찾기
+    // ========================================
+    // 🏗️ Phase 2: 서버 중심 배당률 결정
+    // ========================================
+    
+    // 1️⃣ OddsCache에서 원본 배당률 조회
+    const oddsCacheData = await exchangeGameMappingService.getOddsCacheData(
+      gameId,
+      selection,
+      side
+    );
+
+    if (!oddsCacheData || !oddsCacheData.backOdds || !oddsCacheData.layOdds) {
+      return res.status(404).json({
+        success: false,
+        error: '배당률 정보를 찾을 수 없습니다.',
+        gameId,
+        selection
+      });
+    }
+
+    // 2️⃣ 환수율 설정 조회
+    const returnRateSettings = await ExchangeOddsReturnRateService.getOddsReturnRateSettings();
+
+    // 3️⃣ 서버에서 배당률 결정 (환수율 적용)
+    let finalPrice;
+
+    if (returnRateSettings.enabled) {
+      // 환수율 적용됨
+      const allOdds = [oddsCacheData.backOdds, oddsCacheData.layOdds];
+      const adjustedOdds = adjustOddsPayout(allOdds, returnRateSettings.returnRate);
+      finalPrice = side === 'back' ? adjustedOdds[0] : adjustedOdds[1];
+
+      console.log('📊 매치주문 서버 배당률 결정:', {
+        원본: allOdds,
+        환수율: returnRateSettings.returnRate,
+        조정후: adjustedOdds,
+        최종배당: finalPrice
+      });
+    } else {
+      // 환수율 비활성화 - 원본 배당 사용
+      finalPrice = side === 'back' ? oddsCacheData.backOdds : oddsCacheData.layOdds;
+      console.log('📊 매치주문 서버 배당률 결정 (환수율 비활성화):', finalPrice);
+    }
+
+    // 1. 매칭 가능한 반대편 주문 찾기 (서버 계산된 배당률 사용)
     const oppositeSide = side === 'back' ? 'lay' : 'back';
     let matchingOrders;
 
-    console.log(`🔍 매칭 검색 조건: gameId=${gameId}, market=${market}, line=${line}, side=${side}, price=${price}, userId=${userId}`);
+    console.log(`🔍 매칭 검색 조건: gameId=${gameId}, market=${market}, line=${line}, side=${side}, price=${finalPrice} (서버계산), userId=${userId}`);
     
     if (side === 'back') {
       // Back 주문 → Lay 주문 중 price 이하인 것들과 매칭 (자신의 주문 제외)
@@ -1739,7 +1834,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
           market,
           line,
           side: 'lay',
-          price: { [Op.lte]: price },
+          price: { [Op.lte]: finalPrice }, // 서버 계산된 배당률 사용
           status: 'open',
           userId: { [Op.ne]: userId } // 자신의 주문 제외
         },
@@ -1754,7 +1849,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
           market,
           line,
           side: 'back',
-          price: { [Op.gte]: price },
+          price: { [Op.gte]: finalPrice }, // 서버 계산된 배당률 사용
           status: 'open',
           userId: { [Op.ne]: userId } // 자신의 주문 제외
         },
@@ -1817,14 +1912,14 @@ router.post('/match-order', verifyToken, async (req, res) => {
       orderData.homeTeam = orderData.homeTeam || baseHomeTeam;
       orderData.awayTeam = orderData.awayTeam || baseAwayTeam;
 
-      // 본인 matched 주문 생성
+      // 본인 matched 주문 생성 (서버 계산된 배당률 사용)
       const myMatchedOrder = await ExchangeOrder.create({
         userId,
         gameId,
         market,
         line,
         side,
-        price,
+        price: finalPrice, // 서버 계산된 배당률 사용
         amount: matchAmount,
         selection: orderData.selection,
         status: side === 'lay' ? 'active' : 'matched', // 🆕 Lay는 active 상태로 생성
@@ -1834,8 +1929,8 @@ router.post('/match-order', verifyToken, async (req, res) => {
         commenceTime: new Date(orderData.commenceTime), // UTC로 변환하여 저장
         sportKey: orderData.sportKey,
         selectionDetails: orderData.selectionDetails,
-        stakeAmount: side === 'back' ? matchAmount : Math.floor((price - 1) * matchAmount),
-        potentialProfit: side === 'back' ? Math.floor((price - 1) * matchAmount) : matchAmount, // ✅ 순수익
+        stakeAmount: side === 'back' ? matchAmount : Math.floor((finalPrice - 1) * matchAmount),
+        potentialProfit: side === 'back' ? Math.floor((finalPrice - 1) * matchAmount) : matchAmount, // ✅ 순수익
         autoSettlement: true,
         // 🆕 스포츠북 배당율 정보 사용
         backOdds: orderData.backOdds,
@@ -1880,7 +1975,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
         market,
         line,
         side,
-        price,
+        price: finalPrice, // 서버 계산된 배당률 사용
         amount: remainingAmount,
         selection,
         status: 'open',
@@ -1891,8 +1986,8 @@ router.post('/match-order', verifyToken, async (req, res) => {
         commenceTime: new Date(orderData.commenceTime), // UTC로 변환하여 저장
         sportKey: orderData.sportKey,
         selectionDetails: orderData.selectionDetails,
-        stakeAmount: side === 'back' ? remainingAmount : Math.floor((price - 1) * remainingAmount),
-        potentialProfit: side === 'back' ? Math.floor((price - 1) * remainingAmount) : remainingAmount, // ✅ 순수익
+        stakeAmount: side === 'back' ? remainingAmount : Math.floor((finalPrice - 1) * remainingAmount),
+        potentialProfit: side === 'back' ? Math.floor((finalPrice - 1) * remainingAmount) : remainingAmount, // ✅ 순수익
         autoSettlement: true,
         // 🆕 스포츠북 배당율 정보 사용
         backOdds: orderData.backOdds,
@@ -1905,9 +2000,10 @@ router.post('/match-order', verifyToken, async (req, res) => {
       console.log(`✅ 완전 매칭 완료: ${amount}원`);
     }
 
-    // 4. 매칭 결과 응답
+    // 4. 매칭 결과 응답 (확정된 배당률 포함)
     res.json({
       success: true,
+      confirmedPrice: finalPrice, // ✅ 서버가 확정한 배당률
       matches: matches.length,
       totalMatched: amount - remainingAmount,
       remainingAmount,

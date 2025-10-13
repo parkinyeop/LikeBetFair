@@ -255,6 +255,11 @@ function OrderPanel() {
         if (result.success) {
           console.log('✅ [ExchangeSidebar] 매칭 배팅 성공, 이벤트 발생 시작');
           
+          // ✅ 서버가 확정한 배당률 표시
+          if (result.confirmedPrice) {
+            console.log('✅ 매칭 배팅 서버 확정 배당률:', result.confirmedPrice);
+          }
+          
           // 주문 내역 새로고침 (이벤트 발생)
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new Event('exchangeOrderPlaced'));
@@ -267,7 +272,8 @@ function OrderPanel() {
             }, 100);
           }
           
-          alert('🎉 매칭 배팅이 성공적으로 처리되었습니다!');
+          const confirmedPrice = result.confirmedPrice ? `\n확정 배당률: ${result.confirmedPrice}` : '';
+          alert(`🎉 매칭 배팅이 성공적으로 처리되었습니다!${confirmedPrice}`);
           
           // 매칭 모드 비활성화
           deactivateMatchMode();
@@ -286,13 +292,13 @@ function OrderPanel() {
         }
       }
       
-      // 일반 주문 처리 (기존 로직)
+      // 일반 주문 처리 (Phase 2: price 파라미터 제거)
       const orderData = {
         gameId: selectedBet.gameId || '',
         market: selectedBet.market || 'h2h',
         line: selectedBet.line || 0,
         side: selectedBet.type,
-        price: selectedBet.price,
+        // price: selectedBet.price, // ✅ 제거: 서버에서 결정
         amount: Math.floor(form.amount), // 🆕 정수로 변환
         selection: selectedBet.team,
         homeTeam: selectedBet.homeTeam, // 추가
@@ -304,28 +310,35 @@ function OrderPanel() {
       const result = await placeOrder(orderData);
       console.log('주문 결과:', result);
       
-      // 🆕 주문 성공 시 부분 매칭 정보 포함 알림
+      // ✅ 서버가 확정한 배당률 표시
+      if (result.confirmedPrice) {
+        console.log('✅ 서버 확정 배당률:', result.confirmedPrice);
+      }
+      
+      // 🆕 주문 성공 시 부분 매칭 정보 포함 알림 (확정 배당률 포함)
       if (result.matchingResult) {
         const { totalMatched, remainingAmount, matchCount, isPartiallyMatched, isFullyMatched } = result.matchingResult;
+        const confirmedPrice = result.confirmedPrice ? `\n확정 배당률: ${result.confirmedPrice}` : '';
         
         if (isFullyMatched) {
-          alert(`🎉 주문이 완전히 매칭되었습니다!\n` +
+          alert(`🎉 주문이 완전히 매칭되었습니다!${confirmedPrice}\n` +
                 `매칭 금액: ${totalMatched.toLocaleString()} KRW\n` +
                 `매칭 횟수: ${matchCount}회`);
         } else if (isPartiallyMatched) {
-          alert(`⚡ 주문이 부분 매칭되었습니다!\n` +
+          alert(`⚡ 주문이 부분 매칭되었습니다!${confirmedPrice}\n` +
                 `매칭된 금액: ${totalMatched.toLocaleString()} KRW\n` +
                 `남은 금액: ${remainingAmount.toLocaleString()} KRW (호가창에 등록)\n` +
                 `매칭 횟수: ${matchCount}회`);
         } else if (remainingAmount > 0) {
-          alert(`📝 주문이 호가창에 등록되었습니다!\n` +
+          alert(`📝 주문이 호가창에 등록되었습니다!${confirmedPrice}\n` +
                 `등록 금액: ${remainingAmount.toLocaleString()} KRW\n` +
                 `다른 사용자가 매칭하면 자동으로 체결됩니다.`);
         } else {
-          alert('주문이 성공적으로 등록되었습니다!');
+          alert(`주문이 성공적으로 등록되었습니다!${confirmedPrice}`);
         }
       } else {
-        alert('주문이 성공적으로 등록되었습니다!');
+        const confirmedPrice = result.confirmedPrice ? `\n확정 배당률: ${result.confirmedPrice}` : '';
+        alert(`주문이 성공적으로 등록되었습니다!${confirmedPrice}`);
       }
       
       // 🆕 매칭 모드도 비활성화
