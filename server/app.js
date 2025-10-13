@@ -144,6 +144,12 @@ app.get('/health', (req, res) => {
 // });
 
 // API Routes (순서 중요! 구체적인 경로를 먼저 등록)
+// 🔍 디버깅: 모든 /api/admin 요청 로깅
+app.use('/api/admin', (req, res, next) => {
+  console.log(`🔍 [Admin API] ${req.method} ${req.url}`);
+  next();
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/bet', betRoutes);
 app.use('/api/admin', adminRoutes);

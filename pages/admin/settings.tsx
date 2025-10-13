@@ -190,14 +190,17 @@ export default function SystemSettings() {
         'Content-Type': 'application/json'
       };
 
+        const commissionUrl = buildApiUrl('/api/admin/settings/commission-rates');
+        console.log('🔍 [Settings] 수수료율 API URL:', commissionUrl);
+
         const [settingsRes, adminsRes, logsRes, backupRes, bettingRes, oddsWeightRes, commissionRes] = await Promise.all([
-          fetch(buildApiUrl('/api/admin/settings'), { headers }),
-          fetch(buildApiUrl('/api/admin/settings/admins'), { headers }),
-          fetch(buildApiUrl('/api/admin/settings/logs'), { headers }),
-          fetch(buildApiUrl('/api/admin/settings/backup'), { headers }),
-          fetch(buildApiUrl('/api/admin/settings/betting-amounts'), { headers }),
-          fetch(buildApiUrl('/api/admin/settings/exchange-odds-return-rate'), { headers }),
-          fetch(buildApiUrl('/api/admin/settings/commission-rates'), { headers })
+          fetch(buildApiUrl('/api/admin/settings'), { headers, cache: 'no-store' }),
+          fetch(buildApiUrl('/api/admin/settings/admins'), { headers, cache: 'no-store' }),
+          fetch(buildApiUrl('/api/admin/settings/logs'), { headers, cache: 'no-store' }),
+          fetch(buildApiUrl('/api/admin/settings/backup'), { headers, cache: 'no-store' }),
+          fetch(buildApiUrl('/api/admin/settings/betting-amounts'), { headers, cache: 'no-store' }),
+          fetch(buildApiUrl('/api/admin/settings/exchange-odds-return-rate'), { headers, cache: 'no-store' }),
+          fetch(commissionUrl, { headers, cache: 'no-store' })
         ]);
 
         const [settingsData, adminsData, logsData, backupData, bettingData, oddsWeightData, commissionData] = await Promise.all([
@@ -220,7 +223,9 @@ export default function SystemSettings() {
       }
 
       if (commissionData.success) {
+        console.log('🔍 [Settings] 서버에서 받은 수수료율 데이터:', commissionData.data);
         setCommissionRates(commissionData.data);
+        console.log('✅ [Settings] 수수료율 상태 업데이트 완료:', commissionData.data);
       }
 
       if (bettingData.success && bettingData.data) {
@@ -271,10 +276,13 @@ export default function SystemSettings() {
   // 수수료율 설정 저장
   const handleSaveCommissionRates = async () => {
     try {
+      console.log('💾 [Settings] 수수료율 저장 시작:', commissionRates);
+      
       const tabId = sessionStorage.getItem('tabId');
       const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
 
       // 스포츠북 수수료율 업데이트
+      console.log('📤 [Settings] 스포츠북 수수료율 전송:', { rate: commissionRates.sportsbook });
       const sportsbookResponse = await fetch(buildApiUrl('/api/admin/settings/commission-rates/sportsbook'), {
         method: 'PUT',
         headers: {
@@ -299,12 +307,19 @@ export default function SystemSettings() {
 
       if (sportsbookResponse.ok && exchangeResponse.ok && sportsbookResult.success && exchangeResult.success) {
         alert('수수료율 설정이 저장되었습니다.');
-        // 설정 저장 후 현재 설정값 업데이트
+        // ✅ 설정 저장 후 현재 설정값 업데이트
         setSettings({
           ...settings,
           sportsbook_commission_rate: commissionRates.sportsbook,
           exchange_commission_rate: commissionRates.exchange
         });
+        // ✅ 수수료율 상태도 업데이트 (중요!)
+        setCommissionRates({
+          sportsbook: commissionRates.sportsbook,
+          exchange: commissionRates.exchange
+        });
+        // ✅ 서버에서 최신 데이터 다시 불러오기
+        await fetchSystemData();
       } else {
         alert(`수수료율 설정 저장에 실패했습니다: ${sportsbookResult.error || exchangeResult.error || '알 수 없는 오류'}`);
       }
@@ -569,7 +584,11 @@ export default function SystemSettings() {
                     type="number"
                     step="0.01"
                     value={commissionRates.sportsbook * 100}
-                    onChange={(e) => setCommissionRates({...commissionRates, sportsbook: parseFloat(e.target.value) / 100})}
+                    onChange={(e) => {
+                      const newRate = parseFloat(e.target.value) / 100;
+                      console.log('📝 [Settings] 스포츠북 수수료율 변경:', { 입력값: e.target.value, 계산값: newRate });
+                      setCommissionRates({...commissionRates, sportsbook: newRate});
+                    }}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   />
                   <p className="text-xs text-gray-500 mt-1">

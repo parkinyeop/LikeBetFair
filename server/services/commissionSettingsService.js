@@ -1,4 +1,5 @@
 import Settings from '../models/settingsModel.js';
+import { Op } from 'sequelize';
 
 /**
  * 수수료율 설정 관리 서비스
@@ -22,7 +23,8 @@ class CommissionSettingsService {
       });
 
       if (setting) {
-        return parseFloat(setting.value) || 0;
+        const parsed = parseFloat(setting.value);
+        return isNaN(parsed) ? (platform === 'sportsbook' ? 0.05 : 0.03) : parsed; // ✅ 0도 허용!
       }
 
       // 기본값 반환
@@ -42,7 +44,7 @@ class CommissionSettingsService {
       const settings = await Settings.findAll({
         where: { 
           key: { 
-            [require('sequelize').Op.in]: [
+            [Op.in]: [
               'sportsbook_commission_rate', 
               'exchange_commission_rate'
             ] 
@@ -57,13 +59,20 @@ class CommissionSettingsService {
       };
 
       settings.forEach(setting => {
+        console.log(`🔍 [CommissionSettings] DB에서 조회한 설정: ${setting.key} = "${setting.value}"`);
+        
         if (setting.key === 'sportsbook_commission_rate') {
-          result.sportsbook = parseFloat(setting.value) || 0.05;
+          const parsed = parseFloat(setting.value);
+          result.sportsbook = isNaN(parsed) ? 0.05 : parsed; // ✅ 0도 허용!
+          console.log(`   → 스포츠북: parseFloat("${setting.value}") = ${parsed}, isNaN: ${isNaN(parsed)}, 최종값: ${result.sportsbook}`);
         } else if (setting.key === 'exchange_commission_rate') {
-          result.exchange = parseFloat(setting.value) || 0.03;
+          const parsed = parseFloat(setting.value);
+          result.exchange = isNaN(parsed) ? 0.03 : parsed; // ✅ 0도 허용!
+          console.log(`   → 익스체인지: parseFloat("${setting.value}") = ${parsed}, isNaN: ${isNaN(parsed)}, 최종값: ${result.exchange}`);
         }
       });
 
+      console.log('✅ [CommissionSettings] 최종 수수료율:', result);
       return result;
     } catch (error) {
       console.error('[CommissionSettings] 수수료율 조회 오류:', error);
