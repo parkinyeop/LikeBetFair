@@ -16,10 +16,11 @@ export default function ExchangeOrdersTab() {
   const [orders, setOrders] = useState<ExchangeOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [dateRange, setDateRange] = useState('30d'); // 7d, 30d, 90d, all
 
   useEffect(() => {
     fetchOrders();
-  }, [statusFilter]);
+  }, [statusFilter, dateRange]);
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -34,7 +35,7 @@ export default function ExchangeOrdersTab() {
         return;
       }
 
-      const res = await fetch(buildApiUrl(`/api/mypage/exchange-orders?status=${statusFilter}`), {
+      const res = await fetch(buildApiUrl(`/api/mypage/exchange-orders?status=${statusFilter}&range=${dateRange}`), {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -126,17 +127,32 @@ export default function ExchangeOrdersTab() {
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">익스체인지 주문</h2>
 
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-2 border border-gray-300 rounded bg-white text-gray-700 hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="all">전체</option>
-          <option value="open">대기중</option>
-          <option value="matched">매칭완료</option>
-          <option value="partially_matched">부분매칭</option>
-          <option value="cancelled">취소</option>
-        </select>
+        <div className="flex gap-3">
+          {/* 기간 필터 */}
+          <select
+            value={dateRange}
+            onChange={(e) => setDateRange(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded bg-white text-gray-700 hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="7d">최근 7일</option>
+            <option value="30d">최근 30일</option>
+            <option value="90d">최근 90일</option>
+            <option value="all">전체 기간</option>
+          </select>
+
+          {/* 상태 필터 */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded bg-white text-gray-700 hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">전체 상태</option>
+            <option value="open">대기중</option>
+            <option value="matched">매칭완료</option>
+            <option value="partially_matched">부분매칭</option>
+            <option value="cancelled">취소</option>
+          </select>
+        </div>
       </div>
 
       <AdminTable

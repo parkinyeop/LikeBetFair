@@ -67,22 +67,27 @@ router.put('/password', verifyToken, async (req, res) => {
 // 입출금 내역 조회
 router.get('/payment-history', verifyToken, async (req, res) => {
   try {
-    const { range = '30d' } = req.query;
+    const { range = '30d', type = 'all' } = req.query;
 
-    // 날짜 범위 계산
-    let dateFilter = {};
+    let whereCondition = { userId: req.user.userId };
+
+    // 날짜 범위 필터
     if (range !== 'all') {
       const days = parseInt(range.replace('d', ''));
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
-      dateFilter = { paidAt: { [Op.gte]: startDate } };
+      whereCondition.paidAt = { [Op.gte]: startDate };
+    }
+
+    // 입출금 타입 필터
+    if (type === 'deposit') {
+      whereCondition.amount = { [Op.gt]: 0 }; // 입금 (양수)
+    } else if (type === 'withdrawal') {
+      whereCondition.amount = { [Op.lt]: 0 }; // 출금 (음수)
     }
 
     const payments = await PaymentHistory.findAll({
-      where: {
-        userId: req.user.userId,
-        ...dateFilter
-      },
+      where: whereCondition,
       order: [['paidAt', 'DESC']],
       limit: 100
     });
@@ -97,11 +102,21 @@ router.get('/payment-history', verifyToken, async (req, res) => {
 // 베팅 내역 조회
 router.get('/bets', verifyToken, async (req, res) => {
   try {
-    const { status = 'all' } = req.query;
+    const { status = 'all', range = '30d' } = req.query;
 
     let whereCondition = { userId: req.user.userId };
+
+    // 상태 필터
     if (status !== 'all') {
       whereCondition.status = status;
+    }
+
+    // 날짜 범위 필터
+    if (range !== 'all') {
+      const days = parseInt(range.replace('d', ''));
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      whereCondition.createdAt = { [Op.gte]: startDate };
     }
 
     const bets = await Bet.findAll({
@@ -120,11 +135,21 @@ router.get('/bets', verifyToken, async (req, res) => {
 // 익스체인지 주문 내역 조회
 router.get('/exchange-orders', verifyToken, async (req, res) => {
   try {
-    const { status = 'all' } = req.query;
+    const { status = 'all', range = '30d' } = req.query;
 
     let whereCondition = { userId: req.user.userId };
+
+    // 상태 필터
     if (status !== 'all') {
       whereCondition.status = status;
+    }
+
+    // 날짜 범위 필터
+    if (range !== 'all') {
+      const days = parseInt(range.replace('d', ''));
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      whereCondition.createdAt = { [Op.gte]: startDate };
     }
 
     const orders = await ExchangeOrder.findAll({

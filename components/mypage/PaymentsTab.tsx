@@ -14,11 +14,12 @@ export default function PaymentsTab() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('30d'); // 7d, 30d, 90d, all
+  const [typeFilter, setTypeFilter] = useState('all'); // all, deposit, withdrawal
 
   // 입출금 내역 로드
   useEffect(() => {
     fetchPayments();
-  }, [dateRange]);
+  }, [dateRange, typeFilter]);
 
   const fetchPayments = async () => {
     setLoading(true);
@@ -33,7 +34,7 @@ export default function PaymentsTab() {
         return;
       }
 
-      const res = await fetch(buildApiUrl(`/api/mypage/payment-history?range=${dateRange}`), {
+      const res = await fetch(buildApiUrl(`/api/mypage/payment-history?range=${dateRange}&type=${typeFilter}`), {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -64,7 +65,7 @@ export default function PaymentsTab() {
       label: '금액',
       render: (value: number) => (
         <span className={value > 0 ? 'text-blue-600 font-semibold' : 'text-red-600 font-semibold'}>
-          {value > 0 ? '+' : ''}{value.toLocaleString()}원
+          {value > 0 ? '+' : ''}{Math.floor(value).toLocaleString()} KRW
         </span>
       ),
       className: 'w-32'
@@ -72,7 +73,7 @@ export default function PaymentsTab() {
     {
       key: 'balanceAfter',
       label: '거래 후 잔액',
-      render: (value: number) => `${value.toLocaleString()}원`,
+      render: (value: number) => `${Math.floor(value).toLocaleString()} KRW`,
       className: 'w-32'
     },
     {
@@ -87,17 +88,30 @@ export default function PaymentsTab() {
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">입출금 내역</h2>
 
-        {/* 기간 필터 */}
-        <select
-          value={dateRange}
-          onChange={(e) => setDateRange(e.target.value)}
-          className="px-4 py-2 border border-gray-300 rounded bg-white text-gray-700 hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="7d">최근 7일</option>
-          <option value="30d">최근 30일</option>
-          <option value="90d">최근 90일</option>
-          <option value="all">전체</option>
-        </select>
+        <div className="flex gap-3">
+          {/* 기간 필터 */}
+          <select
+            value={dateRange}
+            onChange={(e) => setDateRange(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded bg-white text-gray-700 hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="7d">최근 7일</option>
+            <option value="30d">최근 30일</option>
+            <option value="90d">최근 90일</option>
+            <option value="all">전체 기간</option>
+          </select>
+
+          {/* 입출금 타입 필터 */}
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded bg-white text-gray-700 hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">전체</option>
+            <option value="deposit">입금</option>
+            <option value="withdrawal">출금</option>
+          </select>
+        </div>
       </div>
 
       <AdminTable
