@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import JoinForm from './JoinForm';
 import LoginForm from './LoginForm';
+import MyPageModal from './MyPageModal';
 import { useAuth } from '../contexts/AuthContext';
 
 
@@ -13,6 +14,7 @@ export default function Header() {
   const [showJoin, setShowJoin] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showSoon, setShowSoon] = useState(false);
+  const [showMyPage, setShowMyPage] = useState(false);
   const [siteName, setSiteName] = useState("Lbetfair"); // 기본값
   const [siteDescription, setSiteDescription] = useState("스포츠 베팅 플랫폼"); // 기본값
   const { isLoggedIn, username, logout, isAdmin, adminLevel } = useAuth();
@@ -152,6 +154,16 @@ export default function Header() {
                   )}
                 </span>
               </div>
+              
+              {/* 마이페이지 버튼 */}
+              <button
+                onClick={() => setShowMyPage(true)}
+                className="p-2 bg-blue-500 text-white rounded hover:bg-blue-400 transition-colors"
+                title="마이페이지"
+              >
+                👤
+              </button>
+              
               <button
                 onClick={logout}
                 className="px-3 py-1 bg-white text-blue-600 rounded hover:bg-blue-50"
@@ -179,6 +191,7 @@ export default function Header() {
       </div>
       {showLogin && <LoginForm onClose={() => setShowLogin(false)} />}
       {showJoin && <JoinForm onClose={() => setShowJoin(false)} />}
+      {showMyPage && <MyPageModal isOpen={showMyPage} onClose={() => setShowMyPage(false)} />}
       {showSoon && (
         <div className="fixed top-16 left-1/2 transform -translate-x-1/2 bg-yellow-300 text-black px-6 py-3 rounded shadow-lg z-50">
           Coming Soon

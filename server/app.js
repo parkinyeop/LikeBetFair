@@ -72,6 +72,7 @@ import adminRoutes from './routes/admin.js';
 import exchangeRoutes from './routes/exchange.js';
 import exchangeMultibetRoutes from './routes/exchangeMultibetRoutes.js';
 import manualGameResultRoutes from './routes/manualGameResult.js';
+import mypageRoutes from './routes/mypage.js';
 
 // 🆕 정산 스케줄러 활성화
 import './jobs/settlementScheduler.js';
@@ -167,6 +168,7 @@ app.use('/api/game-results', gameResultRoutes);
 app.use('/api/exchange/multibet', exchangeMultibetRoutes); // 구체적인 경로를 먼저 등록
 app.use('/api/exchange', exchangeRoutes); // 일반적인 경로를 나중에 등록
 app.use('/api/odds', oddsRoutes);
+app.use('/api/mypage', mypageRoutes);
 
 // API 라우트 디버깅
 app.use('/api/*', (req, res, next) => {

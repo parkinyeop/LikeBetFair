@@ -1,0 +1,135 @@
+import React, { useState, useEffect } from 'react';
+import AdminTable from '../admin/AdminTable';
+
+interface ExchangeOrder {
+  id: string;
+  createdAt: string;
+  side: 'back' | 'lay';
+  price: number;
+  amount: number;
+  filledAmount: number;
+  status: 'open' | 'matched' | 'partially_matched' | 'cancelled';
+}
+
+export default function ExchangeOrdersTab() {
+  const [orders, setOrders] = useState<ExchangeOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  useEffect(() => {
+    fetchOrders();
+  }, [statusFilter]);
+
+  const fetchOrders = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/mypage/exchange-orders?status=${statusFilter}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      setOrders(data.orders || []);
+    } catch (error) {
+      console.error('주문 내역 로드 실패:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getTypeBadge = (side: string) => {
+    const config = side === 'back' 
+      ? { text: 'BACK', className: 'bg-blue-100 text-blue-800' }
+      : { text: 'LAY', className: 'bg-pink-100 text-pink-800' };
+
+    return (
+      <span className={`px-2 py-1 rounded text-xs ${config.className}`}>
+        {config.text}
+      </span>
+    );
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      matched: { text: '매칭완료', className: 'bg-green-100 text-green-800' },
+      open: { text: '대기중', className: 'bg-yellow-100 text-yellow-800' },
+      partially_matched: { text: '부분매칭', className: 'bg-blue-100 text-blue-800' },
+      cancelled: { text: '취소', className: 'bg-gray-100 text-gray-800' }
+    };
+
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.cancelled;
+
+    return (
+      <span className={`px-2 py-1 rounded text-xs ${config.className}`}>
+        {config.text}
+      </span>
+    );
+  };
+
+  const columns = [
+    {
+      key: 'createdAt',
+      label: '주문 시간',
+      render: (value: string) => new Date(value).toLocaleString('ko-KR'),
+      className: 'w-40'
+    },
+    {
+      key: 'side',
+      label: '유형',
+      render: (value: string) => getTypeBadge(value),
+      className: 'w-20'
+    },
+    {
+      key: 'price',
+      label: '배당률',
+      render: (value: number) => value.toFixed(2),
+      className: 'w-24'
+    },
+    {
+      key: 'amount',
+      label: '금액',
+      render: (value: number) => `${value.toLocaleString()}원`,
+      className: 'w-32'
+    },
+    {
+      key: 'filledAmount',
+      label: '매칭액',
+      render: (value: number) => `${value.toLocaleString()}원`,
+      className: 'w-32'
+    },
+    {
+      key: 'status',
+      label: '상태',
+      render: (value: string) => getStatusBadge(value),
+      className: 'w-28'
+    }
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">익스체인지 주문</h2>
+
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-4 py-2 border rounded"
+        >
+          <option value="all">전체</option>
+          <option value="open">대기중</option>
+          <option value="matched">매칭완료</option>
+          <option value="partially_matched">부분매칭</option>
+          <option value="cancelled">취소</option>
+        </select>
+      </div>
+
+      <AdminTable
+        data={orders}
+        columns={columns}
+        loading={loading}
+        emptyMessage="주문 내역이 없습니다."
+      />
+    </div>
+  );
+}
