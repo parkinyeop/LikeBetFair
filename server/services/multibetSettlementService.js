@@ -565,30 +565,56 @@ class MultibetSettlementService {
     let totalProfit = 0;
 
     for (const match of matches) {
-      const matchedAmount = match.matchedAmount;
+      const matchedAmount = match.matchedAmount; // Back 담보금
+      const matchedPrice = match.matchedPrice; // 배당률
+      const layStake = Math.floor(matchedAmount * (matchedPrice - 1)); // Lay 담보금
+      
       // ✅ 핵심: ExchangeOrderMatch.originalSide를 사용하여 Back/Lay 구분
       // ExchangeOrder.side가 아닌 Match 테이블의 originalSide를 기준으로 정산
       const isBackSide = match.originalSide === 'back';
+      
+      // 🎯 현재 주문이 원본인지 매칭인지 확인
+      const isOriginalOrder = (match.originalOrderId === order.id);
 
+      // 🔑 핵심: 담보금은 이미 차감되었으므로, 정산 시에는 승자에게만 총 담보금 지급
       if (result === 'won') {
         if (isBackSide) {
-          // Back 승리: 매칭된 금액만큼 수익
-          totalProfit += matchedAmount;
-          console.log(`🏆 Back 승리 매칭: +${matchedAmount} (vs 주문 ${match.matchingOrderId})`);
+          // Back 승리
+          if (isOriginalOrder) {
+            // 원본 Back 주문 승리: 총 담보금 지급 (자기 + 상대)
+            totalProfit += matchedAmount + layStake;
+            console.log(`🏆 Back 승리 (원본): +${matchedAmount + layStake}원 (Back담보 ${matchedAmount} + Lay담보 ${layStake})`);
+          } else {
+            // 매칭 Back 주문 승리 → 이 경우는 발생하지 않음
+            console.log(`⚠️ 예외 케이스: 매칭 Back 승리`);
+          }
         } else {
-          // Lay 승리: 매칭된 금액 손실
-          totalProfit -= matchedAmount;
-          console.log(`💸 Lay 패배: -${matchedAmount} (vs 주문 ${match.matchingOrderId})`);
+          // Lay 승리
+          if (isOriginalOrder) {
+            // 원본 Lay 주문 승리: 총 담보금 지급 (자기 + 상대)
+            totalProfit += layStake + matchedAmount;
+            console.log(`🏆 Lay 승리 (원본): +${layStake + matchedAmount}원 (Lay담보 ${layStake} + Back담보 ${matchedAmount})`);
+          } else {
+            // 매칭 Lay 주문 승리 → 이 경우는 발생하지 않음
+            console.log(`⚠️ 예외 케이스: 매칭 Lay 승리`);
+          }
         }
       } else { // result === 'lost'
+        // 패배: 담보금은 이미 차감되었으므로 추가 처리 없음 (0원)
         if (isBackSide) {
-          // Back 패배: 매칭된 금액 손실
-          totalProfit -= matchedAmount;
-          console.log(`💸 Back 패배: -${matchedAmount} (vs 주문 ${match.matchingOrderId})`);
+          if (isOriginalOrder) {
+            console.log(`💸 Back 패배 (원본): 0원 (담보금 이미 차감됨)`);
+          } else {
+            // 매칭 Back 패배 = 상대 Lay 승리 → 상대가 처리
+            console.log(`💸 Back 패배 (매칭): 0원 (상대 Lay가 총 담보금 수령)`);
+          }
         } else {
-          // Lay 승리: 매칭된 금액만큼 수익
-          totalProfit += matchedAmount;
-          console.log(`🏆 Lay 승리 매칭: +${matchedAmount} (vs 주문 ${match.matchingOrderId})`);
+          if (isOriginalOrder) {
+            console.log(`💸 Lay 패배 (원본): 0원 (담보금 이미 차감됨)`);
+          } else {
+            // 매칭 Lay 패배 = 상대 Back 승리 → 상대가 처리
+            console.log(`💸 Lay 패배 (매칭): 0원 (상대 Back이 총 담보금 수령)`);
+          }
         }
       }
     }
@@ -669,6 +695,27 @@ class MultibetSettlementService {
         }, { transaction })
       ]);
       console.log(`⏱️ DB 저장 완료: ${Date.now() - saveStartTime}ms`);
+      
+      // 6단계: 매치 상태 업데이트 (settled로 변경)
+      const ExchangeOrderMatch = (await import('../models/exchangeOrderMatchModel.js')).default;
+      const matchUpdateStartTime = Date.now();
+      const updatedMatches = await ExchangeOrderMatch.update(
+        { 
+          status: 'settled',
+          settledAt: new Date()
+        },
+        {
+          where: {
+            [Op.or]: [
+              { originalOrderId: order.id },
+              { matchingOrderId: order.id }
+            ],
+            status: 'active'
+          },
+          transaction
+        }
+      );
+      console.log(`⏱️ 매치 상태 업데이트 완료: ${updatedMatches[0]}개 (${Date.now() - matchUpdateStartTime}ms)`);
 
       const totalTime = Date.now() - paymentStartTime;
       console.log(`💰 결제 완료: ${currentBalance} → ${newBalance} (총 ${totalTime}ms)`);

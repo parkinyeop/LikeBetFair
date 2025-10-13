@@ -523,14 +523,17 @@ class ExchangeSettlementService {
 
     let backWinAmount, layWinAmount;
 
+    // 🔑 핵심: 담보금은 이미 차감되었으므로, 정산 시에는 승자에게만 총 담보금 지급
     if (isBackWin) {
-      // Back 승리 시: Lay가 베팅한 금액만큼 Back이 획득
-      backWinAmount = layStakeAmount;
-      layWinAmount = -layStakeAmount;
+      // Back 승리: 총 담보금 지급 (Back담보 + Lay담보)
+      backWinAmount = backStakeAmount + layStakeAmount;
+      layWinAmount = 0; // Lay 패배: 담보금 이미 차감됨
+      console.log(`  🏆 Back 승리: Back +${backWinAmount}원 (Back담보 ${backStakeAmount} + Lay담보 ${layStakeAmount}), Lay 0원 (이미 차감)`);
     } else {
-      // Lay 승리 시: 정밀 계산으로 수익 산출
-      backWinAmount = -layStakeAmount;
-      layWinAmount = PrecisionCalculation.calculateLayWinAmount(layStakeAmount, backStakeAmount, layShareRatio);
+      // Lay 승리: 총 담보금 지급 (Lay담보 + Back담보)
+      backWinAmount = 0; // Back 패배: 담보금 이미 차감됨
+      layWinAmount = layStakeAmount + backStakeAmount;
+      console.log(`  🏆 Lay 승리: Lay +${layWinAmount}원 (Lay담보 ${layStakeAmount} + Back담보 ${backStakeAmount}), Back 0원 (이미 차감)`);
     }
     
     console.log(`  💰 수익 계산 (올바른 Exchange 로직):`);
