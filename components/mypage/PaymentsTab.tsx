@@ -91,7 +91,7 @@ export default function PaymentsTab() {
         <select
           value={dateRange}
           onChange={(e) => setDateRange(e.target.value)}
-          className="px-4 py-2 border rounded"
+          className="px-4 py-2 border border-gray-300 rounded bg-white text-gray-700 hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="7d">최근 7일</option>
           <option value="30d">최근 30일</option>

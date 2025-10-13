@@ -129,7 +129,7 @@ export default function ExchangeOrdersTab() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-2 border rounded"
+          className="px-4 py-2 border border-gray-300 rounded bg-white text-gray-700 hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="all">전체</option>
           <option value="open">대기중</option>
