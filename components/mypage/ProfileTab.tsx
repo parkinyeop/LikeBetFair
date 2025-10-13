@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { buildApiUrl } from '../../config/apiConfig';
 import PasswordChangeModal from './PasswordChangeModal';
 
 interface UserData {
@@ -21,19 +22,30 @@ export default function ProfileTab() {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('/api/mypage/profile', {
+        // AuthContext와 동일한 방식으로 토큰 가져오기
+        const tabId = sessionStorage.getItem('tabId');
+        const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
+
+        if (!token) {
+          console.error('토큰이 없습니다.');
+          setLoading(false);
+          return;
+        }
+
+        const response = await fetch(buildApiUrl('/api/mypage/profile'), {
           headers: {
             'Authorization': `Bearer ${token}`
           }
         });
-        
+
         if (response.ok) {
           const data = await response.json();
           setUserData(data);
+        } else {
+          console.error('사용자 정보 로드 실패:', response.status);
         }
       } catch (error) {
-        console.error('사용자 정보 로드 실패:', error);
+        console.error('사용자 정보 로드 오류:', error);
       } finally {
         setLoading(false);
       }

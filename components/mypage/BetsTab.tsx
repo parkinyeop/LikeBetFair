@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { buildApiUrl } from '../../config/apiConfig';
 import AdminTable from '../admin/AdminTable';
 
 interface Bet {
@@ -22,16 +23,30 @@ export default function BetsTab() {
   const fetchBets = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/mypage/bets?status=${statusFilter}`, {
+      // AuthContext와 동일한 방식으로 토큰 가져오기
+      const tabId = sessionStorage.getItem('tabId');
+      const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
+
+      if (!token) {
+        console.error('토큰이 없습니다.');
+        setLoading(false);
+        return;
+      }
+
+      const res = await fetch(buildApiUrl(`/api/mypage/bets?status=${statusFilter}`), {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      const data = await res.json();
-      setBets(data.bets || []);
+
+      if (res.ok) {
+        const data = await res.json();
+        setBets(data.bets || []);
+      } else {
+        console.error('베팅 내역 로드 실패:', res.status);
+      }
     } catch (error) {
-      console.error('베팅 내역 로드 실패:', error);
+      console.error('베팅 내역 로드 오류:', error);
     } finally {
       setLoading(false);
     }
