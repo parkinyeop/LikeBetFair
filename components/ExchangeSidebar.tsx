@@ -599,7 +599,6 @@ function OrderPanel() {
 function OrderHistoryPanel() {
   const { orders: userOrders, cancelOrder, loading, fetchOrders } = useExchange();
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
-  const [showCancelConfirm, setShowCancelConfirm] = useState<number | null>(null);
   // 필터 및 정렬 관련 상태 - 주석 처리 (나중에 재활용 가능)
   // const [statusFilter, setStatusFilter] = useState<string>('all');
   // const [sortBy, setSortBy] = useState<'date' | 'amount' | 'price'>('date');
@@ -781,18 +780,24 @@ function OrderHistoryPanel() {
     };
   };
 
-  // 주문 취소 핸들러 (중복 확인창 제거)
-  const handleCancelOrder = async (orderId: number) => {
+  // 주문 취소 핸들러 (확인 모달 없이 바로 처리)
+  const handleCancelOrder = async (orderId: number, orderSide: string) => {
     try {
       await cancelOrder(orderId);
-      setShowCancelConfirm(null);
       
-      // 🆕 주문 취소 후 이벤트 발생
+      // ✅ 성공 메시지 표시
+      alert(orderSide === 'back' 
+        ? '주문이 취소되었습니다.' 
+        : '매치가 취소되었습니다. Back 주문은 유지됩니다.');
+      
+      // 주문 취소 후 이벤트 발생
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('exchangeOrderPlaced'));
       }
     } catch (error) {
       console.error('주문 취소 실패:', error);
+      // ✅ 실패 메시지 표시
+      alert(error instanceof Error ? error.message : '주문 취소 중 오류가 발생했습니다.');
     }
   };
 
@@ -1218,7 +1223,7 @@ function OrderHistoryPanel() {
                       }
                     })() && (
                       <button
-                        onClick={() => setShowCancelConfirm(order.id)}
+                        onClick={() => handleCancelOrder(order.id, order.side)}
                         disabled={loading}
                         className="flex items-center space-x-1 px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
                       >
@@ -1372,51 +1377,6 @@ function OrderHistoryPanel() {
                     </div>
                   )}
 
-                  {/* 취소 확인 모달 */}
-                  {showCancelConfirm === order.id && (
-                    <div className="mt-3 p-4 bg-red-50 border border-red-200 rounded-lg">
-                      <div className="flex items-center mb-3">
-                        <svg className="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                        </svg>
-                        <div className="text-sm font-medium text-red-800">
-                          {order.side === 'back' ? '주문 취소 확인' : '매치 취소 확인'}
-                        </div>
-                      </div>
-                      <div className="text-sm text-red-700 mb-4">
-                        {order.side === 'back' ? (
-                          <>
-                            정말로 이 주문을 취소하시겠습니까?<br/>
-                            {order.status === 'partially_matched' && (
-                              <>매칭된 Lay 주문도 함께 취소됩니다.<br/></>
-                            )}
-                            취소된 주문은 복구할 수 없습니다.
-                          </>
-                        ) : (
-                          <>
-                            정말로 이 매치를 취소하시겠습니까?<br/>
-                            Back 주문은 유지되고 매치만 취소됩니다.<br/>
-                            취소된 매치는 복구할 수 없습니다.
-                          </>
-                        )}
-                      </div>
-                      <div className="flex space-x-3">
-                        <button
-                          onClick={() => handleCancelOrder(order.id)}
-                          disabled={loading}
-                          className="flex-1 py-2 px-4 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
-                        >
-                          {loading ? '처리중...' : '확인'}
-                        </button>
-                        <button
-                          onClick={() => setShowCancelConfirm(null)}
-                          className="flex-1 py-2 px-4 bg-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-400 transition-colors"
-                        >
-                          취소
-                        </button>
-                      </div>
-                    </div>
-                  )}
                   </div>
                 </div>
               );
