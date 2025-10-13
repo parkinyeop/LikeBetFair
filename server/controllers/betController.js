@@ -340,8 +340,14 @@ export async function getBetHistory(req, res) {
     const userId = req.user.userId;
     console.log(`[getBetHistory] User ${userId} requesting bet history`);
     
+    // ✅ cancelled 상태 제외 (히스토리에 노출하지 않음)
     const bets = await Bet.findAll({
-      where: { userId },
+      where: { 
+        userId,
+        status: {
+          [Op.ne]: 'cancelled' // cancelled 상태 제외
+        }
+      },
       order: [['createdAt', 'DESC']]
     });
 
