@@ -816,20 +816,24 @@ class ExchangeSettlementService {
     // 🔧 정밀 계산 유틸리티를 사용한 잔고 업데이트 (부동 소수점 오차 방지)
     const currentBalance = parseFloat(user.balance);
 
-    // 🆕 수수료 계산 및 차감 (Lay 주문 승리 시에만)
+    // 🆕 수수료 계산 및 차감 (Lay 주문 승리 시에만, 상대 담보금에서만)
     let netAmount = amount;
     let commissionAmount = 0;
 
     // Back 주문은 승리 시에도 수수료 차감하지 않음, Lay 주문만 승리 시 수수료 차감
     if (amount > 0 && order.side === 'lay') { // Lay 주문 승리 시에만 수수료 차감
-      // 🆕 통합 수수료 계산 (정책 기반)
+      // 🔑 핵심: 수수료는 상대 담보금(backStakeAmount)에서만 차감
+      // Lay 담보금(layStakeAmount)은 전액 반환
+      const backStakeAmount = amount - (order.stakeAmount || 0); // 상대 Back 담보금
+      
+      // 🆕 통합 수수료 계산 (상대 담보금 기준)
       const commissionCalculation = await CommissionService.calculate({
-        winnings: amount + order.stakeAmount, // 총 당첨금 (수익 + 원금)
-        stake: order.stakeAmount,             // 베팅금
+        winnings: backStakeAmount, // 상대 담보금에서만 수수료 계산
+        stake: order.stakeAmount,  // 베팅금
         platform: 'exchange',
         user: user,
-        bet: { id: order.id, userId: order.userId }, // Exchange order를 bet으로 전달
-        policies: {} // 향후 프로모션 코드 등 추가 가능
+        bet: { id: order.id, userId: order.userId },
+        policies: {}
       });
 
       commissionAmount = commissionCalculation.commissionAmount;
@@ -840,10 +844,10 @@ class ExchangeSettlementService {
         orderId: order.id
       });
 
-      // 정밀 계산으로 수수료 차감
+      // 정밀 계산으로 수수료 차감 (상대 담보금에서만)
       netAmount = PrecisionCalculation.subtract(amount, commissionAmount);
 
-      console.log(`      💰 Lay 주문 수수료 계산 (정밀연산): 수익 ${amount}원, 수수료 ${commissionAmount}원 (${(commissionCalculation.appliedRate * 100).toFixed(2)}%), 실제 지급 ${netAmount}원`);
+      console.log(`      💰 Lay 주문 수수료 (상대 담보금 기준): 총 ${amount}원 (Lay담보 ${order.stakeAmount} + Back담보 ${backStakeAmount}), 수수료 ${commissionAmount}원 (Back담보의 ${(commissionCalculation.appliedRate * 100).toFixed(2)}%), 실제 지급 ${netAmount}원`);
     } else if (amount > 0 && order.side === 'back') {
       console.log(`      💰 Back 주문 승리: 수익 ${amount}원 (수수료 없음)`);
     }

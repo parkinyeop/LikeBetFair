@@ -673,15 +673,41 @@ class MultibetSettlementService {
       const profit = await this.calculateProfit(order, result);
       console.log(`⏱️ 수익 계산 완료: ${Date.now() - profitStartTime}ms`);
 
-      // 3단계: 잔액 업데이트 준비
+      // 3단계: 수수료 계산 (Lay 승리 시, 상대 담보금에서만)
+      let profitAmount = parseFloat(profit) || 0;
+      let commissionAmount = 0;
+      
+      if (profitAmount > 0 && order.side === 'lay' && result === 'won') {
+        // Lay 승리: 상대 Back 담보금에서만 수수료 차감
+        const layStake = order.stakeAmount || 0; // Lay 담보금
+        const backStake = profitAmount - layStake; // Back 담보금 (상대)
+        
+        if (backStake > 0) {
+          const CommissionService = (await import('./commissionService.js')).default;
+          const commissionCalculation = await CommissionService.calculate({
+            winnings: backStake, // 상대 담보금에서만 수수료 계산
+            stake: order.stakeAmount,
+            platform: 'exchange',
+            user: user,
+            bet: { id: order.id, userId: order.userId },
+            policies: {}
+          });
+          
+          commissionAmount = commissionCalculation.commissionAmount;
+          profitAmount -= commissionAmount; // 수수료 차감
+          
+          console.log(`💰 Lay 수수료 (상대 담보금 기준): Lay담보 ${layStake}원 (전액) + Back담보 ${backStake}원 - 수수료 ${commissionAmount}원 = ${profitAmount}원`);
+        }
+      }
+
+      // 4단계: 잔액 업데이트 준비
       const currentBalance = parseFloat(user.balance) || 0;
-      const profitAmount = parseFloat(profit) || 0;
       const newBalance = currentBalance + profitAmount;
 
-      // 4단계: 메모 생성 (미리 준비)
-      const memo = this.generatePaymentMemo(order, result, settlementResult, profit);
+      // 5단계: 메모 생성 (미리 준비)
+      const memo = this.generatePaymentMemo(order, result, settlementResult, profitAmount);
 
-      // 5단계: 데이터베이스 업데이트 (병렬 실행 + 성능 측정)
+      // 6단계: 데이터베이스 업데이트 (병렬 실행 + 성능 측정)
       const saveStartTime = Date.now();
       await Promise.all([
         user.update({ balance: newBalance }, { transaction }),
@@ -696,7 +722,7 @@ class MultibetSettlementService {
       ]);
       console.log(`⏱️ DB 저장 완료: ${Date.now() - saveStartTime}ms`);
       
-      // 6단계: 매치 상태 업데이트 (settled로 변경)
+      // 7단계: 매치 상태 업데이트 (settled로 변경)
       const ExchangeOrderMatch = (await import('../models/exchangeOrderMatchModel.js')).default;
       const matchUpdateStartTime = Date.now();
       const updatedMatches = await ExchangeOrderMatch.update(
@@ -716,6 +742,19 @@ class MultibetSettlementService {
         }
       );
       console.log(`⏱️ 매치 상태 업데이트 완료: ${updatedMatches[0]}개 (${Date.now() - matchUpdateStartTime}ms)`);
+      
+      // 8단계: 수수료 차감 기록 (Lay 승리 시)
+      if (commissionAmount > 0) {
+        await PaymentHistory.create({
+          userId: order.userId,
+          betId: `EXCHANGE_${order.id}`,
+          amount: -commissionAmount,
+          memo: `익스체인지 수수료 (상대 담보금 기준)`,
+          balanceAfter: newBalance,
+          paidAt: new Date()
+        }, { transaction });
+        console.log(`⏱️ 수수료 차감 기록 완료: -${commissionAmount}원`);
+      }
 
       const totalTime = Date.now() - paymentStartTime;
       console.log(`💰 결제 완료: ${currentBalance} → ${newBalance} (총 ${totalTime}ms)`);
