@@ -10,6 +10,7 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "cd server && node app.js",
     "dev:client": "npx next dev",
+    "dev:fresh": "rm -rf .next && npm run dev",
     "dev:watch": "concurrently \"npm run dev:server:watch\" \"npm run dev:client\"",
     "dev:server:watch": "cd server && nodemon app.js --watch . --ext js,json",
     "dev:restart": "npm run dev:stop && npm run dev",
