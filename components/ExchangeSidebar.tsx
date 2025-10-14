@@ -1088,8 +1088,9 @@ function OrderHistoryPanel() {
                     {(order as any).isMultibet && (order as any).selectionDetails && (order as any).selectionDetails.selections ? (
                       <div className="space-y-2">
                         {((order as any).selectionDetails.selections || []).map((selection: any, idx: number) => {
-                          const isOverUnder = selection.market === 'Over/Under' || selection.market === 'totals';
-                          const isHandicap = selection.market === 'Handicap' || selection.market === 'spreads';
+                          const market = selection.market || '';
+                          const isOverUnder = market === '총점' || market === 'Over/Under' || market === 'totals';
+                          const isHandicap = market === '핸디캡' || market === 'Handicap' || market === 'spreads';
                           
                           return (
                             <div key={idx} className="flex items-center justify-between text-sm">
@@ -1100,7 +1101,7 @@ function OrderHistoryPanel() {
                                   ) : isHandicap ? (
                                     selection.team
                                   ) : (
-                                    selection.team || selection.selection
+                                    `${selection.team || selection.selection} (Win)`
                                   )}
                                 </div>
                                 <div className="text-xs text-gray-500">
@@ -1138,7 +1139,15 @@ function OrderHistoryPanel() {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-bold text-gray-800">
-                            {order.selection || '선택된 팀'}
+                            {(() => {
+                              const market = order.market || '';
+                              const isOverUnder = market === '총점' || market === 'Over/Under' || market === 'totals';
+                              const isHandicap = market === '핸디캡' || market === 'Handicap' || market === 'spreads';
+                              const selection = order.selection || '선택된 팀';
+                              
+                              // 오버/언더나 핸디캡이 아니면 (Win) 표시
+                              return (isOverUnder || isHandicap) ? selection : `${selection} (Win)`;
+                            })()}
                           </span>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${sideInfo.bg} ${sideInfo.color}`}>
                             {sideInfo.text}
@@ -1293,11 +1302,6 @@ function OrderHistoryPanel() {
                           </div>
                           <div className="text-xs text-gray-500 mt-1">
                             <div>생성: {new Date(order.createdAt).toLocaleString('ko-KR')}</div>
-                            {order.status === 'settled' && (order as any).settledAt && (
-                              <div className="text-green-600 font-medium">
-                                정산: {new Date((order as any).settledAt).toLocaleString('ko-KR')}
-                              </div>
-                            )}
                           </div>
                         </div>
                         
@@ -1315,128 +1319,90 @@ function OrderHistoryPanel() {
                         {/* 2. 게임 결과 및 스코어 정보 */}
                         {/* 🆕 멀티배팅인 경우 각 경기별 결과 표시 */}
                         {(order as any).isMultibet && (order as any).multibetGameResults && (order as any).multibetGameResults.length > 0 ? (
-                          <div className="space-y-2">
-                            {(order as any).multibetGameResults.map((gameResult: any, idx: number) => {
-                              const isFinished = gameResult.status === 'finished';
-                              const isPending = gameResult.status === 'scheduled' || !gameResult.score;
-                              
-                              // 🆕 경기별 승패 판정
-                              const selectionInfo = (order as any).selectionDetails?.selections?.[idx];
-                              const gameWon = gameResult.result === 'won';
-                              const gameLost = gameResult.result === 'lost';
-                              const gameCancelled = gameResult.result === 'cancelled';
-                              
-                              if (isPending) return null;
-                              
-                              return (
-                                <div key={idx} className={`p-3 rounded-lg border ${
-                                  gameWon ? 'bg-green-50 border-green-200' :
-                                  gameLost ? 'bg-red-50 border-red-200' :
-                                  gameCancelled ? 'bg-gray-50 border-gray-200' :
-                                  'bg-blue-50 border-blue-200'
-                                }`}>
-                                  <div className="flex justify-between items-center mb-2">
-                                    <span className="text-xs text-gray-600">
-                                      경기 {idx + 1}: {gameResult.homeTeam} vs {gameResult.awayTeam}
-                                    </span>
-                                    <div className="flex items-center space-x-2">
-                                      {/* 🆕 승패 아이콘 */}
-                                      {gameWon && <span className="text-xs font-bold text-green-700">✅ 승</span>}
-                                      {gameLost && <span className="text-xs font-bold text-red-700">❌ 패</span>}
-                                      {gameCancelled && <span className="text-xs font-bold text-gray-700">🚫 취소</span>}
-                                      
-                                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                                        isFinished ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
-                                      }`}>
-                                        {isFinished ? '🏁 경기 완료' : '⏳ 경기 진행중'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  
-                                  {/* 스코어 표시 */}
-                                  {(() => {
-                                    const parsed = parseScore(
-                                      gameResult.score,
-                                      gameResult.homeTeam,
-                                      gameResult.awayTeam
-                                    );
-                                    
-                                    if (!parsed.isValid) return null;
-                                    
-                                    return (
-                                      <div className="text-xs text-gray-700 mt-1">
-                                        <div className="flex justify-between items-center">
-                                          <span>{gameResult.homeTeam}</span>
-                                          <span className="font-bold text-sm">{parsed.home}</span>
-                                          <span className="text-gray-400">:</span>
-                                          <span className="font-bold text-sm">{parsed.away}</span>
-                                          <span>{gameResult.awayTeam}</span>
-                                        </div>
+                          <div className="mb-3">
+                            <div className="text-sm font-medium text-gray-700 mb-2">📊 경기 결과</div>
+                            <div className="space-y-2">
+                              {(order as any).multibetGameResults.map((gameResult: any, idx: number) => {
+                                const isPending = gameResult.status === 'scheduled' || !gameResult.score;
+                                
+                                // 🆕 경기별 승패 판정
+                                const gameWon = gameResult.result === 'won';
+                                const gameLost = gameResult.result === 'lost';
+                                
+                                if (isPending) return null;
+                                
+                                return (
+                                  <div key={idx} className="border-l-2 border-gray-200 pl-3 py-1">
+                                    {(gameWon || gameLost) && (
+                                      <div className="flex items-center text-sm mb-1">
+                                        {/* 승패 아이콘 */}
+                                        {gameWon && <span className="mr-2 text-green-600">✔️</span>}
+                                        {gameLost && <span className="mr-2 text-red-500">❌</span>}
+                                        <span className={`text-xs font-medium ${
+                                          gameWon ? 'text-green-600' : 'text-red-500'
+                                        }`}>
+                                          {gameWon ? 'Won' : 'Lost'}
+                                        </span>
                                       </div>
-                                    );
-                                  })()}
-                                  
-                                  {gameResult.status && (
-                                    <div className="text-xs text-gray-500 mt-1">
-                                      <span className="font-medium">결과:</span> {gameResult.status}
+                                    )}
+                                    {/* 경기명 */}
+                                    <div className="text-xs text-gray-500">
+                                      {gameResult.homeTeam} vs {gameResult.awayTeam}
                                     </div>
-                                  )}
-                                </div>
-                              );
-                            })}
+                                    {/* 스코어 표시 */}
+                                    {(() => {
+                                      const parsed = parseScore(
+                                        gameResult.score,
+                                        gameResult.homeTeam,
+                                        gameResult.awayTeam
+                                      );
+                                      
+                                      if (!parsed.isValid) return null;
+                                      
+                                      return (
+                                        <div className="text-xs text-blue-600 mt-1">
+                                          {gameResult.homeTeam} {parsed.home} : {parsed.away} {gameResult.awayTeam}
+                                        </div>
+                                      );
+                                    })()}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         ) :
-                        /* 단일 배팅인 경우 기존 로직 유지 */
+                        /* 단일 배팅 경기 결과 - 간결하게 */
                         (order as any).gameResult && (() => {
                           const gameResult = (order as any).gameResult;
-                          const isFinished = gameResult.status === 'finished';
                           const isPending = gameResult.status === 'scheduled' || !gameResult.score;
                           
-                          // 스코어가 없거나 scheduled 상태면 표시하지 않음
                           if (isPending) return null;
                           
                           return (
-                            <div className={`p-3 rounded-lg border ${
-                              isFinished ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'
-                            }`}>
-                              <div className="flex justify-between items-center mb-2">
-                                <span className="text-xs text-gray-600">경기 결과</span>
-                                <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                                  isFinished ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
-                                }`}>
-                                  {isFinished ? '🏁 경기 완료' : '⏳ 경기 진행중'}
-                                </span>
-                              </div>
-                              
-                              {/* 스코어 표시 - 중앙화된 파싱 로직 사용 */}
-                              {(() => {
-                                const parsed = parseScore(
-                                  gameResult.score,
-                                  gameResult.homeTeam,
-                                  gameResult.awayTeam
-                                );
-                                
-                                if (!parsed.isValid) return null;
-                                
-                                return (
-                                  <div className="text-xs text-gray-700 mt-1">
-                                    <div className="flex justify-between items-center">
-                                      <span>{gameResult.homeTeam || 'Home'}</span>
-                                      <span className="font-bold text-sm">{parsed.home}</span>
-                                      <span className="text-gray-400">:</span>
-                                      <span className="font-bold text-sm">{parsed.away}</span>
-                                      <span>{gameResult.awayTeam || 'Away'}</span>
-                                    </div>
-                                  </div>
-                                );
-                              })()}
-                              
-                              {/* 경기 결과 정보 */}
-                              {gameResult.status && (
-                                <div className="text-xs text-gray-500 mt-1">
-                                  <span className="font-medium">결과:</span> {gameResult.status}
+                            <div className="mb-3">
+                              <div className="text-sm font-medium text-gray-700 mb-2">📊 경기 결과</div>
+                              <div className="border-l-2 border-gray-200 pl-3 py-1">
+                                {/* 경기명 */}
+                                <div className="text-xs text-gray-500">
+                                  {gameResult.homeTeam} vs {gameResult.awayTeam}
                                 </div>
-                              )}
+                                {/* 스코어 표시 */}
+                                {(() => {
+                                  const parsed = parseScore(
+                                    gameResult.score,
+                                    gameResult.homeTeam,
+                                    gameResult.awayTeam
+                                  );
+                                  
+                                  if (!parsed.isValid) return null;
+                                  
+                                  return (
+                                    <div className="text-xs text-blue-600 mt-1">
+                                      {gameResult.homeTeam} {parsed.home} : {parsed.away} {gameResult.awayTeam}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
                             </div>
                           );
                         })()}
@@ -1534,12 +1500,6 @@ function OrderHistoryPanel() {
                               </div>
                               
                               <div className="space-y-1">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-xs text-gray-500">베팅액</span>
-                                  <span className="text-xs font-medium text-gray-700">
-                                    {parseFloat(String(stakeAmount)).toLocaleString()}원
-                                  </span>
-                                </div>
                                 <div className="flex justify-between items-center">
                                   <span className="text-xs text-gray-500">정산 손익</span>
                                   <span className={`text-xs font-bold ${
