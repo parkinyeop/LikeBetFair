@@ -1304,7 +1304,65 @@ function OrderHistoryPanel() {
                         
                         
                         {/* 2. 게임 결과 및 스코어 정보 */}
-                        {(order as any).gameResult && (() => {
+                        {/* 🆕 멀티배팅인 경우 각 경기별 결과 표시 */}
+                        {(order as any).isMultibet && (order as any).multibetGameResults && (order as any).multibetGameResults.length > 0 ? (
+                          <div className="space-y-2">
+                            {(order as any).multibetGameResults.map((gameResult: any, idx: number) => {
+                              const isFinished = gameResult.status === 'finished';
+                              const isPending = gameResult.status === 'scheduled' || !gameResult.score;
+                              
+                              if (isPending) return null;
+                              
+                              return (
+                                <div key={idx} className={`p-3 rounded-lg border ${
+                                  isFinished ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'
+                                }`}>
+                                  <div className="flex justify-between items-center mb-2">
+                                    <span className="text-xs text-gray-600">
+                                      경기 {idx + 1}: {gameResult.homeTeam} vs {gameResult.awayTeam}
+                                    </span>
+                                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                                      isFinished ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
+                                    }`}>
+                                      {isFinished ? '🏁 경기 완료' : '⏳ 경기 진행중'}
+                                    </span>
+                                  </div>
+                                  
+                                  {/* 스코어 표시 */}
+                                  {(() => {
+                                    const parsed = parseScore(
+                                      gameResult.score,
+                                      gameResult.homeTeam,
+                                      gameResult.awayTeam
+                                    );
+                                    
+                                    if (!parsed.isValid) return null;
+                                    
+                                    return (
+                                      <div className="text-xs text-gray-700 mt-1">
+                                        <div className="flex justify-between items-center">
+                                          <span>{gameResult.homeTeam}</span>
+                                          <span className="font-bold text-sm">{parsed.home}</span>
+                                          <span className="text-gray-400">:</span>
+                                          <span className="font-bold text-sm">{parsed.away}</span>
+                                          <span>{gameResult.awayTeam}</span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
+                                  
+                                  {gameResult.status && (
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      <span className="font-medium">결과:</span> {gameResult.status}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) :
+                        /* 단일 배팅인 경우 기존 로직 유지 */
+                        (order as any).gameResult && (() => {
                           const gameResult = (order as any).gameResult;
                           const isFinished = gameResult.status === 'finished';
                           const isPending = gameResult.status === 'scheduled' || !gameResult.score;

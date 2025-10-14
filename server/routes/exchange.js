@@ -1389,7 +1389,63 @@ router.get('/orders', verifyToken, async (req, res) => {
       
         // 🆕 게임 결과 정보 조회
         let gameResult = null;
-        if (orderData.homeTeam && orderData.awayTeam && orderData.commenceTime) {
+        let multibetGameResults = null; // 🆕 멀티배팅 경기 결과 배열
+        
+        // 🆕 멀티배팅인 경우 각 경기의 결과를 조회
+        if (orderData.isMultibet && orderData.selectionDetails && orderData.selectionDetails.selections) {
+          const config = getLocationConfig('exchangeRoutes');
+          multibetGameResults = await Promise.all(
+            orderData.selectionDetails.selections.map(async (selection) => {
+              if (!selection.homeTeam || !selection.awayTeam || !selection.commenceTime) {
+                return null;
+              }
+              
+              try {
+                let result = null;
+                if (config.FEATURE_FLAGS?.USE_CENTRALIZED_QUERY) {
+                  result = await GameResultQuery.findByTeamsAndTime(
+                    selection.homeTeam,
+                    selection.awayTeam,
+                    selection.commenceTime,
+                    'exchangeRoutes'
+                  );
+                } else {
+                  const GameResult = (await import('../models/gameResultModel.js')).default;
+                  result = await GameResult.findOne({
+                    where: {
+                      homeTeam: selection.homeTeam,
+                      awayTeam: selection.awayTeam,
+                      commenceTime: new Date(selection.commenceTime)
+                    }
+                  });
+                }
+                
+                if (result) {
+                  return {
+                    score: result.score,
+                    status: result.status,
+                    result: result.status,
+                    homeTeam: result.homeTeam,
+                    awayTeam: result.awayTeam,
+                    updatedAt: result.updatedAt,
+                    // 어떤 경기인지 식별하기 위한 정보
+                    selectionHomeTeam: selection.homeTeam,
+                    selectionAwayTeam: selection.awayTeam
+                  };
+                }
+                return null;
+              } catch (error) {
+                console.log(`멀티배팅 경기 결과 조회 오류 (${selection.homeTeam} vs ${selection.awayTeam}):`, error.message);
+                return null;
+              }
+            })
+          );
+          
+          // null 제거
+          multibetGameResults = multibetGameResults.filter(result => result !== null);
+        }
+        // 단일 배팅인 경우 기존 로직 유지
+        else if (orderData.homeTeam && orderData.awayTeam && orderData.commenceTime) {
           try {
             // 🚀 중앙화된 경기 결과 조회 사용
             const config = getLocationConfig('exchangeRoutes');
@@ -1443,7 +1499,8 @@ router.get('/orders', verifyToken, async (req, res) => {
         price: displayPrice, // 사용자에게 표시할 환수율 적용된 배당율
         originalPrice: orderData.price, // 원본 배당율 보존
         displayAmount: displayAmount, // ✅ 매칭할 사람이 낼 금액
-        gameResult: gameResult, // 🆕 게임 결과 정보 추가
+        gameResult: gameResult, // 🆕 게임 결과 정보 추가 (단일 배팅용)
+        multibetGameResults: multibetGameResults, // 🆕 멀티배팅 경기 결과 배열
         // ✅ 멀티배팅 필드 추가
         isMultibet: order.isMultibet || false,
         totalOdds: order.totalOdds,

@@ -323,7 +323,7 @@ function MyBetsPanel() {
                   
                   {/* 접힘 상태에서 배팅금액과 합산배당율 정보 표시 */}
                   {!isOpen && (
-                    <div className="mt-3 pt-3 border-t border-gray-200">
+                    <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
                       <div className="flex justify-between items-center text-sm">
                         <div className="flex items-center space-x-4">
                           <span className="text-gray-600">
@@ -335,6 +335,63 @@ function MyBetsPanel() {
                         </div>
                         <button className="px-2 py-1 text-xs border rounded text-blue-600 border-blue-300 hover:bg-blue-50" onClick={e => { e.stopPropagation(); toggleBet(bet.id); }}>{isOpen ? 'Collapse ▲' : 'Expand ▼'}</button>
                       </div>
+                      {/* 🆕 접힘 상태에서도 취소 버튼 표시 */}
+                      {bet.status === 'pending' && Array.isArray(bet.selections) && bet.selections.every((sel: any) => sel.result === 'pending' || !sel.result) && (
+                        <div className="flex justify-end">
+                          <button
+                            className="px-3 py-1.5 text-xs border border-red-500 text-red-500 rounded hover:bg-red-500 hover:text-white transition-colors"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              console.log('[배팅취소] 버튼 클릭됨:', bet.id);
+                              if (!window.confirm('Are you sure you want to cancel this bet?')) {
+                                console.log('[배팅취소] 사용자가 취소함');
+                                return;
+                              }
+                              
+                              // API URL 동적 설정
+                              const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
+                                            (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+                                             ? 'buildApiUrl' 
+                                             : 'https://likebetfair.onrender.com');
+                              
+                              console.log('[배팅취소] API 요청 시작:', `${apiUrl}/api/bet/${bet.id}/cancel`);
+                              console.log('[배팅취소] 토큰 존재:', !!token);
+                              
+                              const res = await fetch(`${apiUrl}/api/bet/${bet.id}/cancel`, {
+                                method: 'POST',
+                                headers: { 
+                                  'x-auth-token': token || '',
+                                  'Content-Type': 'application/json'
+                                },
+                              });
+                              
+                              console.log('[배팅취소] 응답 상태:', res.status, res.statusText);
+                              
+                              if (res.ok) {
+                                const data = await res.json();
+                                console.log('[배팅취소] 성공 응답:', data);
+                                alert('Bet has been cancelled.');
+                                if (data.balance !== undefined) setBalance(Number(data.balance));
+                                setBets((prev: any[]) => prev.map(b => b.id === bet.id ? { ...b, status: 'cancelled' } : b));
+                                window.dispatchEvent(new Event('betCancelled'));
+                                forceRefreshBalance(); // 잔액 새로고침
+                              } else {
+                                const errorData = await res.json().catch(() => ({}));
+                                console.error('[배팅취소] 오류 응답:', errorData);
+                                alert(errorData.message || 'Failed to cancel bet.');
+                              }
+                            }}
+                            disabled={bet.status === 'cancelled' || bet.selections.some((sel: any) => {
+                              if (!sel.commence_time) return false;
+                              // 경기 시작 10분 전까지만 취소 가능
+                              const gameTime = new Date(sel.commence_time);
+                              return gameTime <= new Date(Date.now() + 10 * 60 * 1000);
+                            })}
+                          >
+                            Cancel Bet
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                   {/* 펼친 상태: 배팅금, 배당율, 예상수익 */}
