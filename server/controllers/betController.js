@@ -13,6 +13,7 @@ import { getLocationConfig } from '../config/gameResultQuery.js';
 const sequelize = createScriptSequelize();
 import { Op } from 'sequelize';
 import BettingAmountSettingsService from '../services/bettingAmountSettingsService.js';
+import balanceService from '../services/balanceService.js';
 
 export async function placeBet(req, res) {
   try {
@@ -314,21 +315,38 @@ export async function placeBet(req, res) {
     
     console.log('✅ [PlaceBet] selections 데이터 검증 완료:', normalizedSelections.length);
     
-    const bet = await Bet.create({
-      userId,
-      selections: normalizedSelections, // ✅ 정규화된 데이터 저장
-      stake,
-      totalOdds,
-      potentialWinnings,
-      status: 'pending'
-    });
+    // ✅ 원자적 트랜잭션: Bet 생성 + 잔액 차감을 하나의 트랜잭션으로 처리
+    const transaction = await sequelize.transaction();
+    try {
+      // 1. Bet 생성
+      const bet = await Bet.create({
+        userId,
+        selections: normalizedSelections, // ✅ 정규화된 데이터 저장
+        stake,
+        totalOdds,
+        potentialWinnings,
+        status: 'pending'
+      }, { transaction });
 
-    // Update user balance and add bet
-    user.balance -= stake;
-    await user.save();
+      // 2. 잔액 차감 (PaymentHistory 자동 기록)
+      await balanceService.deductBalance(
+        userId,
+        stake,
+        `스포츠북 베팅 - ${bet.id}`,
+        bet.id,
+        transaction
+      );
 
-    // 베팅 정보와 갱신된 잔액을 함께 반환
-    res.status(201).json({ bet, balance: user.balance });
+      // 3. 트랜잭션 커밋
+      await transaction.commit();
+      
+      // 베팅 정보와 갱신된 잔액을 함께 반환
+      const updatedUser = await User.findByPk(userId);
+      res.status(201).json({ bet, balance: updatedUser.balance });
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
