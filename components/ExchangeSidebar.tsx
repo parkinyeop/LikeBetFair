@@ -1236,8 +1236,12 @@ function OrderHistoryPanel() {
                         const actualProfit = (order as any).actualProfit;
                         const hasProfit = actualProfit !== null && actualProfit !== undefined;
                         const profit = hasProfit ? parseFloat(String(actualProfit)) : 0;
+                        const stakeAmount = (order as any).stakeAmount || order.amount;
+                        
+                        // ✅ 익스체인지 정산 판정 (담보금 미리 차감 방식)
                         const isWin = profit > 0;
-                        const isLoss = profit < 0;
+                        const isRefund = Math.abs(profit - stakeAmount) < 1;
+                        const isLoss = profit === 0 && !isRefund; // 0원 = 패배
                         
                         return (
                           <div className="flex items-center space-x-2">
@@ -1246,15 +1250,8 @@ function OrderHistoryPanel() {
                               isLoss ? 'bg-red-100 text-red-700' :
                               'bg-gray-100 text-gray-700'
                             }`}>
-                              {isWin ? '✅ 승리' : isLoss ? '❌ 패배' : '✅ 정산완료'}
+                              {isWin ? '✅ 승리' : isLoss ? '❌ 패배' : '✅ 환불'}
                             </span>
-                            {hasProfit && profit !== 0 && (
-                              <span className={`px-2 py-1 text-xs font-bold rounded ${
-                                isWin ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-                              }`}>
-                                {isWin ? '+' : ''}{profit.toLocaleString()}원
-                              </span>
-                            )}
                           </div>
                         );
                       })()}
@@ -1345,10 +1342,6 @@ function OrderHistoryPanel() {
                                         </span>
                                       </div>
                                     )}
-                                    {/* 경기명 */}
-                                    <div className="text-xs text-gray-500">
-                                      {gameResult.homeTeam} vs {gameResult.awayTeam}
-                                    </div>
                                     {/* 스코어 표시 */}
                                     {(() => {
                                       const parsed = parseScore(
@@ -1382,10 +1375,6 @@ function OrderHistoryPanel() {
                             <div className="mb-3">
                               <div className="text-sm font-medium text-gray-700 mb-2">📊 경기 결과</div>
                               <div className="border-l-2 border-gray-200 pl-3 py-1">
-                                {/* 경기명 */}
-                                <div className="text-xs text-gray-500">
-                                  {gameResult.homeTeam} vs {gameResult.awayTeam}
-                                </div>
                                 {/* 스코어 표시 */}
                                 {(() => {
                                   const parsed = parseScore(
@@ -1508,14 +1497,6 @@ function OrderHistoryPanel() {
                                     {isWin ? '+' : ''}{actualProfit.toLocaleString()}원
                                   </span>
                                 </div>
-                                {isWin && (
-                                  <div className="flex justify-between items-center pt-1 border-t border-green-200">
-                                    <span className="text-xs text-gray-500">총 수령액</span>
-                                    <span className="text-xs font-bold text-green-700">
-                                      {(parseFloat(String(stakeAmount)) + actualProfit).toLocaleString()}원
-                                    </span>
-                                  </div>
-                                )}
                               </div>
                             </div>
                           );
