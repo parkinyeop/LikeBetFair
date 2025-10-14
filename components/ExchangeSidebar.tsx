@@ -191,15 +191,27 @@ function OrderPanel() {
   // 통계 계산
   const stats = React.useMemo(() => {
     if (!userOrders || !Array.isArray(userOrders)) {
-      return { total: 0, open: 0, matched: 0, totalAmount: 0 };
+      return { total: 0, open: 0, matched: 0, settled: 0, totalAmount: 0, totalProfit: 0 };
     }
     
     const total = userOrders.length;
     const open = userOrders.filter(order => order.status === 'open').length;
     const matched = userOrders.filter(order => order.status === 'matched').length;
+    const settled = userOrders.filter(order => order.status === 'settled').length;
     const totalAmount = userOrders.reduce((sum, order) => sum + order.amount, 0);
+    
+    // 정산 완료된 주문의 총 수익 계산
+    const totalProfit = userOrders
+      .filter(order => order.status === 'settled')
+      .reduce((sum, order) => {
+        const actualProfit = (order as any).actualProfit;
+        if (actualProfit !== null && actualProfit !== undefined) {
+          return sum + parseFloat(String(actualProfit));
+        }
+        return sum;
+      }, 0);
 
-    return { total, open, matched, totalAmount };
+    return { total, open, matched, settled, totalAmount, totalProfit };
   }, [userOrders]);
 
   const handleOrder = async () => {
@@ -1211,11 +1223,32 @@ function OrderHistoryPanel() {
                         </svg>
                         <span>{selectedOrderId === order.id ? '상세 숨기기' : '상세 보기'}</span>
                       </button>
-                      {order.status === 'settled' && (
-                        <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
-                          ✅ 정산완료
-                        </span>
-                      )}
+                      {order.status === 'settled' && (() => {
+                        const actualProfit = (order as any).actualProfit;
+                        const hasProfit = actualProfit !== null && actualProfit !== undefined;
+                        const profit = hasProfit ? parseFloat(String(actualProfit)) : 0;
+                        const isWin = profit > 0;
+                        const isLoss = profit < 0;
+                        
+                        return (
+                          <div className="flex items-center space-x-2">
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                              isWin ? 'bg-green-100 text-green-700' :
+                              isLoss ? 'bg-red-100 text-red-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {isWin ? '✅ 승리' : isLoss ? '❌ 패배' : '✅ 정산완료'}
+                            </span>
+                            {hasProfit && profit !== 0 && (
+                              <span className={`px-2 py-1 text-xs font-bold rounded ${
+                                isWin ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                              }`}>
+                                {isWin ? '+' : ''}{profit.toLocaleString()}원
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                     
                     {/* 🆕 취소 가능 조건: Back과 Lay 구분 + 경기시간 10분 전까지 */}
@@ -1382,6 +1415,59 @@ function OrderHistoryPanel() {
                                   {matchedOrder === undefined ? '매칭된 주문 정보를 로딩 중...' : '매칭된 주문 정보를 찾을 수 없습니다'}
                                 </div>
                               )}
+                            </div>
+                          );
+                        })()}
+
+                        {/* 4. 정산 결과 정보 */}
+                        {order.status === 'settled' && (order as any).actualProfit !== null && (order as any).actualProfit !== undefined && (() => {
+                          const actualProfit = parseFloat(String((order as any).actualProfit));
+                          const stakeAmount = (order as any).stakeAmount || order.amount;
+                          const isWin = actualProfit > 0;
+                          const isLoss = actualProfit < 0;
+                          const isDraw = actualProfit === 0;
+                          
+                          return (
+                            <div className={`p-3 rounded-lg border ${
+                              isWin ? 'bg-green-50 border-green-200' :
+                              isLoss ? 'bg-red-50 border-red-200' :
+                              'bg-gray-50 border-gray-200'
+                            }`}>
+                              <div className="flex justify-between items-center mb-2">
+                                <span className="text-xs text-gray-600">정산 결과</span>
+                                <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                                  isWin ? 'bg-green-100 text-green-700' :
+                                  isLoss ? 'bg-red-100 text-red-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {isWin ? '✅ 승리' : isLoss ? '❌ 패배' : '➖ 무승부'}
+                                </span>
+                              </div>
+                              
+                              <div className="space-y-1">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-xs text-gray-500">베팅액</span>
+                                  <span className="text-xs font-medium text-gray-700">
+                                    {parseFloat(String(stakeAmount)).toLocaleString()}원
+                                  </span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-xs text-gray-500">정산 손익</span>
+                                  <span className={`text-xs font-bold ${
+                                    isWin ? 'text-green-600' : isLoss ? 'text-red-600' : 'text-gray-600'
+                                  }`}>
+                                    {isWin ? '+' : ''}{actualProfit.toLocaleString()}원
+                                  </span>
+                                </div>
+                                {isWin && (
+                                  <div className="flex justify-between items-center pt-1 border-t border-green-200">
+                                    <span className="text-xs text-gray-500">총 수령액</span>
+                                    <span className="text-xs font-bold text-green-700">
+                                      {(parseFloat(String(stakeAmount)) + actualProfit).toLocaleString()}원
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           );
                         })()}
