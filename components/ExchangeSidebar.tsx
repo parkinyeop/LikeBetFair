@@ -1303,6 +1303,15 @@ function OrderHistoryPanel() {
                         
                         
                         
+                        {/* 🆕 정산 대기 중 안내 */}
+                        {order.status !== 'settled' && (order as any).isMultibet && (
+                          <div className="p-3 rounded-lg bg-yellow-50 border border-yellow-200">
+                            <div className="text-sm font-medium text-yellow-700">
+                              ⏳ 모든 경기가 완료되면 자동으로 정산됩니다.
+                            </div>
+                          </div>
+                        )}
+                        
                         {/* 2. 게임 결과 및 스코어 정보 */}
                         {/* 🆕 멀티배팅인 경우 각 경기별 결과 표시 */}
                         {(order as any).isMultibet && (order as any).multibetGameResults && (order as any).multibetGameResults.length > 0 ? (
@@ -1311,21 +1320,37 @@ function OrderHistoryPanel() {
                               const isFinished = gameResult.status === 'finished';
                               const isPending = gameResult.status === 'scheduled' || !gameResult.score;
                               
+                              // 🆕 경기별 승패 판정
+                              const selectionInfo = (order as any).selectionDetails?.selections?.[idx];
+                              const gameWon = gameResult.result === 'won';
+                              const gameLost = gameResult.result === 'lost';
+                              const gameCancelled = gameResult.result === 'cancelled';
+                              
                               if (isPending) return null;
                               
                               return (
                                 <div key={idx} className={`p-3 rounded-lg border ${
-                                  isFinished ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'
+                                  gameWon ? 'bg-green-50 border-green-200' :
+                                  gameLost ? 'bg-red-50 border-red-200' :
+                                  gameCancelled ? 'bg-gray-50 border-gray-200' :
+                                  'bg-blue-50 border-blue-200'
                                 }`}>
                                   <div className="flex justify-between items-center mb-2">
                                     <span className="text-xs text-gray-600">
                                       경기 {idx + 1}: {gameResult.homeTeam} vs {gameResult.awayTeam}
                                     </span>
-                                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                                      isFinished ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
-                                    }`}>
-                                      {isFinished ? '🏁 경기 완료' : '⏳ 경기 진행중'}
-                                    </span>
+                                    <div className="flex items-center space-x-2">
+                                      {/* 🆕 승패 아이콘 */}
+                                      {gameWon && <span className="text-xs font-bold text-green-700">✅ 승</span>}
+                                      {gameLost && <span className="text-xs font-bold text-red-700">❌ 패</span>}
+                                      {gameCancelled && <span className="text-xs font-bold text-gray-700">🚫 취소</span>}
+                                      
+                                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                                        isFinished ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
+                                      }`}>
+                                        {isFinished ? '🏁 경기 완료' : '⏳ 경기 진행중'}
+                                      </span>
+                                    </div>
                                   </div>
                                   
                                   {/* 스코어 표시 */}
@@ -1481,9 +1506,15 @@ function OrderHistoryPanel() {
                         {order.status === 'settled' && (order as any).actualProfit !== null && (order as any).actualProfit !== undefined && (() => {
                           const actualProfit = parseFloat(String((order as any).actualProfit));
                           const stakeAmount = (order as any).stakeAmount || order.amount;
+                          
+                          // ✅ 익스체인지 정산 판정 (담보금 미리 차감 방식)
+                          // - actualProfit > 0: 승리 (담보금 + 수익 반환)
+                          // - actualProfit = 0: 패배 (담보금 못 돌려받음)
+                          // - actualProfit = stakeAmount: 환불 (담보금만 반환)
                           const isWin = actualProfit > 0;
-                          const isLoss = actualProfit < 0;
-                          const isDraw = actualProfit === 0;
+                          const isRefund = Math.abs(actualProfit - stakeAmount) < 1; // 환불 (거의 없음)
+                          const isLoss = actualProfit === 0 && !isRefund; // 0원 = 패배
+                          const isDraw = false; // 익스체인지에는 무승부 없음
                           
                           return (
                             <div className={`p-3 rounded-lg border ${

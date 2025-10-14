@@ -401,50 +401,30 @@ function MyBetsPanel() {
                         <span className="text-sm font-bold text-gray-800">상세 정보</span>
                         <button className="px-2 py-1 text-xs border rounded text-blue-600 border-blue-300 hover:bg-blue-50" onClick={e => { e.stopPropagation(); toggleBet(bet.id); }}>접기 ▲</button>
                       </div>
-                                {/* 경기 정보 표시 */}
+                                {/* 경기 정보 표시 - 경기명과 경기시간만 */}
                                 {Array.isArray(bet.selections) && (
                                   <div className="mb-3">
                                     <div className="text-sm font-medium text-gray-700 mb-2">🏟️ 경기 정보</div>
                                     <div className="space-y-2">
                                       {bet.selections.map((sel: any, idx: number) => {
-                                        const isOverUnder = sel.market === 'Over/Under' || sel.market === 'totals';
-                                        const isHandicap = sel.market === 'Handicap' || sel.market === 'spreads';
-                                        
                                         return (
                                           <div key={idx} className="border-l-2 border-gray-200 pl-3 py-1">
-                                            <div className="flex items-center justify-between text-sm">
-                                              <div className="flex items-center">
-                                                <div className="flex flex-col">
-                                                  <span className="font-medium text-gray-800">
-                                                    {isOverUnder ? (
-                                                      normalizeOverUnderOption(sel.option || sel.team, sel.desc, sel.point)
-                                                    ) : isHandicap ? (
-                                                      sel.team
-                                                    ) : (
-                                                      sel.team || sel.selection
-                                                    )}
-                                                  </span>
-                                                  {/* 경기명 표시 */}
-                                                  <span className="text-xs text-gray-500">
-                                                    {sel.desc || `${sel.team} Game`}
-                                                  </span>
-                                                  {/* 경기 시간 표시 */}
-                                                  {sel.commence_time && (
-                                                    <span className="text-xs text-blue-600 font-medium">
-                                                      🕐 {new Date(sel.commence_time).toLocaleString('ko-KR', { 
-                                                        month: '2-digit', 
-                                                        day: '2-digit', 
-                                                        hour: '2-digit', 
-                                                        minute: '2-digit' 
-                                                      })}
-                                                    </span>
-                                                  )}
-                                                  <span className="text-xs text-gray-400">
-                                                    {sel.market || '승패'}
-                                                  </span>
-                                                </div>
-                                                <span className="ml-2 text-gray-600">@ {Number(sel.odds).toFixed(2)}</span>
-                                              </div>
+                                            <div className="flex flex-col text-sm">
+                                              {/* 경기명 */}
+                                              <span className="text-xs text-gray-500">
+                                                {sel.desc || `${sel.team} Game`}
+                                              </span>
+                                              {/* 경기 시간 */}
+                                              {sel.commence_time && (
+                                                <span className="text-xs text-blue-600 font-medium">
+                                                  🕐 {new Date(sel.commence_time).toLocaleString('ko-KR', { 
+                                                    month: '2-digit', 
+                                                    day: '2-digit', 
+                                                    hour: '2-digit', 
+                                                    minute: '2-digit' 
+                                                  })}
+                                                </span>
+                                              )}
                                             </div>
                                           </div>
                                         );
@@ -515,25 +495,15 @@ function MyBetsPanel() {
                             else if (actualResult === 'cancelled') { icon = '🚫'; color = 'text-orange-500'; label = 'Game Cancelled'; }
 else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; label = 'Draw'; }
                             
-                            const isOverUnder = sel.market === 'Over/Under' || sel.market === 'totals';
-                            const isHandicap = sel.market === 'Handicap' || sel.market === 'spreads';
-                            const ouType = normalizeOverUnderOption(sel.option || sel.team, sel.desc, sel.point);
-                            
                             return (
                               <div key={idx} className="border-l-2 border-gray-200 pl-3 py-1">
                                 <div className="flex items-center justify-between text-sm">
                                   <div className="flex items-center">
                                     <span className={`mr-2 ${color}`}>{icon}</span>
-                                    <div className="flex flex-col">
-                                      <span className={`font-medium ${color}`}>
-                                        {isOverUnder ? ouType : sel.team}
-                                      </span>
-                                      <span className="text-xs text-gray-500">@ {Number(sel.odds).toFixed(2)}</span>
-                                    </div>
+                                    <span className={`text-xs font-medium ${color}`}>{label}</span>
                                   </div>
-                                  <span className={`text-xs font-medium ${color}`}>{label}</span>
                                 </div>
-                                {/* 경기 결과 스코어 표시 - 중앙화된 파싱 로직 사용 */}
+                                {/* 경기 결과 스코어 표시 */}
                                 {(() => {
                                   const parsed = parseScore(
                                     sel.gameResult?.score,
@@ -568,62 +538,6 @@ else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; la
                       <div className="flex justify-between items-center">
                         <span>예상수익:</span>
                         <b className="text-black">{Math.floor(Number(bet.stake) * Number(bet.totalOdds)).toLocaleString()}원</b>
-                      </div>
-                      <div className="flex items-center justify-end pt-1">
-                        {/* 배팅 취소 버튼 - 정상 조건으로 복원 */}
-                        {bet.status === 'pending' && Array.isArray(bet.selections) && bet.selections.every((sel: any) => sel.result === 'pending' || !sel.result) && (
-                          <button
-                            className="px-2 py-0.5 text-xs border border-red-500 text-red-500 rounded hover:bg-red-500 hover:text-white transition-colors ml-1"
-                            onClick={async () => {
-                              console.log('[배팅취소] 버튼 클릭됨:', bet.id);
-                                                          if (!window.confirm('Are you sure you want to cancel this bet?')) {
-                              console.log('[배팅취소] 사용자가 취소함');
-                                return;
-                              }
-                              
-                              // API URL 동적 설정
-                              const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
-                                            (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                                             ? 'buildApiUrl' 
-                                             : 'https://likebetfair.onrender.com');
-                              
-                              console.log('[배팅취소] API 요청 시작:', `${apiUrl}/api/bet/${bet.id}/cancel`);
-                              console.log('[배팅취소] 토큰 존재:', !!token);
-                              
-                              const res = await fetch(`${apiUrl}/api/bet/${bet.id}/cancel`, {
-                                method: 'POST',
-                                headers: { 
-                                  'x-auth-token': token || '',
-                                  'Content-Type': 'application/json'
-                                },
-                              });
-                              
-                              console.log('[배팅취소] 응답 상태:', res.status, res.statusText);
-                              
-                              if (res.ok) {
-                                const data = await res.json();
-                                console.log('[배팅취소] 성공 응답:', data);
-                                alert('Bet has been cancelled.');
-                                if (data.balance !== undefined) setBalance(Number(data.balance));
-                                setBets((prev: any[]) => prev.map(b => b.id === bet.id ? { ...b, status: 'cancelled' } : b));
-                                window.dispatchEvent(new Event('betCancelled'));
-                                forceRefreshBalance(); // 잔액 새로고침
-                              } else {
-                                const errorData = await res.json().catch(() => ({}));
-                                console.error('[배팅취소] 오류 응답:', errorData);
-                                alert(errorData.message || 'Failed to cancel bet.');
-                              }
-                            }}
-                            disabled={bet.status === 'cancelled' || bet.selections.some((sel: any) => {
-                              if (!sel.commence_time) return false;
-                              // 경기 시작 10분 전까지만 취소 가능
-                              const gameTime = new Date(sel.commence_time);
-                              return gameTime <= new Date(Date.now() + 10 * 60 * 1000);
-                            })}
-                          >
-                            Cancel Bet
-                          </button>
-                        )}
                       </div>
                     </div>
                     {bet.status === 'pending' && Array.isArray(bet.selections) && !bet.selections.every((sel: any) => sel.result === 'pending' || !sel.result) && (
