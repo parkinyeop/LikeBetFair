@@ -71,6 +71,14 @@ router.get('/payment-history', verifyToken, async (req, res) => {
 
     let whereCondition = { userId: req.user.userId };
 
+    console.log('📋 [입출금 내역] 조회 요청:', {
+      userId: req.user.userId,
+      username: req.user.username,
+      whereCondition,
+      range,
+      type
+    });
+
     // 날짜 범위 필터
     if (range !== 'all') {
       const days = parseInt(range.replace('d', ''));
@@ -92,6 +100,12 @@ router.get('/payment-history', verifyToken, async (req, res) => {
       limit: 100
     });
 
+    console.log('✅ [입출금 내역] 조회 결과:', {
+      userId: req.user.userId,
+      count: payments.length,
+      firstPayment: payments.length > 0 ? { id: payments[0].id, userId: payments[0].userId, amount: payments[0].amount } : null
+    });
+
     res.json({ payments });
   } catch (error) {
     console.error('입출금 내역 조회 오류:', error);
@@ -105,6 +119,14 @@ router.get('/bets', verifyToken, async (req, res) => {
     const { status = 'all', range = '30d' } = req.query;
 
     let whereCondition = { userId: req.user.userId };
+
+    console.log('🎰 [베팅 내역] 조회 요청:', {
+      userId: req.user.userId,
+      username: req.user.username,
+      whereCondition,
+      status,
+      range
+    });
 
     // 상태 필터
     if (status !== 'all') {
@@ -125,6 +147,12 @@ router.get('/bets', verifyToken, async (req, res) => {
       limit: 100
     });
 
+    console.log('✅ [베팅 내역] 조회 결과:', {
+      userId: req.user.userId,
+      count: bets.length,
+      firstBet: bets.length > 0 ? { id: bets[0].id, userId: bets[0].userId, stake: bets[0].stake } : null
+    });
+
     res.json({ bets });
   } catch (error) {
     console.error('베팅 내역 조회 오류:', error);
@@ -138,6 +166,14 @@ router.get('/exchange-orders', verifyToken, async (req, res) => {
     const { status = 'all', range = '30d' } = req.query;
 
     let whereCondition = { userId: req.user.userId };
+
+    console.log('📊 [익스체인지 주문] 조회 요청:', {
+      userId: req.user.userId,
+      username: req.user.username,
+      whereCondition,
+      status,
+      range
+    });
 
     // 상태 필터
     if (status !== 'all') {
@@ -156,6 +192,12 @@ router.get('/exchange-orders', verifyToken, async (req, res) => {
       where: whereCondition,
       order: [['createdAt', 'DESC']],
       limit: 100
+    });
+
+    console.log('✅ [익스체인지 주문] 조회 결과:', {
+      userId: req.user.userId,
+      count: orders.length,
+      firstOrder: orders.length > 0 ? { id: orders[0].id, userId: orders[0].userId, amount: orders[0].amount } : null
     });
 
     res.json({ orders });

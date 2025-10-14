@@ -197,10 +197,10 @@ const authController = {
 
       console.log('[Register] 사용자 생성 중...');
 
-      // ✅ 트랜잭션 시작
-      const { sequelize } = require('../config/database');
-      const balanceService = require('../services/balanceService');
-      const registerTransaction = await sequelize.transaction();
+      // ✅ 트랜잭션 시작 - User 모델의 sequelize 인스턴스 사용
+      const balanceServiceModule = await import('../services/balanceService.js');
+      const balanceService = balanceServiceModule.default;
+      const registerTransaction = await User.sequelize.transaction();
       
       try {
         // Create new user (초기 잔액 0으로 시작)
