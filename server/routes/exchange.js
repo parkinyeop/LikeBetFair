@@ -35,7 +35,7 @@ async function processPartialMatching(orderData) {
         line,
         side: 'lay',
         price: { [Op.lte]: price },
-        status: 'open',
+        status: { [Op.in]: ['open', 'partially_matched'] }, // ✅ partially_matched도 포함
         userId: { [Op.ne]: userId },
         remainingAmount: { [Op.gt]: 0 }
       },
@@ -50,7 +50,7 @@ async function processPartialMatching(orderData) {
         line,
         side: 'back',
         price: { [Op.gte]: price },
-        status: 'open',
+        status: { [Op.in]: ['open', 'partially_matched'] }, // ✅ partially_matched도 포함
         userId: { [Op.ne]: userId },
         remainingAmount: { [Op.gt]: 0 }
       },
@@ -567,36 +567,20 @@ router.post('/order', verifyToken, async (req, res) => {
         matchCount: partialMatchResult.matches.length
       });
     
-    // 거래 정보 계산
-    let stakeAmount, potentialProfit;
-    
-    if (selectionDetails && selectionDetails.selections && selectionDetails.selections.length > 1) {
-      // 멀티배팅인 경우
-      if (side === 'back') {
-        stakeAmount = amount; // Back: 배팅 금액 (담보금)
-        potentialProfit = Math.floor((price - 1) * amount); // Back: 순수익 (담보금 제외)
-      } else {
-        stakeAmount = Math.floor((price - 1) * amount); // Lay: 스테이크 금액 (담보금)
-        potentialProfit = amount; // Lay: 순수익 (상대 배팅금)
-      }
-    } else {
-      // 단일 배팅인 경우
-      stakeAmount = side === 'back' ? amount : Math.floor((price - 1) * amount);
-      potentialProfit = side === 'back' ? Math.floor((price - 1) * amount) : amount; // Back: 순수익 (담보금 제외)
-    }
-    
+    // ❌ 제거: baseOrderData에서 stakeAmount/potentialProfit 계산 제거
+    // 각 주문 생성 시점에 실제 금액 기준으로 계산하도록 변경
+
     // 🆕 배당율 정보 준비
     const now = new Date();
     const baseOrderData = {
-      userId, 
-      gameId, 
-      market, 
-      line, 
-      side, 
+      userId,
+      gameId,
+      market,
+      line,
+      side,
       price,
       selection,
-      stakeAmount, 
-      potentialProfit,
+      // ✅ stakeAmount와 potentialProfit는 각 주문 생성 시점에 계산
       // 매핑된 게임 데이터 추가
       homeTeam: orderData.homeTeam,
       awayTeam: orderData.awayTeam,
@@ -619,16 +603,28 @@ router.post('/order', verifyToken, async (req, res) => {
     let order;
     if (partialMatchResult.remainingAmount > 0) {
       // 미체결 주문 생성
+      // ✅ remainingAmount 기준으로 stakeAmount와 potentialProfit 계산
+      const remainingStakeAmount = side === 'back'
+        ? partialMatchResult.remainingAmount
+        : Math.floor((finalPrice - 1) * partialMatchResult.remainingAmount);
+      const remainingPotentialProfit = side === 'back'
+        ? Math.floor((finalPrice - 1) * partialMatchResult.remainingAmount)
+        : partialMatchResult.remainingAmount;
+
       order = await ExchangeOrder.create({
         ...baseOrderData,
         amount: partialMatchResult.remainingAmount,
+        stakeAmount: remainingStakeAmount,
+        potentialProfit: remainingPotentialProfit,
         status: partialMatchResult.totalMatched > 0 ? 'open' : 'open'
-      });
-      console.log('📝 새 주문 생성:', { 
-        orderId: order.id, 
+      }, { transaction });
+      console.log('📝 새 주문 생성:', {
+        orderId: order.id,
         originalAmount: amount,
         remainingAmount: partialMatchResult.remainingAmount,
-        status: 'open' 
+        stakeAmount: remainingStakeAmount,
+        potentialProfit: remainingPotentialProfit,
+        status: 'open'
       });
     }
     
@@ -1129,7 +1125,19 @@ async function restoreBackOrderToOpen(backOrder, cancelledLayOrder, transaction)
   // 상태 업데이트
   const newRemainingAmount = (backOrder.remainingAmount || 0) + restoreAmount;
   const newFilledAmount = Math.max(0, (backOrder.filledAmount || 0) - restoreAmount);
-  const newStatus = newFilledAmount > 0 ? 'partially_matched' : 'open';
+  
+  // ⚠️ 중요: remainingAmount가 0이면 매칭 대상에서 제외되어야 함
+  // matched 상태로 복원하지 말고, open/partially_matched만 허용
+  let newStatus;
+  if (newRemainingAmount <= 0) {
+    // 복원 후에도 남은 금액이 없으면 matched 상태 유지 (매칭 불가)
+    newStatus = 'matched';
+    console.log(`    ⚠️  복원 후에도 remainingAmount가 0 이하 → matched 상태 유지 (매칭 불가)`);
+  } else if (newFilledAmount > 0) {
+    newStatus = 'partially_matched';
+  } else {
+    newStatus = 'open';
+  }
   
   await backOrder.update({
     remainingAmount: newRemainingAmount,
@@ -1138,7 +1146,7 @@ async function restoreBackOrderToOpen(backOrder, cancelledLayOrder, transaction)
     partiallyFilled: newFilledAmount > 0 && newRemainingAmount > 0
   }, { transaction });
   
-  console.log(`    ✅ Back 주문 복원 완료: ID ${backOrder.id}, 상태: ${newStatus}, 복원금액: ${restoreAmount}원`);
+  console.log(`    ✅ Back 주문 복원 완료: ID ${backOrder.id}, 상태: ${newStatus}, 복원금액: ${restoreAmount}원, 남은금액: ${newRemainingAmount}원`);
 }
 
 // 🆕 원래 주문 취소 처리

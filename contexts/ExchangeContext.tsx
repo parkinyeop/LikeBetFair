@@ -285,6 +285,13 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
 
   // 매칭 모드 활성화
   const activateMatchMode = (targetOrder: MatchTargetOrder) => {
+    console.log('🎯 매칭 모드 활성화 시작:', targetOrder);
+    
+    // ✅ 먼저 기존 선택 완전 초기화
+    console.log('🧹 기존 선택 초기화 중...');
+    setSelectedBet(null);
+    setMultiBetSelections([]);
+    
     setIsMatchMode(true);
     setMatchTargetOrder(targetOrder);
     
@@ -323,17 +330,23 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
       
       console.log('🎯 추출된 selections:', selections);
       setMultiBetSelections(selections);
-    } else {
-      // 단일 배팅인 경우 멀티배팅 선택 초기화
-      setMultiBetSelections([]);
     }
+    
+    console.log('✅ 매칭 모드 활성화 완료');
   };
 
   // 매칭 모드 비활성화
   const deactivateMatchMode = () => {
+    console.log('🔄 매칭 모드 비활성화 시작');
+    
     setIsMatchMode(false);
     setMatchTargetOrder(null);
     setSelectedBet(null);
+    
+    // ✅ 멀티배팅 선택도 완전 초기화
+    setMultiBetSelections([]);
+    
+    console.log('✅ 매칭 모드 비활성화 완료 (모든 선택 초기화됨)');
   };
 
   // 🆕 매칭에 필요한 정확한 금액 계산 (부분 매칭 지원)
