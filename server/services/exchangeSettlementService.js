@@ -891,8 +891,8 @@ class ExchangeSettlementService {
         const referrerUser = await User.findByPk(referralCode.adminId, findOptions);
 
         if (referrerUser) {
-          // 추천인 수수료 계산 (승리 금액의 일정 비율)
-          const referralCommissionRate = referralCode.commissionRate || 0.05;
+          // 추천인 수수료 계산 (추천코드에 설정된 수수료율 사용)
+          const referralCommissionRate = referralCode.commissionRate || 0;
           const referralCommissionAmount = Math.floor((amount + order.stakeAmount) * referralCommissionRate);
 
           if (referralCommissionAmount > 0) {

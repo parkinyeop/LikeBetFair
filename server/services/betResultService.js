@@ -1383,8 +1383,8 @@ class BetResultService {
         return;
       }
 
-      // 추천인 수수료 계산 (승리 금액의 5%)
-      const referralCommissionRate = referralCode.commissionRate || 0.05;
+      // 추천인 수수료 계산 (추천코드에 설정된 수수료율 사용)
+      const referralCommissionRate = referralCode.commissionRate || 0;
       const referralCommissionAmount = Math.floor(adjustedWinnings * referralCommissionRate);
 
       if (referralCommissionAmount <= 0) {

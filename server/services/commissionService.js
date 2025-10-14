@@ -19,9 +19,6 @@ class CommissionService {
         'diamond': 0.40   // 40% 할인
       },
 
-      // 최소 수수료율 보장
-      minimumRate: 0.005, // 0.5%
-
       // 거래량 기반 할인 기준점 (월간 베팅 기준)
       volumeThresholds: [
         { amount: 10000000, discount: 0.05 }, // 1천만원 이상: 5% 할인
@@ -150,28 +147,7 @@ class CommissionService {
       }
     }
 
-    // 최소 수수료율 보장
-    if (currentRate < this.policies.minimumRate) {
-      const originalRate = currentRate;
-      currentRate = this.policies.minimumRate;
-      breakdown.push({
-        type: 'minimum_rate',
-        rate: currentRate - originalRate,
-        description: `최소 수수료율 보장 (${(this.policies.minimumRate * 100).toFixed(2)}%)`
-      });
-    }
-
-    // 최대 할인 제한 (원래 수수료의 50%까지만 할인)
-    const maxDiscountRate = baseRate * 0.5;
-    if (currentRate < maxDiscountRate) {
-      const originalRate = currentRate;
-      currentRate = maxDiscountRate;
-      breakdown.push({
-        type: 'max_discount_limit',
-        rate: currentRate - originalRate,
-        description: '최대 할인 한도 적용 (50% 할인 한도)'
-      });
-    }
+    // 최소 수수료율 및 최대 할인 제한 제거됨 (Settings 테이블 값 그대로 사용)
 
     return {
       finalRate: Math.max(0, currentRate),

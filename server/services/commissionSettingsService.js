@@ -24,14 +24,14 @@ class CommissionSettingsService {
 
       if (setting) {
         const parsed = parseFloat(setting.value);
-        return isNaN(parsed) ? (platform === 'sportsbook' ? 0.05 : 0.03) : parsed; // ✅ 0도 허용!
+        return isNaN(parsed) ? 0 : parsed; // ✅ 0도 허용!
       }
 
-      // 기본값 반환
-      return platform === 'sportsbook' ? 0.05 : 0.03;
+      // 기본값 반환 (하드코딩 제거)
+      return 0;
     } catch (error) {
       console.error(`[CommissionSettings] ${platform} 수수료율 조회 오류:`, error);
-      return platform === 'sportsbook' ? 0.05 : 0.03; // 기본값
+      return 0; // 기본값 (하드코딩 제거)
     }
   }
 
@@ -54,8 +54,8 @@ class CommissionSettingsService {
       });
 
       const result = {
-        sportsbook: 0.05, // 기본값
-        exchange: 0.03    // 기본값
+        sportsbook: 0, // 기본값 (하드코딩 제거)
+        exchange: 0    // 기본값 (하드코딩 제거)
       };
 
       settings.forEach(setting => {
@@ -63,11 +63,11 @@ class CommissionSettingsService {
         
         if (setting.key === 'sportsbook_commission_rate') {
           const parsed = parseFloat(setting.value);
-          result.sportsbook = isNaN(parsed) ? 0.05 : parsed; // ✅ 0도 허용!
+          result.sportsbook = isNaN(parsed) ? 0 : parsed; // ✅ 0도 허용!
           console.log(`   → 스포츠북: parseFloat("${setting.value}") = ${parsed}, isNaN: ${isNaN(parsed)}, 최종값: ${result.sportsbook}`);
         } else if (setting.key === 'exchange_commission_rate') {
           const parsed = parseFloat(setting.value);
-          result.exchange = isNaN(parsed) ? 0.03 : parsed; // ✅ 0도 허용!
+          result.exchange = isNaN(parsed) ? 0 : parsed; // ✅ 0도 허용!
           console.log(`   → 익스체인지: parseFloat("${setting.value}") = ${parsed}, isNaN: ${isNaN(parsed)}, 최종값: ${result.exchange}`);
         }
       });
@@ -77,8 +77,8 @@ class CommissionSettingsService {
     } catch (error) {
       console.error('[CommissionSettings] 수수료율 조회 오류:', error);
       return {
-        sportsbook: 0.05,
-        exchange: 0.03
+        sportsbook: 0,
+        exchange: 0
       };
     }
   }
