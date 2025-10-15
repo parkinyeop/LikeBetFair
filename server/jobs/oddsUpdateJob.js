@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import oddsApiService from '../services/oddsApiService.js';
+import oddsCleanupService from '../services/oddsCleanupService.js';
 import gameResultService from '../services/gameResultService.js';
 import betResultService from '../services/betResultService.js';
 import ExchangeSettlementService from '../services/exchangeSettlementService.js';
@@ -1021,14 +1022,14 @@ cron.schedule('*/30 * * * *', async () => {
 
 // OddsHistory 정리 스케줄러 - 매일 새벽 4시에 실행
 cron.schedule('0 4 * * *', async () => {
-  saveUpdateLog('cleanup', 'start', { 
+  saveUpdateLog('cleanup', 'start', {
     message: 'Starting OddsHistory cleanup (3+ days old data)'
   });
-  
+
   try {
     const { default: OddsHistory } = await import('../models/oddsHistoryModel.js');
     const { Op } = await import('sequelize');
-    
+
     // 3일 이상 된 데이터 삭제 (5분 타임아웃)
     await withTimeout(
       (async () => {
@@ -1040,26 +1041,62 @@ cron.schedule('0 4 * * *', async () => {
             }
           }
         });
-        
-        saveUpdateLog('cleanup', 'success', { 
+
+        saveUpdateLog('cleanup', 'success', {
           message: 'OddsHistory cleanup completed',
           deletedCount: deletedCount,
           cutoffDate: threeDaysAgo.toISOString()
         });
-        
+
         console.log(`🧹 [Cleanup] OddsHistory에서 ${deletedCount}개 레코드 삭제 완료 (3일 이상)`);
       })(),
       5 * 60 * 1000, // 5분
       'OddsHistory cleanup'
     );
-    
+
   } catch (error) {
-    saveUpdateLog('cleanup', 'error', { 
+    saveUpdateLog('cleanup', 'error', {
       message: 'OddsHistory cleanup failed',
       error: error.message
     });
-    
+
     console.error('❌ [Cleanup] OddsHistory 정리 실패:', error.message);
+  }
+});
+
+// 🧹 OddsCache 오래된 데이터 정리 스케줄러 - 매일 새벽 5시에 실행
+cron.schedule('0 5 * * *', async () => {
+  saveUpdateLog('odds_cleanup', 'start', {
+    message: 'Starting OddsCache old data cleanup'
+  });
+
+  try {
+    // 5분 타임아웃으로 클린업 실행
+    const cleanupResult = await withTimeout(
+      oddsCleanupService.cleanupOldOdds(),
+      5 * 60 * 1000, // 5분
+      'OddsCache cleanup'
+    );
+
+    saveUpdateLog('odds_cleanup', 'success', {
+      message: 'OddsCache cleanup completed',
+      totalDeleted: cleanupResult.totalDeleted,
+      breakdown: cleanupResult.breakdown,
+      executionTime: cleanupResult.executionTime
+    });
+
+    console.log(`🧹 [OddsCleanup] 총 ${cleanupResult.totalDeleted}개 오래된 배당률 데이터 삭제 완료`);
+    console.log(`   - 과거 경기 + 오래된 업데이트: ${cleanupResult.breakdown.abandonedPastGames}개`);
+    console.log(`   - 너무 먼 미래 경기 (14일 초과): ${cleanupResult.breakdown.farFutureGames}개`);
+    console.log(`   - 오래 업데이트 안 된 데이터 (7일 이상): ${cleanupResult.breakdown.staleData}개`);
+
+  } catch (error) {
+    saveUpdateLog('odds_cleanup', 'error', {
+      message: 'OddsCache cleanup failed',
+      error: error.message
+    });
+
+    console.error('❌ [OddsCleanup] 배당률 데이터 정리 실패:', error.message);
   }
 });
 
