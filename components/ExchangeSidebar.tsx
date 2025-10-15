@@ -1,5 +1,5 @@
 import { buildApiUrl } from '../config/apiConfig';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useExchange, ExchangeOrder, OrderForm } from '../hooks/useExchange';
 import { useAuth } from '../contexts/AuthContext';
@@ -623,6 +623,7 @@ function OrderPanel() {
 
 function OrderHistoryPanel() {
   const { orders: userOrders, cancelOrder, loading, fetchOrders } = useExchange();
+  const { token } = useAuth(); // 🆕 토큰 추가
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   // 필터 및 정렬 관련 상태 - 주석 처리 (나중에 재활용 가능)
   // const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -672,18 +673,55 @@ function OrderHistoryPanel() {
   // 매칭된 주문 정보 상태
   const [matchedOrderInfo, setMatchedOrderInfo] = useState<{[key: number]: any}>({});
 
+  // Back 주문에서 매칭된 Lay 주문 정보 가져오기
+  const loadMatchingLayOrders = useCallback(async (backOrderId: number) => {
+    try {
+      if (!token) {
+        console.error('인증 토큰이 없습니다.');
+        return;
+      }
+
+      const response = await fetch(`/api/exchange/orders/${backOrderId}/matches`, {
+        headers: {
+          'x-auth-token': token
+        }
+      });
+      
+      if (response.ok) {
+        const matchData = await response.json();
+        console.log('매칭된 Lay 주문 정보:', matchData);
+        
+        // 매칭된 주문 정보를 상태에 저장
+        setMatchedOrderInfo(prev => ({
+          ...prev,
+          [`back_${backOrderId}`]: matchData
+        }));
+      } else {
+        console.error('매칭된 Lay 주문 정보 조회 실패:', response.status);
+      }
+    } catch (error) {
+      console.error('매칭된 Lay 주문 정보 조회 오류:', error);
+    }
+  }, [token]);
+
   // 상세 보기가 열릴 때 매칭된 주문 정보 로드
   useEffect(() => {
     if (selectedOrderId && userOrders) {
       const selectedOrder = userOrders.find(order => order.id === selectedOrderId);
-      if (selectedOrder && selectedOrder.side === 'lay' && selectedOrder.matchedOrderId) {
-        // 이미 로드된 정보가 없으면 API 호출
-        if (!matchedOrderInfo[selectedOrder.matchedOrderId]) {
-          getMatchedOrderInfo(selectedOrder.matchedOrderId);
+      if (selectedOrder) {
+        // Lay 주문의 경우: matchedOrderId로 매칭된 Back 주문 조회
+        if (selectedOrder.side === 'lay' && selectedOrder.matchedOrderId) {
+          if (!matchedOrderInfo[selectedOrder.matchedOrderId]) {
+            getMatchedOrderInfo(selectedOrder.matchedOrderId);
+          }
+        }
+        // Back 주문의 경우: ExchangeOrderMatch를 통해 매칭된 Lay 주문 조회
+        else if (selectedOrder.side === 'back' && (selectedOrder.status === 'matched' || selectedOrder.status === 'partially_matched')) {
+          loadMatchingLayOrders(selectedOrder.id);
         }
       }
     }
-  }, [selectedOrderId, userOrders]);
+  }, [selectedOrderId, userOrders, loadMatchingLayOrders]);
 
   // 매칭된 주문 정보 가져오기
   const getMatchedOrderInfo = async (matchedOrderId: number) => {
@@ -1261,19 +1299,45 @@ function OrderHistoryPanel() {
                     
                     {/* 🆕 취소 가능 조건: Back과 Lay 구분 + 경기시간 10분 전까지 */}
                     {(() => {
-                      // 경기 시간 10분 전 확인
-                      const isWithin10Minutes = order.commenceTime && 
-                        new Date(order.commenceTime).getTime() - new Date().getTime() <= 10 * 60 * 1000;
-                      
-                      if (isWithin10Minutes) return false; // 경기 시간 10분 전 이후는 취소 불가
+                      // 멀티배팅인 경우 모든 경기 체크
+                      if ((order as any).isMultibet && (order as any).selectionDetails && (order as any).selectionDetails.selections) {
+                        const selections = (order as any).selectionDetails.selections || [];
+                        
+                        // 모든 선택의 경기 시간 체크
+                        for (const selection of selections) {
+                          if (selection.commenceTime) {
+                            const timeUntilGame = new Date(selection.commenceTime).getTime() - new Date().getTime();
+                            
+                            // 경기 시작 10분 전부터는 취소 불가
+                            const isTooCloseToGame = timeUntilGame > 0 && timeUntilGame <= 10 * 60 * 1000;
+                            // 경기가 이미 시작했으면 취소 불가
+                            const hasGameStarted = timeUntilGame <= 0;
+                            
+                            if (isTooCloseToGame || hasGameStarted) return false;
+                          }
+                        }
+                      } else {
+                        // 단일 주문인 경우
+                        const timeUntilGame = order.commenceTime 
+                          ? new Date(order.commenceTime).getTime() - new Date().getTime()
+                          : Infinity;
+                        
+                        // 경기 시작 10분 전부터는 취소 불가
+                        const isTooCloseToGame = timeUntilGame > 0 && timeUntilGame <= 10 * 60 * 1000;
+                        
+                        // 경기가 이미 시작했으면 취소 불가
+                        const hasGameStarted = timeUntilGame <= 0;
+                        
+                        if (isTooCloseToGame || hasGameStarted) return false;
+                      }
                       
                       // Back과 Lay 구분 취소 조건
                       if (order.side === 'lay') {
                         // Lay 매치: active 상태에서만 취소 가능
                         return order.status === 'active';
                       } else {
-                        // Back 주문: open 또는 partially_matched 상태에서 취소 가능
-                        return order.status === 'open' || order.status === 'partially_matched';
+                        // Back 주문: open, partially_matched, matched 상태에서 취소 가능 (경기시간 10분 전까지)
+                        return order.status === 'open' || order.status === 'partially_matched' || order.status === 'matched';
                       }
                     })() && (
                       <button
@@ -1319,7 +1383,6 @@ function OrderHistoryPanel() {
                         {/* 🆕 멀티배팅인 경우 각 경기별 결과 표시 */}
                         {(order as any).isMultibet && (order as any).multibetGameResults && (order as any).multibetGameResults.length > 0 ? (
                           <div className="mb-3">
-                            <div className="text-sm font-medium text-gray-700 mb-2">📊 경기 결과</div>
                             <div className="space-y-2">
                               {(order as any).multibetGameResults.map((gameResult: any, idx: number) => {
                                 const isPending = gameResult.status === 'scheduled' || !gameResult.score;
@@ -1375,7 +1438,6 @@ function OrderHistoryPanel() {
                           
                           return (
                             <div className="mb-3">
-                              <div className="text-sm font-medium text-gray-700 mb-2">📊 경기 결과</div>
                               <div className="border-l-2 border-gray-200 pl-3 py-1">
                                 {/* 스코어 표시 */}
                                 {(() => {
@@ -1399,13 +1461,14 @@ function OrderHistoryPanel() {
                         })()}
 
 
-                        {/* 3. 매칭 정보 (Lay인 경우만) */}
+                        {/* 3. 매칭 정보 */}
+                        {/* Lay 주문의 매칭된 Back 주문 정보 */}
                         {order.side === 'lay' && order.matchedOrderId && (() => {
                           const matchedOrder = matchedOrderInfo[order.matchedOrderId!];
                           return (
                             <div className="bg-green-50 p-3 rounded-lg border border-green-200">
                               <div className="flex justify-between items-center mb-2">
-                                <span className="text-xs text-gray-600">매칭된 주문</span>
+                                <span className="text-xs text-gray-600">매칭된 Back 주문</span>
                                 <span className="text-xs font-medium text-green-600">#{order.matchedOrderId}</span>
                               </div>
                               {matchedOrder ? (
@@ -1453,6 +1516,50 @@ function OrderHistoryPanel() {
                               ) : (
                                 <div className="text-xs text-gray-500">
                                   {matchedOrder === undefined ? '매칭된 주문 정보를 로딩 중...' : '매칭된 주문 정보를 찾을 수 없습니다'}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        {/* Back 주문의 매칭된 Lay 주문 정보 */}
+                        {order.side === 'back' && (order.status === 'matched' || order.status === 'partially_matched') && (() => {
+                          const matchingData = matchedOrderInfo[`back_${order.id}`];
+                          return (
+                            <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                              <div className="flex justify-between items-center mb-2">
+                                <span className="text-xs text-gray-600">매칭된 Lay 주문</span>
+                                <span className="text-xs font-medium text-blue-600">
+                                  {matchingData?.orderInfo?.matchCount || 0}개
+                                </span>
+                              </div>
+                              {matchingData ? (
+                                <div className="space-y-2">
+                                  {matchingData.matches && matchingData.matches.length > 0 ? (
+                                    matchingData.matches.map((match: any, index: number) => (
+                                      <div key={index} className="text-xs p-2">
+                                        <div className="flex justify-between items-center">
+                                          <span>
+                                            Lay #{match.counterparty?.orderId || match.id}
+                                          </span>
+                                          <span className="text-gray-600">
+                                            (총배팅: {match.counterparty?.order?.stakeAmount ? 
+                                              `${match.counterparty.order.stakeAmount.toLocaleString()}원` : 
+                                              '확인중'
+                                            })
+                                          </span>
+                                        </div>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div className="text-xs text-gray-500">
+                                      매칭된 주문이 없습니다.
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="text-xs text-gray-500">
+                                  매칭된 Lay 주문 정보를 로딩 중...
                                 </div>
                               )}
                             </div>
