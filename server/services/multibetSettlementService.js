@@ -547,13 +547,14 @@ class MultibetSettlementService {
 
     // ✅ 매칭된 주문들을 조회하여 실제 수익/손실 계산 (양방향 조회)
     // ExchangeOrderMatch 테이블의 originalSide를 사용하여 Back/Lay 구분
+    // 🔧 FIX: status 조건 제거 - settled 상태의 매칭도 조회해야 정산 가능
     const matches = await ExchangeOrderMatch.findAll({
       where: {
         [Op.or]: [
           { originalOrderId: order.id },
           { matchingOrderId: order.id }
-        ],
-        status: 'active'
+        ]
+        // status: 'active' 제거 - 정산 시점에 이미 settled 상태일 수 있음
       }
     });
 
@@ -569,52 +570,31 @@ class MultibetSettlementService {
       const matchedPrice = match.matchedPrice; // 배당률
       const layStake = Math.floor(matchedAmount * (matchedPrice - 1)); // Lay 담보금
       
-      // ✅ 핵심: ExchangeOrderMatch.originalSide를 사용하여 Back/Lay 구분
-      // ExchangeOrder.side가 아닌 Match 테이블의 originalSide를 기준으로 정산
-      const isBackSide = match.originalSide === 'back';
-      
-      // 🎯 현재 주문이 원본인지 매칭인지 확인
+      // ✅ 핵심: 현재 주문의 Side를 올바르게 판단
+      // ExchangeOrderMatch에서 현재 주문이 original인지 matching인지에 따라 side 결정
       const isOriginalOrder = (match.originalOrderId === order.id);
+      
+      // 현재 주문의 실제 side 판단
+      const currentOrderSide = isOriginalOrder ? match.originalSide : match.matchingSide;
+      const isBackSide = currentOrderSide === 'back';
 
       // 🔑 핵심: 담보금은 이미 차감되었으므로, 정산 시에는 승자에게만 총 담보금 지급
       if (result === 'won') {
         if (isBackSide) {
-          // Back 승리
-          if (isOriginalOrder) {
-            // 원본 Back 주문 승리: 총 담보금 지급 (자기 + 상대)
-            totalProfit += matchedAmount + layStake;
-            console.log(`🏆 Back 승리 (원본): +${matchedAmount + layStake}원 (Back담보 ${matchedAmount} + Lay담보 ${layStake})`);
-          } else {
-            // 매칭 Back 주문 승리 → 이 경우는 발생하지 않음
-            console.log(`⚠️ 예외 케이스: 매칭 Back 승리`);
-          }
+          // Back 승리: 총 담보금 지급 (자기 + 상대)
+          totalProfit += matchedAmount + layStake;
+          console.log(`🏆 Back 승리 (주문 ${order.id}): +${matchedAmount + layStake}원 (Back담보 ${matchedAmount} + Lay담보 ${layStake})`);
         } else {
-          // Lay 승리
-          if (isOriginalOrder) {
-            // 원본 Lay 주문 승리: 총 담보금 지급 (자기 + 상대)
-            totalProfit += layStake + matchedAmount;
-            console.log(`🏆 Lay 승리 (원본): +${layStake + matchedAmount}원 (Lay담보 ${layStake} + Back담보 ${matchedAmount})`);
-          } else {
-            // 매칭 Lay 주문 승리 → 이 경우는 발생하지 않음
-            console.log(`⚠️ 예외 케이스: 매칭 Lay 승리`);
-          }
+          // Lay 승리: 총 담보금 지급 (자기 + 상대)
+          totalProfit += layStake + matchedAmount;
+          console.log(`🏆 Lay 승리 (주문 ${order.id}): +${layStake + matchedAmount}원 (Lay담보 ${layStake} + Back담보 ${matchedAmount})`);
         }
       } else { // result === 'lost'
         // 패배: 담보금은 이미 차감되었으므로 추가 처리 없음 (0원)
         if (isBackSide) {
-          if (isOriginalOrder) {
-            console.log(`💸 Back 패배 (원본): 0원 (담보금 이미 차감됨)`);
-          } else {
-            // 매칭 Back 패배 = 상대 Lay 승리 → 상대가 처리
-            console.log(`💸 Back 패배 (매칭): 0원 (상대 Lay가 총 담보금 수령)`);
-          }
+          console.log(`💸 Back 패배 (주문 ${order.id}): 0원 (담보금 이미 차감됨)`);
         } else {
-          if (isOriginalOrder) {
-            console.log(`💸 Lay 패배 (원본): 0원 (담보금 이미 차감됨)`);
-          } else {
-            // 매칭 Lay 패배 = 상대 Back 승리 → 상대가 처리
-            console.log(`💸 Lay 패배 (매칭): 0원 (상대 Back이 총 담보금 수령)`);
-          }
+          console.log(`💸 Lay 패배 (주문 ${order.id}): 0원 (담보금 이미 차감됨)`);
         }
       }
     }
@@ -674,7 +654,7 @@ class MultibetSettlementService {
       console.log(`⏱️ 수익 계산 완료: ${Date.now() - profitStartTime}ms`);
 
       // 3단계: 수수료 계산 (Lay 승리 시, 상대 담보금에서만)
-      let profitAmount = parseFloat(profit) || 0;
+      let profitAmount = Math.round(parseFloat(profit) || 0); // 소수점 방지
       let commissionAmount = 0;
       
       if (profitAmount > 0 && order.side === 'lay' && result === 'won') {
@@ -702,7 +682,7 @@ class MultibetSettlementService {
 
       // 4단계: 잔액 업데이트 준비
       const currentBalance = parseFloat(user.balance) || 0;
-      const newBalance = currentBalance + profitAmount;
+      const newBalance = Math.round(currentBalance + profitAmount); // 소수점 방지
 
       // 5단계: 메모 생성 (미리 준비)
       const memo = this.generatePaymentMemo(order, result, settlementResult, profitAmount);

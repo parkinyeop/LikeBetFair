@@ -265,7 +265,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
       line: targetOrder.line,
       side: matchType,
       price: targetOrder.price,
-      amount: actualMatchAmount,
+      amount: stakeAmount, // Lay 주문의 amount는 stakeAmount여야 함
       status: matchType === 'lay' ? 'active' : 'matched', // 🆕 Lay는 active 상태로 생성
       matchedOrderId: targetOrder.id,
       homeTeam: targetOrder.homeTeam,
