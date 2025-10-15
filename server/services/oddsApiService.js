@@ -9,7 +9,7 @@ import { ODDS_API_CONFIG, LOG_LEVELS } from '../config/oddsApiConfig.js';
 
 // 클라이언트에서 사용하는 sport key 매핑 (영문으로 통일)
 const clientSportKeyMap = {
-  // 영문 카테고리명
+  // 영문 카테고리명만 사용 (한글 제거)
   'KLEAGUE': 'soccer_korea_kleague1',
   'JLEAGUE': 'soccer_japan_j_league',
   'SERIEA': 'soccer_italy_serie_a',
@@ -19,8 +19,7 @@ const clientSportKeyMap = {
   'CSL': 'soccer_china_superleague',
   'LALIGA': 'soccer_spain_la_liga',
   'BUNDESLIGA': 'soccer_germany_bundesliga',
-  'EPL': 'soccer_epl',  // ✅ 수정: soccer_england_premier_league → soccer_epl
-  '프리미어리그': 'soccer_epl', // ✅ 수정: 한글 매핑도 soccer_epl로 변경
+  'EPL': 'soccer_epl',
   'NBA': 'basketball_nba',
   'MLB': 'baseball_mlb',
   'KBO': 'baseball_kbo',

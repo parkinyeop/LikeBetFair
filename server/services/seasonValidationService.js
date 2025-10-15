@@ -316,11 +316,12 @@ class SeasonValidationService {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
     
-    // sportKey를 기반으로 subCategory 매핑
+    // sportKey를 기반으로 subCategory 매핑 (oddsApiService.js의 clientSportKeyMap과 일치하도록)
     const subCategoryMap = {
-      'soccer_japan_j_league': 'J_LEAGUE',
-      'soccer_korea_kleague1': 'KLEAGUE1',
-      'soccer_italy_serie_a': 'SERIE_A',
+      'soccer_japan_j_league': 'JLEAGUE',
+      'soccer_korea_kleague1': 'KLEAGUE',
+      'soccer_italy_serie_a': 'SERIEA',
+      'soccer_epl': 'EPL',
       'basketball_nba': 'NBA',
       'basketball_kbl': 'KBL',
       'baseball_kbo': 'KBO',
@@ -330,7 +331,7 @@ class SeasonValidationService {
       'soccer_brazil_campeonato': 'BRASILEIRAO',
       'soccer_argentina_primera_division': 'ARGENTINA_PRIMERA',
       'soccer_china_superleague': 'CSL',
-      'soccer_spain_primera_division': 'LALIGA',
+      'soccer_spain_la_liga': 'LALIGA',
       'soccer_germany_bundesliga': 'BUNDESLIGA'
     };
     
