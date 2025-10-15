@@ -2237,7 +2237,7 @@ export default function ExchangeAdmin() {
                                     </span>
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {order.price.toFixed(3)}
+                                    {order.price ? Number(order.price).toFixed(3) : 'N/A'}
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                     ₩{(order.amount || 0).toLocaleString()}
