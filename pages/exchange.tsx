@@ -6,7 +6,7 @@ import { normalizeTeamNameForComparison } from '../utils/matchSportsbookGame';
 import { convertUtcToLocal, getCurrentLocalTime } from '../utils/timeUtils';
 import { useExchangeContext } from '../contexts/ExchangeContext';
 import { useExchange } from '../hooks/useExchange';
-import { adjustOddsSophisticated } from '../utils/oddsCalculator';
+import { applyExchangeReturnRate as applyExchangeReturnRateUtil } from '../utils/oddsCalculator';
 
 export default function Exchange() {
   const router = useRouter();
@@ -81,22 +81,15 @@ export default function Exchange() {
     }
   };
   
-  // 🆕 Exchange 배당율에 환수율 적용 (올바른 방식 - Proportional Margin Application)
-  const applyExchangeReturnRate = (originalOdds: number, allOdds: number[] = []) => {
+  // 🆕 Exchange 배당율에 환수율 적용 (단순 나누기 방식으로 통일)
+  const applyExchangeReturnRate = (originalOdds: number, allOdds: number[] = [], returnRate?: number) => {
     if (!originalOdds || !oddsReturnRateSettings.enabled) return originalOdds;
 
-    // 단일 배당율인 경우에도 adjustOddsSophisticated 사용 (일관성)
-    if (allOdds.length === 0) {
-      allOdds = [originalOdds]; // 단일 배당률을 배열로 변환
-    }
-
-    // 모든 경우에 adjustOddsSophisticated 함수 사용 (일관성 보장)
-    const adjustedOdds = adjustOddsSophisticated(allOdds, oddsReturnRateSettings.returnRate);
-    const originalIndex = allOdds.indexOf(originalOdds);
-    const result = adjustedOdds[originalIndex] || originalOdds;
-
+    // 환수율 파라미터가 없으면 설정에서 가져오기
+    const effectiveReturnRate = returnRate || oddsReturnRateSettings.returnRate;
     
-    return result;
+    // utils 함수 사용
+    return applyExchangeReturnRateUtil(originalOdds, allOdds, effectiveReturnRate);
   };
   
   // 🎯 버튼이 선택되었는지 확인하는 함수 - Exchange 기존 로직 유지
@@ -876,15 +869,15 @@ export default function Exchange() {
              outcomes = [
                { 
                  name: game.home_team, 
-                 price: applyExchangeReturnRate((homeOdds as any)?.averagePrice, allOdds)
+                 price: applyExchangeReturnRate((homeOdds as any)?.averagePrice, allOdds, oddsReturnRateSettings.returnRate)
                },
                { 
                  name: 'Draw', 
-                 price: applyExchangeReturnRate((drawOdds?.[1] as any)?.averagePrice, allOdds)
+                 price: applyExchangeReturnRate((drawOdds?.[1] as any)?.averagePrice, allOdds, oddsReturnRateSettings.returnRate)
                },
                { 
                  name: game.away_team, 
-                 price: applyExchangeReturnRate((awayOdds as any)?.averagePrice, allOdds)
+                 price: applyExchangeReturnRate((awayOdds as any)?.averagePrice, allOdds, oddsReturnRateSettings.returnRate)
                }
              ].filter(outcome => outcome.price !== undefined);
           } else {
@@ -906,11 +899,11 @@ export default function Exchange() {
             outcomes = [
               { 
                 name: game.home_team, 
-                price: applyExchangeReturnRate(homeKey ? h2hOdds[homeKey]?.averagePrice : undefined, allOdds)
+                price: applyExchangeReturnRate(homeKey ? h2hOdds[homeKey]?.averagePrice : undefined, allOdds, oddsReturnRateSettings.returnRate)
               },
               { 
                 name: game.away_team, 
-                price: applyExchangeReturnRate(awayKey ? h2hOdds[awayKey]?.averagePrice : undefined, allOdds)
+                price: applyExchangeReturnRate(awayKey ? h2hOdds[awayKey]?.averagePrice : undefined, allOdds, oddsReturnRateSettings.returnRate)
               }
             ].filter(outcome => outcome.price !== undefined);
           }
@@ -1112,8 +1105,8 @@ export default function Exchange() {
                           
                           // ========================= [ 환수율 적용 로직 추가 ] =========================
                           const allTotalsOdds = [overOdds, underOdds].filter(odds => odds != null);
-                          const adjustedOverOdds = applyExchangeReturnRate(overOdds, allTotalsOdds);
-                          const adjustedUnderOdds = applyExchangeReturnRate(underOdds, allTotalsOdds);
+                          const adjustedOverOdds = applyExchangeReturnRate(overOdds, allTotalsOdds, oddsReturnRateSettings.returnRate);
+                          const adjustedUnderOdds = applyExchangeReturnRate(underOdds, allTotalsOdds, oddsReturnRateSettings.returnRate);
                           // ========================================================================
                           
                           return (
@@ -1283,8 +1276,8 @@ export default function Exchange() {
                           
                           // ========================= [ 환수율 적용 로직 추가 ] =========================
                           const allSpreadsOdds = [homeOdds, awayOdds].filter(odds => odds != null);
-                          const adjustedHomeOdds = applyExchangeReturnRate(homeOdds, allSpreadsOdds);
-                          const adjustedAwayOdds = applyExchangeReturnRate(awayOdds, allSpreadsOdds);
+                          const adjustedHomeOdds = applyExchangeReturnRate(homeOdds, allSpreadsOdds, oddsReturnRateSettings.returnRate);
+                          const adjustedAwayOdds = applyExchangeReturnRate(awayOdds, allSpreadsOdds, oddsReturnRateSettings.returnRate);
                           // ========================================================================
                           
                           return (
@@ -1589,9 +1582,9 @@ export default function Exchange() {
                    ].filter(odds => odds !== undefined);
                    
                    outcomes = [
-                     { name: game.home_team, price: applyExchangeReturnRate((homeOdds as any)?.averagePrice, allOdds) },
-                     { name: 'Draw', price: applyExchangeReturnRate((drawOdds?.[1] as any)?.averagePrice, allOdds) },
-                     { name: game.away_team, price: applyExchangeReturnRate((awayOdds as any)?.averagePrice, allOdds) }
+                     { name: game.home_team, price: applyExchangeReturnRate((homeOdds as any)?.averagePrice, allOdds, oddsReturnRateSettings.returnRate) },
+                     { name: 'Draw', price: applyExchangeReturnRate((drawOdds?.[1] as any)?.averagePrice, allOdds, oddsReturnRateSettings.returnRate) },
+                     { name: game.away_team, price: applyExchangeReturnRate((awayOdds as any)?.averagePrice, allOdds, oddsReturnRateSettings.returnRate) }
                    ].filter(outcome => outcome.price !== undefined);
                 } else {
                   const h2hKeys = Object.keys(h2hOdds);
@@ -1609,8 +1602,8 @@ export default function Exchange() {
                   ].filter(odds => odds !== undefined);
                   
                   outcomes = [
-                    { name: game.home_team, price: applyExchangeReturnRate(homeKey ? h2hOdds[homeKey]?.averagePrice : undefined, allOdds) },
-                    { name: game.away_team, price: applyExchangeReturnRate(awayKey ? h2hOdds[awayKey]?.averagePrice : undefined, allOdds) }
+                    { name: game.home_team, price: applyExchangeReturnRate(homeKey ? h2hOdds[homeKey]?.averagePrice : undefined, allOdds, oddsReturnRateSettings.returnRate) },
+                    { name: game.away_team, price: applyExchangeReturnRate(awayKey ? h2hOdds[awayKey]?.averagePrice : undefined, allOdds, oddsReturnRateSettings.returnRate) }
                   ].filter(outcome => outcome.price !== undefined);
                 }
                 
@@ -1790,8 +1783,8 @@ export default function Exchange() {
                                 
                                 // 🆕 환수율 적용
                                 const allTotalsOdds = [overOdds, underOdds].filter(odds => odds !== undefined);
-                                const adjustedOverOdds = overOdds ? applyExchangeReturnRate(overOdds, allTotalsOdds) : undefined;
-                                const adjustedUnderOdds = underOdds ? applyExchangeReturnRate(underOdds, allTotalsOdds) : undefined;
+                                const adjustedOverOdds = overOdds ? applyExchangeReturnRate(overOdds, allTotalsOdds, oddsReturnRateSettings.returnRate) : undefined;
+                                const adjustedUnderOdds = underOdds ? applyExchangeReturnRate(underOdds, allTotalsOdds, oddsReturnRateSettings.returnRate) : undefined;
                                 
                                 return (
                                   <div key={point} className="flex items-center gap-2">
@@ -1961,8 +1954,8 @@ export default function Exchange() {
                                 
                                 // 🆕 환수율 적용
                                 const allSpreadsOdds = [homeOdds, awayOdds].filter(odds => odds !== undefined);
-                                const adjustedHomeOdds = homeOdds ? applyExchangeReturnRate(homeOdds, allSpreadsOdds) : undefined;
-                                const adjustedAwayOdds = awayOdds ? applyExchangeReturnRate(awayOdds, allSpreadsOdds) : undefined;
+                                const adjustedHomeOdds = homeOdds ? applyExchangeReturnRate(homeOdds, allSpreadsOdds, oddsReturnRateSettings.returnRate) : undefined;
+                                const adjustedAwayOdds = awayOdds ? applyExchangeReturnRate(awayOdds, allSpreadsOdds, oddsReturnRateSettings.returnRate) : undefined;
                                 const pointValue = parseFloat(absPoint);
                                 // 스프레드 베팅에서는 하나의 핸디캡 값으로 양팀이 반대 방향을 가짐
                                 const homeHandicap = pointValue;

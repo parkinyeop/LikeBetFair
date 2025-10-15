@@ -94,6 +94,32 @@ class ExchangeOddsReturnRateService {
     
     return adjustedOdds;
   }
+
+  /**
+   * 단일 배당율에 환수율 적용
+   * @param {number} odds - 원본 배당율
+   * @returns {number} - 환수율이 적용된 배당율
+   */
+  static async applyReturnRateToSingleOdds(odds) {
+    if (!odds || odds <= 0) {
+      return odds;
+    }
+
+    const settings = await this.getOddsReturnRateSettings();
+
+    if (!settings.enabled) {
+      return odds; // 환수율 적용 비활성화 시 원본 반환
+    }
+
+    const returnRate = settings.returnRate || 0.95;
+    
+    // 환수율 적용: odds / returnRate
+    const adjustedOdds = odds / returnRate;
+    
+    console.log(`[ExchangeOddsReturnRate] 단일 배당율 조정: ${odds} / ${returnRate} = ${adjustedOdds}`);
+    
+    return adjustedOdds;
+  }
 }
 
 export default ExchangeOddsReturnRateService;
