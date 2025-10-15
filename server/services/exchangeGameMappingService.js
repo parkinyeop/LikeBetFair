@@ -254,9 +254,9 @@ class ExchangeGameMappingService {
         layOdds = opposingOutcome ? opposingOutcome.price : null;
       }
 
-      // 원본 배당율 (가중치 적용 전)
-      const originalBackOdds = backOdds !== null ? parseFloat(backOdds.toFixed(2)) : null;
-      const originalLayOdds = layOdds !== null ? parseFloat(layOdds.toFixed(2)) : null;
+      // 원본 배당율 (가중치 적용 전) - 소수점 3자리
+      const originalBackOdds = backOdds !== null ? parseFloat(backOdds.toFixed(3)) : null;
+      const originalLayOdds = layOdds !== null ? parseFloat(layOdds.toFixed(3)) : null;
 
       // 원본 배당율 사용 (가중치는 조회 시에만 적용)
       const finalBackOdds = originalBackOdds;

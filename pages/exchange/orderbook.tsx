@@ -595,7 +595,7 @@ const OrderbookPage: React.FC = () => {
                     <div className="text-right">
                       <div className="text-sm text-gray-600 mb-1">주문금액:</div>
                       <div className="text-lg font-semibold text-gray-700">{formatCurrency(order.amount)}원</div>
-                      <div className="text-sm text-gray-500 mt-1">{computeTotalOdds(order).toFixed(2)}배당</div>
+                      <div className="text-sm text-gray-500 mt-1">{computeTotalOdds(order).toFixed(3)}배당</div>
                     </div>
                   </div>
 
@@ -605,7 +605,7 @@ const OrderbookPage: React.FC = () => {
                       const legs = normalizeSelectionDetails(order.selectionDetails);
                       const count = order.selectionCount || legs.length;
                       return (
-                        <>🎯 {count}개 선택 ・ 총 배당: {computeTotalOdds(order).toFixed(2)}</>
+                        <>🎯 {count}개 선택 ・ 총 배당: {computeTotalOdds(order).toFixed(3)}</>
                       );
                     })()}
                   </div>
@@ -618,7 +618,7 @@ const OrderbookPage: React.FC = () => {
                         <div className="font-semibold text-gray-900">{leg?.teamName || leg?.selection || `선택 ${idx + 1}`}</div>
                         <div className="text-sm text-gray-600">
                           {(leg?.homeTeam && leg?.awayTeam) ? `${leg.homeTeam} vs ${leg.awayTeam}` : (leg?.match || '')}
-                          {leg?.odds ? ` • @${Number(leg.odds).toFixed(2)}` : ''}
+                          {leg?.odds ? ` • @${Number(leg.odds).toFixed(3)}` : ''}
                         </div>
                         {/* 각 경기의 시간 표시 */}
                         {leg?.commenceTime && (
@@ -709,7 +709,7 @@ const OrderbookPage: React.FC = () => {
                     
                     <div className="text-right">
                       <div className="text-lg font-bold text-blue-600">
-                        {order.odds ? applyExchangeReturnRate(order.odds, [order.odds]).toFixed(2) : 'N/A'}
+                        {order.odds ? applyExchangeReturnRate(order.odds, [order.odds]).toFixed(3) : 'N/A'}
                       </div>
                       <div className="text-sm text-gray-500">
                         베팅: {formatCurrency(order.amount)}원
@@ -821,7 +821,7 @@ const OrderbookPage: React.FC = () => {
                       멀티 x{selectedOrderDetail.selectionCount || 0}
                     </span>
                     {selectedOrderDetail.totalOdds && (
-                      <span className="text-xs text-yellow-700">총배당 {Number(selectedOrderDetail.totalOdds).toFixed(2)}</span>
+                      <span className="text-xs text-yellow-700">총배당 {Number(selectedOrderDetail.totalOdds).toFixed(3)}</span>
                     )}
                     {selectedOrderDetail.potentialWinnings !== undefined && (
                       <span className="text-xs text-green-700">예상당첨 {formatCurrency(Math.floor(selectedOrderDetail.potentialWinnings))}원</span>
@@ -847,7 +847,7 @@ const OrderbookPage: React.FC = () => {
                   <div>
                     <span className="text-gray-600">배당률:</span>
                     <span className="ml-2 font-medium text-blue-600">
-                      {selectedOrderDetail.odds ? applyExchangeReturnRate(selectedOrderDetail.odds, [selectedOrderDetail.odds]).toFixed(2) : 'N/A'}
+                      {selectedOrderDetail.odds ? applyExchangeReturnRate(selectedOrderDetail.odds, [selectedOrderDetail.odds]).toFixed(3) : 'N/A'}
                     </span>
                   </div>
                   <div>
@@ -924,7 +924,7 @@ const OrderbookPage: React.FC = () => {
                           <div className="text-xs text-gray-500">
                             {leg.marketType || leg.market} {leg.point ? `(${leg.point})` : ''}
                           </div>
-                          <div className="text-xs text-blue-600 font-semibold">@ {leg.odds ? Number(leg.odds).toFixed(2) : '-'}</div>
+                          <div className="text-xs text-blue-600 font-semibold">@ {leg.odds ? Number(leg.odds).toFixed(3) : '-'}</div>
                         </div>
                         {/* 🆕 각 경기의 시간 표시 */}
                         {leg?.commenceTime && (

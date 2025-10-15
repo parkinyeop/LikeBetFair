@@ -373,7 +373,7 @@ export default function Analytics() {
                           {formatCurrency(pattern.total_amount)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {pattern.avg_odds.toFixed(2)}
+                          {pattern.avg_odds.toFixed(3)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {formatPercentage(pattern.win_rate)}

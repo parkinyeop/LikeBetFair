@@ -2213,7 +2213,7 @@ export default function ExchangeAdmin() {
                                             멀티배팅 ({order.selectionDetails?.selections?.length || 0}개 선택)
                                           </div>
                                           <div className="text-gray-500 text-xs">
-                                            총 배당률: {order.selectionDetails?.totalOdds?.toFixed(2) || 'N/A'}
+                                            총 배당률: {order.selectionDetails?.totalOdds?.toFixed(3) || 'N/A'}
                                           </div>
                                         </div>
                                       ) : (
@@ -2237,7 +2237,7 @@ export default function ExchangeAdmin() {
                                     </span>
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {order.price.toFixed(2)}
+                                    {order.price.toFixed(3)}
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                     ₩{(order.amount || 0).toLocaleString()}
@@ -2534,7 +2534,7 @@ export default function ExchangeAdmin() {
                             </div>
                             <div className="flex justify-between">
                               <span className="text-sm text-gray-600">배당률:</span>
-                              <span className="text-sm font-medium">{selectedOrder.price.toFixed(2)}</span>
+                              <span className="text-sm font-medium">{selectedOrder.price.toFixed(3)}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-sm text-gray-600">주문 금액:</span>
@@ -2728,7 +2728,7 @@ export default function ExchangeAdmin() {
                                       </div>
                                       <div className="text-right">
                                         <div className="text-sm font-bold text-orange-600">
-                                          {selection.odds?.toFixed(2) || 'N/A'}
+                                          {selection.odds?.toFixed(3) || 'N/A'}
                                         </div>
                                         <div className="text-xs text-gray-500">배당률</div>
                                       </div>
@@ -3375,7 +3375,7 @@ export default function ExchangeAdmin() {
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {order.odds?.toFixed(2)}배
+                            {order.odds?.toFixed(3)}배
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             ₩{order.stakeAmount?.toLocaleString() || 0}
@@ -3455,7 +3455,7 @@ export default function ExchangeAdmin() {
                                     ₩{match.matchedStakeAmount?.toLocaleString() || 0}
                                   </div>
                                   <div className="text-xs text-gray-500">
-                                    {match.matchedOdds?.toFixed(2)}배
+                                    {match.matchedOdds?.toFixed(3)}배
                                   </div>
                                 </div>
                                 <div className="text-right">

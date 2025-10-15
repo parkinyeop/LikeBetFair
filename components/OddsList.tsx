@@ -437,7 +437,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                             disabled={!isBettable || !outcome.price}
                           >
                             <div className="font-medium">{label}</div>
-                            <div className="text-xs">{outcome.price ? outcome.price.toFixed(2) : 'N/A'}</div>
+                            <div className="text-xs">{outcome.price ? outcome.price.toFixed(3) : 'N/A'}</div>
                           </button>
                         );
                       })}
@@ -531,7 +531,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                               disabled={!isBettable || !overOdds}
                             >
                               <div className="font-medium">Over {point}</div>
-                              <div className="text-xs">{overOdds ? overOdds.toFixed(2) : 'N/A'}</div>
+                              <div className="text-xs">{overOdds ? overOdds.toFixed(3) : 'N/A'}</div>
                             </button>
                             <div className="w-12 text-sm font-medium text-blue-700 text-center">{point}</div>
                             <button
@@ -558,7 +558,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
                               disabled={!isBettable || !underOdds}
                             >
                               <div className="font-medium">Under {point}</div>
-                              <div className="text-xs">{underOdds ? underOdds.toFixed(2) : 'N/A'}</div>
+                              <div className="text-xs">{underOdds ? underOdds.toFixed(3) : 'N/A'}</div>
                             </button>
                           </div>
                         );

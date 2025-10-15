@@ -75,8 +75,26 @@ const BetSelectionPanel = () => {
     data?: any;
   }>({ isOpen: false });
 
-  const totalOdds = Math.round(selections.reduce((acc, curr) => acc * curr.odds, 1) * 1000) / 1000; // 소수점 3자리로 반올림
-  const expectedReturn = Math.round(stake * totalOdds * 100) / 100; // 소수점 2자리로 반올림
+  // ✅ 배당률 계산: 사용자의 요구사항에 따라 '내림' 처리
+  const rawOdds = selections.reduce((acc, curr) => acc * curr.odds, 1);
+  const totalOdds = Math.floor(rawOdds * 1000) / 1000;
+  
+  // ✅ 정확한 예상 수익 계산: 부동소수점 오차 방지
+  const expectedReturn = Math.floor(Math.round(stake * totalOdds * 100) / 100);
+  
+  // 🔍 디버깅: 계산 과정 확인
+  console.log('🔍 [BetSelectionPanel] 계산 과정:', {
+    selections: selections.map(s => ({ odds: s.odds })),
+    rawOdds,
+    totalOdds,
+    stake,
+    expectedReturn,
+    step1: stake * totalOdds,
+    step2: Math.round(stake * totalOdds * 100) / 100,
+    step3: Math.floor(Math.round(stake * totalOdds * 100) / 100),
+    manualCalc: Math.floor(10000 * 8.354),
+    expected: Math.floor(10000 * 8.354) // 예상값
+  });
 
   // 베팅 가능 시간 체크 (10분 전 마감)
   const now = new Date();
@@ -151,7 +169,7 @@ const BetSelectionPanel = () => {
               `📊 베팅 정보:\n` +
               `• 선택 항목: ${selections.length}개\n` +
               `• 베팅 금액: ${totalStake.toLocaleString()} KRW\n` +
-              `• 총 배당률: ${totalOdds.toFixed(2)}배\n` +
+              `• 총 배당률: ${totalOdds.toFixed(3)}배\n` +
               `• 예상 수익: ${estimatedProfit.toLocaleString()} KRW\n\n` +
               `💰 현재 잔액: ${responseData.balance ? Number(responseData.balance).toLocaleString() : '확인 중'} KRW`);
         
@@ -231,7 +249,7 @@ const BetSelectionPanel = () => {
               `📊 베팅 정보:\n` +
               `• 선택 항목: ${selections.length}개\n` +
               `• 베팅 금액: ${totalStake.toLocaleString()} KRW\n` +
-              `• 총 배당률: ${totalOdds.toFixed(2)}배\n` +
+              `• 총 배당률: ${totalOdds.toFixed(3)}배\n` +
               `• 예상 수익: ${estimatedProfit.toLocaleString()} KRW\n\n` +
               `💰 현재 잔액: ${data.balance ? Number(data.balance).toLocaleString() : '확인 중'} KRW`);
         
@@ -333,7 +351,7 @@ const BetSelectionPanel = () => {
               <p className="text-xs text-gray-500">{sel.desc}</p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold">{sel.odds.toFixed(2)}</span>
+              <span className="text-sm font-semibold">{sel.odds.toFixed(3)}</span>
               <button onClick={() => {
                 removeSelection(sel.team);
                 // 선택 제거 시 메시지 초기화 (더 이상 사용하지 않음)
@@ -353,8 +371,8 @@ const BetSelectionPanel = () => {
         />
       </div>
       <div className="text-sm">
-        <p className="mb-1">Total Odds: <span className="font-semibold">{totalOdds.toFixed(2)}</span></p>
-        <p className="mb-1">Estimated Profit: <span className="font-semibold">{Math.floor(expectedReturn).toLocaleString()} KRW</span></p>
+        <p className="mb-1">Total Odds: <span className="font-semibold">{totalOdds.toFixed(3)}</span></p>
+        <p className="mb-1">Estimated Profit: <span className="font-semibold">{expectedReturn.toLocaleString()} KRW</span></p>
       </div>
       <button
         className="w-full mt-4 bg-blue-600 text-white py-2 rounded text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"

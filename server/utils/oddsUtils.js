@@ -35,8 +35,8 @@ export function adjustOddsPayout(odds, targetPayout) {
       return Infinity;
     }
     const newOdd = 1 / prob;
-    // 최종 배당률을 소수점 2자리로 반올림
-    return Math.round(newOdd * 100) / 100;
+    // 최종 배당률을 소수점 3자리로 floor 처리
+    return Math.floor(newOdd * 1000) / 1000;
   });
 
   return newOdds;

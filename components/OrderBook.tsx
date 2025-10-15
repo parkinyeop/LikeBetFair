@@ -147,7 +147,7 @@ export default function OrderBook({ gameId, market, line, onOrderClick }: OrderB
         <div className="flex justify-between items-start mb-2">
           <div className="flex items-center space-x-2">
             <div>
-              <span className="text-lg font-bold text-gray-900">{order.price.toFixed(2)}</span>
+              <span className="text-lg font-bold text-gray-900">{order.price.toFixed(3)}</span>
               {/* 배당율 정보 표시 */}
               {(() => {
                 console.log('🔍 주문 배당율 데이터:', {
@@ -165,12 +165,12 @@ export default function OrderBook({ gameId, market, line, onOrderClick }: OrderB
                 return (
                   <div className="text-xs text-gray-600 mt-1">
                     <div className="flex justify-between">
-                      <span>주문 Back: {typeof order.backOdds === 'number' ? order.backOdds.toFixed(2) : 'N/A'}</span>
-                      <span>주문 Lay: {typeof order.layOdds === 'number' ? order.layOdds.toFixed(2) : 'N/A'}</span>
+                      <span>주문 Back: {typeof order.backOdds === 'number' ? order.backOdds.toFixed(3) : 'N/A'}</span>
+                      <span>주문 Lay: {typeof order.layOdds === 'number' ? order.layOdds.toFixed(3) : 'N/A'}</span>
                     </div>
                     {sportsbookBackOdds && (
                       <div className="flex justify-between mt-1 text-blue-600">
-                        <span>스포츠북: {sportsbookBackOdds.toFixed(2)}</span>
+                        <span>스포츠북: {sportsbookBackOdds.toFixed(3)}</span>
                         <span>참고 배당</span>
                       </div>
                     )}

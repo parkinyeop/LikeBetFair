@@ -299,7 +299,7 @@ function MyBetsPanel() {
                               </div>
                               <div className="text-right">
                                 <div className="font-bold text-gray-800">
-                                  @ {Number(sel.odds).toFixed(2)}
+                                  @ {Number(sel.odds).toFixed(3)}
                                 </div>
                               </div>
                             </div>
@@ -330,7 +330,7 @@ function MyBetsPanel() {
                             배팅금액: <span className="font-medium text-black">{Math.floor(bet.stake || 0).toLocaleString()}원</span>
                           </span>
                           <span className="text-gray-600">
-                            배당율: <span className="font-medium text-black">{Number(bet.totalOdds).toFixed(2)}배</span>
+                            배당율: <span className="font-medium text-black">{Number(bet.totalOdds).toFixed(3)}배</span>
                           </span>
                         </div>
                         <button className="px-2 py-1 text-xs border rounded text-blue-600 border-blue-300 hover:bg-blue-50" onClick={e => { e.stopPropagation(); toggleBet(bet.id); }}>{isOpen ? 'Collapse ▲' : 'Expand ▼'}</button>
@@ -533,7 +533,7 @@ else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; la
                       </div>
                       <div className="flex justify-between items-center">
                         <span>배당율:</span>
-                        <b className="text-black">{Number(bet.totalOdds).toFixed(2)}배</b>
+                        <b className="text-black">{Number(bet.totalOdds).toFixed(3)}배</b>
                       </div>
                       <div className="flex justify-between items-center">
                         <span>예상수익:</span>

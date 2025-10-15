@@ -729,7 +729,7 @@ export default function Exchange() {
                   officialOdds[marketKey] = {};
                   Object.keys(marketData[marketKey]).forEach(outcomeKey => {
                     const { count, totalPrice } = marketData[marketKey][outcomeKey];
-                    officialOdds[marketKey][outcomeKey] = (totalPrice / count).toFixed(2);
+                    officialOdds[marketKey][outcomeKey] = (totalPrice / count).toFixed(3);
                   });
                 });
               }
@@ -1041,7 +1041,7 @@ export default function Exchange() {
                           title={isBettable && outcome.price ? `클릭하여 ${outcome.name} 주문하기` : '베팅 마감됨'}
                         >
                           <div className="font-medium">{label}</div>
-                          <div className="text-xs">{outcome.price ? outcome.price.toFixed(2) : 'N/A'}</div>
+                          <div className="text-xs">{outcome.price ? outcome.price.toFixed(3) : 'N/A'}</div>
                           {!isBettable && <div className="text-xs text-red-400 mt-1">Betting Closed</div>}
                         </button>
                       );
@@ -1160,7 +1160,7 @@ export default function Exchange() {
                                 disabled={!isBettable || !adjustedOverOdds}
                               >
                                 <div className="font-medium">{game.home_team}</div>
-                                <div className="text-xs">{adjustedOverOdds ? adjustedOverOdds.toFixed(2) : 'N/A'}</div>
+                                <div className="text-xs">{adjustedOverOdds ? adjustedOverOdds.toFixed(3) : 'N/A'}</div>
                               </button>
                               <div className="w-12 text-sm font-medium text-blue-400 text-center">{point}</div>
                               <button
@@ -1205,7 +1205,7 @@ export default function Exchange() {
                                 disabled={!isBettable || !adjustedUnderOdds}
                               >
                                 <div className="font-medium">{game.away_team}</div>
-                                <div className="text-xs">{adjustedUnderOdds ? adjustedUnderOdds.toFixed(2) : 'N/A'}</div>
+                                <div className="text-xs">{adjustedUnderOdds ? adjustedUnderOdds.toFixed(3) : 'N/A'}</div>
                               </button>
                             </div>
                           );
@@ -1333,7 +1333,7 @@ export default function Exchange() {
                                   disabled={!isBettable || !adjustedHomeOdds}
                                 >
                                   <div className="font-medium">{game.home_team} {homeHandicap > 0 ? '+' : ''}{homeHandicap}</div>
-                                  <div className="text-xs">{adjustedHomeOdds ? adjustedHomeOdds.toFixed(2) : 'N/A'}</div>
+                                  <div className="text-xs">{adjustedHomeOdds ? adjustedHomeOdds.toFixed(3) : 'N/A'}</div>
                                 </button>
                               )}
                               <div className="w-12 text-sm font-medium text-blue-400 text-center">{pointValue}</div>
@@ -1381,7 +1381,7 @@ export default function Exchange() {
                                   disabled={!isBettable || !adjustedAwayOdds}
                                 >
                                   <div className="font-medium">{game.away_team} {awayHandicap > 0 ? '+' : ''}{awayHandicap}</div>
-                                  <div className="text-xs">{adjustedAwayOdds ? adjustedAwayOdds.toFixed(2) : 'N/A'}</div>
+                                  <div className="text-xs">{adjustedAwayOdds ? adjustedAwayOdds.toFixed(3) : 'N/A'}</div>
                                 </button>
                               )}
                             </div>
@@ -1720,7 +1720,7 @@ export default function Exchange() {
                                 title={game.isBettable && outcome.price ? `클릭하여 ${outcome.name} 주문하기` : '베팅 마감됨'}
                               >
                                 <div className="font-medium">{label}</div>
-                                <div className="text-xs">{outcome.price ? outcome.price.toFixed(2) : 'N/A'}</div>
+                                <div className="text-xs">{outcome.price ? outcome.price.toFixed(3) : 'N/A'}</div>
                                 {!game.isBettable && <div className="text-xs text-red-400 mt-1">Betting Closed</div>}
                               </button>
                             );
@@ -1839,7 +1839,7 @@ export default function Exchange() {
                                       disabled={!game.isBettable || !adjustedOverOdds}
                                     >
                                       <div className="font-medium">{game.home_team}</div>
-                                      <div className="text-xs">{adjustedOverOdds ? adjustedOverOdds.toFixed(2) : 'N/A'}</div>
+                                      <div className="text-xs">{adjustedOverOdds ? adjustedOverOdds.toFixed(3) : 'N/A'}</div>
                                     </button>
                                     <div className="w-12 text-sm font-medium text-blue-400 text-center">{point}</div>
                                     <button
@@ -1886,7 +1886,7 @@ export default function Exchange() {
                                       disabled={!game.isBettable || !adjustedUnderOdds}
                                     >
                                       <div className="font-medium">{game.away_team}</div>
-                                      <div className="text-xs">{adjustedUnderOdds ? adjustedUnderOdds.toFixed(2) : 'N/A'}</div>
+                                      <div className="text-xs">{adjustedUnderOdds ? adjustedUnderOdds.toFixed(3) : 'N/A'}</div>
                                     </button>
                                   </div>
                                 );
@@ -2017,7 +2017,7 @@ export default function Exchange() {
                                         title={game.isBettable && adjustedHomeOdds ? `클릭하여 ${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap} 주문하기` : '베팅 마감됨'}
                                       >
                                         <div className="font-medium">{game.home_team} {homeHandicap > 0 ? '+' : ''}{homeHandicap}</div>
-                                        <div className="text-xs">{adjustedHomeOdds ? adjustedHomeOdds.toFixed(2) : 'N/A'}</div>
+                                        <div className="text-xs">{adjustedHomeOdds ? adjustedHomeOdds.toFixed(3) : 'N/A'}</div>
                                       </button>
                                     )}
                                     <div className="w-12 text-sm font-medium text-blue-400 text-center">{pointValue}</div>
@@ -2068,7 +2068,7 @@ export default function Exchange() {
                                         title={game.isBettable && adjustedAwayOdds ? `클릭하여 ${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap} 주문하기` : '베팅 마감됨'}
                                       >
                                         <div className="font-medium">{game.away_team} {awayHandicap > 0 ? '+' : ''}{awayHandicap}</div>
-                                        <div className="text-xs">{adjustedAwayOdds ? adjustedAwayOdds.toFixed(2) : 'N/A'}</div>
+                                        <div className="text-xs">{adjustedAwayOdds ? adjustedAwayOdds.toFixed(3) : 'N/A'}</div>
                                       </button>
                                     )}
                                   </div>

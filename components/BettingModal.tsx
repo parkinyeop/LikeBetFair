@@ -106,7 +106,7 @@ export default function BettingModal({ isOpen, onClose, onConfirm, selection }: 
               <span className={`font-bold text-lg ${
                 selection.type === 'back' ? 'text-blue-600' : 'text-pink-600'
               }`}>
-                {selection.price.toFixed(2)}
+                {selection.price.toFixed(3)}
               </span>
             </div>
             <div className="text-sm text-gray-600 mt-1">
@@ -143,7 +143,7 @@ export default function BettingModal({ isOpen, onClose, onConfirm, selection }: 
                 </div>
                 <div className="flex justify-between">
                   <span>Odds:</span>
-                  <span className="font-semibold">{selection.price.toFixed(2)}</span>
+                  <span className="font-semibold">{selection.price.toFixed(3)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Expected Profit:</span>

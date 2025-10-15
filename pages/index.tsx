@@ -1025,7 +1025,7 @@ export default function Home() {
                                 disabled={!isBettable || !outcome.price}
                               >
                                 <div className="font-medium">{label}</div>
-                                <div className="text-xs">{outcome.price ? outcome.price.toFixed(2) : 'N/A'}</div>
+                                <div className="text-xs">{outcome.price ? outcome.price.toFixed(3) : 'N/A'}</div>
                                 {!isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
                               </button>
                             );
@@ -1103,7 +1103,7 @@ export default function Home() {
                             disabled={!isBettable || !overOdds}
                           >
                             <div className="font-medium">{game.home_team}</div>
-                            <div className="text-xs">Over ({overOdds ? overOdds.toFixed(2) : 'N/A'})</div>
+                            <div className="text-xs">Over ({overOdds ? overOdds.toFixed(3) : 'N/A'})</div>
                           </button>
                           <div className="w-16 text-base font-bold text-gray-800 text-center">{point}</div>
                           <button
@@ -1129,7 +1129,7 @@ export default function Home() {
                             disabled={!isBettable || !underOdds}
                           >
                             <div className="font-medium">{game.away_team}</div>
-                            <div className="text-xs">Under ({underOdds ? underOdds.toFixed(2) : 'N/A'})</div>
+                            <div className="text-xs">Under ({underOdds ? underOdds.toFixed(3) : 'N/A'})</div>
                           </button>
                         </div>
                       );
@@ -1570,7 +1570,7 @@ export default function Home() {
                                         disabled={!game.isBettable || !outcome.odds.averagePrice}
                                       >
                                         <div className="font-medium">{label}</div>
-                                        <div className="text-xs">{outcome.odds.averagePrice.toFixed(2)}</div>
+                                        <div className="text-xs">{outcome.odds.averagePrice.toFixed(3)}</div>
                                         {!game.isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
                                       </button>
                                     );
@@ -1676,7 +1676,7 @@ export default function Home() {
                                       disabled={!game.isBettable || !overOdds}
                                     >
                                       <div className="font-medium">{game.home_team}</div>
-                                      <div className="text-xs">Over ({overOdds ? overOdds.toFixed(2) : 'N/A'})</div>
+                                      <div className="text-xs">Over ({overOdds ? overOdds.toFixed(3) : 'N/A'})</div>
                                       {!game.isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
                                     </button>
                                     <div className="w-16 text-base font-bold text-gray-800 text-center">
@@ -1708,7 +1708,7 @@ export default function Home() {
                                       disabled={!game.isBettable || !underOdds}
                                     >
                                       <div className="font-medium">{game.away_team}</div>
-                                      <div className="text-xs">Under ({underOdds ? underOdds.toFixed(2) : 'N/A'})</div>
+                                      <div className="text-xs">Under ({underOdds ? underOdds.toFixed(3) : 'N/A'})</div>
                                       {!game.isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
                                     </button>
                                   </div>
@@ -1827,7 +1827,7 @@ export default function Home() {
                                       >
                                         <div className="font-medium">{game.home_team}</div>
                                         <div className="text-xs">
-                                          {homeOdds.toFixed(2)} 
+                                          {homeOdds.toFixed(3)} 
                                           <span className="ml-1 text-xs">{homeHandicap > 0 ? '+' : ''}{homeHandicap}</span>
                                         </div>
                                         {!game.isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
@@ -1862,7 +1862,7 @@ export default function Home() {
                                       >
                                         <div className="font-medium">{game.away_team}</div>
                                         <div className="text-xs">
-                                          {awayOdds.toFixed(2)} 
+                                          {awayOdds.toFixed(3)} 
                                           <span className="ml-1 text-xs">{awayHandicap > 0 ? '+' : ''}{awayHandicap}</span>
                                         </div>
                                         {!game.isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}

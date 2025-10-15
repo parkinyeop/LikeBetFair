@@ -233,8 +233,8 @@ export async function placeBet(req, res) {
       return res.status(400).json({ message: 'Insufficient balance' });
     }
 
-    // Create bet with precise decimal calculation
-    const potentialWinnings = Math.round(stake * totalOdds * 100) / 100; // 소수점 2자리로 반올림
+    // Create bet with precise decimal calculation (floor to 3 decimal places)
+    const potentialWinnings = Math.floor(stake * totalOdds * 100) / 100; // 소수점 2자리로 내림
     
     // ✅ selections 데이터 검증 및 정규화
     console.log('🔍 [PlaceBet] selections 데이터 검증 시작');

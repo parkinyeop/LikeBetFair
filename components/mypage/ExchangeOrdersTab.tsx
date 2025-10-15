@@ -99,7 +99,7 @@ export default function ExchangeOrdersTab() {
     {
       key: 'price',
       label: '배당률',
-      render: (value: number) => value.toFixed(2),
+      render: (value: number) => value.toFixed(3),
       className: 'w-24'
     },
     {

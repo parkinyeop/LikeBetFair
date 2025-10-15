@@ -215,7 +215,7 @@ export default function SportsPage() {
                                 href={`/odds/${league.key}`}
                                 className="font-medium text-green-600 hover:text-green-800 transition-colors cursor-pointer"
                               >
-                                Odds {data.sampleOdds.toFixed(2)}
+                                Odds {data.sampleOdds.toFixed(3)}
                               </Link>
                             ) : (
                               <span className="text-gray-400">No odds</span>

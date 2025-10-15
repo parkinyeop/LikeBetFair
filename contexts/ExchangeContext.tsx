@@ -167,11 +167,42 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
     const totalOdds = multiBetSelections.length > 0 
       ? multiBetSelections.reduce((acc, selection) => acc * (selection.odds || 1), 1)
       : 1;
-    setMultiBetTotalOdds(totalOdds);
+    
+    // ✅ 배당률을 3자리로 정확하게 처리 (floor 방식)
+    const roundedTotalOdds = Math.floor(parseFloat(totalOdds.toFixed(3)) * 1000) / 1000;
+    
+    // 🔍 디버깅: 총 배당률 계산 확인
+    console.log('🔍 [ExchangeContext] 총 배당률 계산:', {
+      selectionsCount: multiBetSelections.length,
+      selections: multiBetSelections.map(s => ({ 
+        team: s.team, 
+        odds: s.odds,
+        oddsType: typeof s.odds,
+        oddsValue: s.odds
+      })),
+      totalOdds,
+      totalOddsType: typeof totalOdds
+    });
+    
+    setMultiBetTotalOdds(roundedTotalOdds);
     
     if (multiBetStake > 0) {
-      // ✅ 올바른 Exchange 멀티배팅 수익 계산: 본금 포함 (총 수익)
-      const potentialWinnings = Math.round(multiBetStake * totalOdds);
+      // ✅ 정확한 Exchange 멀티배팅 수익 계산: 부동소수점 오차 방지
+      const potentialWinnings = Math.floor(Math.round(multiBetStake * roundedTotalOdds * 100) / 100);
+      
+      // 🔍 디버깅: 계산 과정 확인
+      console.log('🔍 [ExchangeContext] 멀티배팅 수익 계산:', {
+        multiBetStake,
+        originalTotalOdds: totalOdds,
+        roundedTotalOdds: roundedTotalOdds,
+        rawCalculation: multiBetStake * roundedTotalOdds,
+        step1: multiBetStake * roundedTotalOdds * 100,
+        step2: Math.round(multiBetStake * roundedTotalOdds * 100),
+        step3: Math.round(multiBetStake * roundedTotalOdds * 100) / 100,
+        finalResult: potentialWinnings,
+        selections: multiBetSelections.map(s => ({ odds: s.odds, team: s.team }))
+      });
+      
       setMultiBetPotentialWinnings(potentialWinnings);
     }
   }, [multiBetSelections, multiBetStake]);
@@ -220,6 +251,13 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
 
   // 🆕 멀티배팅 베팅 금액 업데이트
   const updateMultiBetStake = (stake: number) => {
+    // 🔍 디버깅: 베팅 금액 업데이트 확인
+    console.log('🔍 [ExchangeContext] 베팅 금액 업데이트:', {
+      previousStake: multiBetStake,
+      newStake: stake,
+      stakeType: typeof stake,
+      stakeValue: stake
+    });
     setMultiBetStake(stake);
   };
 

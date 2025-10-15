@@ -121,7 +121,7 @@ const HandicapOddsDisplay: React.FC<HandicapOddsDisplayProps> = ({
                 <div className="font-medium">
                   {game.home_team} {formatHandicap(homeHandicap)}
                 </div>
-                <div className="text-xs">{homeOdds.toFixed(2)}</div>
+                <div className="text-xs">{homeOdds.toFixed(3)}</div>
               </button>
             )}
 
@@ -165,7 +165,7 @@ const HandicapOddsDisplay: React.FC<HandicapOddsDisplayProps> = ({
                 <div className="font-medium">
                   {game.away_team} {formatHandicap(awayHandicap)}
                 </div>
-                <div className="text-xs">{awayOdds.toFixed(2)}</div>
+                <div className="text-xs">{awayOdds.toFixed(3)}</div>
               </button>
             )}
           </div>

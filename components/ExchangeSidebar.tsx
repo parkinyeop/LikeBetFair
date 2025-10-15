@@ -456,7 +456,7 @@ function OrderPanel() {
                     {selection.homeTeam} vs {selection.awayTeam}
                   </div>
                   <div className="text-sm text-gray-700 pr-6">
-                    {selection.selection} • {selection.side === 'back' ? '🎯 Back' : '📉 Lay'} • <span className="font-bold text-blue-600">{(typeof selection.odds === 'string' ? parseFloat(selection.odds) : selection.odds || 0).toFixed(2)}</span>
+                    {selection.selection} • {selection.side === 'back' ? '🎯 Back' : '📉 Lay'} • <span className="font-bold text-blue-600">{(typeof selection.odds === 'string' ? parseFloat(selection.odds) : selection.odds || 0).toFixed(3)}</span>
                   </div>
                 </div>
               ))}
@@ -528,7 +528,7 @@ function OrderPanel() {
                           {(selectedBet?.isMultibet ? 
                             Number(selectedBet?.totalOdds || selectedBet?.price || 0) : 
                             Number(selectedBet?.price || 0)
-                          ).toFixed(2)}
+                          ).toFixed(3)}
                         </span>
                       </div>
                       <div className="flex justify-between">
@@ -552,7 +552,7 @@ function OrderPanel() {
                     <>
                       <div className="flex justify-between">
                         <span className="text-gray-700">총 배당률:</span>
-                        <span className="font-bold text-blue-600">{(typeof multiBetTotalOdds === 'string' ? parseFloat(multiBetTotalOdds) : multiBetTotalOdds || 0).toFixed(2)}</span>
+                        <span className="font-bold text-blue-600">{(typeof multiBetTotalOdds === 'string' ? parseFloat(multiBetTotalOdds) : multiBetTotalOdds || 0).toFixed(3)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-700">예상 수익:</span>
@@ -789,10 +789,12 @@ function OrderHistoryPanel() {
     
     if (order.side === 'back') {
       // Back: 본인 배팅금액 + 수익 = stakeAmount + (stakeAmount * (odds - 1))
-      return Math.round(stakeAmount * totalOdds);
+      // ✅ 부동소수점 오차 방지: Math.round를 2번 적용
+      return Math.round(Math.round(stakeAmount * totalOdds * 100) / 100);
     } else {
       // Lay: 본인 배팅금액 + 수익 = stakeAmount + (stakeAmount * (odds - 1) / odds)
-      return Math.round(stakeAmount + (stakeAmount * (totalOdds - 1) / totalOdds));
+      const expectedProfit = stakeAmount + (stakeAmount * (totalOdds - 1) / totalOdds);
+      return Math.round(Math.round(expectedProfit * 100) / 100);
     }
   };
 
@@ -1127,7 +1129,7 @@ function OrderHistoryPanel() {
                               </div>
                               <div className="text-right">
                                 <div className="font-bold text-gray-800">
-                                  @{selection.odds?.toFixed(2) || '0.00'}
+                                  @{selection.odds?.toFixed(3) || '0.000'}
                                 </div>
                               </div>
                             </div>
@@ -1172,7 +1174,7 @@ function OrderHistoryPanel() {
                             @{(order.isMultibet ? 
                               Number(order.totalOdds || order.price || 0) : 
                               Number(order.price || 0)
-                            ).toFixed(2)}
+                            ).toFixed(3)}
                           </div>
                         </div>
                       </div>
@@ -1201,7 +1203,7 @@ function OrderHistoryPanel() {
                       <div className="flex items-center space-x-2">
                         <span className="text-gray-500">배당률</span>
                         <span className="text-sm font-bold text-blue-600">
-                          @{Number(totalOdds || 0).toFixed(2)}
+                          @{Number(totalOdds || 0).toFixed(3)}
                         </span>
                       </div>
                     </div>

@@ -27,7 +27,7 @@ const Bet = sequelize.define('Bet', {
     allowNull: false
   },
   totalOdds: {
-    type: DataTypes.DECIMAL(10, 2),
+    type: DataTypes.DECIMAL(10, 3),
     allowNull: false
   },
   potentialWinnings: {

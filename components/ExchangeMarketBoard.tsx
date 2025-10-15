@@ -456,7 +456,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                     >
                       <div className="text-center truncate max-w-full">{game.homeTeam}</div>
                       <div className="text-xs mt-1 opacity-90">
-                        배당: {game.homeTeamOdds ? game.homeTeamOdds.toFixed(2) : 'N/A'}
+                        배당: {game.homeTeamOdds ? game.homeTeamOdds.toFixed(3) : 'N/A'}
                       </div>
                     </button>
 
@@ -473,7 +473,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                       >
                         <div className="text-center">무승부</div>
                         <div className="text-xs mt-1 opacity-90">
-                          배당: {game.drawOdds ? game.drawOdds.toFixed(2) : 'N/A'}
+                          배당: {game.drawOdds ? game.drawOdds.toFixed(3) : 'N/A'}
                         </div>
                       </button>
                     )}
@@ -490,7 +490,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                     >
                       <div className="text-center truncate max-w-full">{game.awayTeam}</div>
                       <div className="text-xs mt-1 opacity-90">
-                        배당: {game.awayTeamOdds ? game.awayTeamOdds.toFixed(2) : 'N/A'}
+                        배당: {game.awayTeamOdds ? game.awayTeamOdds.toFixed(3) : 'N/A'}
                       </div>
                     </button>
                   </div>
@@ -574,7 +574,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                                 }`}
                               >
                                 <div className="font-medium">{game.homeTeam}</div>
-                                <div className="text-xs">{adjustedOverOdds ? adjustedOverOdds.toFixed(2) : 'N/A'}</div>
+                                <div className="text-xs">{adjustedOverOdds ? adjustedOverOdds.toFixed(3) : 'N/A'}</div>
                               </button>
                               <div className="w-12 text-sm font-medium text-blue-400 text-center">{point}</div>
                               <button
@@ -587,7 +587,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                                 }`}
                               >
                                 <div className="font-medium">{game.awayTeam}</div>
-                                <div className="text-xs">{adjustedUnderOdds ? adjustedUnderOdds.toFixed(2) : 'N/A'}</div>
+                                <div className="text-xs">{adjustedUnderOdds ? adjustedUnderOdds.toFixed(3) : 'N/A'}</div>
                               </button>
                             </div>
                           );
@@ -662,7 +662,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                                   }`}
                                 >
                                   <div className="font-medium">{game.homeTeam}</div>
-                                  <div className="text-xs">{adjustedHomeOdds ? adjustedHomeOdds.toFixed(2) : 'N/A'}</div>
+                                  <div className="text-xs">{adjustedHomeOdds ? adjustedHomeOdds.toFixed(3) : 'N/A'}</div>
                                 </button>
                               )}
                               <div className="w-12 text-sm font-medium text-blue-400 text-center">{pointValue}</div>
@@ -677,7 +677,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                                   }`}
                                 >
                                   <div className="font-medium">{game.awayTeam}</div>
-                                  <div className="text-xs">{adjustedAwayOdds ? adjustedAwayOdds.toFixed(2) : 'N/A'}</div>
+                                  <div className="text-xs">{adjustedAwayOdds ? adjustedAwayOdds.toFixed(3) : 'N/A'}</div>
                                 </button>
                               )}
                             </div>

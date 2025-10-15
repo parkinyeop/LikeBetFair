@@ -577,7 +577,7 @@ export default function LiveOddsPage() {
                       </div>
                       <div className="text-xs text-gray-400">
                         <div className="mb-1">주문금액: {(multibetOrder as any).stakeAmount?.toLocaleString()}원</div>
-                        <div>총 배당: {parseFloat((multibetOrder as any).totalOdds).toFixed(2)}배당</div>
+                        <div>총 배당: {parseFloat((multibetOrder as any).totalOdds).toFixed(3)}배당</div>
                       </div>
                     </div>
 
@@ -599,7 +599,7 @@ export default function LiveOddsPage() {
                           {getLeagueFromSportKey(selection.sportKey || '')}
                         </div>
                         <div className="text-gray-300 text-sm mb-2">
-                          {selection.selection} • {selection.side === 'back' ? '🎯 Back' : '📉 Lay'} • {selection.odds ? Number(selection.odds).toFixed(2) : 'N/A'}배당
+                          {selection.selection} • {selection.side === 'back' ? '🎯 Back' : '📉 Lay'} • {selection.odds ? Number(selection.odds).toFixed(3) : 'N/A'}배당
                         </div>
                         {/* 각 경기의 시간 표시 */}
                         {selection.commenceTime && (
@@ -645,7 +645,7 @@ export default function LiveOddsPage() {
                                       <div className="font-medium">{selection.selection}</div>
                                       <div className="text-xs mt-1 opacity-90">🎯 Back</div>
                                       <div className="text-xs mt-1 text-white font-medium">
-                                        배당률: {selection.odds ? Number(selection.odds).toFixed(2) : 'N/A'}
+                                        배당률: {selection.odds ? Number(selection.odds).toFixed(3) : 'N/A'}
                                       </div>
                                     </button>
                                     
@@ -678,7 +678,7 @@ export default function LiveOddsPage() {
                                       <div className="font-medium">{selection.selection}</div>
                                       <div className="text-xs mt-1 opacity-90">🎯 Back</div>
                                       <div className="text-xs mt-1 text-white font-medium">
-                                        배당률: {selection.odds ? Number(selection.odds).toFixed(2) : 'N/A'}
+                                        배당률: {selection.odds ? Number(selection.odds).toFixed(3) : 'N/A'}
                                       </div>
                                     </button>
                                     
@@ -726,7 +726,7 @@ export default function LiveOddsPage() {
                                     <div className="font-medium">{selection.selection}</div>
                                     <div className="text-xs mt-1 opacity-90">🎯 Back</div>
                                     <div className="text-xs mt-1 text-white font-medium">
-                                      배당률: {selection.odds?.toFixed(2)}
+                                      배당률: {selection.odds?.toFixed(3)}
                                     </div>
                                   </button>
                                   
@@ -833,7 +833,7 @@ export default function LiveOddsPage() {
                               <button disabled={true} className={getButtonStyle(false, true, false, false)}>
                                 <div className="font-medium">{order.selection}</div>
                                 <div className="text-xs mt-1 opacity-90">🎯 Back</div>
-                                <div className="text-xs mt-1 text-white font-medium">배당률: {applyExchangeReturnRate(order.price, [order.price]).toFixed(2)}</div>
+                                <div className="text-xs mt-1 text-white font-medium">배당률: {applyExchangeReturnRate(order.price, [order.price]).toFixed(3)}</div>
                                 <div className="text-xs mt-1 text-white font-medium">금액: {order.amount.toLocaleString()}원</div>
                               </button>
                               <button onClick={() => handleButtonClick(String(order.id), `lay_무승부`)} className={getButtonStyle(true, false, isButtonSelected(String(order.id), `lay_무승부`), false)}>
@@ -864,7 +864,7 @@ export default function LiveOddsPage() {
                               <button disabled={true} className={getButtonStyle(false, true, false, false)}>
                                 <div className="font-medium">{order.selection}</div>
                                 <div className="text-xs mt-1 opacity-90">🎯 Back</div>
-                                <div className="text-xs mt-1 text-white font-medium">배당률: {applyExchangeReturnRate(order.price, [order.price]).toFixed(2)}</div>
+                                <div className="text-xs mt-1 text-white font-medium">배당률: {applyExchangeReturnRate(order.price, [order.price]).toFixed(3)}</div>
                                 <div className="text-xs mt-1 text-white font-medium">금액: {order.amount.toLocaleString()}원</div>
                               </button>
                               <button onClick={() => handleButtonClick(String(order.id), `lay_${order.market}_${order.selection}`)} className={getButtonStyle(true, false, false, false)}>

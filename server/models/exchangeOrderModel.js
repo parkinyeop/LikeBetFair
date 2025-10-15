@@ -17,7 +17,7 @@ const ExchangeOrder = sequelize.define('ExchangeOrder', {
   market: { type: DataTypes.STRING, allowNull: false },
   line: { type: DataTypes.FLOAT, allowNull: false },
   side: { type: DataTypes.ENUM('back', 'lay'), allowNull: false },
-  price: { type: DataTypes.FLOAT, allowNull: false },
+  price: { type: DataTypes.DECIMAL(10, 3), allowNull: false },
   amount: { type: DataTypes.INTEGER, allowNull: false },
   selection: { type: DataTypes.STRING, allowNull: true }, // 선택한 팀/선수명 (기존 호환성)
   status: { 
@@ -111,7 +111,7 @@ const ExchangeOrder = sequelize.define('ExchangeOrder', {
     comment: '멀티배팅 여부'
   },
   totalOdds: {
-    type: DataTypes.DECIMAL(10, 4),
+    type: DataTypes.DECIMAL(10, 3),
     allowNull: true,
     comment: '총 배당률 (멀티배팅용)'
   },
