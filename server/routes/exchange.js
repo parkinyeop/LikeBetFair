@@ -1257,14 +1257,19 @@ router.get('/orders/:orderId/matches', verifyToken, async (req, res) => {
     const { orderId } = req.params;
     const userId = req.user.userId;
     
+    console.log(`📊 매칭 정보 조회 요청: orderId=${orderId}, userId=${userId}`);
+    
     // 주문 소유권 확인
     const order = await ExchangeOrder.findOne({
       where: { id: orderId, userId }
     });
     
     if (!order) {
+      console.log(`❌ 주문을 찾을 수 없음: orderId=${orderId}, userId=${userId}`);
       return res.status(404).json({ message: '주문을 찾을 수 없습니다.' });
     }
+    
+    console.log(`✅ 주문 찾음: orderId=${orderId}, side=${order.side}, status=${order.status}`);
     
     // 매칭 내역 조회
     const matches = await ExchangeOrderMatch.findAll({
@@ -1330,8 +1335,12 @@ router.get('/orders/:orderId/matches', verifyToken, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('주문 매칭 내역 조회 오류:', error);
-    res.status(500).json({ message: '매칭 내역 조회 중 오류가 발생했습니다.' });
+    console.error('❌ 주문 매칭 내역 조회 오류:', error);
+    console.error('❌ 에러 스택:', error.stack);
+    res.status(500).json({ 
+      message: '매칭 내역 조회 중 오류가 발생했습니다.',
+      error: error.message 
+    });
   }
 });
 
