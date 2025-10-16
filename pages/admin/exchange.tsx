@@ -2534,7 +2534,7 @@ export default function ExchangeAdmin() {
                             </div>
                             <div className="flex justify-between">
                               <span className="text-sm text-gray-600">배당률:</span>
-                              <span className="text-sm font-medium">{selectedOrder.price.toFixed(3)}</span>
+                              <span className="text-sm font-medium">{Number(selectedOrder.price || 0).toFixed(3)}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-sm text-gray-600">주문 금액:</span>
