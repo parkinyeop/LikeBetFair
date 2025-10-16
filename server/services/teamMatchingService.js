@@ -4,6 +4,8 @@
  * - 축약형, 별명, 다양한 표기법 지원
  */
 
+const { normalizeForBetSettlement } = require('../utils/normalizeUtils.js');
+
 class TeamMatchingService {
   constructor() {
     // 팀명 정규화 함수들
@@ -19,16 +21,8 @@ class TeamMatchingService {
   normalizeTeamName(teamName) {
     if (!teamName) return '';
     
-    return teamName
-      .toLowerCase()
-      .trim()
-      // 특수문자 제거
-      .replace(/[^\w\s]/g, '')
-      // 연속 공백을 하나로
-      .replace(/\s+/g, ' ')
-      // 불필요한 단어 제거
-      .replace(/\b(fc|club|team|united|city|town|athletic|sports|football|soccer|basketball|baseball)\b/g, '')
-      .trim();
+    // 🎯 중앙화된 함수 사용 (공백 유지 모드)
+    return normalizeForBetSettlement(teamName);
   }
 
   /**

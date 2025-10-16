@@ -21,7 +21,8 @@ function normalizeAccents(str) {
 function normalizeTeamName(team) {
   if (!team) return '';
   
-  let normalized = team
+  // 🔧 유니코드 악센트 먼저 제거
+  let normalized = normalizeAccents(team)
     .toLowerCase()
     .replace(/[^a-z0-9가-힣]/g, '')
     .replace(/\s+/g, '')
@@ -402,6 +403,7 @@ const globalTeamMapping = {
 
 /**
  * 팀명 비교용 정규화: 더 엄격한 정규화 (앞뒤 공백, 대소문자, 특수문자 모두 제거)
+ * 🎯 중앙화된 로직 사용 (하위 호환성 유지)
  */
 function normalizeTeamNameForComparison(team) {
   if (!team) return '';
@@ -412,22 +414,20 @@ function normalizeTeamNameForComparison(team) {
   // 2. 소문자 변환 및 trim
   normalized = normalized.toLowerCase().trim();
   
-  // 3. 지역 접미사 제거 (⚠️ 공백이 있을 때 동작)
-  // 예: "Bragantino SP" → "Bragantino"
+  // 3. 지역 접미사 제거
   normalized = normalized
-    .replace(/[-\s](sp|rj|mg|ba|rs|pr|ce|pe)$/i, '')  // 브라질 주 약어
-    .replace(/\s+(ba|cordoba|sanjuan|tucuman|plata|buenos\s*aires)$/i, '');  // 아르헨티나 지역
+    .replace(/[-\s](sp|rj|mg|ba|rs|pr|ce|pe|go|sc|df|am|pa|pb|al|se|ro|ac|ap|rn|pi|to|ma|mt|ms)$/i, '')  // 브라질 주
+    .replace(/\s+(ba|cordoba|sanjuan|mendoza|santafe|entrerios|tucuman|plata)$/i, '');  // 아르헨티나 지역
   
-  // 4. 확장명 제거 (⚠️ 공백이 있을 때 동작)
-  // 예: "Sport Club do Recife" → "Sport Recife"
+  // 4. 확장명 및 전치사 제거
   normalized = normalized
     .replace(/\b(club|clube|fc|sc|cf|ac)\b/gi, '')
-    .replace(/\b(do|de|da|del|la|el|los|las)\b/gi, '');
+    .replace(/\b(do|de|da|del|dels|de la|los|las|el|la)\b/gi, '');
   
-  // 5. 모든 공백 및 특수문자 제거 (⚠️ 반드시 마지막에)
+  // 5. 모든 공백 및 특수문자 제거
   normalized = normalized
-    .replace(/\s+/g, '')              // 공백 제거
-    .replace(/[^a-z0-9가-힣]/g, '');  // 특수문자 제거
+    .replace(/\s+/g, '')
+    .replace(/[^a-z0-9가-힣]/g, '');
   
   // 6. 북메이커 접미사 제거
   normalized = normalized.replace(/(fanduel|draftkings|betrivers)$/i, '');

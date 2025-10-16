@@ -1,5 +1,6 @@
 import GameResult from '../models/gameResultModel.js';
 import { Op } from 'sequelize';
+import { normalizeForDirectMatching } from '../utils/normalizeUtils.js';
 
 /**
  * 개선된 메모이제이션(캐싱) 유틸리티 함수
@@ -116,18 +117,8 @@ class DirectMatchingService {
   normalizeTeamName(teamName) {
     if (!teamName) return '';
     
-    return teamName
-      // 공통 접미사 제거
-      .replace(/\s+(FC|CF|United|City|Town|Athletic|Athletics|Club)$/gi, '')
-      // 공통 접두사 제거  
-      .replace(/^(The\s+|FC\s+|CF\s+)/gi, '')
-      // 특수문자 제거
-      .replace(/[^\w\s]/g, '')
-      // 여러 공백을 하나로
-      .replace(/\s+/g, ' ')
-      // 소문자로 변환 후 trim
-      .toLowerCase()
-      .trim();
+    // 🎯 중앙화된 함수 사용 (접두사+접미사 제거 모드)
+    return normalizeForDirectMatching(teamName);
   }
 
   /**
