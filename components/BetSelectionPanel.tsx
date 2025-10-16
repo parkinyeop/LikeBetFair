@@ -75,26 +75,12 @@ const BetSelectionPanel = () => {
     data?: any;
   }>({ isOpen: false });
 
-  // ✅ 배당률 계산: 사용자의 요구사항에 따라 '내림' 처리
+  // ✅ 배당률 계산: floor 처리로 3자리까지 정확하게
   const rawOdds = selections.reduce((acc, curr) => acc * curr.odds, 1);
   const totalOdds = Math.floor(rawOdds * 1000) / 1000;
   
   // ✅ 정확한 예상 수익 계산: 부동소수점 오차 방지
   const expectedReturn = Math.floor(Math.round(stake * totalOdds * 100) / 100);
-  
-  // 🔍 디버깅: 계산 과정 확인
-  console.log('🔍 [BetSelectionPanel] 계산 과정:', {
-    selections: selections.map(s => ({ odds: s.odds })),
-    rawOdds,
-    totalOdds,
-    stake,
-    expectedReturn,
-    step1: stake * totalOdds,
-    step2: Math.round(stake * totalOdds * 100) / 100,
-    step3: Math.floor(Math.round(stake * totalOdds * 100) / 100),
-    manualCalc: Math.floor(10000 * 8.354),
-    expected: Math.floor(10000 * 8.354) // 예상값
-  });
 
   // 베팅 가능 시간 체크 (10분 전 마감)
   const now = new Date();
@@ -162,7 +148,7 @@ const BetSelectionPanel = () => {
       if (res.ok) {
         // 베팅 성공 시 익스체인지 스타일의 메시지 표시
         const totalStake = stake; // useBetStore의 stake 사용
-        const totalOdds = selections.reduce((product, sel) => product * (sel.odds || 1), 1);
+        const totalOdds = Math.floor(selections.reduce((product, sel) => product * (sel.odds || 1), 1) * 1000) / 1000;
         const estimatedProfit = totalStake * (totalOdds - 1);
         
         alert(`🎉 베팅이 성공적으로 저장되었습니다!\n\n` +
@@ -242,7 +228,7 @@ const BetSelectionPanel = () => {
       if (res.ok) {
         // 베팅 성공 시 익스체인지 스타일의 메시지 표시
         const totalStake = stake; // useBetStore의 stake 사용
-        const totalOdds = selections.reduce((product, sel) => product * (sel.odds || 1), 1);
+        const totalOdds = Math.floor(selections.reduce((product, sel) => product * (sel.odds || 1), 1) * 1000) / 1000;
         const estimatedProfit = totalStake * (totalOdds - 1);
         
         alert(`🎉 베팅이 성공적으로 저장되었습니다!\n\n` +

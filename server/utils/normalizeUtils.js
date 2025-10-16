@@ -39,7 +39,10 @@ function normalizeTeamNameForComparison(teamName) {
     .replace(/club$/, '')
     .replace(/association$/, '')
     .replace(/football$/, '')
-    .replace(/soccer$/, '');
+    .replace(/soccer$/, '')
+    // 브라질 팀 특수 처리
+    .replace(/sportclubdorecife/, 'sportrecife')  // Sport Club do Recife → Sport Recife
+    .replace(/clubdorecife/, 'recife');           // Club do Recife → Recife
 
   return normalized;
 }

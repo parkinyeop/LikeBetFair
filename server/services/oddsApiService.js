@@ -378,44 +378,78 @@ class OddsApiService {
               if (forceUpdate) {
                 console.log(`[DEBUG] 🔄 강제 업데이트 모드: ${game.home_team} vs ${game.away_team}`);
                 
-                // 기존 레코드 찾기
-                const existingRecord = await OddsCache.findOne({
+                // 시간 정규화: 분 단위로 정규화하여 1분 차이로 인한 중복 방지
+                const normalizedCommenceTime = new Date(Math.floor(new Date(commenceTime).getTime() / (60 * 1000)) * (60 * 1000));
+                
+                // findOrCreate + update 방식으로 강제 업데이트
+                const [oddsRecord, created] = await OddsCache.findOrCreate({
                   where: {
+                    sportKey: sportKey,
+                    homeTeam: game.home_team,
+                    awayTeam: game.away_team,
+                    commenceTime: normalizedCommenceTime
+                  },
+                  defaults: {
                     mainCategory,
                     subCategory,
-                    homeTeam: game.home_team,  
+                    sportKey: sportKey,
+                    sportTitle: clientCategory,
+                    homeTeam: game.home_team,
                     awayTeam: game.away_team,
-                    commenceTime: new Date(commenceTime) // UTC 문자열을 Date 객체로 변환하여 비교
+                    commenceTime: normalizedCommenceTime,
+                    bookmakers: game.bookmakers,
+                    officialOdds: this.calculateAverageOdds(game.bookmakers),
+                    lastUpdated: new Date()
                   }
                 });
                 
-                if (existingRecord) {
-                  // 기존 레코드 업데이트
-                  await existingRecord.update(upsertData);
-                  totalUpdatedCount++;
-                  console.log(`[DEBUG] ✅ 강제 업데이트 완료: ${game.home_team} vs ${game.away_team}`);
-                } else {
-                  // 새 레코드 생성
-                  await OddsCache.create(upsertData);
-                  totalNewCount++;
-                  console.log(`[DEBUG] ✅ 강제 새로 생성: ${game.home_team} vs ${game.away_team}`);
-                }
-              } else {
-                // 기존 로직: findOrCreate 사용
-                const [oddsRecord, created] = await OddsCache.findOrCreate({
-                  where: {
-                    mainCategory,
-                    subCategory,
-                    homeTeam: game.home_team,  
-                    awayTeam: game.away_team,
-                    commenceTime: new Date(commenceTime) // UTC 문자열을 Date 객체로 변환하여 비교
-                  },
-                  defaults: upsertData
+                // 강제 업데이트 모드에서는 무조건 업데이트
+                await oddsRecord.update({
+                  bookmakers: game.bookmakers,
+                  officialOdds: this.calculateAverageOdds(game.bookmakers),
+                  lastUpdated: new Date()
                 });
                 
-                // 기존 레코드 업데이트
+                if (created) {
+                  totalNewCount++;
+                  console.log(`[DEBUG] ✅ 강제 새로 생성: ${game.home_team} vs ${game.away_team}`);
+                } else {
+                  totalUpdatedCount++;
+                  console.log(`[DEBUG] ✅ 강제 업데이트 완료: ${game.home_team} vs ${game.away_team}`);
+                }
+              } else {
+                // 시간 정규화: 분 단위로 정규화하여 1분 차이로 인한 중복 방지
+                const normalizedCommenceTime = new Date(Math.floor(new Date(commenceTime).getTime() / (60 * 1000)) * (60 * 1000));
+                
+                // findOrCreate + update 방식으로 중복 방지
+                const [oddsRecord, created] = await OddsCache.findOrCreate({
+                  where: {
+                    sportKey: sportKey,
+                    homeTeam: game.home_team,
+                    awayTeam: game.away_team,
+                    commenceTime: normalizedCommenceTime
+                  },
+                  defaults: {
+                    mainCategory,
+                    subCategory,
+                    sportKey: sportKey,
+                    sportTitle: clientCategory,
+                    homeTeam: game.home_team,
+                    awayTeam: game.away_team,
+                    commenceTime: normalizedCommenceTime,
+                    bookmakers: game.bookmakers,
+                    officialOdds: this.calculateAverageOdds(game.bookmakers),
+                    lastUpdated: new Date()
+                  }
+                });
+                
+                // 기존 레코드면 업데이트
                 if (!created) {
-                  await oddsRecord.update(upsertData);
+                  await oddsRecord.update({
+                    bookmakers: game.bookmakers,
+                    officialOdds: this.calculateAverageOdds(game.bookmakers),
+                    lastUpdated: new Date()
+                  });
                 }
 
                 if (created) {
@@ -425,14 +459,6 @@ class OddsApiService {
                   totalUpdatedCount++;
                   console.log(`[DEBUG] 🔄 기존 배당률 업데이트: ${game.home_team} vs ${game.away_team}`);
                 }
-              }
-
-              if (created) {
-                totalNewCount++;
-                console.log(`[DEBUG] ✅ 새 배당률 저장: ${game.home_team} vs ${game.away_team}`);
-              } else {
-                totalUpdatedCount++;
-                console.log(`[DEBUG] 🔄 기존 배당률 업데이트: ${game.home_team} vs ${game.away_team}`);
               }
 
               // 배당률 히스토리 저장 (강제 업데이트 모드에서는 건너뛰기)
@@ -835,38 +861,19 @@ class OddsApiService {
               if (forceUpdate) {
                 console.log(`[DEBUG] 🔄 강제 업데이트 모드: ${game.home_team} vs ${game.away_team}`);
                 
-                // 기존 레코드 찾기
-                oddsRecord = await OddsCache.findOne({
-                  where: {
-                    mainCategory,
-                    subCategory,
-                    homeTeam: game.home_team,
-                    awayTeam: game.away_team,
-                    commenceTime: new Date(commenceTime) // UTC 문자열을 Date 객체로 변환하여 비교
-                  }
-                });
+                // 시간 정규화: 분 단위로 정규화하여 1분 차이로 인한 중복 방지
+                const normalizedCommenceTime = new Date(Math.floor(new Date(commenceTime).getTime() / (60 * 1000)) * (60 * 1000));
                 
-                if (oddsRecord) {
-                  // 기존 레코드 업데이트
-                  await oddsRecord.update(upsertData);
-                  totalUpdatedCount++;
-                  console.log(`[DEBUG] ✅ 강제 업데이트 완료: ${game.home_team} vs ${game.away_team}`);
-                } else {
-                  // 새 레코드 생성
-                  oddsRecord = await OddsCache.create(upsertData);
-                  created = true;
-                  totalNewCount++;
-                  console.log(`[DEBUG] ✅ 강제 새로 생성: ${game.home_team} vs ${game.away_team}`);
-                }
-              } else {
-                // 기존 로직: findOrCreate 사용
+                // upsert 데이터에 정규화된 시간 적용
+                upsertData.commenceTime = normalizedCommenceTime;
+                
+                // findOrCreate + update 방식으로 강제 업데이트
                 const [record, isCreated] = await OddsCache.findOrCreate({
                   where: {
-                    mainCategory,
-                    subCategory,
+                    sportKey: sportKey,
                     homeTeam: game.home_team,
                     awayTeam: game.away_team,
-                    commenceTime: new Date(commenceTime) // UTC 문자열을 Date 객체로 변환하여 비교
+                    commenceTime: normalizedCommenceTime
                   },
                   defaults: upsertData
                 });
@@ -874,9 +881,48 @@ class OddsApiService {
                 oddsRecord = record;
                 created = isCreated;
                 
-                // 기존 레코드 업데이트
+                // 강제 업데이트 모드에서는 무조건 업데이트
+                await oddsRecord.update({
+                  bookmakers: game.bookmakers,
+                  officialOdds: this.calculateAverageOdds(game.bookmakers),
+                  lastUpdated: new Date()
+                });
+                
+                if (created) {
+                  totalNewCount++;
+                  console.log(`[DEBUG] ✅ 강제 새로 생성: ${game.home_team} vs ${game.away_team}`);
+                } else {
+                  totalUpdatedCount++;
+                  console.log(`[DEBUG] ✅ 강제 업데이트 완료: ${game.home_team} vs ${game.away_team}`);
+                }
+              } else {
+                // 시간 정규화: 분 단위로 정규화하여 1분 차이로 인한 중복 방지
+                const normalizedCommenceTime = new Date(Math.floor(new Date(commenceTime).getTime() / (60 * 1000)) * (60 * 1000));
+                
+                // upsert 데이터에 정규화된 시간 적용
+                upsertData.commenceTime = normalizedCommenceTime;
+                
+                // findOrCreate + update 방식으로 중복 방지
+                const [record, isCreated] = await OddsCache.findOrCreate({
+                  where: {
+                    sportKey: sportKey,
+                    homeTeam: game.home_team,
+                    awayTeam: game.away_team,
+                    commenceTime: normalizedCommenceTime
+                  },
+                  defaults: upsertData
+                });
+                
+                oddsRecord = record;
+                created = isCreated;
+                
+                // 기존 레코드면 업데이트
                 if (!created) {
-                  await oddsRecord.update(upsertData);
+                  await oddsRecord.update({
+                    bookmakers: game.bookmakers,
+                    officialOdds: this.calculateAverageOdds(game.bookmakers),
+                    lastUpdated: new Date()
+                  });
                 }
 
                 if (created) {

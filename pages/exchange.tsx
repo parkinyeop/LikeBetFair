@@ -81,15 +81,19 @@ export default function Exchange() {
     }
   };
   
-  // 🆕 Exchange 배당율에 환수율 적용 (단순 나누기 방식으로 통일)
+  // 🆕 Exchange 배당율에 환수율 적용 (내재 확률 기반 정교한 계산)
   const applyExchangeReturnRate = (originalOdds: number, allOdds: number[] = [], returnRate?: number) => {
-    if (!originalOdds || !oddsReturnRateSettings.enabled) return originalOdds;
+    if (!originalOdds || !oddsReturnRateSettings.enabled) {
+      return originalOdds;
+    }
 
     // 환수율 파라미터가 없으면 설정에서 가져오기
     const effectiveReturnRate = returnRate || oddsReturnRateSettings.returnRate;
     
     // utils 함수 사용
-    return applyExchangeReturnRateUtil(originalOdds, allOdds, effectiveReturnRate);
+    const adjustedOdds = applyExchangeReturnRateUtil(originalOdds, allOdds, effectiveReturnRate);
+    
+    return adjustedOdds;
   };
   
   // 🎯 버튼이 선택되었는지 확인하는 함수 - Exchange 기존 로직 유지

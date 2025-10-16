@@ -33,9 +33,9 @@ export const adjustOddsSophisticated = (oddsArray: number[], targetPayout: numbe
 };
 
 /**
- * 익스체인지 환수율을 적용하는 함수
+ * 익스체인지 환수율을 적용하는 함수 (백엔드 adjustOddsPayout()와 동일한 로직)
  * @param odds - 원본 배당률
- * @param oddsArray - 배당률 배열 (호환성을 위해 유지)
+ * @param oddsArray - 전체 배당률 배열 (내재 확률 기반 계산용)
  * @param returnRate - 환수율 (기본값: 0.95)
  * @returns 환수율이 적용된 배당률
  */
@@ -44,8 +44,40 @@ export const applyExchangeReturnRate = (odds: number, oddsArray?: number[], retu
     return odds;
   }
   
-  // 환수율 적용: odds / returnRate
-  return odds / returnRate;
+  // oddsArray가 제공되지 않았거나 비어있으면 단순 계산
+  if (!oddsArray || oddsArray.length === 0) {
+    return odds / returnRate;
+  }
+  
+  // 백엔드의 adjustOddsPayout()과 동일한 로직 사용
+  // 1. 각 배당률의 내재 확률 계산
+  const impliedProbs = oddsArray.map(odd => 1 / odd);
+  
+  // 2. 현재 확률 총합 계산
+  const currentPayoutSum = impliedProbs.reduce((sum, prob) => sum + prob, 0);
+  
+  if (currentPayoutSum === 0) {
+    return odds;
+  }
+  
+  // 3. 목표 확률 총합 설정
+  const targetPayoutSum = 1 / returnRate;
+  
+  // 4. 현재 배당률의 내재 확률
+  const currentOddImpliedProb = 1 / odds;
+  
+  // 5. 조정된 확률 계산
+  const adjustedProb = currentOddImpliedProb * (targetPayoutSum / currentPayoutSum);
+  
+  // 6. 조정된 배당률로 변환
+  if (adjustedProb === 0) {
+    return Infinity;
+  }
+  
+  const newOdd = 1 / adjustedProb;
+  
+  // 7. 소수점 3자리로 floor 처리
+  return Math.floor(newOdd * 1000) / 1000;
 };
 
 /**
