@@ -67,8 +67,18 @@ async function processPartialMatching(orderData) {
   // 순차적으로 매칭 처리
   for (const existingOrder of availableOrders) {
     if (remainingAmount <= 0) break;
-    
-    const availableAmount = existingOrder.remainingAmount || existingOrder.amount;
+
+    // 🔒 방어적 프로그래밍: remainingAmount가 null/undefined가 아닌 경우에만 사용
+    const availableAmount = existingOrder.remainingAmount !== null && existingOrder.remainingAmount !== undefined
+      ? existingOrder.remainingAmount
+      : existingOrder.amount;
+
+    // 🔒 추가 방어: availableAmount가 0 이하면 스킵
+    if (availableAmount <= 0) {
+      console.warn(`⚠️ 주문 ${existingOrder.id}의 availableAmount가 0 이하입니다. 스킵합니다.`);
+      continue;
+    }
+
     const matchAmount = Math.min(remainingAmount, availableAmount);
     const matchPrice = existingOrder.price;
     
@@ -191,6 +201,35 @@ router.post('/match-order', verifyToken, async (req, res) => {
     // 🆕 원본 배당율 사용 (환수율은 프론트엔드에서 적용)
     const adjustedPrice = targetOrder.price;
     
+    // 🔒 보안 검증 1: remainingAmount 존재 및 양수 확인
+    if (!targetOrder.remainingAmount || targetOrder.remainingAmount <= 0) {
+      console.error('🚨 매칭 시도 실패: remainingAmount 없음', {
+        orderId: targetOrder.id,
+        remainingAmount: targetOrder.remainingAmount,
+        amount: targetOrder.amount,
+        userId: userId
+      });
+      return res.status(400).json({
+        success: false,
+        message: '매칭 가능한 잔액이 없는 주문입니다.'
+      });
+    }
+
+    // 🔒 보안 검증 2: 데이터 무결성 검증
+    if (targetOrder.remainingAmount > targetOrder.amount) {
+      console.error('🚨 데이터 무결성 오류: remainingAmount > amount', {
+        orderId: targetOrder.id,
+        remainingAmount: targetOrder.remainingAmount,
+        amount: targetOrder.amount,
+        matchedAmount: targetOrder.matchedAmount,
+        userId: userId
+      });
+      return res.status(500).json({
+        success: false,
+        message: '주문 상태 오류가 발생했습니다. 관리자에게 문의하세요.'
+      });
+    }
+    
     // 🆕 올바른 매칭 금액 계산 로직
     let actualMatchAmount;
     let stakeAmount;
@@ -206,7 +245,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
       }
       // 🆕 소수점 문제 해결: Math.floor → Math.round 사용 (환수율 적용된 배당율 사용)
       const maxMatchableAmount = Math.round(matchAmount / (adjustedPrice - 1));
-      actualMatchAmount = Math.min(maxMatchableAmount, targetOrder.remainingAmount || targetOrder.amount);
+      actualMatchAmount = Math.min(maxMatchableAmount, targetOrder.remainingAmount); // ✅ 수정: || targetOrder.amount 제거
       stakeAmount = matchAmount; // 리스크 금액
     } else {
       // Lay 주문에 Back으로 매칭: matchAmount는 주문 금액
@@ -216,7 +255,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
           message: '유효하지 않은 배당율입니다. (1.0 이하)' 
         });
       }
-      actualMatchAmount = Math.min(matchAmount, targetOrder.remainingAmount || targetOrder.amount);
+      actualMatchAmount = Math.min(matchAmount, targetOrder.remainingAmount); // ✅ 수정: || targetOrder.amount 제거
       stakeAmount = Math.floor((adjustedPrice - 1) * actualMatchAmount); // 리스크 금액 (환수율 적용된 배당율 사용)
     }
     
@@ -298,7 +337,11 @@ router.post('/match-order', verifyToken, async (req, res) => {
     targetOrder.matchedOrderId = matchOrder.id;
 
     // 🆕 대상 주문 상태 업데이트 (부분 매칭 처리)
-    if (actualMatchAmount >= (targetOrder.remainingAmount || targetOrder.amount)) {
+    const currentRemainingAmount = targetOrder.remainingAmount !== null && targetOrder.remainingAmount !== undefined
+      ? targetOrder.remainingAmount
+      : targetOrder.amount;
+
+    if (actualMatchAmount >= currentRemainingAmount) {
       // 완전 매칭
       targetOrder.originalAmount = targetOrder.originalAmount || targetOrder.amount; // 🆕 originalAmount 설정
       targetOrder.filledAmount = targetOrder.originalAmount;
@@ -321,7 +364,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
       targetOrder.originalAmount = targetOrder.originalAmount || targetOrder.amount; // 🆕 originalAmount 설정
       targetOrder.partiallyFilled = true;
       targetOrder.filledAmount = (targetOrder.filledAmount || 0) + actualMatchAmount;
-      targetOrder.remainingAmount = (targetOrder.remainingAmount || targetOrder.amount) - actualMatchAmount;
+      targetOrder.remainingAmount = currentRemainingAmount - actualMatchAmount;
       
       // ✅ 수정: 멀티베팅 주문도 부분 매칭 시 partially_matched 상태로 설정
       if (targetOrder.isMultibet) {
@@ -806,7 +849,9 @@ router.get('/orderbook', verifyToken, async (req, res) => {
       // ✅ 오더북: 매칭하는 사람이 낼 금액 표시
       // - Back 주문 → LAY 매처가 낼 담보금
       // - LAY 주문 → Back 매처가 낼 배팅금
-      const remainingAmt = order.remainingAmount || order.amount;
+      const remainingAmt = order.remainingAmount !== null && order.remainingAmount !== undefined
+        ? order.remainingAmount
+        : order.amount;
       const displayAmount = order.side === 'back'
         ? Math.floor(remainingAmt * (order.price - 1)) // LAY 담보금
         : remainingAmt; // Back 배팅금
@@ -826,7 +871,7 @@ router.get('/orderbook', verifyToken, async (req, res) => {
         originalPrice: orderData.price, // 원본 배당율 보존
         displayAmount: displayAmount, // ✅ 매칭할 사람이 낼 금액
         originalAmount: order.originalAmount || order.amount,
-        remainingAmount: order.remainingAmount || order.amount,
+        remainingAmount: order.remainingAmount !== null && order.remainingAmount !== undefined ? order.remainingAmount : order.amount,
         filledAmount: order.filledAmount || 0,
         partiallyFilled: order.partiallyFilled || false
       };
@@ -1306,7 +1351,7 @@ router.get('/orders/:orderId/matches', verifyToken, async (req, res) => {
       orderInfo: {
         originalAmount: order.originalAmount || order.amount,
         filledAmount: order.filledAmount || 0,
-        remainingAmount: order.remainingAmount || order.amount,
+        remainingAmount: order.remainingAmount !== null && order.remainingAmount !== undefined ? order.remainingAmount : order.amount,
         partiallyFilled: order.partiallyFilled || false,
         status: order.status,
         // 🆕 매칭 통계 추가
@@ -1596,7 +1641,9 @@ router.get('/orders', verifyToken, async (req, res) => {
       // ✅ 내 주문 목록: 매칭하는 사람이 낼 금액 표시
       // - Back 주문 → LAY 매처가 낼 담보금
       // - LAY 주문 → Back 매처가 낼 배팅금
-      const remainingAmt = order.remainingAmount || order.amount;
+      const remainingAmt = order.remainingAmount !== null && order.remainingAmount !== undefined
+        ? order.remainingAmount
+        : order.amount;
       const displayAmount = order.side === 'back'
         ? Math.floor(remainingAmt * (order.price - 1)) // LAY 담보금
         : remainingAmt; // Back 배팅금
@@ -1617,7 +1664,7 @@ router.get('/orders', verifyToken, async (req, res) => {
         matchInfo: {
           originalAmount: order.originalAmount || order.amount,
           filledAmount: order.filledAmount || 0,
-          remainingAmount: order.remainingAmount || order.amount,
+          remainingAmount: order.remainingAmount !== null && order.remainingAmount !== undefined ? order.remainingAmount : order.amount,
           partiallyFilled: order.partiallyFilled || false,
           fillPercentage: order.originalAmount ? 
             Math.round((order.filledAmount || 0) / order.originalAmount * 100) : 0,
@@ -1663,7 +1710,7 @@ router.get('/order/:id', async (req, res) => {
       stakeAmount: order.stakeAmount,
       potentialProfit: order.potentialProfit,
       originalAmount: order.originalAmount || order.amount,
-      remainingAmount: order.remainingAmount || order.amount,
+      remainingAmount: order.remainingAmount !== null && order.remainingAmount !== undefined ? order.remainingAmount : order.amount,
       filledAmount: order.filledAmount || 0,
       partiallyFilled: order.partiallyFilled || false,
       // ✅ 멀티배팅 필드 추가
@@ -1724,7 +1771,9 @@ router.get('/all-orders', async (req, res) => {
       // ✅ 오더북: 매칭하는 사람이 낼 금액 표시
       // - Back 주문 → LAY 매처가 낼 담보금
       // - LAY 주문 → Back 매처가 낼 배팅금
-      const remainingAmt = order.remainingAmount || order.amount;
+      const remainingAmt = order.remainingAmount !== null && order.remainingAmount !== undefined
+        ? order.remainingAmount
+        : order.amount;
       const displayAmount = order.side === 'back'
         ? Math.floor(remainingAmt * (order.price - 1)) // LAY 담보금
         : remainingAmt; // Back 배팅금
@@ -1763,7 +1812,7 @@ router.get('/all-orders', async (req, res) => {
         oddsUpdatedAt: order.oddsUpdatedAt,
         // 🆕 부분 매칭 정보 추가
         originalAmount: order.originalAmount || order.amount,
-        remainingAmount: order.remainingAmount || order.amount,
+        remainingAmount: order.remainingAmount !== null && order.remainingAmount !== undefined ? order.remainingAmount : order.amount,
         filledAmount: order.filledAmount || 0,
         partiallyFilled: order.partiallyFilled || false,
         displayAmount: displayAmount, // ✅ 매칭할 사람이 낼 금액!

@@ -1009,6 +1009,12 @@ class BetResultService {
       (validatedScore.home + validatedScore.away) :
       this.calculateTotalScore(scoreToUse);
 
+    // 스코어 계산 실패 시 pending 처리
+    if (totalScore === null || totalScore === undefined) {
+      console.log(`[언더/오버 판정] 스코어 계산 실패 → pending`);
+      return 'pending';
+    }
+
     // point가 없으면 무효
     if (typeof point !== 'number' || isNaN(point)) {
       console.log(`[언더/오버 판정] 포인트 없음: ${point} → cancelled`);
@@ -1097,6 +1103,13 @@ class BetResultService {
       console.log(`[핸디캡] 검증된 스코어 사용: ${homeScore}-${awayScore}`);
     } else {
       const scoreResult = this.extractHomeAwayScores(gameResult.score, gameResult.homeTeam, gameResult.awayTeam);
+
+      // 스코어 추출 실패 시 pending 처리
+      if (!scoreResult) {
+        console.log(`[핸디캡 판정] 스코어 추출 실패 → pending`);
+        return 'pending';
+      }
+
       homeScore = scoreResult.homeScore;
       awayScore = scoreResult.awayScore;
     }
@@ -1176,8 +1189,8 @@ class BetResultService {
   calculateTotalScore(scoreData) {
     const normalizedScore = this.validateAndNormalizeScore(scoreData);
     if (!normalizedScore) {
-      console.error('[Score Calculation] 스코어 형식 검증 실패');
-      return 0;
+      console.error('[Score Calculation] 스코어 형식 검증 실패 - null 반환');
+      return null;
     }
 
     try {
@@ -1187,7 +1200,7 @@ class BetResultService {
       }, 0);
     } catch (error) {
       console.error('[Score Calculation] 총점 계산 오류:', error.message);
-      return 0;
+      return null;
     }
   }
 
@@ -1195,13 +1208,13 @@ class BetResultService {
   extractHomeAwayScores(scoreData, homeTeam, awayTeam) {
     const normalizedScore = this.validateAndNormalizeScore(scoreData);
     if (!normalizedScore) {
-      console.error('[Score Extraction] 스코어 형식 검증 실패');
-      return { homeScore: 0, awayScore: 0 };
+      console.error('[Score Extraction] 스코어 형식 검증 실패 - null 반환');
+      return null;
     }
 
     try {
       let homeScore = 0, awayScore = 0;
-      
+
       for (const score of normalizedScore) {
         if (score.name === homeTeam) {
           homeScore = parseInt(score.score || 0);
@@ -1213,7 +1226,7 @@ class BetResultService {
       return { homeScore, awayScore };
     } catch (error) {
       console.error('[Score Extraction] 점수 추출 오류:', error.message);
-      return { homeScore: 0, awayScore: 0 };
+      return null;
     }
   }
 
