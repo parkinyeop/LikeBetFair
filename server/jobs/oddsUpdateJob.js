@@ -347,6 +347,10 @@ cron.schedule('*/30 * * * *', async () => {
   if (isUpdatingOdds) {
     console.log('[SCHEDULER_ODDS] ⏭️ Previous odds update is still running, skipping this update');
     console.log('[SCHEDULER_ODDS] ⏭️ isUpdatingOdds flag is:', isUpdatingOdds);
+    saveUpdateLog('odds', 'skip', { 
+      message: 'Previous odds update still running, skipping',
+      reason: 'isUpdatingOdds flag is true'
+    });
     return;
   }
   
@@ -456,6 +460,17 @@ cron.schedule('*/30 * * * *', async () => {
 // ✅ ORIGINAL SCHEDULER RESTORED - NEW API KEY AVAILABLE
 // 중우선순위 리그 - 2시간마다 업데이트 (원래 설정)
 cron.schedule('0 */2 * * *', async () => {
+  // 중복 실행 방지
+  if (isUpdatingOdds) {
+    console.log('[SCHEDULER_ODDS_MEDIUM] ⏭️ Previous odds update is still running, skipping medium-priority update');
+    saveUpdateLog('odds', 'skip', { 
+      message: 'Previous odds update still running, skipping medium-priority update',
+      priority: 'medium',
+      reason: 'isUpdatingOdds flag is true'
+    });
+    return;
+  }
+  
   saveUpdateLog('odds', 'start', { 
     message: 'Starting medium-priority leagues odds update (2hour interval)',
     priority: 'medium',
@@ -525,6 +540,17 @@ cron.schedule('0 */2 * * *', async () => {
 
 // ✅ 저우선순위 리그 - 매일 자정에 업데이트 (활성화)
 cron.schedule('0 0 * * *', async () => {
+  // 중복 실행 방지
+  if (isUpdatingOdds) {
+    console.log('[SCHEDULER_ODDS_LOW] ⏭️ Previous odds update is still running, skipping low-priority update');
+    saveUpdateLog('odds_low', 'skip', {
+      message: 'Previous odds update still running, skipping low-priority update',
+      priority: 'low',
+      reason: 'isUpdatingOdds flag is true'
+    });
+    return;
+  }
+  
   saveUpdateLog('odds_low', 'start', {
     message: 'Starting low-priority leagues odds update (daily)',
     priority: 'low',
