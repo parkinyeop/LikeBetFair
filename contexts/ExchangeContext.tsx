@@ -379,27 +379,40 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
     }
   };
 
-  // 🆕 최대 매칭 가능 금액 (남은 금액 기준)
+  // 🆕 최대 매칭 가능 금액 (매칭할 사람이 낼 금액 기준)
   const getMaxMatchAmount = () => {
     if (!matchTargetOrder) return 0;
-    return matchTargetOrder.displayAmount || 
-           matchTargetOrder.remainingAmount || 
-           matchTargetOrder.amount;
+
+    // 🔒 보안: remainingAmount 체크
+    if (!matchTargetOrder.remainingAmount || matchTargetOrder.remainingAmount <= 0) {
+      return 0; // 매칭 가능한 금액 없음
+    }
+
+    // ✅ displayAmount가 있으면 사용, 없으면 remainingAmount 기반으로 계산
+    if (matchTargetOrder.displayAmount !== undefined && matchTargetOrder.displayAmount !== null) {
+      return matchTargetOrder.displayAmount;
+    }
+
+    // displayAmount가 없으면 remainingAmount 기반으로 직접 계산
+    const remaining = matchTargetOrder.remainingAmount;
+    if (matchTargetOrder.type === 'back') {
+      // Back 주문: Lay가 내야 할 담보금 = remainingAmount × (odds - 1)
+      return Math.floor(remaining * (matchTargetOrder.odds - 1));
+    } else {
+      // Lay 주문: Back이 내야 할 배팅금 = remainingAmount
+      return remaining;
+    }
   };
 
   // 🆕 실제 매칭 가능한 금액 (리스크 기준)
   const getAvailableMatchAmount = () => {
     if (!matchTargetOrder) return 0;
-    
-    const maxAmount = getMaxMatchAmount();
-    
-    if (matchTargetOrder.type === 'back') {
-      // Back 주문에 Lay로 매칭할 때 필요한 리스크
-      return maxAmount * (matchTargetOrder.odds - 1);
-    } else {
-      // Lay 주문에 Back으로 매칭할 때 필요한 리스크
-      return maxAmount;
-    }
+
+    // ✅ getMaxMatchAmount()는 이미 사용자가 낼 금액을 반환함
+    // Back 주문: Lay가 낼 담보금 (= remainingAmount × (odds - 1))
+    // Lay 주문: Back이 낼 배팅금 (= remainingAmount)
+    // 따라서 추가 계산 없이 그대로 반환
+    return getMaxMatchAmount();
   };
 
   // 🆕 부분 매칭 정보 포맷팅

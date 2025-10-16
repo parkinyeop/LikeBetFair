@@ -141,10 +141,11 @@ function OrderPanel() {
   // 매칭 모드일 때 초기값 설정 (자동 설정 제거)
   useEffect(() => {
     if (isMatchMode && form.amount === 0) {
-      const maxAmount = getRequiredMatchAmount();
+      // ✅ getAvailableMatchAmount() 사용 (이미 올바른 최대 매칭 금액 반환)
+      const maxAmount = getAvailableMatchAmount();
       setForm(prev => ({ ...prev, amount: maxAmount }));
     }
-  }, [isMatchMode, getRequiredMatchAmount, form.amount]);
+  }, [isMatchMode, getAvailableMatchAmount, form.amount]);
 
 
 

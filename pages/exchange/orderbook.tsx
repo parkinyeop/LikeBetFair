@@ -71,19 +71,28 @@ const OrderbookPage: React.FC = () => {
 
   // 🆕 매칭 금액 및 비율 계산 함수
   const calculateMatchingInfo = (order: ExchangeOrder) => {
-    // ✅ 매칭 금액 기준으로 계산 (displayAmount 기준!)
-    const totalMatchAmount = order.displayAmount || order.amount || 0; // 전체 매칭 금액
-    const remainingMatchAmount = order.type === 'back' 
-      ? Math.floor((order.remainingAmount || 0) * ((order.odds || 1) - 1)) // Back: LAY 담보금
-      : (order.remainingAmount || 0); // Lay: Back 배팅금
+    // ✅ 원래 전체 매칭 금액 계산 (originalAmount 또는 amount 기준)
+    const originalAmount = order.originalAmount || order.amount || 0;
+    const totalMatchAmount = order.type === 'back'
+      ? Math.floor(originalAmount * ((order.odds || 1) - 1)) // Back: 원래 전체 LAY 담보금
+      : originalAmount; // Lay: 원래 전체 Back 배팅금
+
+    // 남은 매칭 금액 계산
+    const remainingMatchAmount = order.type === 'back'
+      ? Math.floor((order.remainingAmount || 0) * ((order.odds || 1) - 1)) // Back: 남은 LAY 담보금
+      : (order.remainingAmount || 0); // Lay: 남은 Back 배팅금
+
+    // 체결된 매칭 금액 = 전체 - 남은
     const matchedAmount = totalMatchAmount - remainingMatchAmount;
+
+    // 체결 비율 계산
     const matchPercentage = totalMatchAmount > 0 ? Math.round((matchedAmount / totalMatchAmount) * 100) : 0;
-    
+
     return {
       totalAmount: totalMatchAmount, // 전체 매칭 금액
-      matchedAmount: matchedAmount,
-      remainingAmount: remainingMatchAmount,
-      matchPercentage: matchPercentage
+      matchedAmount: matchedAmount, // 체결된 매칭 금액
+      remainingAmount: remainingMatchAmount, // 남은 매칭 금액
+      matchPercentage: matchPercentage // 체결 비율 (%)
     };
   };
 
@@ -204,7 +213,7 @@ const OrderbookPage: React.FC = () => {
       const matchTargetOrder: MatchTargetOrder = {
         id: targetOrder.id.toString(),
         type: targetOrder.type as 'back' | 'lay',
-        odds: targetOrder.odds,
+        odds: typeof targetOrder.odds === 'string' ? parseFloat(targetOrder.odds) : targetOrder.odds,
         amount: targetOrder.amount,
         selection: targetOrder.selection || (targetOrder.isMultibet ? '멀티배팅' : ''),
         homeTeam: targetOrder.homeTeam || '',
@@ -214,7 +223,13 @@ const OrderbookPage: React.FC = () => {
         sportKey: targetOrder.sportKey || '',
         // 🆕 멀티배팅 정보 추가
         isMultibet: targetOrder.isMultibet || false,
-        selectionDetails: targetOrder.selectionDetails || []
+        selectionDetails: targetOrder.selectionDetails || [],
+        // ✅ 부분 매칭 필드 추가 (ExchangeContext에서 최대 매칭 금액 계산에 필요)
+        displayAmount: targetOrder.displayAmount,
+        remainingAmount: targetOrder.remainingAmount,
+        filledAmount: targetOrder.filledAmount,
+        originalAmount: targetOrder.originalAmount,
+        partiallyFilled: targetOrder.partiallyFilled
       };
       
       activateMatchMode(matchTargetOrder);
