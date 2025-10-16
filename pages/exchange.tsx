@@ -7,6 +7,8 @@ import { convertUtcToLocal, getCurrentLocalTime } from '../utils/timeUtils';
 import { useExchangeContext } from '../contexts/ExchangeContext';
 import { useExchange } from '../hooks/useExchange';
 import { applyExchangeReturnRate as applyExchangeReturnRateUtil } from '../utils/oddsCalculator';
+import { formatHandicap, groupHandicapsByPoint, filterHalfPointHandicaps } from '../utils/handicapUtils';
+import ExchangeMarketBoard from '../components/ExchangeMarketBoard';
 
 export default function Exchange() {
   const router = useRouter();
@@ -1229,33 +1231,14 @@ export default function Exchange() {
                       );
                     }
                     
-                    // Home/Away 쌍으로 그룹화 (팀명 기반 매칭)
-                    const groupedSpreads: { [absPoint: string]: { home?: { oddsData: any, handicap: number }, away?: { oddsData: any, handicap: number } } } = {};
+                    // ✅ 수정: groupHandicapsByPoint 함수 사용
+                    const groupedSpreads = groupHandicapsByPoint(
+                      spreadsOdds,
+                      game.home_team,
+                      game.away_team
+                    );
                     
-                    spreadEntries.forEach(([outcomeName, oddsData]) => {
-                      // "Team Point" 형식에서 팀명과 핸디캡 분리
-                      const parts = outcomeName.split(' ');
-                      const point = parts[parts.length - 1]; // 마지막 부분이 핸디캡
-                      const teamName = parts.slice(0, -1).join(' '); // 나머지가 팀명
-                      
-                      const handicapValue = parseFloat(point); // -1.5 또는 +1.5
-                      const absPoint = Math.abs(handicapValue).toString(); // "1.5"로 통일
-                      
-                      if (!groupedSpreads[absPoint]) groupedSpreads[absPoint] = {};
-                      
-                      // 홈팀인지 원정팀인지 판단
-                      if (teamName === game.home_team) {
-                        groupedSpreads[absPoint].home = { oddsData, handicap: handicapValue };
-                      } else if (teamName === game.away_team) {
-                        groupedSpreads[absPoint].away = { oddsData, handicap: handicapValue };
-                      }
-                    });
-                    
-                    // 0.5 단위 핸디캡만 필터링 (-1.5, -1, -0.5, 0.5, 1, 1.5 등)
-                    const filteredSpreads = Object.entries(groupedSpreads).filter(([absPoint, oddsPair]) => {
-                      const pointValue = Math.abs(parseFloat(absPoint));
-                      return pointValue % 0.5 === 0;
-                    });
+                    const filteredSpreads = filterHalfPointHandicaps(groupedSpreads);
                     
                     if (filteredSpreads.length === 0) {
                       return (
@@ -1274,9 +1257,9 @@ export default function Exchange() {
                           const homeOdds = homeData?.oddsData?.averagePrice;
                           const awayOdds = awayData?.oddsData?.averagePrice;
                           const pointValue = parseFloat(absPoint);
-                          // 스프레드 베팅에서는 하나의 핸디캡 값으로 양팀이 반대 방향을 가짐
-                          const homeHandicap = pointValue;
-                          const awayHandicap = -pointValue;
+                          // ✅ 수정: groupHandicapsByPoint()에서 계산된 실제 핸디캡 값 사용
+                          const homeHandicap = homeData?.handicap || 0;
+                          const awayHandicap = awayData?.handicap || 0;
                           
                           // ========================= [ 환수율 적용 로직 추가 ] =========================
                           const allSpreadsOdds = [homeOdds, awayOdds].filter(odds => odds != null);
@@ -1290,7 +1273,7 @@ export default function Exchange() {
                                 <button
                                   onClick={() => {
                                     // 🎯 버튼 선택 상태 토글
-                                    const selection = `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`;
+                                    const selection = `${game.home_team} ${formatHandicap(homeHandicap)}`;
                                     const wasSelected = isButtonSelected(game.id, `핸디캡_${selection}`);
                                     handleButtonClick(game, selection, adjustedHomeOdds, '핸디캡');
                                     
@@ -1323,13 +1306,13 @@ export default function Exchange() {
                                     }
                                   }}
                                   className={`flex-1 p-2 rounded-lg text-center transition-colors ${
-                                    isButtonSelected(game.id, `핸디캡_${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`)
+                                    isButtonSelected(game.id, `핸디캡_${game.home_team} ${formatHandicap(homeHandicap)}`)
                                       ? 'bg-yellow-500 hover:bg-yellow-600'
                                       : isBettable && adjustedHomeOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                   } text-white text-sm`}
                                   disabled={!isBettable || !adjustedHomeOdds}
                                 >
-                                  <div className="font-medium">{game.home_team} {homeHandicap > 0 ? '+' : ''}{homeHandicap}</div>
+                                  <div className="font-medium">{game.home_team} {formatHandicap(homeHandicap)}</div>
                                   <div className="text-xs">{adjustedHomeOdds ? adjustedHomeOdds.toFixed(3) : 'N/A'}</div>
                                 </button>
                               )}
@@ -1338,7 +1321,7 @@ export default function Exchange() {
                                 <button
                                   onClick={() => {
                                     // 🎯 버튼 선택 상태 토글
-                                    const selection = `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`;
+                                    const selection = `${game.away_team} ${formatHandicap(awayHandicap)}`;
                                     const wasSelected = isButtonSelected(game.id, `핸디캡_${selection}`);
                                     handleButtonClick(game, selection, adjustedAwayOdds, '핸디캡');
                                     
@@ -1371,13 +1354,13 @@ export default function Exchange() {
                                     }
                                   }}
                                   className={`flex-1 p-2 rounded-lg text-center transition-colors ${
-                                    isButtonSelected(game.id, `핸디캡_${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`)
+                                    isButtonSelected(game.id, `핸디캡_${game.away_team} ${formatHandicap(awayHandicap)}`)
                                       ? 'bg-yellow-500 hover:bg-yellow-600'
                                       : isBettable && adjustedAwayOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                   } text-white text-sm`}
                                   disabled={!isBettable || !adjustedAwayOdds}
                                 >
-                                  <div className="font-medium">{game.away_team} {awayHandicap > 0 ? '+' : ''}{awayHandicap}</div>
+                                  <div className="font-medium">{game.away_team} {formatHandicap(awayHandicap)}</div>
                                   <div className="text-xs">{adjustedAwayOdds ? adjustedAwayOdds.toFixed(3) : 'N/A'}</div>
                                 </button>
                               )}
@@ -1910,34 +1893,14 @@ export default function Exchange() {
                             );
                           }
                           
-                          // Home/Away 쌍으로 그룹화 (팀명 기반 매칭)
-                          const groupedSpreads: { [absPoint: string]: { home?: { oddsData: any, handicap: number }, away?: { oddsData: any, handicap: number } } } = {};
+                          // ✅ 수정: groupHandicapsByPoint 함수 사용
+                          const groupedSpreads = groupHandicapsByPoint(
+                            spreadsOdds,
+                            game.home_team,
+                            game.away_team
+                          );
                           
-                          spreadEntries.forEach(([outcomeName, oddsData]) => {
-                            // "Team Point" 형식에서 팀명과 핸디캡 분리
-                            const parts = outcomeName.split(' ');
-                            const point = parts[parts.length - 1]; // 마지막 부분이 핸디캡
-                            const teamName = parts.slice(0, -1).join(' '); // 나머지가 팀명
-                            
-                            const handicapValue = parseFloat(point); // -1.5 또는 +1.5
-                            const absPoint = Math.abs(handicapValue).toString(); // "1.5"로 통일
-                            
-                            if (!groupedSpreads[absPoint]) {
-                              groupedSpreads[absPoint] = {};
-                            }
-                            
-                            if (teamName === game.home_team) {
-                              groupedSpreads[absPoint].home = { oddsData, handicap: handicapValue };
-                            } else if (teamName === game.away_team) {
-                              groupedSpreads[absPoint].away = { oddsData, handicap: handicapValue };
-                            }
-                          });
-                          
-                          // 0.5 단위 핸디캡만 필터링 (-1.5, -1, -0.5, 0.5, 1, 1.5 등)
-                          const filteredSpreads = Object.entries(groupedSpreads).filter(([absPoint, oddsPair]) => {
-                            const pointValue = Math.abs(parseFloat(absPoint));
-                            return pointValue % 0.5 === 0;
-                          });
+                          const filteredSpreads = filterHalfPointHandicaps(groupedSpreads);
                           
                           if (filteredSpreads.length === 0) {
                             return (
@@ -1961,9 +1924,9 @@ export default function Exchange() {
                                 const adjustedHomeOdds = homeOdds ? applyExchangeReturnRate(homeOdds, allSpreadsOdds, oddsReturnRateSettings.returnRate) : undefined;
                                 const adjustedAwayOdds = awayOdds ? applyExchangeReturnRate(awayOdds, allSpreadsOdds, oddsReturnRateSettings.returnRate) : undefined;
                                 const pointValue = parseFloat(absPoint);
-                                // 스프레드 베팅에서는 하나의 핸디캡 값으로 양팀이 반대 방향을 가짐
-                                const homeHandicap = pointValue;
-                                const awayHandicap = -pointValue;
+                                // ✅ 수정: groupHandicapsByPoint()에서 계산된 실제 핸디캡 값 사용
+                                const homeHandicap = homeData?.handicap || 0;
+                                const awayHandicap = awayData?.handicap || 0;
                                 
                                 return (
                                   <div key={absPoint} className="flex items-center gap-2">
@@ -1971,7 +1934,7 @@ export default function Exchange() {
                                       <button
                                         onClick={() => {
                                           // 🎯 버튼 선택 상태 토글
-                                          const selection = `${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`;
+                                          const selection = `${game.home_team} ${formatHandicap(homeHandicap)}`;
                                           const wasSelected = isButtonSelected(game.id, `핸디캡_${selection}`);
                                           if (adjustedHomeOdds) {
                                             handleButtonClick(game, selection, adjustedHomeOdds, '핸디캡');
@@ -2006,14 +1969,14 @@ export default function Exchange() {
                                           }
                                         }}
                                         className={`flex-1 p-2 rounded-lg text-center transition-colors ${
-                                          isButtonSelected(game.id, `핸디캡_${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap}`)
+                                          isButtonSelected(game.id, `핸디캡_${game.home_team} ${formatHandicap(homeHandicap)}`)
                                             ? 'bg-yellow-500 hover:bg-yellow-600'
                                             : game.isBettable && adjustedHomeOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                         } text-white text-sm`}
                                         disabled={!game.isBettable || !adjustedHomeOdds}
-                                        title={game.isBettable && adjustedHomeOdds ? `클릭하여 ${game.home_team} ${homeHandicap > 0 ? '+' : ''}${homeHandicap} 주문하기` : '베팅 마감됨'}
+                                        title={game.isBettable && adjustedHomeOdds ? `클릭하여 ${game.home_team} ${formatHandicap(homeHandicap)} 주문하기` : '베팅 마감됨'}
                                       >
-                                        <div className="font-medium">{game.home_team} {homeHandicap > 0 ? '+' : ''}{homeHandicap}</div>
+                                        <div className="font-medium">{game.home_team} {formatHandicap(homeHandicap)}</div>
                                         <div className="text-xs">{adjustedHomeOdds ? adjustedHomeOdds.toFixed(3) : 'N/A'}</div>
                                       </button>
                                     )}
@@ -2022,7 +1985,7 @@ export default function Exchange() {
                                       <button
                                         onClick={() => {
                                           // 🎯 버튼 선택 상태 토글
-                                          const selection = `${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`;
+                                          const selection = `${game.away_team} ${formatHandicap(awayHandicap)}`;
                                           const wasSelected = isButtonSelected(game.id, `핸디캡_${selection}`);
                                           if (adjustedAwayOdds) {
                                             handleButtonClick(game, selection, adjustedAwayOdds, '핸디캡');
@@ -2057,14 +2020,14 @@ export default function Exchange() {
                                           }
                                         }}
                                         className={`flex-1 p-2 rounded-lg text-center transition-colors ${
-                                          isButtonSelected(game.id, `핸디캡_${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap}`)
+                                          isButtonSelected(game.id, `핸디캡_${game.away_team} ${formatHandicap(awayHandicap)}`)
                                             ? 'bg-yellow-500 hover:bg-yellow-600'
                                             : game.isBettable && adjustedAwayOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                         } text-white text-sm`}
                                         disabled={!game.isBettable || !adjustedAwayOdds}
-                                        title={game.isBettable && adjustedAwayOdds ? `클릭하여 ${game.away_team} ${awayHandicap > 0 ? '+' : ''}${awayHandicap} 주문하기` : '베팅 마감됨'}
+                                        title={game.isBettable && adjustedAwayOdds ? `클릭하여 ${game.away_team} ${formatHandicap(awayHandicap)} 주문하기` : '베팅 마감됨'}
                                       >
-                                        <div className="font-medium">{game.away_team} {awayHandicap > 0 ? '+' : ''}{awayHandicap}</div>
+                                        <div className="font-medium">{game.away_team} {formatHandicap(awayHandicap)}</div>
                                         <div className="text-xs">{adjustedAwayOdds ? adjustedAwayOdds.toFixed(3) : 'N/A'}</div>
                                       </button>
                                     )}

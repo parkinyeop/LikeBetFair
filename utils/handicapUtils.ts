@@ -15,6 +15,7 @@ export const groupHandicapsByPoint = (
   homeTeam: string,
   awayTeam: string
 ): GroupedSpreads => {
+  
   const groupedSpreads: GroupedSpreads = {};
 
   // 임시 저장소: 각 팀의 모든 핸디캡 수집
@@ -35,7 +36,7 @@ export const groupHandicapsByPoint = (
     const absPoint = Math.abs(handicapValue).toString();
     const handicapInfo: HandicapData = {
       oddsData,
-      handicap: handicapValue  // 원본 값 유지 (-1.5, +1.5)
+      handicap: handicapValue
     };
 
     if (teamName === homeTeam) {
@@ -63,16 +64,18 @@ export const groupHandicapsByPoint = (
         // 부호가 반대인 경우만 매칭
         if ((homeOpt.handicap > 0 && awayOpt.handicap < 0) || 
             (homeOpt.handicap < 0 && awayOpt.handicap > 0)) {
-          // 배당률이 낮은 쪽을 우선 선택 (일반적으로 유리한 쪽)
+          // 🔧 수정: 실제 팀명에 따라 올바르게 할당
+          // homeOpt는 homeTeam에서 온 데이터, awayOpt는 awayTeam에서 온 데이터
           if (!bestHomePick || homeOpt.oddsData.averagePrice < bestHomePick.oddsData.averagePrice) {
-            bestHomePick = homeOpt;
-            bestAwayPick = awayOpt;
+            bestHomePick = homeOpt;  // homeTeam 데이터
+            bestAwayPick = awayOpt;  // awayTeam 데이터
           }
         }
       }
     }
 
     if (bestHomePick && bestAwayPick) {
+      
       groupedSpreads[absPoint] = {
         home: bestHomePick,
         away: bestAwayPick

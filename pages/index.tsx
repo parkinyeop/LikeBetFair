@@ -9,6 +9,7 @@ import { useBetStore } from '../stores/useBetStore';
 import { normalizeTeamNameForComparison } from '../utils/matchSportsbookGame';
 import { convertUtcToLocal, getCurrentLocalTime } from '../utils/timeUtils';
 import HandicapOddsDisplay from '../components/HandicapOddsDisplay';
+import { groupHandicapsByPoint, filterHalfPointHandicaps } from '../utils/handicapUtils';
 
 const initialGameData: Record<string, { teams: string; time: string }[]> = {
   "EPL": [
@@ -1750,31 +1751,15 @@ export default function Home() {
                           <div className="space-y-2">
                             {(() => {
                               const spreadsOdds = game.officialOdds.spreads;
-                              const groupedSpreads: { [point: string]: { home?: any, away?: any } } = {};
                               
-                              Object.entries(spreadsOdds).forEach(([outcomeName, oddsData]) => {
-                                // "Team Point" 형식에서 팀명과 핸디캡 분리
-                                const parts = outcomeName.split(' ');
-                                const point = parts[parts.length - 1]; // 마지막 부분이 핸디캡
-                                const teamName = parts.slice(0, -1).join(' '); // 나머지가 팀명
-                                const handicapValue = parseFloat(point); // -1.5 또는 +1.5
-                                const absPoint = Math.abs(handicapValue).toString(); // "1.5"로 통일
-                                
-                                if (!groupedSpreads[absPoint]) groupedSpreads[absPoint] = {};
-                                
-                                // 홈팀인지 원정팀인지 판단
-                                if (teamName === game.home_team) {
-                                  groupedSpreads[absPoint].home = { oddsData, handicap: handicapValue };
-                                } else if (teamName === game.away_team) {
-                                  groupedSpreads[absPoint].away = { oddsData, handicap: handicapValue };
-                                }
-                              });
+                              // ✅ 수정: groupHandicapsByPoint 함수 사용
+                              const groupedSpreads = groupHandicapsByPoint(
+                                spreadsOdds,
+                                game.home_team,
+                                game.away_team
+                              );
                               
-                              // 0.5 단위 핸디캡만 필터링 (-1.5, -1, -0.5, 0.5, 1, 1.5 등)
-                              const filteredSpreads = Object.entries(groupedSpreads).filter(([point, oddsPair]) => {
-                                const pointValue = Math.abs(parseFloat(point));
-                                return pointValue % 0.5 === 0;
-                              });
+                              const filteredSpreads = filterHalfPointHandicaps(groupedSpreads);
                               
                               if (filteredSpreads.length === 0) {
                                 return (
