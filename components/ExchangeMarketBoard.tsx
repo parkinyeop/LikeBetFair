@@ -614,6 +614,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                     }
 
                     // ✅ 유틸리티 함수 사용
+                    
                     const groupedSpreads = groupHandicapsByPoint(
                       spreadsOdds,
                       game.homeTeam,
@@ -645,9 +646,10 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                           const adjustedAwayOdds = awayOdds ? applyExchangeReturnRate(awayOdds, allSpreadsOdds) : undefined;
 
                           const pointValue = parseFloat(absPoint);
-                          // ⚠️ Exchange는 핸디캡을 반대로 계산 (기존 로직 유지)
-                          const homeHandicap = pointValue;
-                          const awayHandicap = -pointValue;
+                          // ✅ 수정: groupHandicapsByPoint()에서 계산된 실제 핸디캡 값 사용
+                          const homeHandicap = homeData.handicap;  // 실제 핸디캡 값 (부호 포함)
+                          const awayHandicap = awayData.handicap;  // 실제 핸디캡 값 (부호 포함)
+                          
 
                           return (
                             <div key={absPoint} className="flex items-center gap-2">
@@ -661,7 +663,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                                       : isOpen ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'
                                   }`}
                                 >
-                                  <div className="font-medium">{game.homeTeam}</div>
+                                  <div className="font-medium">{game.homeTeam} {formatHandicap(homeHandicap)}</div>
                                   <div className="text-xs">{adjustedHomeOdds ? adjustedHomeOdds.toFixed(3) : 'N/A'}</div>
                                 </button>
                               )}
@@ -676,7 +678,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                                       : isOpen ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'
                                   }`}
                                 >
-                                  <div className="font-medium">{game.awayTeam}</div>
+                                  <div className="font-medium">{game.awayTeam} {formatHandicap(awayHandicap)}</div>
                                   <div className="text-xs">{adjustedAwayOdds ? adjustedAwayOdds.toFixed(3) : 'N/A'}</div>
                                 </button>
                               )}
