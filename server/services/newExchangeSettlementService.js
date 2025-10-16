@@ -413,12 +413,30 @@ class NewExchangeSettlementService {
       winnings = 0;
     }
     
+    // actualProfit 계산
+    let actualProfit = 0;
+    if (orderResult === 'won') {
+      if (order.side === 'back') {
+        // Back 승리: 배당금이 실제 수익
+        actualProfit = winnings;
+      } else if (order.side === 'lay') {
+        // Lay 승리: 상대방의 stake가 실제 수익
+        actualProfit = order.stakeAmount || order.stake || 0;
+      }
+    } else {
+      // 패배: 실제 수익 없음 (손실은 이미 차감됨)
+      actualProfit = 0;
+    }
+
+    console.log(`[actualProfit 계산] 주문 ${order.id}: ${order.side} ${orderResult} → actualProfit = ₩${actualProfit.toLocaleString()}`);
+
     // 주문 상태 업데이트
     await order.update({
       status: 'settled',
       settledAt: new Date(),
       settlementResult: orderResult,
-      winnings: winnings
+      winnings: winnings,
+      actualProfit: actualProfit
     });
     
     return {
