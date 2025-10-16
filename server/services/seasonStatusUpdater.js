@@ -12,7 +12,7 @@ import { reloadSeasonSchedules } from '../config/sportsMapping.js';
  */
 async function updateSeasonStatus(sportKey, statusInfo) {
   try {
-    const configPath = path.join(process.cwd(), 'server/config/seasonSchedules.json');
+    const configPath = path.join(process.cwd(), 'config/seasonSchedules.json');
     
     // 1. 현재 설정 파일 읽기
     const configContent = await fs.readFile(configPath, 'utf8');

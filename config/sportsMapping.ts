@@ -270,11 +270,11 @@ export const SEASON_SCHEDULES: Record<string, SeasonInfo> = {
   // 농구
   'basketball_nba': {
     name: 'NBA',
-    status: 'offseason',
+    status: 'active',
     currentSeason: '2024-25',
     seasonEnd: '2025-06-19',
     nextSeasonStart: '2025-10-15',
-    description: 'Season Off (Auto-detected: No recent games, no scheduled games, no odds available)'
+    description: 'DB 경기 데이터 존재 (15개 예정 경기)'
   },
   'basketball_kbl': {
     name: 'KBL',

@@ -78,15 +78,17 @@ class SeasonStatusChecker {
     const checks = await Promise.all([
       this.checkOddsAvailability(oddsApiKey),
       this.checkRecentGames(sportKey),
-      this.checkUpcomingGames(sportKey)
+      this.checkUpcomingGames(sportKey),
+      this.checkDatabaseGames(sportKey)  // ✅ 실제 DB 데이터 체크 추가
     ]);
 
-    const [hasOdds, recentGames, upcomingGames] = checks;
+    const [hasOdds, recentGames, upcomingGames, dbGames] = checks;
 
     return this.determineSeasonStatus({
       hasOdds,
       recentGames,
       upcomingGames,
+      dbGames,
       sportKey,
       currentStatus: seasonInfo.status
     });
@@ -272,10 +274,74 @@ class SeasonStatusChecker {
   }
 
   /**
+   * 실제 데이터베이스에서 경기 데이터 확인
+   */
+  async checkDatabaseGames(sportKey) {
+    try {
+      // OddsCache 모델 import (동적 import 사용)
+      const { default: OddsCache } = await import('../models/oddsCacheModel.js');
+      
+      const now = new Date();
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const sevenDaysLater = new Date();
+      sevenDaysLater.setDate(sevenDaysLater.getDate() + 7);
+      
+      // 최근 30일 + 향후 7일 범위에서 경기 데이터 확인
+      const games = await OddsCache.findAll({
+        where: {
+          sportKey: sportKey,
+          commenceTime: {
+            [require('sequelize').Op.between]: [thirtyDaysAgo, sevenDaysLater]
+          }
+        },
+        order: [['commenceTime', 'ASC']]
+      });
+      
+      const nowTime = now.getTime();
+      const recentGames = games.filter(game => new Date(game.commenceTime).getTime() < nowTime);
+      const upcomingGames = games.filter(game => new Date(game.commenceTime).getTime() >= nowTime);
+      
+      const nextGame = upcomingGames.length > 0 ? upcomingGames[0] : null;
+      
+      return {
+        totalCount: games.length,
+        recentCount: recentGames.length,
+        upcomingCount: upcomingGames.length,
+        nextGameDate: nextGame ? nextGame.commenceTime : null,
+        hasData: games.length > 0
+      };
+    } catch (error) {
+      console.log(`⚠️ DB 경기 체크 실패: ${error.message}`);
+      return { totalCount: 0, recentCount: 0, upcomingCount: 0, nextGameDate: null, hasData: false };
+    }
+  }
+
+  /**
    * 수집된 정보를 바탕으로 시즌 상태 결정 (개선된 범용 로직)
    */
-  determineSeasonStatus({ hasOdds, recentGames, upcomingGames, sportKey, currentStatus }) {
+  determineSeasonStatus({ hasOdds, recentGames, upcomingGames, dbGames, sportKey, currentStatus }) {
     const reasons = [];
+    
+    // 0. 실제 DB에 경기 데이터가 있는 경우 - 최우선 지표
+    if (dbGames.hasData) {
+      if (dbGames.upcomingCount > 0) {
+        reasons.push(`DB 경기 데이터 존재 (${dbGames.upcomingCount}개 예정 경기)`);
+        if (dbGames.recentCount > 0) {
+          reasons.push(`최근 ${dbGames.recentCount}개 경기 완료`);
+        }
+        return {
+          status: 'active',
+          reason: reasons.join(', ')
+        };
+      } else if (dbGames.recentCount > 0) {
+        reasons.push(`DB 경기 데이터 존재 (최근 ${dbGames.recentCount}개 경기)`);
+        return {
+          status: 'active',
+          reason: reasons.join(', ')
+        };
+      }
+    }
     
     // 1. 배당율 제공 중인 경우 - 가장 중요한 지표
     if (hasOdds.hasOdds) {
