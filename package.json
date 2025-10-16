@@ -14,7 +14,7 @@
     "dev:watch": "concurrently \"npm run dev:server:watch\" \"npm run dev:client\"",
     "dev:server:watch": "cd server && nodemon app.js --watch . --ext js,json",
     "dev:restart": "npm run dev:stop && sleep 3 && npm run dev",
-    "dev:stop": "pkill -f 'next-server' 2>/dev/null || true; pkill -f 'next dev' 2>/dev/null || true; pkill -f 'concurrently' 2>/dev/null || true; killall -9 node 2>/dev/null || true",
+    "dev:stop": "pkill -f 'next-server' 2>/dev/null || true; pkill -f 'next dev' 2>/dev/null || true; pkill -f 'concurrently' 2>/dev/null || true; lsof -t -i:5050 | xargs kill -9 2>/dev/null || true",
     "dev:stop:wait": "npm run dev:stop && sleep 3 && echo 'Ready to restart'",
     "migrate": "cd server && node runMigrations.js",
     "lint": "next lint",
