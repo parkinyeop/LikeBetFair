@@ -1130,22 +1130,22 @@ class ExchangeSettlementService {
 
   /**
    * 경기 시작 시점에 매칭되지 않은 주문 자동 취소
-   * 개선: 경기 시작 후 3시간 경과 시 자동 취소
+   * ✅ 개선: 경기 시작 시점에 즉시 자동 취소 (10분 전까지만 배팅 가능하므로)
    */
   async cancelUnmatchedOrdersAtKickoff() {
     try {
-      console.log('🔄 경기 시작 후 매칭되지 않은 주문 자동 취소 시작...');
+      console.log('🔄 경기 시작 시점 매칭되지 않은 주문 자동 취소 시작...');
       
       const now = new Date();
-      const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000); // 3시간 전
+      // ✅ 수정: 경기 시작 시점 기준으로 변경 (3시간 대기 제거)
       
-      // 매칭되지 않은 주문들 조회 (경기 시작 후 3시간이 지난 주문들)
+      // 매칭되지 않은 주문들 조회 (경기 시작 시점 이후)
       const unmatchedOrders = await ExchangeOrder.findAll({
         where: {
           status: 'open',
           matchedOrderId: null,
           commenceTime: {
-            [Op.lte]: threeHoursAgo // 경기 시작 후 3시간 경과
+            [Op.lte]: now // 경기 시작 시점
           }
         }
       });
@@ -1187,7 +1187,7 @@ class ExchangeSettlementService {
             // 1. 주문 상태 업데이트
             await order.update({
               status: 'cancelled',
-              settlementNote: `경기 시작 후 ${hoursSinceGame.toFixed(1)}시간 경과로 매칭되지 않아 자동 취소`,
+              settlementNote: `경기 시작으로 매칭되지 않아 자동 취소`,
               settledAt: new Date()
             }, { transaction });
 
@@ -1907,10 +1907,11 @@ class ExchangeSettlementService {
       console.log('🔄 경기 시작 후 미매칭 오픈 주문 및 부분 매칭 주문 환불 처리 시작...');
       
       const now = new Date();
-      const oneHourAgo = new Date(now.getTime() - (60 * 60 * 1000)); // 1시간 전
+      // ✅ 수정: 경기 시작 시점 기준으로 변경 (1시간 대기 제거)
+      // 경기 시작 10분 전까지만 배팅 가능하므로, 경기 시작 시점에 즉시 환불
       
       // 🆕 수정: 오픈 주문과 부분 매칭된 주문 모두 처리
-      // 1. 완전히 미매칭된 오픈 주문들
+      // 1. 완전히 미매칭된 오픈 주문들 (경기 시작 시점 기준)
       const [openOrdersResults] = await sequelize.query(`
         SELECT 
           id, "userId", side, amount, price, status, "filledAmount", 
@@ -1920,17 +1921,17 @@ class ExchangeSettlementService {
           "createdAt", "updatedAt"
         FROM "ExchangeOrders" 
         WHERE status = 'open' 
-          AND "commenceTime" < :oneHourAgo
+          AND "commenceTime" < :now
           AND "filledAmount" = 0 
           AND ("partiallyFilled" = false OR "partiallyFilled" IS NULL)
         ORDER BY "commenceTime" ASC
-        LIMIT 25
+        LIMIT 50
       `, {
-        replacements: { oneHourAgo },
+        replacements: { now },
         type: sequelize.QueryTypes.SELECT
       });
       
-      // 2. 부분 매칭된 주문들 (남은 금액이 있는 경우)
+      // 2. 부분 매칭된 주문들 (남은 금액이 있는 경우) - 경기 시작 시점 기준
       const [partialOrdersResults] = await sequelize.query(`
         SELECT 
           id, "userId", side, amount, price, status, "filledAmount", 
@@ -1940,12 +1941,12 @@ class ExchangeSettlementService {
           "createdAt", "updatedAt"
         FROM "ExchangeOrders" 
         WHERE status = 'partially_matched' 
-          AND "commenceTime" < :oneHourAgo
+          AND "commenceTime" < :now
           AND "remainingAmount" > 0
         ORDER BY "commenceTime" ASC
-        LIMIT 25
+        LIMIT 50
       `, {
-        replacements: { oneHourAgo },
+        replacements: { now },
         type: sequelize.QueryTypes.SELECT
       });
       
@@ -2039,18 +2040,18 @@ class ExchangeSettlementService {
           // 환불 후 잔액 조회
           const user = await User.findByPk(order.userId, { transaction });
           
-          // 환불 사유 및 메모 생성
+          // ✅ 환불 사유 및 메모 생성 (경기 시작 시점 기준)
           const timeDescription = isGameStarted 
-            ? `경기 시작 후 ${Math.abs(hoursSinceGame).toFixed(1)}시간 경과` 
+            ? `경기 시작됨 (${Math.abs(hoursSinceGame).toFixed(1)}시간 경과)` 
             : `경기 시작 전 ${Math.abs(hoursSinceGame).toFixed(1)}시간`;
           
           let refundReason;
           if (order.status === 'partially_matched') {
-            refundReason = '경기 시작 후 부분 매칭된 주문의 남은 금액 자동 환불';
+            refundReason = '경기 시작으로 부분 매칭된 주문의 남은 금액 자동 환불';
           } else {
             refundReason = isGameStarted 
-              ? '경기 시작 후 미매칭으로 인한 자동 환불' 
-              : '경기 시작 전 미매칭으로 인한 자동 환불';
+              ? '경기 시작으로 미매칭 주문 자동 환불' 
+              : '경기 시작 전 미매칭 주문 자동 환불';
           }
           
           // 환불 내역 기록
