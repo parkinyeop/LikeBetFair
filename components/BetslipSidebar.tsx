@@ -49,7 +49,29 @@ function MyBetsPanel() {
       console.log('[클라이언트] API 응답 상태:', res.status, res.statusText);
       const data = await res.json();
       console.log('[클라이언트] API 응답 데이터:', data);
-      
+      console.log('[클라이언트] 데이터 길이:', data.length);
+      console.log('[클라이언트] 데이터 타입:', typeof data, Array.isArray(data));
+
+      // gameResult 확인 - 상세 로그
+      if (data.length > 0) {
+        console.log('[클라이언트] 첫 번째 베팅 존재');
+        console.log('[클라이언트] 첫 번째 베팅 status:', data[0].status);
+
+        if (data[0].selections) {
+        console.log('[클라이언트] 첫 번째 베팅:', data[0]);
+        console.log('[클라이언트] 첫 번째 베팅의 selections:', data[0].selections);
+        data[0].selections.forEach((sel: any, idx: number) => {
+          console.log(`[클라이언트] Selection ${idx}:`, sel);
+          console.log(`[클라이언트] Selection ${idx} gameResult:`, sel.gameResult);
+          if (sel.gameResult) {
+            console.log(`[클라이언트] Selection ${idx} gameResult.score:`, sel.gameResult.score);
+            console.log(`[클라이언트] Selection ${idx} gameResult.homeTeam:`, sel.gameResult.homeTeam);
+            console.log(`[클라이언트] Selection ${idx} gameResult.awayTeam:`, sel.gameResult.awayTeam);
+          }
+        });
+        }
+      }
+
       if (res.ok) {
         console.log('[클라이언트] 베팅 내역 업데이트:', data.length, '개의 베팅');
         data.forEach((bet: any, index: number) => {
@@ -401,130 +423,48 @@ function MyBetsPanel() {
                         <span className="text-sm font-bold text-gray-800">상세 정보</span>
                         <button className="px-2 py-1 text-xs border rounded text-blue-600 border-blue-300 hover:bg-blue-50" onClick={e => { e.stopPropagation(); toggleBet(bet.id); }}>접기 ▲</button>
                       </div>
-                                {/* 경기 정보 표시 - 경기명과 경기시간만 */}
-                                {Array.isArray(bet.selections) && (
-                                  <div className="mb-3">
-                                    <div className="text-sm font-medium text-gray-700 mb-2">🏟️ 경기 정보</div>
-                                    <div className="space-y-2">
-                                      {bet.selections.map((sel: any, idx: number) => {
-                                        return (
-                                          <div key={idx} className="border-l-2 border-gray-200 pl-3 py-1">
-                                            <div className="flex flex-col text-sm">
-                                              {/* 경기명 */}
-                                              <span className="text-xs text-gray-500">
-                                                {sel.desc || `${sel.team} Game`}
-                                              </span>
-                                              {/* 경기 시간 */}
-                                              {sel.commence_time && (
-                                                <span className="text-xs text-blue-600 font-medium">
-                                                  🕐 {new Date(sel.commence_time).toLocaleString('ko-KR', { 
-                                                    month: '2-digit', 
-                                                    day: '2-digit', 
-                                                    hour: '2-digit', 
-                                                    minute: '2-digit' 
-                                                  })}
-                                                </span>
-                                              )}
-                                            </div>
-                                          </div>
-                                        );
+
+                      {/* 경기 결과 표시 (스코어가 있을 때만) */}
+                      {Array.isArray(bet.selections) && bet.selections.some((sel: any) => sel.gameResult?.score) && (
+                        <div className="mb-3 bg-blue-50 rounded-lg p-2">
+                          <div className="space-y-1.5">
+                            {bet.selections.map((sel: any, idx: number) => {
+                              // 스코어가 있는 경기만 표시
+                              if (!sel.gameResult || !sel.gameResult.score) return null;
+
+                              const parsed = parseScore(
+                                sel.gameResult.score,
+                                sel.gameResult.homeTeam,
+                                sel.gameResult.awayTeam
+                              );
+
+                              if (!parsed.isValid) return null;
+
+                              return (
+                                <div key={idx} className="bg-white rounded p-2">
+                                  <div className="text-xs text-gray-500">
+                                    {sel.desc || `${sel.gameResult.homeTeam} vs ${sel.gameResult.awayTeam}`}
+                                  </div>
+                                  {sel.commence_time && (
+                                    <div className="text-xs text-gray-400 mb-1">
+                                      {new Date(sel.commence_time).toLocaleString('ko-KR', {
+                                        month: '2-digit',
+                                        day: '2-digit',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        hour12: false
                                       })}
                                     </div>
-                                  </div>
-                                )}
-
-                                {/* 경기 결과 표시 (적중/미적중일 때) */}
-                                {['won', 'lost'].includes(bet.status) && Array.isArray(bet.selections) && (
-                                  <div className="mb-3">
-                                    <div className="text-sm font-medium text-gray-700 mb-2">📊 Result</div>
-                                    <div className="space-y-2">
-                                      {bet.selections.map((sel: any, idx: number) => {
-                            // 디버깅용 로그
-                            console.log(`[배팅내역] 선택 ${idx}:`, {
-                              result: sel.result,
-                              market: sel.market,
-                              team: sel.team,
-                              option: sel.option,
-                              desc: sel.desc,
-                              gameResult: sel.gameResult,
-                              betStatus: bet.status
-                            });
-                            
-                            // 개별 선택의 실제 결과 계산
-                            let actualResult = sel.result;
-                            
-                            // sel.result가 없거나 pending인 경우, 경기 결과를 직접 계산
-                            if (!actualResult || actualResult === 'pending') {
-                              if (sel.gameResult && sel.gameResult.score) {
-                                // Over/Under 베팅의 경우 점수 계산 (중앙화된 유틸리티 사용)
-                                if (sel.market === 'Over/Under' || sel.market === 'totals') {
-                                  const totalScore = calculateTotalScore(sel.gameResult.score);
-                                  const betPoint = parseFloat(sel.point) || 0;
-                                  const isOver = (sel.option || sel.team || '').toLowerCase().includes('over');
-                                  
-                                  if (isOver) {
-                                    actualResult = totalScore > betPoint ? 'won' : 'lost';
-                                  } else {
-                                    actualResult = totalScore < betPoint ? 'won' : 'lost';
-                                  }
-                                  
-                                  console.log(`[Over/Under 계산] ${sel.desc}: 총점 ${totalScore}, 기준 ${betPoint}, ${isOver ? 'Over' : 'Under'} 베팅 → ${actualResult}`);
-                                }
-                                // Win/Loss 베팅의 경우 (추후 필요시 구현)
-                                else if (sel.market === 'Win/Loss' || sel.market === 'h2h') {
-                                  // 승부 결과 계산 로직 (현재는 기존 result 사용)
-                                  actualResult = sel.result;
-                                }
-                                // Handicap 베팅의 경우 (추후 필요시 구현)
-                                else if (sel.market === 'Handicap' || sel.market === 'spreads') {
-                                  // 핸디캡 결과 계산 로직 (현재는 기존 result 사용)
-                                  actualResult = sel.result;
-                                }
-                              }
-                              
-                              // 여전히 결과가 없으면 전체 베팅 상태 기준으로 추정 (단일 베팅인 경우)
-                              if (!actualResult || actualResult === 'pending') {
-                                if (bet.status === 'won') actualResult = 'won';
-                                else if (bet.status === 'lost') actualResult = 'lost';
-                              }
-                            }
-                            
-                                                          let icon = '⏳', color = 'text-gray-400', label = 'Pending';
-                                                          if (actualResult === 'won') { icon = '✔️'; color = 'text-green-600'; label = 'Won'; }
-                              else if (actualResult === 'lost') { icon = '❌'; color = 'text-red-500'; label = 'Lost'; }
-                            else if (actualResult === 'cancelled') { icon = '🚫'; color = 'text-orange-500'; label = 'Game Cancelled'; }
-else if (actualResult === 'draw') { icon = '⚖️'; color = 'text-blue-500'; label = 'Draw'; }
-                            
-                            return (
-                              <div key={idx} className="border-l-2 border-gray-200 pl-3 py-1">
-                                <div className="flex items-center justify-between text-sm">
-                                  <div className="flex items-center">
-                                    <span className={`mr-2 ${color}`}>{icon}</span>
-                                    <span className={`text-xs font-medium ${color}`}>{label}</span>
+                                  )}
+                                  <div className="text-xs font-bold text-blue-600">
+                                    {sel.gameResult.homeTeam} {parsed.home} : {parsed.away} {sel.gameResult.awayTeam}
                                   </div>
                                 </div>
-                                {/* 경기 결과 스코어 표시 */}
-                                {(() => {
-                                  const parsed = parseScore(
-                                    sel.gameResult?.score,
-                                    sel.gameResult?.homeTeam,
-                                    sel.gameResult?.awayTeam
-                                  );
-                                  
-                                  if (!parsed.isValid) return null;
-                                  
-                                  return (
-                                    <div className="text-xs text-blue-600 mt-1 ml-6">
-                                      {sel.gameResult?.homeTeam || 'Home'} {parsed.home} : {sel.gameResult?.awayTeam || 'Away'} {parsed.away}
-                                    </div>
-                                  );
-                                })()}
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                     
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between items-center">

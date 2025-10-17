@@ -411,33 +411,71 @@ export async function getBetHistory(req, res) {
                 
                 if (!isNaN(commenceTime.getTime())) {
                   try {
-                    // 🚀 중앙화된 경기 결과 조회 사용
-                    const config = getLocationConfig('betController');
+                    // 🚀 익스체인지와 동일한 유연한 매칭 로직 사용
+                    const { normalizeTeamNameForComparison } = await import('../utils/normalizeUtils.js');
                     
-                    if (config.FEATURE_FLAGS?.USE_CENTRALIZED_QUERY) {
-                      console.log(`[getBetHistory] Using centralized query for selection ${selectionIndex + 1}`);
-                      gameResult = await GameResultQuery.findByTeamsAndTime(
-                        homeTeam,
-                        awayTeam,
-                        commenceTime,
-                        'betController'
-                      );
-                    } else {
-                      // 레거시 로직 (Feature Flag가 비활성화된 경우)
-                      console.log(`[getBetHistory] Using legacy query for selection ${selectionIndex + 1}`);
-                      gameResult = await GameResult.findOne({
-                        where: {
-                          homeTeam: { [Op.iLike]: `%${homeTeam}%` },
-                          awayTeam: { [Op.iLike]: `%${awayTeam}%` },
-                          commenceTime: {
-                            [Op.between]: [
-                              new Date(commenceTime.getTime() - 24 * 60 * 60 * 1000),
-                              new Date(commenceTime.getTime() + 24 * 60 * 60 * 1000)
-                            ]
-                          }
+                    // 정규화된 팀명으로 매칭
+                    const normalizedHomeTeam = normalizeTeamNameForComparison(homeTeam);
+                    const normalizedAwayTeam = normalizeTeamNameForComparison(awayTeam);
+                    
+                    console.log(`[getBetHistory] 유연한 매칭 시작: ${homeTeam} vs ${awayTeam}`);
+                    console.log(`   - 정규화된 팀명: ${normalizedHomeTeam} vs ${normalizedAwayTeam}`);
+                    
+                    // 시간 범위로 후보 경기들을 가져온 다음 메모리에서 정규화 매칭 (±3시간)
+                    const candidateGames = await GameResult.findAll({
+                      where: {
+                        commenceTime: {
+                          [Op.gte]: new Date(commenceTime.getTime() - 3 * 60 * 60 * 1000), // 3시간 전
+                          [Op.lte]: new Date(commenceTime.getTime() + 3 * 60 * 60 * 1000)  // 3시간 후
                         },
-                        order: [['createdAt', 'DESC']]
-                      });
+                        status: { [Op.in]: ['finished', 'cancelled', 'postponed', 'scheduled'] }
+                      },
+                      order: [['createdAt', 'DESC']]
+                    });
+
+                    console.log(`[getBetHistory] 후보 경기 ${candidateGames.length}개 발견`);
+
+                    // 정산을 위해 finished 상태 경기를 우선 정렬
+                    const statusPriority = { 'finished': 1, 'cancelled': 2, 'postponed': 3, 'scheduled': 4, 'live': 5 };
+                    candidateGames.sort((a, b) => {
+                      const priorityA = statusPriority[a.status] || 99;
+                      const priorityB = statusPriority[b.status] || 99;
+                      if (priorityA !== priorityB) {
+                        return priorityA - priorityB; // finished가 가장 먼저
+                      }
+                      // 같은 우선순위면 시간이 가까운 것 우선
+                      return Math.abs(new Date(a.commenceTime).getTime() - commenceTime.getTime()) - 
+                             Math.abs(new Date(b.commenceTime).getTime() - commenceTime.getTime());
+                    });
+
+                    // 메모리에서 정규화된 팀명으로 매칭
+                    for (const candidate of candidateGames) {
+                      const dbHomeNorm = normalizeTeamNameForComparison(candidate.homeTeam);
+                      const dbAwayNorm = normalizeTeamNameForComparison(candidate.awayTeam);
+
+                      // 정규화된 팀명으로 매칭 (양방향)
+                      if ((dbHomeNorm === normalizedHomeTeam && dbAwayNorm === normalizedAwayTeam) ||
+                          (dbHomeNorm === normalizedAwayTeam && dbAwayNorm === normalizedHomeTeam)) {
+                        gameResult = candidate;
+                        console.log(`🎯 [getBetHistory] 정규화된 팀명으로 매칭 성공: ${candidate.homeTeam} vs ${candidate.awayTeam}`);
+                        break;
+                      }
+
+                      // 원본 팀명으로도 시도 (부분 매칭)
+                      const homeMatch = candidate.homeTeam.toLowerCase().includes(homeTeam.toLowerCase()) ||
+                                       homeTeam.toLowerCase().includes(candidate.homeTeam.toLowerCase());
+                      const awayMatch = candidate.awayTeam.toLowerCase().includes(awayTeam.toLowerCase()) ||
+                                       awayTeam.toLowerCase().includes(candidate.awayTeam.toLowerCase());
+
+                      if (homeMatch && awayMatch) {
+                        gameResult = candidate;
+                        console.log(`🎯 [getBetHistory] 부분 매칭 성공: ${candidate.homeTeam} vs ${candidate.awayTeam}`);
+                        break;
+                      }
+                    }
+                    
+                    if (!gameResult) {
+                      console.log(`❌ [getBetHistory] 매칭 실패: ${homeTeam} vs ${awayTeam} (후보 ${candidateGames.length}개)`);
                     }
                     
                     console.log(`[getBetHistory] Selection ${selectionIndex + 1} - 게임 결과 조회 결과:`, {
