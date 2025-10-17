@@ -158,6 +158,9 @@ async function processPartialMatching(orderData) {
 
 // 매칭 배팅 API - 즉시 매칭 방식
 router.post('/match-order', verifyToken, async (req, res) => {
+  // 🔒 트랜잭션 시작 (중복 매칭 방지)
+  const transaction = await sequelize.transaction();
+  
   // 🆕 catch 블록에서 사용할 변수들을 미리 선언
   let targetOrder, matchOrder, exchangeOrderMatch;
   let matchAmount, matchType, userId;
@@ -175,9 +178,14 @@ router.post('/match-order', verifyToken, async (req, res) => {
       sequelize: !!ExchangeOrderMatch?.sequelize
     });
     
-    // 대상 주문 찾기
-    const targetOrder = await ExchangeOrder.findByPk(targetOrderId);
+    // 🔒 대상 주문 찾기 (비관적 락 적용 - SELECT FOR UPDATE)
+    const targetOrder = await ExchangeOrder.findByPk(targetOrderId, {
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    });
+    
     if (!targetOrder) {
+      await transaction.rollback();
       return res.status(404).json({ success: false, message: '대상 주문을 찾을 수 없습니다.' });
     }
     
@@ -186,16 +194,19 @@ router.post('/match-order', verifyToken, async (req, res) => {
     
     // 주문 상태 확인 (부분 매칭된 주문도 허용)
     if (targetOrder.status !== 'open' && targetOrder.status !== 'partially_matched') {
+      await transaction.rollback();
       return res.status(400).json({ success: false, message: '이미 완전히 체결되었거나 취소된 주문입니다.' });
     }
     
     // 본인 주문인지 확인
     if (targetOrder.userId === userId) {
+      await transaction.rollback();
       return res.status(400).json({ success: false, message: '자신이 생성한 주문에는 매칭 배팅을 할 수 없습니다.' });
     }
     
     // 매칭 타입 확인 (반대 타입이어야 함)
     if (targetOrder.side === matchType) {
+      await transaction.rollback();
       return res.status(400).json({ success: false, message: '매칭 배팅은 반대 타입으로만 가능합니다.' });
     }
     
@@ -210,6 +221,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
         amount: targetOrder.amount,
         userId: userId
       });
+      await transaction.rollback();
       return res.status(400).json({
         success: false,
         message: '매칭 가능한 잔액이 없는 주문입니다.'
@@ -225,6 +237,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
         matchedAmount: targetOrder.matchedAmount,
         userId: userId
       });
+      await transaction.rollback();
       return res.status(500).json({
         success: false,
         message: '주문 상태 오류가 발생했습니다. 관리자에게 문의하세요.'
@@ -239,6 +252,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
       // Back 주문에 Lay로 매칭: matchAmount는 리스크 금액
       // 실제 매칭되는 주문 금액 = matchAmount / (odds - 1)
       if (targetOrder.price <= 1.0) {
+        await transaction.rollback();
         return res.status(400).json({ 
           success: false, 
           message: '유효하지 않은 배당율입니다. (1.0 이하)' 
@@ -251,6 +265,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
     } else {
       // Lay 주문에 Back으로 매칭: matchAmount는 주문 금액
       if (adjustedPrice <= 1.0) {
+        await transaction.rollback();
         return res.status(400).json({ 
           success: false, 
           message: '유효하지 않은 배당율입니다. (1.0 이하)' 
@@ -262,6 +277,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
     }
     
     if (actualMatchAmount <= 0) {
+      await transaction.rollback();
       return res.status(400).json({ 
         success: false, 
         message: '매칭 가능한 금액이 없습니다.' 
@@ -284,20 +300,27 @@ router.post('/match-order', verifyToken, async (req, res) => {
         `${matchAmount} * (${targetOrder.price} - 1) = ${matchAmount * (targetOrder.price - 1)}`
     });
     
-    // ✅ 중앙화된 잔액 관리 서비스 사용
-    const transaction = await sequelize.transaction();
+    // 🔒 사용자 잔액도 Lock (중복 차감 방지)
+    const user = await User.findByPk(userId, {
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    });
     
-    try {
-      // 사용자 잔고 확인 및 차감 (PaymentHistory 자동 기록)
-      await balanceService.deductBalance(
-        userId,
-        stakeAmount,
-        `익스체인지 매칭 배팅 차감: ${targetOrder.homeTeam} vs ${targetOrder.awayTeam}`,
-        `EXCHANGE_${Date.now()}`,
-        transaction
-      );
-      
-      console.log(`✅ 잔액 차감 완료: ${stakeAmount.toLocaleString()}원 (PaymentHistory 기록됨)`);
+    if (!user) {
+      await transaction.rollback();
+      return res.status(404).json({ success: false, message: '사용자를 찾을 수 없습니다.' });
+    }
+    
+    // 사용자 잔고 확인 및 차감 (PaymentHistory 자동 기록)
+    await balanceService.deductBalance(
+      userId,
+      stakeAmount,
+      `익스체인지 매칭 배팅 차감: ${targetOrder.homeTeam} vs ${targetOrder.awayTeam}`,
+      `EXCHANGE_${Date.now()}`,
+      transaction
+    );
+    
+    console.log(`✅ 잔액 차감 완료: ${stakeAmount.toLocaleString()}원 (PaymentHistory 기록됨)`);
 
       // 🔒 Zero-Sum 위반 방지: 매칭 주문 생성 시 selection 검증 (단일 베팅만)
       // 멀티배팅은 selection=NULL이어도 정상
@@ -488,25 +511,19 @@ router.post('/match-order', verifyToken, async (req, res) => {
         isPartiallyMatched: targetOrder.partiallyFilled
       });
       
-    } catch (error) {
-      // 트랜잭션 롤백
-      await transaction.rollback();
-      
-      console.error('❌ 매칭 배팅 실패:', {
-        error: error.message,
-        stack: error.stack,
-        targetOrderId: targetOrder?.id || 'unknown',
-        matchAmount: matchAmount || 'unknown',
-        matchType: matchType || 'unknown',
-        userId: userId || 'unknown'
-      });
-      res.status(500).json({ 
-        success: false, 
-        message: `매칭 배팅 처리 중 오류가 발생했습니다: ${error.message}` 
-      });
-    }
   } catch (error) {
-    console.error('❌ 매칭 배팅 외부 에러:', error);
+    // 🔒 트랜잭션 롤백 (중요!)
+    await transaction.rollback();
+    
+    console.error('❌ 매칭 배팅 실패 (롤백 완료):', {
+      error: error.message,
+      stack: error.stack,
+      targetOrderId: targetOrder?.id || 'unknown',
+      matchAmount: matchAmount || 'unknown',
+      matchType: matchType || 'unknown',
+      userId: userId || 'unknown'
+    });
+    
     res.status(500).json({ 
       success: false, 
       message: `매칭 배팅 처리 중 오류가 발생했습니다: ${error.message}` 

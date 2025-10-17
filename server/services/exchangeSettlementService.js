@@ -1910,58 +1910,35 @@ class ExchangeSettlementService {
       // ✅ 수정: 경기 시작 시점 기준으로 변경 (1시간 대기 제거)
       // 경기 시작 10분 전까지만 배팅 가능하므로, 경기 시작 시점에 즉시 환불
       
-      // 🆕 수정: 오픈 주문과 부분 매칭된 주문 모두 처리
-      // 1. 완전히 미매칭된 오픈 주문들 (경기 시작 시점 기준)
-      const [openOrdersResults] = await sequelize.query(`
-        SELECT 
-          id, "userId", side, amount, price, status, "filledAmount", 
-          "partiallyFilled", "remainingAmount", "originalAmount", 
-          "matchedOrderId", "gameId", market, line, selection, "isMultibet", 
-          "selectionDetails", "homeTeam", "awayTeam", "commenceTime",
-          "createdAt", "updatedAt"
-        FROM "ExchangeOrders" 
-        WHERE status = 'open' 
-          AND "commenceTime" < :now
-          AND "filledAmount" = 0 
-          AND ("partiallyFilled" = false OR "partiallyFilled" IS NULL)
-        ORDER BY "commenceTime" ASC
-        LIMIT 50
-      `, {
-        replacements: { now },
-        type: sequelize.QueryTypes.SELECT
+      // ✅ 수정: Sequelize ORM 메서드 사용 (SQL raw query 제거)
+      // 1. 완전히 미매칭된 오픈 주문들
+      const openOrders = await ExchangeOrder.findAll({
+        where: {
+          status: 'open',
+          commenceTime: { [Op.lt]: now },
+          filledAmount: 0,
+          [Op.or]: [
+            { partiallyFilled: false },
+            { partiallyFilled: null }
+          ]
+        },
+        order: [['commenceTime', 'ASC']],
+        limit: 50
       });
       
-      // 2. 부분 매칭된 주문들 (남은 금액이 있는 경우) - 경기 시작 시점 기준
-      const [partialOrdersResults] = await sequelize.query(`
-        SELECT 
-          id, "userId", side, amount, price, status, "filledAmount", 
-          "partiallyFilled", "remainingAmount", "originalAmount", 
-          "matchedOrderId", "gameId", market, line, selection, "isMultibet", 
-          "selectionDetails", "homeTeam", "awayTeam", "commenceTime",
-          "createdAt", "updatedAt"
-        FROM "ExchangeOrders" 
-        WHERE status = 'partially_matched' 
-          AND "commenceTime" < :now
-          AND "remainingAmount" > 0
-        ORDER BY "commenceTime" ASC
-        LIMIT 50
-      `, {
-        replacements: { now },
-        type: sequelize.QueryTypes.SELECT
+      // 2. 부분 매칭된 주문들
+      const partialOrders = await ExchangeOrder.findAll({
+        where: {
+          status: 'partially_matched',
+          commenceTime: { [Op.lt]: now },
+          remainingAmount: { [Op.gt]: 0 }
+        },
+        order: [['commenceTime', 'ASC']],
+        limit: 50
       });
       
       // 두 결과를 합치기
-      const allResults = [...(Array.isArray(openOrdersResults) ? openOrdersResults : [openOrdersResults]), 
-                          ...(Array.isArray(partialOrdersResults) ? partialOrdersResults : [partialOrdersResults])];
-      const sqlResults = allResults.filter(result => result != null);
-      
-      // SQL 결과를 ExchangeOrder 인스턴스로 변환
-      const resultsArray = Array.isArray(sqlResults) ? sqlResults : [sqlResults];
-      const unmatchedOpenOrders = resultsArray.filter(result => result != null).map(row => {
-        const order = ExchangeOrder.build(row);
-        order.isNewRecord = false;
-        return order;
-      });
+      const unmatchedOpenOrders = [...openOrders, ...partialOrders];
       console.log(`📋 환불 대상 오픈 주문: ${unmatchedOpenOrders.length}개`);
       
       if (unmatchedOpenOrders.length === 0) {
