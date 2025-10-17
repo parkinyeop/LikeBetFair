@@ -72,8 +72,8 @@ router.post('/manual-game-result', async (req, res) => {
             commenceTime: new Date(gameData.commenceTime)
           },
           defaults: {
-            mainCategory: 'soccer',
-            subCategory: 'ARGENTINA_PRIMERA',
+            mainCategory: gameData.mainCategory || 'soccer',
+            subCategory: gameData.subCategory || 'MANUAL_INPUT',
             homeTeam: gameData.homeTeam,
             awayTeam: gameData.awayTeam,
             commenceTime: new Date(gameData.commenceTime),
@@ -81,10 +81,10 @@ router.post('/manual-game-result', async (req, res) => {
               { name: gameData.homeTeam, score: String(gameData.homeScore || 0) },
               { name: gameData.awayTeam, score: String(gameData.awayScore || 0) }
             ]),
-            status: gameData.status || 'pending',
+            status: gameData.status || 'finished',
             result: gameData.result || calculateGameResult(gameData.homeScore, gameData.awayScore),
-            sportKey: 'soccer_argentina_primera_division',
-            sportTitle: '아르헨티나 프리메라 디비시온',
+            sportKey: gameData.sportKey || 'soccer_manual',
+            sportTitle: gameData.sportTitle || '수동 입력',
             eventId: `manual_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
           }
         });
@@ -96,8 +96,12 @@ router.post('/manual-game-result', async (req, res) => {
               { name: gameData.homeTeam, score: String(gameData.homeScore || 0) },
               { name: gameData.awayTeam, score: String(gameData.awayScore || 0) }
             ]),
-            status: gameData.status || 'pending',
+            status: gameData.status || 'finished',
             result: gameData.result || calculateGameResult(gameData.homeScore, gameData.awayScore),
+            mainCategory: gameData.mainCategory || gameResult.mainCategory,
+            subCategory: gameData.subCategory || gameResult.subCategory,
+            sportKey: gameData.sportKey || gameResult.sportKey,
+            sportTitle: gameData.sportTitle || gameResult.sportTitle,
             updatedAt: new Date()
           });
           console.log(`🔄 기존 경기 업데이트: ${gameData.homeTeam} vs ${gameData.awayTeam}`);

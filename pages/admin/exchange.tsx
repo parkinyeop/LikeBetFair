@@ -672,9 +672,13 @@ export default function ExchangeAdmin() {
           awayTeam: selection.awayTeam,
           homeScore: parseInt(manualData.homeScore) || 0,
           awayScore: parseInt(manualData.awayScore) || 0,
-          status: manualData.status || 'pending',
+          status: manualData.status || 'finished',
           result: manualData.result || null,
-          commenceTime: selection.commenceTime
+          commenceTime: selection.commenceTime,
+          sportKey: selection.sportKey || selectedOrder.sportKey,
+          sportTitle: selection.sportTitle || selectedOrder.sportTitle,
+          mainCategory: 'soccer',
+          subCategory: selection.sportKey?.replace('soccer_', '').toUpperCase() || 'MANUAL_INPUT'
         };
       }) || [];
 

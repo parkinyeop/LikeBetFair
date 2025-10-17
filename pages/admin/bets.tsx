@@ -504,9 +504,13 @@ export default function BettingAdmin() {
           awayTeam: awayTeam,
           homeScore: parseInt(manualData.homeScore) || 0,
           awayScore: parseInt(manualData.awayScore) || 0,
-          status: manualData.status || 'pending',
+          status: manualData.status || 'finished',
           result: manualData.result || null,
-          commenceTime: selection.commence_time
+          commenceTime: selection.commence_time,
+          sportKey: selectedBet.sport_key,
+          sportTitle: selectedBet.sport_title,
+          mainCategory: 'soccer',
+          subCategory: selectedBet.sport_key?.replace('soccer_', '').toUpperCase() || 'MANUAL_INPUT'
         };
       }) || [];
 
