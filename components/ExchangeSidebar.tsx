@@ -138,14 +138,33 @@ function OrderPanel() {
     };
   }, []); // 의존성 제거하여 매번 체크
 
-  // 매칭 모드일 때 초기값 설정 (자동 설정 제거)
+  // 매칭 모드일 때 초기값 설정 및 다른 매치 선택 시 금액 초기화
   useEffect(() => {
-    if (isMatchMode && form.amount === 0) {
-      // ✅ getAvailableMatchAmount() 사용 (이미 올바른 최대 매칭 금액 반환)
+    if (isMatchMode && matchTargetOrder) {
+      // ✅ 다른 매치 버튼 선택 시에도 금액을 최대 금액으로 자동 설정
+      const maxAmount = getAvailableMatchAmount();
+      console.log('🎯 매치 모드 금액 자동 설정:', { maxAmount, matchTargetOrder: matchTargetOrder.id });
+      setForm(prev => ({ ...prev, amount: maxAmount }));
+    } else if (!isMatchMode) {
+      // 매치 모드가 아닐 때는 금액 초기화
+      setForm(prev => ({ ...prev, amount: 0 }));
+    }
+  }, [isMatchMode, matchTargetOrder, getAvailableMatchAmount]);
+
+  // 🆕 매칭 모드 활성화 이벤트 감지하여 금액 즉시 초기화
+  useEffect(() => {
+    const handleMatchModeActivated = (event: CustomEvent) => {
+      console.log('🎯 매칭 모드 활성화 이벤트 감지, 금액 초기화 중...');
       const maxAmount = getAvailableMatchAmount();
       setForm(prev => ({ ...prev, amount: maxAmount }));
-    }
-  }, [isMatchMode, getAvailableMatchAmount, form.amount]);
+    };
+
+    window.addEventListener('matchModeActivated', handleMatchModeActivated as EventListener);
+    
+    return () => {
+      window.removeEventListener('matchModeActivated', handleMatchModeActivated as EventListener);
+    };
+  }, [getAvailableMatchAmount]);
 
 
 

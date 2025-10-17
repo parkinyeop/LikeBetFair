@@ -337,6 +337,11 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
       awayTeam: targetOrder.awayTeam,
       commenceTime: targetOrder.commenceTime
     });
+
+    // 🆕 매칭 모드 활성화 이벤트 발생 (사이드바에서 금액 초기화용)
+    window.dispatchEvent(new CustomEvent('matchModeActivated', {
+      detail: { targetOrder }
+    }));
     
     // 멀티배팅인 경우 selectionDetails를 multiBetSelections로 설정
     if (targetOrder.isMultibet && targetOrder.selectionDetails) {
