@@ -303,7 +303,7 @@ class MultibetSettlementService {
    * @returns {string} 경기 결과 (won/lost/cancelled/pending)
    */
   determineGameResult(gameResult, selection, validatedScore = null) {
-    const { status, homeScore, awayScore, score } = gameResult;
+    const { status, score } = gameResult;
     const { team: selectedTeam } = selection;
 
     // 경기 취소/연기
@@ -315,8 +315,8 @@ class MultibetSettlementService {
     console.log(`[MULTIBET] 스코어 기반 판정 시작 - status: ${status}`);
 
     // 스코어 기반 판정 (검증된 스코어 우선 사용)
-    let actualHomeScore = homeScore;
-    let actualAwayScore = awayScore;
+    let actualHomeScore = null;
+    let actualAwayScore = null;
 
     // 검증된 스코어가 있으면 우선 사용
     if (validatedScore) {
@@ -325,7 +325,7 @@ class MultibetSettlementService {
       console.log(`[MULTIBET] 검증된 스코어 사용: ${actualHomeScore}-${actualAwayScore}`);
     }
     // score JSON에서 스코어 추출 시도 (fallback)
-    else if ((actualHomeScore === null || actualHomeScore === undefined) && score) {
+    else if (score) {
       try {
         let scoreData;
         if (typeof score === 'string') {

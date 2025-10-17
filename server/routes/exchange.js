@@ -331,7 +331,8 @@ router.post('/match-order', verifyToken, async (req, res) => {
       selectionCount: targetOrder.selectionCount,
       potentialWinnings: targetOrder.potentialWinnings,
       stakeAmount: stakeAmount, // 🆕 올바른 리스크 금액 사용
-      potentialProfit: matchType === 'back' ? Math.floor((targetOrder.price - 1) * actualMatchAmount) : actualMatchAmount, // ✅ 순수익 (담보금 제외)
+      // 🔧 부동소수점 오차 방지: (price - 1) * amount 대신 price * amount - amount 사용
+      potentialProfit: matchType === 'back' ? Math.floor(targetOrder.price * actualMatchAmount) - actualMatchAmount : actualMatchAmount, // ✅ 순수익 (담보금 제외)
       autoSettlement: true,
       backOdds: targetOrder.backOdds,
       layOdds: targetOrder.layOdds,
@@ -716,7 +717,8 @@ router.post('/order', verifyToken, async (req, res) => {
         originalAmount: match.matchAmount,
         remainingAmount: 0,
         stakeAmount: side === 'back' ? match.matchAmount : Math.floor((match.matchPrice - 1) * match.matchAmount),
-        potentialProfit: side === 'back' ? Math.floor((match.matchPrice - 1) * match.matchAmount) : match.matchAmount // ✅ 순수익
+        // 🔧 부동소수점 오차 방지: (price - 1) * amount 대신 price * amount - amount 사용
+        potentialProfit: side === 'back' ? Math.floor(match.matchPrice * match.matchAmount) - match.matchAmount : match.matchAmount // ✅ 순수익
       }, { transaction });
       
       // 매칭 기록 업데이트 (새 주문 ID 연결)
@@ -2172,7 +2174,8 @@ router.post('/match-order', verifyToken, async (req, res) => {
         sportKey: orderData.sportKey,
         selectionDetails: orderData.selectionDetails,
         stakeAmount: side === 'back' ? matchAmount : Math.floor((finalPrice - 1) * matchAmount),
-        potentialProfit: side === 'back' ? Math.floor((finalPrice - 1) * matchAmount) : matchAmount, // ✅ 순수익
+        // 🔧 부동소수점 오차 방지: (price - 1) * amount 대신 price * amount - amount 사용
+        potentialProfit: side === 'back' ? Math.floor(finalPrice * matchAmount) - matchAmount : matchAmount, // ✅ 순수익
         autoSettlement: true,
         // 🆕 스포츠북 배당율 정보 사용
         backOdds: orderData.backOdds,
