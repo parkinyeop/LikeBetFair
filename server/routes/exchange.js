@@ -256,7 +256,8 @@ router.post('/match-order', verifyToken, async (req, res) => {
         });
       }
       actualMatchAmount = Math.min(matchAmount, targetOrder.remainingAmount); // ✅ 수정: || targetOrder.amount 제거
-      stakeAmount = Math.floor((adjustedPrice - 1) * actualMatchAmount); // 리스크 금액 (환수율 적용된 배당율 사용)
+      // 🔧 부동소수점 오차 방지: (price - 1) * amount 대신 price * amount - amount 사용
+      stakeAmount = Math.floor(adjustedPrice * actualMatchAmount) - actualMatchAmount; // 리스크 금액 (환수율 적용된 배당율 사용)
     }
     
     if (actualMatchAmount <= 0) {
@@ -716,8 +717,8 @@ router.post('/order', verifyToken, async (req, res) => {
         filledAmount: filledAmount,
         originalAmount: match.matchAmount,
         remainingAmount: 0,
-        stakeAmount: side === 'back' ? match.matchAmount : Math.floor((match.matchPrice - 1) * match.matchAmount),
         // 🔧 부동소수점 오차 방지: (price - 1) * amount 대신 price * amount - amount 사용
+        stakeAmount: side === 'back' ? match.matchAmount : Math.floor(match.matchPrice * match.matchAmount) - match.matchAmount,
         potentialProfit: side === 'back' ? Math.floor(match.matchPrice * match.matchAmount) - match.matchAmount : match.matchAmount // ✅ 순수익
       }, { transaction });
       
@@ -1152,7 +1153,8 @@ async function cancelMatchedLayOrder(layOrder, transaction) {
   }
   
   // ✅ 간단명료: 본인이 낸 담보금만 환불
-  const refundAmount = layOrder.stakeAmount || Math.floor((layOrder.price - 1) * layOrder.amount);
+  // 🔧 부동소수점 오차 방지: (price - 1) * amount 대신 price * amount - amount 사용
+  const refundAmount = layOrder.stakeAmount || (Math.floor(layOrder.price * layOrder.amount) - layOrder.amount);
   
   console.log(`    💰 LAY 환불: ${refundAmount}원 (본인이 낸 담보금)`);
   
@@ -1250,7 +1252,8 @@ async function cancelOriginalOrder(order, transaction) {
     console.log(`    💰 BACK 환불: ${refundAmount}원 (본인이 낸 돈)`);
   } else {
     // LAY: 담보금 환불
-    refundAmount = order.stakeAmount || Math.floor((order.price - 1) * order.amount);
+    // 🔧 부동소수점 오차 방지: (price - 1) * amount 대신 price * amount - amount 사용
+    refundAmount = order.stakeAmount || (Math.floor(order.price * order.amount) - order.amount);
     console.log(`    💰 LAY 환불: ${refundAmount}원 (본인이 낸 담보금)`);
   }
   
@@ -2173,8 +2176,8 @@ router.post('/match-order', verifyToken, async (req, res) => {
         commenceTime: new Date(orderData.commenceTime), // UTC로 변환하여 저장
         sportKey: orderData.sportKey,
         selectionDetails: orderData.selectionDetails,
-        stakeAmount: side === 'back' ? matchAmount : Math.floor((finalPrice - 1) * matchAmount),
         // 🔧 부동소수점 오차 방지: (price - 1) * amount 대신 price * amount - amount 사용
+        stakeAmount: side === 'back' ? matchAmount : Math.floor(finalPrice * matchAmount) - matchAmount,
         potentialProfit: side === 'back' ? Math.floor(finalPrice * matchAmount) - matchAmount : matchAmount, // ✅ 순수익
         autoSettlement: true,
         // 🆕 스포츠북 배당율 정보 사용
@@ -2231,8 +2234,9 @@ router.post('/match-order', verifyToken, async (req, res) => {
         commenceTime: new Date(orderData.commenceTime), // UTC로 변환하여 저장
         sportKey: orderData.sportKey,
         selectionDetails: orderData.selectionDetails,
-        stakeAmount: side === 'back' ? remainingAmount : Math.floor((finalPrice - 1) * remainingAmount),
-        potentialProfit: side === 'back' ? Math.floor((finalPrice - 1) * remainingAmount) : remainingAmount, // ✅ 순수익
+        // 🔧 부동소수점 오차 방지: (price - 1) * amount 대신 price * amount - amount 사용
+        stakeAmount: side === 'back' ? remainingAmount : Math.floor(finalPrice * remainingAmount) - remainingAmount,
+        potentialProfit: side === 'back' ? Math.floor(finalPrice * remainingAmount) - remainingAmount : remainingAmount, // ✅ 순수익
         autoSettlement: true,
         // 🆕 스포츠북 배당율 정보 사용
         backOdds: orderData.backOdds,
