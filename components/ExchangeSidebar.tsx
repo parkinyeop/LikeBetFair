@@ -306,6 +306,15 @@ function OrderPanel() {
       }
       
       // 일반 주문 처리 (Phase 2: price 파라미터 제거)
+
+      // 🔒 Zero-Sum 위반 방지: selection 필수 검증 (단일 베팅만)
+      // 멀티배팅은 selection 체크하지 않음 (selectionDetails에 저장됨)
+      if (!selectedBet.isMultibet && !selectedBet.team) {
+        alert('선택된 팀 정보가 없습니다. 주문을 생성할 수 없습니다.');
+        console.error('❌ selection 누락 (단일 베팅):', selectedBet);
+        return;
+      }
+
       const orderData = {
         gameId: selectedBet.gameId || '',
         market: selectedBet.market || 'h2h',

@@ -202,13 +202,20 @@ const OrderbookPage: React.FC = () => {
         alert('이미 완전히 체결되었거나 취소된 주문입니다.');
         return;
       }
-      
+
       // 🆕 부분 매칭된 주문의 경우 남은 금액이 있어야 함
       if (targetOrder.status === 'partially_matched' && (!targetOrder.remainingAmount || targetOrder.remainingAmount <= 0)) {
         alert('매칭 가능한 금액이 없습니다.');
         return;
       }
-      
+
+      // 🔒 Zero-Sum 위반 방지: selection 검증
+      if (!targetOrder.selection && !targetOrder.isMultibet) {
+        alert('올바르지 않은 주문입니다. 선택 정보가 없습니다.');
+        console.error('❌ selection 누락:', targetOrder);
+        return;
+      }
+
       // 매칭 모드 활성화
       const matchTargetOrder: MatchTargetOrder = {
         id: targetOrder.id.toString(),

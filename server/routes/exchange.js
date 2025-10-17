@@ -296,7 +296,18 @@ router.post('/match-order', verifyToken, async (req, res) => {
       );
       
       console.log(`✅ 잔액 차감 완료: ${stakeAmount.toLocaleString()}원 (PaymentHistory 기록됨)`);
-    
+
+      // 🔒 Zero-Sum 위반 방지: 매칭 주문 생성 시 selection 검증 (단일 베팅만)
+      // 멀티배팅은 selection=NULL이어도 정상
+      if (!targetOrder.isMultibet && !targetOrder.selection) {
+        await transaction.rollback();
+        console.error('❌ 대상 주문에 selection 정보 없음 (단일 베팅):', targetOrder.id);
+        return res.status(400).json({
+          success: false,
+          message: `대상 주문 ${targetOrder.id}에 selection 정보가 없습니다. (멀티배팅이 아닌 경우) 매칭할 수 없습니다.`
+        });
+      }
+
       // 🆕 매칭 주문 생성 (매치 배팅자용)
       const matchOrder = await ExchangeOrder.create({
       userId: userId,
@@ -507,9 +518,19 @@ router.post('/order', verifyToken, async (req, res) => {
     console.log('🚨🚨🚨 [DEBUG] req.body:', JSON.stringify(req.body));
     
     // ✅ Phase 2: price 파라미터 제거!
-    const { gameId, market, line, side, amount, selection } = req.body;
+    const { gameId, market, line, side, amount, selection, isMultibet } = req.body;
     const userId = req.user.userId;
-    
+
+    // 🔒 Zero-Sum 위반 방지: selection 필수 검증 (단일 베팅만)
+    // 멀티배팅(isMultibet=true)은 selection=NULL이어도 정상 (selectionDetails에 저장)
+    if (!isMultibet && !selection) {
+      console.error('❌ selection 필드 누락 (단일 베팅):', req.body);
+      return res.status(400).json({
+        success: false,
+        error: 'selection 필드는 필수입니다. (멀티배팅이 아닌 경우)'
+      });
+    }
+
     console.log('🎯 Exchange 주문 생성 요청:', { gameId, market, line, side, amount, selection });
     console.log('🔍 [DEBUG] req.body에 price 필드 존재:', 'price' in req.body);
     console.log('🔍 [DEBUG] req.body.price 값:', req.body.price);

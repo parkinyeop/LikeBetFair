@@ -298,27 +298,34 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
   // 매칭 모드 활성화
   const activateMatchMode = (targetOrder: MatchTargetOrder) => {
     console.log('🎯 매칭 모드 활성화 시작:', targetOrder);
-    
+
+    // 🔒 Zero-Sum 위반 방지: selection 검증 (단일 베팅만)
+    // 멀티배팅은 selection=NULL이어도 정상 (selectionDetails에 저장됨)
+    if (!targetOrder.isMultibet && !targetOrder.selection) {
+      console.error('⚠️ selection이 없는 주문으로 매칭 모드 활성화 시도 (단일 베팅):', targetOrder);
+      throw new Error('올바르지 않은 주문입니다. selection 정보가 없습니다.');
+    }
+
     // ✅ 먼저 기존 선택 완전 초기화
     console.log('🧹 기존 선택 초기화 중...');
     setSelectedBet(null);
     setMultiBetSelections([]);
-    
+
     setIsMatchMode(true);
     setMatchTargetOrder(targetOrder);
-    
+
     // 사이드바 탭을 주문하기로 전환
     setSidebarActiveTab('order');
-    
+
     // 🆕 전역 이벤트 발생으로 Layout의 사이드바 탭도 동기화
-    window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', { 
-      detail: { tab: 'order' } 
+    window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+      detail: { tab: 'order' }
     }));
-    
+
     // 매칭 정보로 selectedBet 자동 설정
     const matchType = targetOrder.type === 'back' ? 'lay' : 'back';
     const matchOdds = targetOrder.odds;
-    
+
     setSelectedBet({
       team: targetOrder.selection,
       price: matchOdds,

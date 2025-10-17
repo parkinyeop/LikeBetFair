@@ -272,19 +272,78 @@ class NewExchangeSettlementService {
    * @returns {string} 주문 결과 ('won' | 'lost')
    */
   determineOrderResult(order, winner, gameResult) {
+    // 🔒 CRITICAL FIX: selection이 NULL이면 정산 불가 (단일 베팅만)
+    // Zero-Sum 위반 방지 - selection=NULL일 때 Lay가 무조건 승리 처리되는 버그 수정
+    // 멀티배팅(isMultibet=true)은 selection=NULL이어도 정상 (selectionDetails 사용)
+    if (!order.isMultibet && !order.selection) {
+      throw new Error(
+        `[Zero-Sum 위반 방지] 주문 ${order.id}의 selection 필드가 없습니다. ` +
+        `정산할 수 없습니다. (side: ${order.side}, homeTeam: ${order.homeTeam}, awayTeam: ${order.awayTeam})`
+      );
+    }
+
+    // 🆕 멀티배팅 정산 로직
+    if (order.isMultibet) {
+      console.log(`🎯 멀티배팅 주문 정산: ${order.id}`);
+
+      // selectionDetails에서 현재 경기와 매칭되는 선택 찾기
+      const selections = order.selectionDetails?.selections || [];
+
+      // 현재 경기와 매칭되는 선택 찾기
+      const matchingSelection = selections.find(sel => {
+        const homeMatch = this.teamMatching.isTeamMatch(sel.homeTeam, gameResult.homeTeam);
+        const awayMatch = this.teamMatching.isTeamMatch(sel.awayTeam, gameResult.awayTeam);
+        return homeMatch && awayMatch;
+      });
+
+      if (!matchingSelection) {
+        throw new Error(
+          `[멀티배팅 정산] 주문 ${order.id}: 현재 경기(${gameResult.homeTeam} vs ${gameResult.awayTeam})와 ` +
+          `매칭되는 선택을 찾을 수 없습니다.`
+        );
+      }
+
+      console.log(`   현재 경기 선택: ${matchingSelection.selection || matchingSelection.team}`);
+
+      // 현재 경기의 선택이 맞는지 확인
+      const currentGameCorrect = this.isSelectionCorrect(
+        matchingSelection.selection || matchingSelection.team,
+        winner,
+        gameResult.homeTeam,
+        gameResult.awayTeam
+      );
+
+      console.log(`   현재 경기 결과: ${currentGameCorrect ? '맞음' : '틀림'}`);
+
+      // 🚨 중요: 멀티배팅은 하나라도 틀리면 전체 패배
+      // 따라서 현재 경기 하나만 정산하는 경우, 그 경기가 틀리면 무조건 패배
+      // (다른 경기는 아직 완료되지 않았으므로 정산 대상이 아님)
+
+      if (order.side === 'back') {
+        // Back: 현재 경기가 틀리면 패배 확정
+        return currentGameCorrect ? 'won' : 'lost';
+      } else if (order.side === 'lay') {
+        // Lay: 현재 경기가 틀리면 승리 확정
+        return currentGameCorrect ? 'lost' : 'won';
+      }
+
+      return 'lost';
+    }
+
+    // 단일 베팅 정산 로직
     const isCorrect = this.isSelectionCorrect(
       order.selection,
       winner,
       gameResult.homeTeam,
       gameResult.awayTeam
     );
-    
+
     if (order.side === 'back') {
       return isCorrect ? 'won' : 'lost';
     } else if (order.side === 'lay') {
       return isCorrect ? 'lost' : 'won';
     }
-    
+
     return 'lost';
   }
 
