@@ -181,6 +181,19 @@ const OrderbookPage: React.FC = () => {
     };
   }, [fetchAllOpenOrders]);
 
+  // 🆕 경기 시작 시간 체크 함수 (10분 전까지만 허용)
+  const isMatchingAllowed = (commenceTime: string | undefined) => {
+    if (!commenceTime) return false; // 경기 시간이 없으면 매칭 불가
+
+    const now = new Date();
+    const gameTime = new Date(commenceTime);
+    const timeDiff = gameTime.getTime() - now.getTime();
+    const minutesDiff = timeDiff / (1000 * 60); // 분 단위
+
+    // 경기 시작 10분 전까지만 허용
+    return minutesDiff >= 10;
+  };
+
   // 매치 배팅 처리 함수 - Exchange 홈으로 리다이렉트하여 사이드바 주문하기 UI 사용
   const handleMatchBet = (orderId: string) => {
     try {
@@ -190,13 +203,13 @@ const OrderbookPage: React.FC = () => {
         alert('주문을 찾을 수 없습니다.');
         return;
       }
-      
+
       // 본인 주문인지 확인
       if (targetOrder.userId === userId) {
         alert('자신이 생성한 주문에는 매칭 배팅을 할 수 없습니다.');
         return;
       }
-      
+
       // 주문 상태 확인 - 🆕 부분 매칭된 주문도 매칭 가능
       if (targetOrder.status !== 'open' && targetOrder.status !== 'partially_matched') {
         alert('이미 완전히 체결되었거나 취소된 주문입니다.');
@@ -207,6 +220,24 @@ const OrderbookPage: React.FC = () => {
       if (targetOrder.status === 'partially_matched' && (!targetOrder.remainingAmount || targetOrder.remainingAmount <= 0)) {
         alert('매칭 가능한 금액이 없습니다.');
         return;
+      }
+
+      // 🔒 경기 시작 시간 체크: 멀티배팅은 모든 경기, 단일 배팅은 해당 경기
+      if (targetOrder.isMultibet && targetOrder.selectionDetails?.selections) {
+        // 멀티배팅: 모든 경기가 10분 전 이상이어야 함
+        const allGamesAllowed = targetOrder.selectionDetails.selections.every((leg: any) =>
+          isMatchingAllowed(leg.commenceTime)
+        );
+        if (!allGamesAllowed) {
+          alert('멀티배팅 중 일부 경기가 시작 10분 전 미만입니다. 매칭할 수 없습니다.');
+          return;
+        }
+      } else {
+        // 단일 배팅: 해당 경기만 확인
+        if (!isMatchingAllowed(targetOrder.commenceTime)) {
+          alert('경기 시작 10분 전까지만 매칭할 수 있습니다.');
+          return;
+        }
       }
 
       // 🔒 Zero-Sum 위반 방지: selection 검증
@@ -663,9 +694,17 @@ const OrderbookPage: React.FC = () => {
                   <div className="mt-4 flex gap-2 items-center">
                     <button
                       onClick={() => handleMatchBet(order.id)}
-                      disabled={(order.status !== 'open' && order.status !== 'partially_matched') || order.userId === userId}
+                      disabled={
+                        (order.status !== 'open' && order.status !== 'partially_matched') ||
+                        order.userId === userId ||
+                        // 🔒 멀티배팅: 모든 경기가 10분 전 이상이어야 함
+                        (order.selectionDetails?.selections && !order.selectionDetails.selections.every((leg: any) => isMatchingAllowed(leg.commenceTime)))
+                      }
                       className={`flex-1 py-3 px-3 rounded text-sm font-semibold transition-colors text-white ${
-                        (order.status === 'open' || order.status === 'partially_matched') && order.userId !== userId
+                        (order.status === 'open' || order.status === 'partially_matched') &&
+                        order.userId !== userId &&
+                        // 🔒 시간 체크 통과해야 활성화
+                        (!order.selectionDetails?.selections || order.selectionDetails.selections.every((leg: any) => isMatchingAllowed(leg.commenceTime)))
                           ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 text-gray-600 cursor-not-allowed'
                       }`}
                     >
@@ -768,11 +807,19 @@ const OrderbookPage: React.FC = () => {
                   
                   {/* 간단한 매칭 배팅 버튼 */}
                   <div className="mt-3 flex gap-2">
-                    <button 
+                    <button
                       onClick={() => handleMatchBet(order.id)}
-                      disabled={(order.status !== 'open' && order.status !== 'partially_matched') || order.userId === userId}
+                      disabled={
+                        (order.status !== 'open' && order.status !== 'partially_matched') ||
+                        order.userId === userId ||
+                        // 🔒 단일 배팅: 경기 시작 10분 전까지만 허용
+                        !isMatchingAllowed(order.commenceTime)
+                      }
                       className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors text-white ${
-                        (order.status === 'open' || order.status === 'partially_matched') && order.userId !== userId
+                        (order.status === 'open' || order.status === 'partially_matched') &&
+                        order.userId !== userId &&
+                        // 🔒 시간 체크 통과해야 활성화
+                        isMatchingAllowed(order.commenceTime)
                           ? order.type === 'back' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'
                           : 'bg-gray-400 text-gray-600 cursor-not-allowed'
                       }`}
