@@ -1014,6 +1014,25 @@ router.post('/cancel/:orderId', verifyToken, async (req, res) => {
       const timeDiff = gameTime.getTime() - now.getTime();
       return timeDiff <= 10 * 60 * 1000; // 10분 = 600,000ms
     };
+    
+    // 🆕 멀티배팅인 경우 모든 경기 시간 확인
+    if (order.isMultibet && order.selectionDetails?.selections) {
+      const now = new Date();
+      const selections = order.selectionDetails.selections;
+      
+      // 모든 경기 중 하나라도 10분 전 이내이거나 시작된 경우 취소 불가
+      for (const selection of selections) {
+        const gameTime = new Date(selection.commenceTime);
+        const timeDiff = gameTime.getTime() - now.getTime();
+        
+        if (timeDiff <= 10 * 60 * 1000) { // 10분 이내 또는 이미 시작됨
+          await transaction.rollback();
+          return res.status(400).json({ 
+            message: `일부 경기가 시작 10분 전이거나 이미 시작되어 취소할 수 없습니다. (${selection.homeTeam} vs ${selection.awayTeam})` 
+          });
+        }
+      }
+    }
 
     // 🆕 Back과 Lay 구분 취소 조건
     if (order.side === 'lay') {
@@ -1032,7 +1051,9 @@ router.post('/cancel/:orderId', verifyToken, async (req, res) => {
         await transaction.rollback();
         return res.status(400).json({ message: '취소할 수 없는 주문 상태입니다.' });
       }
-      if (isWithin10MinutesOfGame(order.commenceTime)) {
+      
+      // 단일 배팅인 경우에만 commenceTime 확인
+      if (!order.isMultibet && isWithin10MinutesOfGame(order.commenceTime)) {
         await transaction.rollback();
         return res.status(400).json({ message: '경기 시작 10분 전 이후에는 취소할 수 없습니다.' });
       }

@@ -3,7 +3,7 @@ import oddsApiService from '../services/oddsApiService.js';
 import oddsCleanupService from '../services/oddsCleanupService.js';
 import gameResultService from '../services/gameResultService.js';
 import betResultService from '../services/betResultService.js';
-import NewExchangeSettlementService from '../services/newExchangeSettlementService.js';
+import ExchangeSettlementService from '../services/exchangeSettlementService.js';
 import multibetSettlementService from '../services/multibetSettlementService.js';
 import fs from 'fs';
 import path from 'path';
@@ -932,7 +932,7 @@ cron.schedule('*/10 * * * *', async () => {
     console.log('🔄 [Exchange] 만료된 주문 자동 취소 시작...');
     
     // Exchange 주문 만료 처리 실행 (직접 호출)
-    const service = new NewExchangeSettlementService();
+    const service = new ExchangeSettlementService();
     await service.cancelUnmatchedOrdersAtKickoff();
     
     console.log('✅ [Exchange] 만료된 주문 자동 취소 완료');
@@ -997,7 +997,7 @@ cron.schedule('*/5 * * * *', async () => {
     // --- 기존 정산 로직 실행 ---
 
     // Exchange 개별 주문 자동 정산 실행 (직접 호출)
-    const service = new NewExchangeSettlementService();
+    const service = new ExchangeSettlementService();
     const individualResult = await service.settleAllConnectedOrders();
     console.log('✅ [Exchange] 개별 주문 자동 정산 완료:', individualResult);
 

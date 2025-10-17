@@ -8,6 +8,7 @@ interface Payment {
   amount: number;
   balanceAfter: number;
   memo: string;
+  betId?: string;
 }
 
 export default function PaymentsTab() {
@@ -59,6 +60,40 @@ export default function PaymentsTab() {
       label: '일시',
       render: (value: string) => new Date(value).toLocaleString('ko-KR'),
       className: 'w-40'
+    },
+    {
+      key: 'betId',
+      label: '주문/배팅번호',
+      render: (value: string | undefined, row: Payment) => {
+        if (!value) return '-';
+        
+        // EXCHANGE_123 형식인 경우
+        if (value.startsWith('EXCHANGE_')) {
+          const orderId = value.replace('EXCHANGE_', '');
+          return (
+            <span className="text-blue-600 font-mono text-xs">
+              익스체인지 #{orderId}
+            </span>
+          );
+        }
+        
+        // UUID 형식인 경우 (스포츠북 배팅)
+        if (value.includes('-')) {
+          return (
+            <span className="text-green-600 font-mono text-xs" title={value}>
+              배팅 #{value.substring(0, 8)}...
+            </span>
+          );
+        }
+        
+        // 숫자만 있는 경우
+        return (
+          <span className="font-mono text-xs">
+            #{value}
+          </span>
+        );
+      },
+      className: 'w-36'
     },
     {
       key: 'amount',
