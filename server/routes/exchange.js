@@ -94,7 +94,8 @@ async function processPartialMatching(orderData) {
       actualFilledAmount = matchAmount;
     } else {
       // Lay 베팅: filledAmount = stake × (odds - 1) (리스크 금액)
-      actualFilledAmount = Math.floor(matchAmount * (existingOrder.price - 1));
+      // 🔧 부동소수점 오차 방지: (price - 1) * amount 대신 price * amount - amount 사용
+      actualFilledAmount = Math.floor(matchAmount * existingOrder.price) - matchAmount;
     }
     
     const newFilledAmount = (existingOrder.filledAmount || 0) + actualFilledAmount;
@@ -600,8 +601,9 @@ router.post('/order', verifyToken, async (req, res) => {
     
     try {
       // 필요 금액 계산
-      const required = side === 'back' ? amount : Math.floor((finalPrice - 1) * amount);
-      
+      // 🔧 부동소수점 오차 방지: (price - 1) * amount 대신 price * amount - amount 사용
+      const required = side === 'back' ? amount : Math.floor(finalPrice * amount) - amount;
+
       console.log('🔍 잔고 검증 상세:', { 
         userId,
         required, 
@@ -671,11 +673,12 @@ router.post('/order', verifyToken, async (req, res) => {
     if (partialMatchResult.remainingAmount > 0) {
       // 미체결 주문 생성
       // ✅ remainingAmount 기준으로 stakeAmount와 potentialProfit 계산
+      // 🔧 부동소수점 오차 방지: (price - 1) * amount 대신 price * amount - amount 사용
       const remainingStakeAmount = side === 'back'
         ? partialMatchResult.remainingAmount
-        : Math.floor((finalPrice - 1) * partialMatchResult.remainingAmount);
+        : Math.floor(finalPrice * partialMatchResult.remainingAmount) - partialMatchResult.remainingAmount;
       const remainingPotentialProfit = side === 'back'
-        ? Math.floor((finalPrice - 1) * partialMatchResult.remainingAmount)
+        ? Math.floor(finalPrice * partialMatchResult.remainingAmount) - partialMatchResult.remainingAmount
         : partialMatchResult.remainingAmount;
 
       order = await ExchangeOrder.create({
@@ -706,7 +709,8 @@ router.post('/order', verifyToken, async (req, res) => {
         filledAmount = match.matchAmount;
       } else {
         // Lay 베팅: filledAmount = stake × (odds - 1) (리스크 금액)
-        filledAmount = Math.floor(match.matchAmount * (match.matchPrice - 1));
+        // 🔧 부동소수점 오차 방지: (price - 1) * amount 대신 price * amount - amount 사용
+        filledAmount = Math.floor(match.matchAmount * match.matchPrice) - match.matchAmount;
       }
       
       const matchedOrder = await ExchangeOrder.create({
@@ -876,8 +880,9 @@ router.get('/orderbook', verifyToken, async (req, res) => {
       const remainingAmt = order.remainingAmount !== null && order.remainingAmount !== undefined
         ? order.remainingAmount
         : order.amount;
+      // 🔧 부동소수점 오차 방지: (price - 1) * amount 대신 price * amount - amount 사용
       const displayAmount = order.side === 'back'
-        ? Math.floor(remainingAmt * (order.price - 1)) // LAY 담보금
+        ? Math.floor(remainingAmt * order.price) - remainingAmt // LAY 담보금
         : remainingAmt; // Back 배팅금
       
       console.log(`🔍 [ALL-ORDERS] 주문 ${order.id} displayAmount 계산:`, {
@@ -931,7 +936,8 @@ router.post('/settle', verifyToken, async (req, res) => {
       winner = matched;
       // Lay 승리: 자신의 베팅금액 + Back의 배팅금액 중 지분만큼 획득
       if (matched.side === 'lay') {
-        const backMatchAmount = order.amount * (order.price - 1);
+        // 🔧 부동소수점 오차 방지: (price - 1) * amount 대신 price * amount - amount 사용
+        const backMatchAmount = Math.floor(order.amount * order.price) - order.amount;
         const layShareRatio = backMatchAmount > 0 ? matched.amount / backMatchAmount : 0;
         payout = matched.amount + (order.amount * layShareRatio);
       } else {
@@ -1670,8 +1676,9 @@ router.get('/orders', verifyToken, async (req, res) => {
       const remainingAmt = order.remainingAmount !== null && order.remainingAmount !== undefined
         ? order.remainingAmount
         : order.amount;
+      // 🔧 부동소수점 오차 방지: (price - 1) * amount 대신 price * amount - amount 사용
       const displayAmount = order.side === 'back'
-        ? Math.floor(remainingAmt * (order.price - 1)) // LAY 담보금
+        ? Math.floor(remainingAmt * order.price) - remainingAmt // LAY 담보금
         : remainingAmt; // Back 배팅금
 
       return {
@@ -1800,8 +1807,9 @@ router.get('/all-orders', async (req, res) => {
       const remainingAmt = order.remainingAmount !== null && order.remainingAmount !== undefined
         ? order.remainingAmount
         : order.amount;
+      // 🔧 부동소수점 오차 방지: (price - 1) * amount 대신 price * amount - amount 사용
       const displayAmount = order.side === 'back'
-        ? Math.floor(remainingAmt * (order.price - 1)) // LAY 담보금
+        ? Math.floor(remainingAmt * order.price) - remainingAmt // LAY 담보금
         : remainingAmt; // Back 배팅금
       
       console.log(`🔍 [ALL-ORDERS-v2] 주문 ${order.id} displayAmount 계산:`, {
