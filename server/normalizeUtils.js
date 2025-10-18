@@ -276,6 +276,8 @@ const globalTeamMapping = {
   'beijingguoan': 'beijingguoan',
   'shandongtaishanfc': 'shandongtaishan',
   'shandongtaishan': 'shandongtaishan',
+  'shandonglunengtaishan': 'shandongtaishan',  // Shandong Luneng Taishan FC → Shandong Taishan
+  'shandonglunengtaishanfc': 'shandongtaishan',
   'wuhanthreetownsfc': 'wuhanthreetowns',
   'wuhanthreetowns': 'wuhanthreetowns',
   'changchunyataifc': 'changchunyatai',

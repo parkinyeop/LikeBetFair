@@ -89,7 +89,8 @@ export const LOCATION_CONFIGS = {
   exchangeRoutes: {
     usePartialMatch: false,
     useNormalizeUtils: true,  // ✅ 팀명 정규화 활성화 (스코어 표시를 위해)
-    timeRange: 0,
+    timeRange: 2,  // ✅ 2시간 범위 (더블헤더 대응)
+    twoStageQuery: true,  // ✅ 2단계 조회 활성화 (정규화 매칭)
     statusFilter: null,
     orderBy: null,
     orderDirection: null,

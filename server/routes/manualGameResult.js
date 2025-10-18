@@ -77,14 +77,14 @@ router.post('/manual-game-result', async (req, res) => {
             homeTeam: gameData.homeTeam,
             awayTeam: gameData.awayTeam,
             commenceTime: new Date(gameData.commenceTime),
-            score: JSON.stringify([
+            score: [
               { name: gameData.homeTeam, score: String(gameData.homeScore || 0) },
               { name: gameData.awayTeam, score: String(gameData.awayScore || 0) }
-            ]),
+            ],
             status: gameData.status || 'finished',
             result: gameData.result || calculateGameResult(gameData.homeScore, gameData.awayScore),
             sportKey: gameData.sportKey || 'soccer_manual',
-            sportTitle: gameData.sportTitle || '수동 입력',
+            sportTitle: gameData.sportTitle,
             eventId: `manual_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
           }
         });
@@ -92,10 +92,10 @@ router.post('/manual-game-result', async (req, res) => {
         // 기존 경기인 경우 업데이트
         if (!created) {
           await gameResult.update({
-            score: JSON.stringify([
+            score: [
               { name: gameData.homeTeam, score: String(gameData.homeScore || 0) },
               { name: gameData.awayTeam, score: String(gameData.awayScore || 0) }
-            ]),
+            ],
             status: gameData.status || 'finished',
             result: gameData.result || calculateGameResult(gameData.homeScore, gameData.awayScore),
             mainCategory: gameData.mainCategory || gameResult.mainCategory,
