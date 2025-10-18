@@ -357,8 +357,17 @@ function MyBetsPanel() {
                         </div>
                         <button className="px-2 py-1 text-xs border rounded text-blue-600 border-blue-300 hover:bg-blue-50" onClick={e => { e.stopPropagation(); toggleBet(bet.id); }}>{isOpen ? 'Collapse ▲' : 'Expand ▼'}</button>
                       </div>
-                      {/* 🆕 접힘 상태에서도 취소 버튼 표시 */}
-                      {bet.status === 'pending' && Array.isArray(bet.selections) && bet.selections.every((sel: any) => sel.result === 'pending' || !sel.result) && (
+                      {/* 🆕 접힘 상태에서도 취소 버튼 표시 (경기 시작 10분 전까지만) */}
+                      {bet.status === 'pending' && 
+                       Array.isArray(bet.selections) && 
+                       bet.selections.every((sel: any) => sel.result === 'pending' || !sel.result) &&
+                       // ✅ 모든 경기가 시작 10분 전이어야 버튼 표시
+                       bet.selections.every((sel: any) => {
+                         if (!sel.commence_time) return true; // 시간 정보 없으면 표시
+                         const gameTime = new Date(sel.commence_time);
+                         const tenMinutesBeforeGame = new Date(gameTime.getTime() - 10 * 60 * 1000);
+                         return new Date() < tenMinutesBeforeGame;
+                       }) && (
                         <div className="flex justify-end">
                           <button
                             className="px-3 py-1.5 text-xs border border-red-500 text-red-500 rounded hover:bg-red-500 hover:text-white transition-colors"

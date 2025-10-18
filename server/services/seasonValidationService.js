@@ -47,9 +47,27 @@ class SeasonValidationService {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
+      // ✅ EPL 등 여러 키로 저장될 수 있는 리그를 위한 대체 키
+      const alternativeKeys = {
+        'soccer_england_premier_league': ['soccer_epl', 'soccer_england_premier_league'],
+        'soccer_spain_primera_division': ['soccer_spain_la_liga', 'soccer_spain_primera_division'],
+        'soccer_usa_mls': ['soccer_usa_mls'],
+        'soccer_korea_kleague1': ['soccer_korea_kleague1'],
+        'soccer_japan_j_league': ['soccer_japan_j_league'],
+        'soccer_italy_serie_a': ['soccer_italy_serie_a'],
+        'soccer_brazil_campeonato': ['soccer_brazil_campeonato'],
+        'soccer_argentina_primera_division': ['soccer_argentina_primera_division'],
+        'soccer_china_superleague': ['soccer_china_superleague'],
+        'soccer_germany_bundesliga': ['soccer_germany_bundesliga']
+      };
+      
+      const keysToCheck = alternativeKeys[sportKey] || [sportKey];
+      
       const oddsCount = await OddsCache.count({
         where: {
-          sportKey: sportKey,
+          sportKey: {
+            [Op.in]: keysToCheck
+          },
           commenceTime: {
             [Op.gte]: thirtyDaysAgo
           }
