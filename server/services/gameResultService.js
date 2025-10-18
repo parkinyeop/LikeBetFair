@@ -322,7 +322,8 @@ class GameResultService {
       'soccer_korea_kleague1',    // ✅ K리그 (연도 형식 사용)
       'soccer_japan_j_league',    // ✅ J리그 (연도 형식 사용)
       'soccer_brazil_campeonato', // ✅ 브라질 세리에 A (시즌 기반)
-      'soccer_argentina_primera_division' // ✅ 아르헨티나 프리메라 (시즌 기반)
+      'soccer_argentina_primera_division', // ✅ 아르헨티나 프리메라 (시즌 기반)
+      'soccer_china_superleague'  // ✅ 중국 슈퍼 리그 (연도 형식 사용)
     ];
     return yearBasedLeagues.includes(sportKey);
   }
