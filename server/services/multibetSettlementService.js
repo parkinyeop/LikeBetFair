@@ -612,9 +612,12 @@ class MultibetSettlementService {
     let totalProfit = 0;
 
     for (const match of matches) {
-      const matchedAmount = match.matchedAmount; // Back 담보금
-      const matchedPrice = parseFloat(match.matchedPrice); // 배당률
-      const layStake = Math.floor(matchedAmount * matchedPrice) - matchedAmount; // Lay 담보금 (부동소수점 오차 방지)
+      const matchedAmount = Number(match.matchedAmount); // Back 담보금
+      const matchedPrice = Number(match.matchedPrice); // 배당률
+
+      // ✅ 원 단위 계산: 정수 연산으로 부동소수점 오차 방지
+      // Math.floor(amount * (price - 1)) 대신 Math.floor(amount * price) - amount 사용
+      const layStake = Math.floor(matchedAmount * matchedPrice) - matchedAmount;
       
       // ✅ 핵심: 현재 주문의 Side를 올바르게 판단
       // ExchangeOrderMatch에서 현재 주문이 original인지 matching인지에 따라 side 결정
@@ -991,9 +994,12 @@ class MultibetSettlementService {
         console.log(`       백 결과: ${backResult} → 레이 결과: ${layResult}`);
 
         // 레이 수익 계산
-        const backMatchAmount = parseFloat(match.matchedAmount);
-        const matchedPrice = parseFloat(match.matchedPrice);
-        const layLiability = Math.floor(backMatchAmount * matchedPrice) - backMatchAmount;  // ✅ 부동소수점 오차 방지
+        const backMatchAmount = Number(match.matchedAmount);
+        const matchedPrice = Number(match.matchedPrice);
+
+        // ✅ 원 단위 계산: 정수 연산으로 부동소수점 오차 방지
+        // Math.floor(amount * (price - 1)) 대신 Math.floor(amount * price) - amount 사용
+        const layLiability = Math.floor(backMatchAmount * matchedPrice) - backMatchAmount;
 
         // ✅ actualProfit 계산 (순수익 기준)
         let layActualProfit = 0;

@@ -727,24 +727,28 @@ class ExchangeSettlementService {
         hasDataValues: !!match.dataValues,
         keys: Object.keys(match)
       });
-      
+
       // Sequelize 인스턴스면 dataValues 사용
       const matchedAmountValue = match.dataValues?.matchedAmount || match.matchedAmount;
       const matchedPriceValue = match.dataValues?.matchedPrice || match.matchedPrice;
-      
-      backStakeAmount = parseFloat(matchedAmountValue);
-      const matchedPrice = parseFloat(matchedPriceValue);
-      layStakeAmount = Math.floor(backStakeAmount * (matchedPrice - 1));
-      
-      console.log(`  ✅ Match 기반 정산: matchedAmount=${backStakeAmount.toLocaleString()}원, price=${matchedPrice}`);
+
+      backStakeAmount = Number(matchedAmountValue);
+      const matchedPrice = Number(matchedPriceValue);
+
+      // ✅ 원 단위 계산: 정수 연산으로 부동소수점 오차 방지
+      // Math.floor(backStake * (price - 1)) 대신 Math.floor(backStake * price) - backStake 사용
+      // 이유: (price - 1) 연산에서 부동소수점 오차 발생 가능
+      layStakeAmount = Math.floor(backStakeAmount * matchedPrice) - backStakeAmount;
+
+      console.log(`  ✅ Match 기반 정산: matchedAmount=${backStakeAmount.toLocaleString()}원, price=${matchedPrice}, layStake=${layStakeAmount}원`);
     } else {
       // ✅ Fallback: match 파라미터가 없을 때 zero-sum 계산
       backStakeAmount = backOrder.partiallyFilled ? (backOrder.filledAmount || 0) : backOrder.stakeAmount;
-      
-      // ✅ layLiability 계산 (zero-sum 원칙)
-      const matchedPrice = parseFloat(backOrder.price || layOrder.price);
-      layStakeAmount = Math.floor(backStakeAmount * (matchedPrice - 1));
-      
+
+      // ✅ layLiability 계산 (zero-sum 원칙) - 정수 연산으로 부동소수점 오차 방지
+      const matchedPrice = Number(backOrder.price || layOrder.price);
+      layStakeAmount = Math.floor(backStakeAmount * matchedPrice) - backStakeAmount;
+
       console.log(`  ⚠️  Fallback 로직 정산 (match 파라미터 없음): backStake=${backStakeAmount.toLocaleString()}원, layLiability=${layStakeAmount.toLocaleString()}원, price=${matchedPrice}`);
     }
     
@@ -775,13 +779,15 @@ class ExchangeSettlementService {
     // 🔑 핵심: 담보금은 이미 차감되었으므로, 정산 시에는 승자에게만 총 담보금 지급
     if (isBackWin) {
       // Back 승리: 총 담보금 지급 (Back담보 + Lay담보)
-      backWinAmount = backStakeAmount + layStakeAmount;
+      // ✅ 정수 연산 보장: Number() 명시적 변환
+      backWinAmount = Number(backStakeAmount) + Number(layStakeAmount);
       layWinAmount = 0; // Lay 패배: 담보금 이미 차감됨
       console.log(`  🏆 Back 승리: Back +${backWinAmount}원 (Back담보 ${backStakeAmount} + Lay담보 ${layStakeAmount}), Lay 0원 (이미 차감)`);
     } else {
       // Lay 승리: 총 담보금 지급 (Lay담보 + Back담보)
       backWinAmount = 0; // Back 패배: 담보금 이미 차감됨
-      layWinAmount = layStakeAmount + backStakeAmount;
+      // ✅ 정수 연산 보장: Number() 명시적 변환
+      layWinAmount = Number(layStakeAmount) + Number(backStakeAmount);
       console.log(`  🏆 Lay 승리: Lay +${layWinAmount}원 (Lay담보 ${layStakeAmount} + Back담보 ${backStakeAmount}), Back 0원 (이미 차감)`);
     }
     
@@ -3184,10 +3190,11 @@ class ExchangeSettlementService {
           timestamp: new Date().toISOString()
         });
 
-        // ✅ 제로썸 계산
-        const backAmount = parseFloat(match.matchedAmount);
-        const layLiability = Math.floor(backAmount * (parseFloat(match.matchedPrice) - 1));
-        const totalStake = backAmount + layLiability;
+        // ✅ 제로썸 계산 - 정수 연산으로 부동소수점 오차 방지
+        const backAmount = Number(match.matchedAmount);
+        const matchedPriceValue = Number(match.matchedPrice);
+        const layLiability = Math.floor(backAmount * matchedPriceValue) - backAmount;
+        const totalStake = Number(backAmount) + Number(layLiability);
 
         const settledProfit = parseFloat(settledOrder.actualProfit) || 0;
 
