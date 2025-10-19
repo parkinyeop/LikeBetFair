@@ -787,12 +787,23 @@ class GameResultService {
                 const mainCategory = this.determineMainCategory(sportKey);
                 const subCategory = this.determineSubCategory(sportKey);
                 
-                // 기존 데이터 확인
+                // 기존 데이터 확인 (unique 제약조건 고려)
+                const commenceTime = new Date(event.commence_time + 'Z');
                 const existingGame = await GameResult.findOne({
                   where: {
-                    eventId: event.id,
-                    mainCategory,
-                    subCategory
+                    [Op.or]: [
+                      // eventId가 있으면 eventId로 조회
+                      event.id ? {
+                        eventId: event.id,
+                        sportKey: sportKey
+                      } : null,
+                      // homeTeam, awayTeam, commenceTime으로도 조회 (unique 제약조건)
+                      {
+                        homeTeam: event.home_team,
+                        awayTeam: event.away_team,
+                        commenceTime: commenceTime
+                      }
+                    ].filter(Boolean)
                   }
                 });
                 
@@ -820,7 +831,7 @@ class GameResultService {
                   sportTitle: this.getSportTitleFromSportKey(sportKey),
                   homeTeam: event.home_team,
                   awayTeam: event.away_team,
-                  commenceTime: new Date(event.commence_time + 'Z'), // UTC 명시
+                  commenceTime: commenceTime, // 이미 라인 791에서 생성
                   status: this.determineGameStatus(event),
                   score: validatedScore,
                   // result 필드 제거 - status로 대체
