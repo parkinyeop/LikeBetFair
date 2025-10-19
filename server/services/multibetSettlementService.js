@@ -613,8 +613,8 @@ class MultibetSettlementService {
 
     for (const match of matches) {
       const matchedAmount = match.matchedAmount; // Back 담보금
-      const matchedPrice = match.matchedPrice; // 배당률
-      const layStake = Math.floor(matchedAmount * (matchedPrice - 1)); // Lay 담보금
+      const matchedPrice = parseFloat(match.matchedPrice); // 배당률
+      const layStake = Math.floor(matchedAmount * matchedPrice) - matchedAmount; // Lay 담보금 (부동소수점 오차 방지)
       
       // ✅ 핵심: 현재 주문의 Side를 올바르게 판단
       // ExchangeOrderMatch에서 현재 주문이 original인지 matching인지에 따라 side 결정
@@ -624,23 +624,25 @@ class MultibetSettlementService {
       const currentOrderSide = isOriginalOrder ? match.originalSide : match.matchingSide;
       const isBackSide = currentOrderSide === 'back';
 
-      // 🔑 핵심: 담보금은 이미 차감되었으므로, 정산 시에는 승자에게만 총 담보금 지급
+      // 🔑 핵심: actualProfit은 순수익 (담보금 제외)
       if (result === 'won') {
         if (isBackSide) {
-          // Back 승리: 총 담보금 지급 (자기 + 상대)
-          totalProfit += matchedAmount + layStake;
-          console.log(`🏆 Back 승리 (주문 ${order.id}): +${matchedAmount + layStake}원 (Back담보 ${matchedAmount} + Lay담보 ${layStake})`);
+          // ✅ Back 승리: Lay Liability만 (Back Stake 제외)
+          totalProfit += layStake;
+          console.log(`🏆 Back 승리 (주문 ${order.id}): +${layStake}원 (순수익, Back담보 ${matchedAmount}원 제외)`);
         } else {
-          // Lay 승리: 총 담보금 지급 (자기 + 상대)
-          totalProfit += layStake + matchedAmount;
-          console.log(`🏆 Lay 승리 (주문 ${order.id}): +${layStake + matchedAmount}원 (Lay담보 ${layStake} + Back담보 ${matchedAmount})`);
+          // ✅ Lay 승리: Back Stake만 (Lay Liability 제외)
+          totalProfit += matchedAmount;
+          console.log(`🏆 Lay 승리 (주문 ${order.id}): +${matchedAmount}원 (순수익, Lay담보 ${layStake}원 제외)`);
         }
-      } else { // result === 'lost'
-        // 패배: 담보금은 이미 차감되었으므로 추가 처리 없음 (0원)
+      } else if (result === 'lost') {
+        // ✅ 패배 시 담보금 손실 (음수로 기록)
         if (isBackSide) {
-          console.log(`💸 Back 패배 (주문 ${order.id}): 0원 (담보금 이미 차감됨)`);
+          totalProfit -= matchedAmount;  // Back 손실
+          console.log(`💸 Back 패배 (주문 ${order.id}): -${matchedAmount}원 (담보금 손실)`);
         } else {
-          console.log(`💸 Lay 패배 (주문 ${order.id}): 0원 (담보금 이미 차감됨)`);
+          totalProfit -= layStake;  // Lay 손실
+          console.log(`💸 Lay 패배 (주문 ${order.id}): -${layStake}원 (담보금 손실)`);
         }
       }
     }
@@ -727,23 +729,30 @@ class MultibetSettlementService {
       }
 
       // 4단계: 잔액 업데이트 준비
+      // ✅ actualProfit은 순수익이므로, 승리 시 담보금 환급 + 순수익
       const currentBalance = parseFloat(user.balance) || 0;
-      const newBalance = Math.round(currentBalance + profitAmount); // 소수점 방지
+      let balanceChange = profitAmount;
+
+      if (result === 'won') {
+        // 승리: 담보금 환급 + 순수익
+        const stakeAmount = parseFloat(order.stakeAmount || 0);
+        balanceChange = stakeAmount + profitAmount;  // 담보금 + 순수익
+        console.log(`💰 승리 잔액 변동: 담보금 환급 ${stakeAmount}원 + 순수익 ${profitAmount}원 = ${balanceChange}원`);
+      } else if (result === 'lost') {
+        // 패배: 담보금은 이미 차감되었고, profitAmount는 음수
+        balanceChange = 0;  // 잔액 변동 없음 (담보금은 주문 생성 시 차감됨)
+        console.log(`💸 패배: 잔액 변동 없음 (담보금 ${Math.abs(profitAmount)}원은 이미 차감됨)`);
+      }
+
+      const newBalance = Math.round(currentBalance + balanceChange); // 소수점 방지
 
       // 5단계: 메모 생성 (미리 준비)
       const memo = this.generatePaymentMemo(order, result, settlementResult, profitAmount);
 
-      // ✅ PaymentHistory 기록 금액 계산 (순수익만)
-      let paymentAmount = profitAmount;
-      
-      if (result === 'won' && order.side === 'back') {
-        // Back 승리: 총 수령액에서 Back Stake 차감하여 순수익만 기록
-        const backStake = parseFloat(order.filledAmount || order.amount);
-        paymentAmount = profitAmount - backStake;
-        console.log(`💰 Back PaymentHistory 기록: 총수령 ${profitAmount.toLocaleString()}원 - Back담보 ${backStake.toLocaleString()}원 = 순수익 ${paymentAmount.toLocaleString()}원`);
-      }
-      // Lay 승리 시는 이미 순수익 (matchedAmount만)
-      // 패배 시는 0원
+      // ✅ PaymentHistory 기록: actualProfit(순수익)만 기록
+      let paymentAmount = profitAmount;  // actualProfit은 이미 순수익
+      console.log(`📝 PaymentHistory 기록: ${paymentAmount}원 (${result})`);
+
 
       // 6단계: 데이터베이스 업데이트 (병렬 실행 + 성능 측정)
       const saveStartTime = Date.now();
@@ -983,26 +992,33 @@ class MultibetSettlementService {
 
         // 레이 수익 계산
         const backMatchAmount = parseFloat(match.matchedAmount);
-        const layLiability = Math.floor(backMatchAmount * (parseFloat(match.matchedPrice) - 1));
+        const matchedPrice = parseFloat(match.matchedPrice);
+        const layLiability = Math.floor(backMatchAmount * matchedPrice) - backMatchAmount;  // ✅ 부동소수점 오차 방지
 
-        let layProfit = 0;
+        // ✅ actualProfit 계산 (순수익 기준)
+        let layActualProfit = 0;
+        let layTotalWinnings = 0;  // 실제 수령액
+
         if (layResult === 'won') {
-          // 레이 승리: 총 담보금 지급
-          layProfit = layLiability + backMatchAmount;
-          console.log(`       🏆 레이 승리: ${layProfit.toLocaleString()}원 (Lay담보 ${layLiability.toLocaleString()} + Back담보 ${backMatchAmount.toLocaleString()})`);
+          // 레이 승리: Back 담보금만 순수익 (Lay 담보금 제외)
+          layActualProfit = backMatchAmount;
+          layTotalWinnings = layLiability + backMatchAmount;  // 실제 수령액
+          console.log(`       🏆 레이 승리: 순수익 ${layActualProfit.toLocaleString()}원 (총수령 ${layTotalWinnings.toLocaleString()} = Lay담보 ${layLiability.toLocaleString()} + Back담보 ${backMatchAmount.toLocaleString()})`);
         } else if (layResult === 'lost') {
-          // 레이 패배: 담보금 손실
-          layProfit = 0;
-          console.log(`       💸 레이 패배: 0원 (담보금 ${layLiability.toLocaleString()}원 손실)`);
+          // 레이 패배: Lay 담보금 손실
+          layActualProfit = -layLiability;
+          layTotalWinnings = 0;
+          console.log(`       💸 레이 패배: 순수익 ${layActualProfit.toLocaleString()}원 (담보금 ${layLiability.toLocaleString()}원 손실)`);
         } else {
-          // 취소: 담보금 환불
-          layProfit = layLiability;
-          console.log(`       🔄 취소 환불: ${layProfit.toLocaleString()}원`);
+          // 취소: 담보금 환불 (순수익 0)
+          layActualProfit = 0;
+          layTotalWinnings = layLiability;
+          console.log(`       🔄 취소 환불: ${layTotalWinnings.toLocaleString()}원`);
         }
 
         // ✅ FIX: 레이 주문 업데이트 (actualProfit 누적)
         const currentActualProfit = parseFloat(layOrder.actualProfit || 0);
-        const newActualProfit = currentActualProfit + layProfit;
+        const newActualProfit = currentActualProfit + layActualProfit;
 
         // ✅ FIX: 레이 주문의 모든 매칭이 정산되었는지 확인
         const allMatches = await ExchangeOrderMatch.findAll({
@@ -1016,16 +1032,13 @@ class MultibetSettlementService {
         });
 
         // 현재 매치를 settled로 업데이트
+        // ✅ settlementResult는 문자열로 저장 ('back_won' 또는 'lay_won')
+        const settlementResultString = backResult === 'won' ? 'back_won' : 'lay_won';
+
         await match.update({
           status: 'settled',
           settledAt: new Date(),
-          settlementResult: {
-            backOrderId: backOrder.id,
-            layOrderId: layOrder.id,
-            backResult: backResult,
-            layResult: layResult,
-            layProfit: layProfit
-          }
+          settlementResult: settlementResultString  // ✅ 문자열
         }, { transaction });
 
         // 모든 매치가 정산되었는지 확인 (현재 매치 제외)
@@ -1039,7 +1052,7 @@ class MultibetSettlementService {
           {
             status: newStatus,
             settledAt: remainingActiveMatches > 0 ? null : new Date(),
-            actualProfit: sequelize.literal(`COALESCE("actualProfit", 0) + ${layProfit}`)
+            actualProfit: sequelize.literal(`COALESCE("actualProfit", 0) + ${layActualProfit}`)
           },
           {
             where: { id: layOrder.id },
@@ -1047,41 +1060,47 @@ class MultibetSettlementService {
           }
         );
 
-        console.log(`       ✅ 레이 주문 actualProfit 누적: ${currentActualProfit.toLocaleString()} + ${layProfit.toLocaleString()} = ${newActualProfit.toLocaleString()}원`);
+        console.log(`       ✅ 레이 주문 actualProfit 누적: ${currentActualProfit.toLocaleString()} + ${layActualProfit.toLocaleString()} = ${newActualProfit.toLocaleString()}원`);
         console.log(`       ✅ 레이 주문 상태: ${newStatus} (남은 매치: ${remainingActiveMatches}개)`);
         
-        // ✅ FIX: 레이 사용자 잔액 업데이트 (수익이 있을 때만)
-        if (layProfit !== 0) {
-          const layUser = await User.findByPk(layOrder.userId, { transaction });
-          const currentLayBalance = parseFloat(layUser.balance);
-          const newLayBalance = currentLayBalance + layProfit;
+        // ✅ FIX: 레이 사용자 잔액 업데이트
+        const layUser = await User.findByPk(layOrder.userId, { transaction });
+        const currentLayBalance = parseFloat(layUser.balance);
 
-          await layUser.update({ balance: newLayBalance }, { transaction });
+        // 잔액 변동 = 승리 시 담보금 환급 + 순수익, 패배 시 0
+        let layBalanceChange = 0;
+        if (layResult === 'won') {
+          // Lay 승리: Lay 담보금 환급 + Back 담보금 순수익
+          layBalanceChange = layLiability + layActualProfit;  // = layTotalWinnings
+          console.log(`       💰 Lay 잔액 변동: Lay담보 환급 ${layLiability.toLocaleString()}원 + 순수익 ${layActualProfit.toLocaleString()}원 = ${layBalanceChange.toLocaleString()}원`);
+        } else if (layResult === 'lost') {
+          // Lay 패배: 잔액 변동 없음 (담보금은 이미 차감됨)
+          layBalanceChange = 0;
+          console.log(`       💸 Lay 패배: 잔액 변동 없음 (담보금 ${layLiability.toLocaleString()}원 손실)`);
+        } else {
+          // 취소: Lay 담보금 환급
+          layBalanceChange = layLiability;
+          console.log(`       🔄 취소: Lay담보 환급 ${layLiability.toLocaleString()}원`);
+        }
 
-          // ✅ PaymentHistory 기록 금액 계산 (순수익만)
-          let layPaymentAmount = layProfit;
-          
-          if (layResult === 'won') {
-            // Lay 승리: 총 수령액에서 Lay Liability 차감하여 순수익만 기록
-            layPaymentAmount = layProfit - layLiability;  // = backMatchAmount만
-            console.log(`       💰 Lay PaymentHistory 기록: 총수령 ${layProfit.toLocaleString()}원 - Lay담보 ${layLiability.toLocaleString()}원 = 순수익 ${layPaymentAmount.toLocaleString()}원`);
-          }
-          // 패배/취소 시는 그대로
-          
-          // ✅ FIX: PaymentHistory 기록 (매치별로 개별 기록)
+        const newLayBalance = currentLayBalance + layBalanceChange;
+        await layUser.update({ balance: newLayBalance }, { transaction });
+
+        // ✅ PaymentHistory 기록 (순수익만)
+        if (layActualProfit !== 0) {
           await PaymentHistory.create({
             userId: layOrder.userId,
             betId: `EXCHANGE_${layOrder.id}_MATCH_${match.id}`,  // ✅ 매치 ID 포함
-            amount: layPaymentAmount,  // ✅ 순수익
+            amount: layActualProfit,  // ✅ 순수익만 기록
             balanceAfter: newLayBalance,
             memo: `Exchange 멀티베팅 제로썸 정산 (백 주문 ${backOrder.id} 매치 ${match.id}: ${layResult})`,
             paidAt: new Date()
           }, { transaction });
-
-          console.log(`       💰 레이 사용자 잔액: ${currentLayBalance.toLocaleString()} → ${newLayBalance.toLocaleString()} (${layProfit > 0 ? '+' : ''}${layProfit.toLocaleString()}원)`);
-        } else {
-          console.log(`       💰 레이 사용자 잔액 변동 없음 (손실)`);
+          console.log(`       📝 PaymentHistory 기록: ${layActualProfit.toLocaleString()}원 (순수익)`);
         }
+
+        console.log(`       💰 레이 사용자 잔액: ${currentLayBalance.toLocaleString()} → ${newLayBalance.toLocaleString()} (${layBalanceChange > 0 ? '+' : ''}${layBalanceChange.toLocaleString()}원)`);
+
       }
       
       console.log(`\n   ✅ 제로썸 정산 완료: ${matches.length}개 레이 주문 정산됨\n`);

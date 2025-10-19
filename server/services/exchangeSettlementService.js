@@ -2289,7 +2289,7 @@ class ExchangeSettlementService {
               refundAmount = order.amount;
             } else {
               // Lay 주문: 스테이크 금액 환불
-              refundAmount = Math.floor((order.price - 1) * order.amount);
+              refundAmount = Math.floor((parseFloat(order.price) - 1) * order.amount);
             }
             console.log(`   완전 미매칭 주문 - 전체 금액 환불: ${refundAmount}원`);
           }
