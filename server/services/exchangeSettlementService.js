@@ -854,25 +854,48 @@ class ExchangeSettlementService {
     }
     
     // Lay 주문 정산
-    if (layOrder.partiallyFilled) {
-      // 부분 매칭된 주문: 체결된 부분만 정산하고 남은 부분은 취소 처리
-      const laySettlementNote = this.generateDetailedPartialMatchingSettlementNote(layOrder, gameResult, isBackWin, layStakeAmount);
-      await layOrder.update({
-        status: 'settled',
-        actualProfit: layWinAmount,
-        settledAt,
-        settlementNote: laySettlementNote
-      }, { transaction });
-      
-      // Lay 주문은 Back 주문의 매칭이므로 환불 없음
+    if (match) {
+      // ✅ ExchangeOrderMatch 기반: SQL INCREMENT로 누적 (1:N 매칭 지원)
+      await ExchangeOrder.update(
+        {
+          status: 'settled',
+          settledAt,
+          actualProfit: sequelize.literal(`COALESCE("actualProfit", 0) + ${layWinAmount}`)
+        },
+        {
+          where: { id: layOrder.id },
+          transaction
+        }
+      );
+
+      console.log(`  ✅ 레이 주문 ${layOrder.id} actualProfit 누적: +${layWinAmount}원 (SQL INCREMENT)`);
+
+      // 부분 매칭 처리
+      if (layOrder.partiallyFilled && layOrder.remainingAmount > 0) {
+        await this.cancelRemainingAmount(layOrder, transaction);
+      }
     } else {
-      // 완전 매칭된 주문: 기존 로직
-      await layOrder.update({
-        status: 'settled',
-        actualProfit: layWinAmount,
-        settledAt,
-        settlementNote: this.generateSettlementNote(layOrder, gameResult, isBackWin)
-      }, { transaction });
+      // 기존 로직 (1:1 쌍 정산): 덮어쓰기
+      if (layOrder.partiallyFilled) {
+        const laySettlementNote = this.generateDetailedPartialMatchingSettlementNote(layOrder, gameResult, isBackWin, layStakeAmount);
+        await layOrder.update({
+          status: 'settled',
+          actualProfit: layWinAmount,
+          settledAt,
+          settlementNote: laySettlementNote
+        }, { transaction });
+
+        if (layOrder.remainingAmount > 0) {
+          await this.cancelRemainingAmount(layOrder, transaction);
+        }
+      } else {
+        await layOrder.update({
+          status: 'settled',
+          actualProfit: layWinAmount,
+          settledAt,
+          settlementNote: this.generateSettlementNote(layOrder, gameResult, isBackWin)
+        }, { transaction });
+      }
     }
     
     return {
