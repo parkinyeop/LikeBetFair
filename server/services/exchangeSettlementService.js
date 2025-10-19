@@ -435,7 +435,19 @@ class ExchangeSettlementService {
       
       for (const pair of orderPairs) {
         try {
-          const result = await this.settlePair(pair, gameResult, transaction);
+          // ✅ match 파라미터 조회
+          const [backOrder, layOrder] = pair;
+          const match = await ExchangeOrderMatch.findOne({
+            where: {
+              [Op.or]: [
+                { originalOrderId: backOrder.id, matchingOrderId: layOrder.id },
+                { originalOrderId: layOrder.id, matchingOrderId: backOrder.id }
+              ]
+            },
+            transaction
+          });
+          
+          const result = await this.settlePair(pair, gameResult, transaction, match);
           settlementResults.push(result);
           settledCount += 2; // back + lay 주문
           totalWinnings += result.totalWinnings;
@@ -726,10 +738,14 @@ class ExchangeSettlementService {
       
       console.log(`  ✅ Match 기반 정산: matchedAmount=${backStakeAmount.toLocaleString()}원, price=${matchedPrice}`);
     } else {
-      // 기존 로직: 부분 매칭된 주문의 경우 실제 체결된 금액으로 수익 계산
+      // ✅ Fallback: match 파라미터가 없을 때 zero-sum 계산
       backStakeAmount = backOrder.partiallyFilled ? (backOrder.filledAmount || 0) : backOrder.stakeAmount;
-      layStakeAmount = layOrder.partiallyFilled ? (layOrder.filledAmount || 0) : layOrder.stakeAmount;
-      console.log(`  ℹ️  기존 로직 정산: backStake=${backStakeAmount.toLocaleString()}원, layStake=${layStakeAmount.toLocaleString()}원`);
+      
+      // ✅ layLiability 계산 (zero-sum 원칙)
+      const matchedPrice = parseFloat(backOrder.price || layOrder.price);
+      layStakeAmount = Math.floor(backStakeAmount * (matchedPrice - 1));
+      
+      console.log(`  ⚠️  Fallback 로직 정산 (match 파라미터 없음): backStake=${backStakeAmount.toLocaleString()}원, layLiability=${layStakeAmount.toLocaleString()}원, price=${matchedPrice}`);
     }
     
     // ✅ 정밀 계산 유틸리티를 사용한 Exchange 정산 (부동 소수점 오차 방지)
@@ -1756,7 +1772,19 @@ class ExchangeSettlementService {
       const orderPairs = this.groupMatchedOrders(regularOrders);
       for (const pair of orderPairs) {
         try {
-          const result = await this.settlePair(pair, gameResult, transaction);
+          // ✅ match 파라미터 조회
+          const [backOrder, layOrder] = pair;
+          const match = await ExchangeOrderMatch.findOne({
+            where: {
+              [Op.or]: [
+                { originalOrderId: backOrder.id, matchingOrderId: layOrder.id },
+                { originalOrderId: layOrder.id, matchingOrderId: backOrder.id }
+              ]
+            },
+            transaction
+          });
+          
+          const result = await this.settlePair(pair, gameResult, transaction, match);
           settlementResults.push(result);
           settledCount += 2; // back + lay 주문
           totalWinnings += result.totalWinnings;
@@ -2573,7 +2601,18 @@ class ExchangeSettlementService {
                 }
               } else {
                 // 둘 다 미정산인 경우 정상 정산
-                const result = await this.settlePair(pair, gameResult, null); // transaction 없이
+                // ✅ match 파라미터 조회
+                const [backOrder, layOrder] = pair;
+                const match = await ExchangeOrderMatch.findOne({
+                  where: {
+                    [Op.or]: [
+                      { originalOrderId: backOrder.id, matchingOrderId: layOrder.id },
+                      { originalOrderId: layOrder.id, matchingOrderId: backOrder.id }
+                    ]
+                  }
+                });
+                
+                const result = await this.settlePair(pair, gameResult, null, match); // transaction 없이
                 totalSettled += 2; // back + lay 주문
                 totalWinnings += result.totalWinnings || 0;
                 allSettlementResults.push(result);

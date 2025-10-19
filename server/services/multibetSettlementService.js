@@ -530,6 +530,31 @@ class MultibetSettlementService {
     
     // ✅ 제로썸 정산: 백 주문 정산 시 매칭된 레이 주문들을 함께 정산
     await this.settleMatchedLayOrders(order, finalResult, transaction);
+    
+    // ✅ 부분 매칭 환불 처리
+    if (order.partiallyFilled && order.remainingAmount > 0) {
+      console.log(`   🔄 부분 매칭 환불 처리: 주문 ${order.id}, 남은 금액 ${order.remainingAmount}원`);
+      
+      const user = await User.findByPk(order.userId, { transaction });
+      const refundAmount = parseFloat(order.remainingAmount);
+      const currentBalance = parseFloat(user.balance);
+      const newBalance = currentBalance + refundAmount;
+      
+      await user.update({ balance: newBalance }, { transaction });
+      
+      await PaymentHistory.create({
+        userId: order.userId,
+        betId: `EXCHANGE_${order.id}`,
+        amount: refundAmount,
+        balanceAfter: newBalance,
+        memo: `Exchange 주문 경기 시작으로 부분 매칭된 주문의 남은 금액 자동 환불 (경기: ${order.homeTeam} vs ${order.awayTeam}, 경기 시작됨)`,
+        paidAt: new Date()
+      }, { transaction });
+      
+      await order.update({ remainingAmount: 0 }, { transaction });
+      
+      console.log(`   ✅ 환불 완료: ${refundAmount.toLocaleString()}원`);
+    }
 
     return {
       orderId: order.id,
