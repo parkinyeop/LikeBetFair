@@ -261,15 +261,21 @@ class ExchangeSettlementService {
           continue;
         }
 
+        // ✅ 멀티배팅 주문 제외 (multibetSettlementService에서 처리)
+        if (backOrder.isMultibet || layOrder.isMultibet) {
+          console.log(`   🔄 [Team-Based] Match ${match.id}: 멀티배팅 주문 포함 -> 건너뜀 (Back: #${backOrder.id}${backOrder.isMultibet ? ' [멀티]' : ''}, Lay: #${layOrder.id}${layOrder.isMultibet ? ' [멀티]' : ''})`);
+          continue;
+        }
+
         const pair = [backOrder, layOrder];
-        
+
         console.log(`\n  📝 Match 정보:`, {
           matchId: match.id,
           matchedAmount: match.matchedAmount,
           matchedPrice: match.matchedPrice,
           originalSide: match.originalSide
         });
-        
+
         // ✅ 핵심 수정: match 객체를 settlePair에 전달 (순서: pair, gameResult, transaction, match)
         const result = await this.settlePair(pair, gameResult, transaction, match);
 
