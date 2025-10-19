@@ -155,8 +155,53 @@ class ExchangeSettlementService {
         transaction
       });
       
+      // ✅ 멀티배팅 Back과 매칭된 Lay 주문 ID 조회 (제로썸 정산에서 처리하므로 제외)
+      const multibetBackOrders = await ExchangeOrder.findAll({
+        where: {
+          isMultibet: true,
+          side: 'back',
+          status: { [Op.in]: ['matched', 'partially_matched', 'settled'] }
+        },
+        attributes: ['id'],
+        transaction
+      });
+      
+      const multibetBackIds = multibetBackOrders.map(o => o.id);
+      
+      let excludedLayOrderIds = [];
+      if (multibetBackIds.length > 0) {
+        const multibetMatches = await ExchangeOrderMatch.findAll({
+          where: {
+            [Op.or]: [
+              { originalOrderId: { [Op.in]: multibetBackIds } },
+              { matchingOrderId: { [Op.in]: multibetBackIds } }
+            ]
+          },
+          attributes: ['originalOrderId', 'matchingOrderId'],
+          transaction
+        });
+        
+        // 멀티배팅 Back과 매칭된 Lay 주문 ID 추출
+        excludedLayOrderIds = multibetMatches.map(m => {
+          // Back이 original이면 matching이 Lay, 반대도 마찬가지
+          if (multibetBackIds.includes(m.originalOrderId)) {
+            return m.matchingOrderId;
+          } else {
+            return m.originalOrderId;
+          }
+        }).filter(id => !multibetBackIds.includes(id)); // Back ID는 제외
+        
+        console.log(`   🚫 멀티배팅 제로썸 정산 대상 Lay 주문 제외: ${excludedLayOrderIds.length}개`);
+      }
+      
       // 정규화된 팀명으로 매칭
       const orders = allOrders.filter(order => {
+        // ✅ 멀티배팅 제로썸 정산 대상은 제외
+        if (excludedLayOrderIds.includes(order.id)) {
+          console.log(`   ⏭️  주문 ${order.id} 건너뜀 (멀티배팅 제로썸 정산 대상)`);
+          return false;
+        }
+        
         const orderHomeNorm = normalizeTeamNameForComparison(order.homeTeam);
         const orderAwayNorm = normalizeTeamNameForComparison(order.awayTeam);
         
