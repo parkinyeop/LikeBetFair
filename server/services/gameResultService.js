@@ -311,6 +311,7 @@ class GameResultService {
    */
   isYearBasedSeasonLeague(sportKey) {
     const yearBasedLeagues = [
+      // 북미 리그
       'soccer_usa_mls',           // MLS
       'baseball_mlb',             // MLB
       'basketball_nba',           // NBA
@@ -318,12 +319,16 @@ class GameResultService {
       'americanfootball_nfl',     // NFL
       'americanfootball_ncaaf',   // NCAAF
       'icehockey_nhl',            // NHL
-      'baseball_kbo',             // KBO (한국도 단일 연도 시즌)
-      'soccer_korea_kleague1',    // ✅ K리그 (연도 형식 사용)
-      'soccer_japan_j_league',    // ✅ J리그 (연도 형식 사용)
-      'soccer_brazil_campeonato', // ✅ 브라질 세리에 A (시즌 기반)
-      'soccer_argentina_primera_division', // ✅ 아르헨티나 프리메라 (시즌 기반)
-      'soccer_china_superleague'  // ✅ 중국 슈퍼 리그 (연도 형식 사용)
+      // 한국 리그
+      'baseball_kbo',             // KBO
+      'basketball_kbl',           // ✅ KBL (한국농구연맹, 연도 형식 사용)
+      'soccer_korea_kleague1',    // K리그
+      // 아시아 리그
+      'soccer_japan_j_league',    // J리그
+      'soccer_china_superleague', // 중국 슈퍼 리그
+      // 남미 리그
+      'soccer_brazil_campeonato', // 브라질 세리에 A
+      'soccer_argentina_primera_division' // 아르헨티나 프리메라
     ];
     return yearBasedLeagues.includes(sportKey);
   }
@@ -341,12 +346,12 @@ class GameResultService {
         throw new Error(`No TheSportsDB league ID for ${sportKey}`);
       }
 
-      // MLS, MLB 등 북미 리그는 eventsseason.php 사용, 유럽 리그는 eventsround.php 사용
-      const isNorthAmericanLeague = this.isNorthAmericanLeague(sportKey);
+      // 연도 기반 리그는 eventsseason.php 사용, 유럽 리그는 eventslast + eventsnext 사용
+      const isYearBasedSeason = this.isYearBasedSeasonLeague(sportKey);
       let response;
-      
-      if (isNorthAmericanLeague) {
-        // 북미 리그: 시즌 기반 (MLS, MLB, NBA, NFL 등)
+
+      if (isYearBasedSeason) {
+        // 연도 기반 리그: 시즌 기반 (북미, 아시아 리그: MLS, MLB, NBA, NFL, K리그, J리그, 중국 슈퍼리그 등)
         const currentYear = new Date().getFullYear();
         response = await axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsseason.php`, {
           params: {
@@ -355,7 +360,7 @@ class GameResultService {
           },
           timeout: 15000
         });
-        console.log(`[Fallback] 북미 리그 시즌 API 사용: ${sportKey} (${currentYear})`);
+        console.log(`[Fallback] 연도 기반 리그 시즌 API 사용: ${sportKey} (${currentYear})`);
       } else {
         // 유럽 리그: 최근 + 예정 경기 조합으로 시간 범위 내 데이터 수집
         const [lastResponse, nextResponse] = await Promise.all([

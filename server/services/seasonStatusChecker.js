@@ -174,6 +174,45 @@ class SeasonStatusChecker {
   }
 
   /**
+   * 연도 기반 시즌 형식을 사용하는 리그 판단
+   */
+  isYearBasedSeasonLeague(sportKey) {
+    const yearBasedLeagues = [
+      // 북미 리그
+      'soccer_usa_mls', 'baseball_mlb', 'basketball_nba', 'basketball_wnba',
+      'americanfootball_nfl', 'americanfootball_ncaaf', 'icehockey_nhl',
+      // 한국 리그
+      'baseball_kbo', 'basketball_kbl', 'soccer_korea_kleague1',
+      // 아시아 리그
+      'soccer_japan_j_league', 'soccer_china_superleague',
+      // 남미 리그
+      'soccer_brazil_campeonato', 'soccer_argentina_primera_division'
+    ];
+    return yearBasedLeagues.includes(sportKey);
+  }
+
+  /**
+   * sportKey에 맞는 시즌 파라미터 생성
+   */
+  getSeasonParam(sportKey) {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+
+    if (this.isYearBasedSeasonLeague(sportKey)) {
+      // 연도 기반 리그: 2025
+      return currentYear.toString();
+    } else {
+      // 유럽 리그: 2024-2025 형식
+      if (currentMonth >= 8) {
+        return `${currentYear}-${currentYear + 1}`;
+      } else {
+        return `${currentYear - 1}-${currentYear}`;
+      }
+    }
+  }
+
+  /**
    * TheSportsDB에서 최근 경기 확인 (지난 30일)
    */
   async checkRecentGames(sportKey) {
@@ -184,13 +223,13 @@ class SeasonStatusChecker {
         return { count: 0, lastGameDate: null };
       }
 
-      const currentSeason = new Date().getFullYear();
+      const seasonParam = this.getSeasonParam(sportKey);
       const response = await axios.get(
         `https://www.thesportsdb.com/api/v1/json/${this.theSportsDbApiKey}/eventsseason.php`,
         {
           params: {
             id: leagueId,
-            s: currentSeason
+            s: seasonParam
           },
           timeout: 10000
         }
@@ -233,13 +272,13 @@ class SeasonStatusChecker {
         return { count: 0, nextGameDate: null };
       }
 
-      const currentSeason = new Date().getFullYear();
+      const seasonParam = this.getSeasonParam(sportKey);
       const response = await axios.get(
         `https://www.thesportsdb.com/api/v1/json/${this.theSportsDbApiKey}/eventsseason.php`,
         {
           params: {
             id: leagueId,
-            s: currentSeason
+            s: seasonParam
           },
           timeout: 10000
         }
