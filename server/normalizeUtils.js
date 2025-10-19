@@ -291,6 +291,11 @@ const globalTeamMapping = {
   'shenzhenpengcityfc': 'shenzhenpengcity',
   'shenzhenpengcity': 'shenzhenpengcity',
 
+  // === Brasileirao (브라질 세리에 A) ===
+  'sportclubdorecife': 'sportrecife',  // Sport Club do Recife → Sport Recife
+  'sportclubrecife': 'sportrecife',    // Sport Club Recife → Sport Recife
+  'sportrecife': 'sportrecife',
+
   // === K-League (한국 프로축구) ===
   'jejuunitedfc': 'jejusk',
   'jejusk': 'jejusk',
