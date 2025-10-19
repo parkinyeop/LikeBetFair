@@ -733,6 +733,18 @@ class MultibetSettlementService {
       // 5단계: 메모 생성 (미리 준비)
       const memo = this.generatePaymentMemo(order, result, settlementResult, profitAmount);
 
+      // ✅ PaymentHistory 기록 금액 계산 (순수익만)
+      let paymentAmount = profitAmount;
+      
+      if (result === 'won' && order.side === 'back') {
+        // Back 승리: 총 수령액에서 Back Stake 차감하여 순수익만 기록
+        const backStake = parseFloat(order.filledAmount || order.amount);
+        paymentAmount = profitAmount - backStake;
+        console.log(`💰 Back PaymentHistory 기록: 총수령 ${profitAmount.toLocaleString()}원 - Back담보 ${backStake.toLocaleString()}원 = 순수익 ${paymentAmount.toLocaleString()}원`);
+      }
+      // Lay 승리 시는 이미 순수익 (matchedAmount만)
+      // 패배 시는 0원
+
       // 6단계: 데이터베이스 업데이트 (병렬 실행 + 성능 측정)
       const saveStartTime = Date.now();
       await Promise.all([
@@ -740,7 +752,7 @@ class MultibetSettlementService {
         PaymentHistory.create({
           userId: order.userId,
           betId: `EXCHANGE_${order.id}`,
-          amount: profitAmount,
+          amount: paymentAmount,  // ✅ 순수익
           balanceAfter: newBalance,
           memo: memo,
           paidAt: new Date()
@@ -1046,11 +1058,21 @@ class MultibetSettlementService {
 
           await layUser.update({ balance: newLayBalance }, { transaction });
 
+          // ✅ PaymentHistory 기록 금액 계산 (순수익만)
+          let layPaymentAmount = layProfit;
+          
+          if (layResult === 'won') {
+            // Lay 승리: 총 수령액에서 Lay Liability 차감하여 순수익만 기록
+            layPaymentAmount = layProfit - layLiability;  // = backMatchAmount만
+            console.log(`       💰 Lay PaymentHistory 기록: 총수령 ${layProfit.toLocaleString()}원 - Lay담보 ${layLiability.toLocaleString()}원 = 순수익 ${layPaymentAmount.toLocaleString()}원`);
+          }
+          // 패배/취소 시는 그대로
+          
           // ✅ FIX: PaymentHistory 기록 (매치별로 개별 기록)
           await PaymentHistory.create({
             userId: layOrder.userId,
             betId: `EXCHANGE_${layOrder.id}_MATCH_${match.id}`,  // ✅ 매치 ID 포함
-            amount: layProfit,
+            amount: layPaymentAmount,  // ✅ 순수익
             balanceAfter: newLayBalance,
             memo: `Exchange 멀티베팅 제로썸 정산 (백 주문 ${backOrder.id} 매치 ${match.id}: ${layResult})`,
             paidAt: new Date()
