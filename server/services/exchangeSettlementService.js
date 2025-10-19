@@ -196,7 +196,13 @@ class ExchangeSettlementService {
       
       // 정규화된 팀명으로 매칭
       const orders = allOrders.filter(order => {
-        // ✅ 멀티배팅 제로썸 정산 대상은 제외
+        // ✅ 멀티배팅 주문은 모두 제외 (멀티배팅 정산에서 처리)
+        if (order.isMultibet) {
+          console.log(`   ⏭️  주문 ${order.id} 건너뜀 (멀티배팅은 multibetSettlementService에서 처리)`);
+          return false;
+        }
+        
+        // ✅ 멀티배팅 Back과 매칭된 Lay도 제외
         if (excludedLayOrderIds.includes(order.id)) {
           console.log(`   ⏭️  주문 ${order.id} 건너뜀 (멀티배팅 제로썸 정산 대상)`);
           return false;
