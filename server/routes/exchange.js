@@ -172,11 +172,11 @@ router.post('/match-order', verifyToken, async (req, res) => {
     matchType = reqMatchType;
     userId = req.user.userId;
 
-    // ✅ 금액 1,000원 단위 검증
-    if (matchAmount % 1000 !== 0) {
+    // ✅ 금액 10원 단위 검증
+    if (matchAmount % 10 !== 0) {
       return res.status(400).json({
         success: false,
-        message: '매칭 금액은 1,000원 단위로 입력해주세요.'
+        message: '매칭 금액은 10원 단위로 입력해주세요.'
       });
     }
 
@@ -524,11 +524,11 @@ router.post('/order', verifyToken, async (req, res) => {
     const { gameId, market, line, side, amount, selection } = req.body;
     const userId = req.user.userId;
 
-    // ✅ 금액 1,000원 단위 검증
-    if (amount % 1000 !== 0) {
+    // ✅ 금액 10원 단위 검증
+    if (amount % 10 !== 0) {
       return res.status(400).json({
         success: false,
-        message: '주문 금액은 1,000원 단위로 입력해주세요.'
+        message: '주문 금액은 10원 단위로 입력해주세요.'
       });
     }
 
