@@ -283,7 +283,7 @@ async function resettleOrder(order, transaction) {
     await PaymentHistory.create({
       userId: order.userId,
       betId: `RESETTLE_${order.id}`,
-      amount: Math.abs(profitDiff),
+      amount: profitDiff, // 🆕 부호 유지 (양수=입금, 음수=출금)
       type: profitDiff > 0 ? 'winning' : 'loss',
       memo: `총점 베팅 재정산 (주문 #${order.id})`,
       status: 'completed',
