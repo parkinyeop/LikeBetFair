@@ -13,7 +13,8 @@ const PaymentHistory = sequelize.define('PaymentHistory', {
   },
   betId: {
     type: DataTypes.STRING,
-    allowNull: true
+    allowNull: true,
+    comment: 'Deprecated - Use relatedBetId instead'
   },
   amount: {
     type: DataTypes.DECIMAL(10, 2),
@@ -30,6 +31,42 @@ const PaymentHistory = sequelize.define('PaymentHistory', {
   paidAt: {
     type: DataTypes.DATE,
     allowNull: false
+  },
+  // ===== 새로 추가된 필드들 =====
+  transactionType: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    comment: 'Transaction type from TransactionType enum'
+  },
+  status: {
+    type: DataTypes.STRING(20),
+    defaultValue: 'completed',
+    comment: 'Transaction status: completed, rolled_back, pending, failed'
+  },
+  relatedOrderId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    comment: 'Reference to ExchangeOrder.id'
+  },
+  relatedBetId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    comment: 'Reference to Bet.id'
+  },
+  relatedMultibetId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    comment: 'Reference to ExchangeMultibet.id (if exists)'
+  },
+  relatedMatchId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    comment: 'Reference to ExchangeOrderMatch.id'
+  },
+  metadata: {
+    type: DataTypes.JSONB,
+    allowNull: true,
+    comment: 'Additional structured data'
   }
 }, {
   timestamps: true

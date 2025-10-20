@@ -14,15 +14,23 @@ import sequelize from '../models/sequelize.js';
 class BalanceService {
   /**
    * 잔액 변경 및 PaymentHistory 기록을 원자적으로 처리
-   * 
+   *
    * @param {string} userId - 사용자 ID
    * @param {number} amount - 변경 금액 (양수: 입금, 음수: 출금)
    * @param {string} memo - 거래 메모
-   * @param {string|null} betId - 베팅 ID (선택사항)
+   * @param {object|string|null} options - 옵션 객체 또는 레거시 betId
+   *   - {string} options.betId - 베팅 ID (deprecated, use relatedBetId)
+   *   - {string} options.transactionType - 거래 유형 (TransactionType enum)
+   *   - {string} options.status - 거래 상태 (기본값: 'completed')
+   *   - {UUID} options.relatedOrderId - 관련 주문 ID
+   *   - {UUID} options.relatedBetId - 관련 베팅 ID
+   *   - {UUID} options.relatedMultibetId - 관련 멀티베팅 ID
+   *   - {UUID} options.relatedMatchId - 관련 매치 ID
+   *   - {object} options.metadata - 추가 메타데이터 (JSONB)
    * @param {Transaction} transaction - Sequelize 트랜잭션 객체
    * @returns {Promise<{user, paymentHistory, oldBalance, newBalance}>}
    */
-  async updateBalance(userId, amount, memo, betId = null, transaction) {
+  async updateBalance(userId, amount, memo, options = null, transaction) {
     try {
       // 1. 사용자 조회 (비관적 락)
       const user = await User.findByPk(userId, {
@@ -52,14 +60,46 @@ class BalanceService {
       user.balance = newBalance;
       await user.save({ transaction });
 
-      // 5. PaymentHistory 기록 (원자적으로 처리)
+      // 5. 옵션 파싱 (하위 호환성)
+      let betId = null;
+      let transactionType = null;
+      let status = 'completed';
+      let relatedOrderId = null;
+      let relatedBetId = null;
+      let relatedMultibetId = null;
+      let relatedMatchId = null;
+      let metadata = null;
+
+      if (typeof options === 'string') {
+        // 레거시: options가 betId 문자열인 경우
+        betId = options;
+      } else if (options && typeof options === 'object') {
+        // 새로운 방식: options 객체
+        betId = options.betId || null;
+        transactionType = options.transactionType || null;
+        status = options.status || 'completed';
+        relatedOrderId = options.relatedOrderId || null;
+        relatedBetId = options.relatedBetId || null;
+        relatedMultibetId = options.relatedMultibetId || null;
+        relatedMatchId = options.relatedMatchId || null;
+        metadata = options.metadata || null;
+      }
+
+      // 6. PaymentHistory 기록 (원자적으로 처리)
       const paymentHistory = await PaymentHistory.create({
         userId,
         amount: changeAmount,
         balanceAfter: newBalance,
         memo,
-        betId,
-        paidAt: new Date() // ✅ paidAt 필드 추가
+        betId,  // legacy
+        transactionType,
+        status,
+        relatedOrderId,
+        relatedBetId,
+        relatedMultibetId,
+        relatedMatchId,
+        metadata,
+        paidAt: new Date()
       }, { transaction });
 
       console.log(
@@ -186,15 +226,15 @@ class BalanceService {
   /**
    * 잔액 차감 (편의 메서드)
    */
-  async deductBalance(userId, amount, memo, betId = null, transaction) {
-    return await this.updateBalance(userId, -Math.abs(amount), memo, betId, transaction);
+  async deductBalance(userId, amount, memo, options = null, transaction) {
+    return await this.updateBalance(userId, -Math.abs(amount), memo, options, transaction);
   }
 
   /**
    * 잔액 추가 (편의 메서드)
    */
-  async addBalance(userId, amount, memo, betId = null, transaction) {
-    return await this.updateBalance(userId, Math.abs(amount), memo, betId, transaction);
+  async addBalance(userId, amount, memo, options = null, transaction) {
+    return await this.updateBalance(userId, Math.abs(amount), memo, options, transaction);
   }
 }
 
