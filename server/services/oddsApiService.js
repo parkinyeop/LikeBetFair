@@ -274,7 +274,7 @@ class OddsApiService {
           const oddsResponse = await axios.get(`${this.baseUrl}/${sportKey}/odds`, {
             params: {
               apiKey: this.apiKey,
-              regions: 'us',
+              regions: 'us,uk,eu,au',  // 🆕 regions 확장: 미국, 영국, 유럽, 호주
               markets: 'h2h,spreads,totals',
               oddsFormat: 'decimal',
               dateFormat: 'iso'
@@ -310,10 +310,39 @@ class OddsApiService {
           console.log(`[DEBUG] ${clientCategory}: ${filteredGames.length}개 경기 처리 시작 (과거 3일 ~ 미래 14일)`);
           console.log(`[DEBUG] 원본 데이터: ${oddsResponse.data.length}개, 필터링 후: ${filteredGames.length}개`);
 
+          // 🆕 spreads 데이터 부족한 경기들 식별
+          const gamesWithoutSpreads = filteredGames.filter(game => !this.hasSpreadsData(game));
+          console.log(`[Spreads] spreads 데이터가 없는 경기: ${gamesWithoutSpreads.length}개`);
+          
+          // 🆕 spreads 데이터가 부족한 경우 2차 API 호출
+          let spreadsData = [];
+          if (gamesWithoutSpreads.length > 0) {
+            console.log(`[Spreads] spreads 전용 API 호출 시작: ${clientCategory}`);
+            spreadsData = await this.fetchSpreadsData(sportKey, gamesWithoutSpreads);
+            console.log(`[Spreads] spreads 전용 API 응답: ${spreadsData.length}개 경기`);
+          }
+
           // 데이터 검증 및 저장
           for (const game of filteredGames) {
             console.log(`[DEBUG] 경기 검증: ${game.home_team} vs ${game.away_team}`);
-            if (this.validateOddsData(game)) {
+            
+            // 🆕 spreads 데이터가 없는 경우 2차 API 데이터에서 찾아서 병합
+            let enhancedGame = { ...game };
+            if (!this.hasSpreadsData(game) && spreadsData.length > 0) {
+              const matchingSpreadsGame = spreadsData.find(spreadsGame => 
+                spreadsGame.home_team === game.home_team && 
+                spreadsGame.away_team === game.away_team &&
+                spreadsGame.commence_time === game.commence_time
+              );
+              
+              if (matchingSpreadsGame) {
+                console.log(`[Spreads] spreads 데이터 병합: ${game.home_team} vs ${game.away_team}`);
+                // spreads 북메이커 데이터를 기존 북메이커 데이터에 추가
+                enhancedGame.bookmakers = [...(game.bookmakers || []), ...(matchingSpreadsGame.bookmakers || [])];
+              }
+            }
+            
+            if (this.validateOddsData(enhancedGame)) {
               const mainCategory = this.determineMainCategory(clientCategory);
               const subCategory = this.determineSubCategory(clientCategory);
               
@@ -326,7 +355,7 @@ class OddsApiService {
               console.log(`[DEBUG] 카테고리 매핑 성공: ${mainCategory}/${subCategory}`);
               
               // 디버깅: upsert 데이터 확인
-              const calculatedOdds = this.calculateAverageOdds(game.bookmakers);
+              const calculatedOdds = this.calculateAverageOdds(enhancedGame.bookmakers);
               console.log(`[DEBUG] calculateAverageOdds 결과:`, JSON.stringify(calculatedOdds, null, 2));
               
               // 🆕 강제 UTC 시간 처리 로직
@@ -362,11 +391,11 @@ class OddsApiService {
                 subCategory,
                 sportKey: sportKey,
                 sportTitle: this.getSportTitleFromSportKey(sportKey),
-                homeTeam: game.home_team,
-                awayTeam: game.away_team,
+                homeTeam: enhancedGame.home_team,
+                awayTeam: enhancedGame.away_team,
                 commenceTime: commenceTime, // ✅ UTC ISO 문자열로 저장 (이미 toISOString() 적용됨)
-                odds: game.bookmakers, // odds 필드 추가
-                bookmakers: game.bookmakers,
+                odds: enhancedGame.bookmakers, // odds 필드 추가
+                bookmakers: enhancedGame.bookmakers,
                 market: 'h2h', // 기본값 추가
                 officialOdds: calculatedOdds,
                 lastUpdated: new Date()
@@ -397,8 +426,8 @@ class OddsApiService {
                     homeTeam: game.home_team,
                     awayTeam: game.away_team,
                     commenceTime: normalizedCommenceTime,
-                    bookmakers: game.bookmakers,
-                    officialOdds: this.calculateAverageOdds(game.bookmakers),
+                    bookmakers: enhancedGame.bookmakers,
+                    officialOdds: this.calculateAverageOdds(enhancedGame.bookmakers),
                     lastUpdated: new Date()
                   }
                 });
@@ -412,10 +441,10 @@ class OddsApiService {
                 
                 if (created) {
                   totalNewCount++;
-                  console.log(`[DEBUG] ✅ 강제 새로 생성: ${game.home_team} vs ${game.away_team}`);
+                  console.log(`[DEBUG] ✅ 강제 새로 생성: ${enhancedGame.home_team} vs ${enhancedGame.away_team}`);
                 } else {
                   totalUpdatedCount++;
-                  console.log(`[DEBUG] ✅ 강제 업데이트 완료: ${game.home_team} vs ${game.away_team}`);
+                  console.log(`[DEBUG] ✅ 강제 업데이트 완료: ${enhancedGame.home_team} vs ${enhancedGame.away_team}`);
                 }
               } else {
                 // 시간 정규화: 분 단위로 정규화하여 1분 차이로 인한 중복 방지
@@ -437,8 +466,8 @@ class OddsApiService {
                     homeTeam: game.home_team,
                     awayTeam: game.away_team,
                     commenceTime: normalizedCommenceTime,
-                    bookmakers: game.bookmakers,
-                    officialOdds: this.calculateAverageOdds(game.bookmakers),
+                    bookmakers: enhancedGame.bookmakers,
+                    officialOdds: this.calculateAverageOdds(enhancedGame.bookmakers),
                     lastUpdated: new Date()
                   }
                 });
@@ -446,18 +475,18 @@ class OddsApiService {
                 // 기존 레코드면 업데이트
                 if (!created) {
                   await oddsRecord.update({
-                    bookmakers: game.bookmakers,
-                    officialOdds: this.calculateAverageOdds(game.bookmakers),
+                    bookmakers: enhancedGame.bookmakers,
+                    officialOdds: this.calculateAverageOdds(enhancedGame.bookmakers),
                     lastUpdated: new Date()
                   });
                 }
 
                 if (created) {
                   totalNewCount++;
-                  console.log(`[DEBUG] ✅ 새 배당률 저장: ${game.home_team} vs ${game.away_team}`);
+                  console.log(`[DEBUG] ✅ 새 배당률 저장: ${enhancedGame.home_team} vs ${enhancedGame.away_team}`);
                 } else {
                   totalUpdatedCount++;
-                  console.log(`[DEBUG] 🔄 기존 배당률 업데이트: ${game.home_team} vs ${game.away_team}`);
+                  console.log(`[DEBUG] 🔄 기존 배당률 업데이트: ${enhancedGame.home_team} vs ${enhancedGame.away_team}`);
                 }
               }
 
@@ -672,7 +701,7 @@ class OddsApiService {
           const oddsResponse = await axios.get(`${this.baseUrl}/${sportKey}/odds`, {
             params: {
               apiKey: this.apiKey,
-              regions: 'us',
+              regions: 'us,uk,eu,au',  // 🆕 regions 확장: 미국, 영국, 유럽, 호주
               markets: 'h2h,spreads,totals',
               oddsFormat: 'decimal',
               dateFormat: 'iso'
@@ -767,10 +796,38 @@ class OddsApiService {
             console.log(`[야구 디버깅]   필터링 후: ${filteredGames.length}개`);
           }
 
+          // 🆕 spreads 데이터 부족한 경기들 식별 (두 번째 API 호출)
+          const gamesWithoutSpreads2 = filteredGames.filter(game => !this.hasSpreadsData(game));
+          console.log(`[Spreads] spreads 데이터가 없는 경기: ${gamesWithoutSpreads2.length}개`);
+          
+          // 🆕 spreads 데이터가 부족한 경우 2차 API 호출
+          let spreadsData2 = [];
+          if (gamesWithoutSpreads2.length > 0) {
+            console.log(`[Spreads] spreads 전용 API 호출 시작: ${clientCategory}`);
+            spreadsData2 = await this.fetchSpreadsData(sportKey, gamesWithoutSpreads2);
+            console.log(`[Spreads] spreads 전용 API 응답: ${spreadsData2.length}개 경기`);
+          }
+
           // 데이터 검증 및 저장
           console.log(`[DEBUG] ${clientCategory} Processing ${filteredGames.length} games for database storage`);
           for (const game of filteredGames) {
             console.log(`[DEBUG] ${clientCategory} Validating game: ${game.home_team} vs ${game.away_team}`);
+            
+            // 🆕 spreads 데이터가 없는 경우 2차 API 데이터에서 찾아서 병합
+            let enhancedGame = { ...game };
+            if (!this.hasSpreadsData(game) && spreadsData2.length > 0) {
+              const matchingSpreadsGame = spreadsData2.find(spreadsGame => 
+                spreadsGame.home_team === game.home_team && 
+                spreadsGame.away_team === game.away_team &&
+                spreadsGame.commence_time === game.commence_time
+              );
+              
+              if (matchingSpreadsGame) {
+                console.log(`[Spreads] spreads 데이터 병합: ${game.home_team} vs ${game.away_team}`);
+                // spreads 북메이커 데이터를 기존 북메이커 데이터에 추가
+                enhancedGame.bookmakers = [...(game.bookmakers || []), ...(matchingSpreadsGame.bookmakers || [])];
+              }
+            }
             
             // 🆕 야구 전용 디버깅 로그 추가
             if (clientCategory.includes('KBO') || clientCategory.includes('MLB')) {
@@ -781,14 +838,14 @@ class OddsApiService {
               console.log(`[야구 디버깅]   bookmakers: ${Array.isArray(game.bookmakers) ? game.bookmakers.length + '개' : '배열아님'}`);
             }
             
-            const isValid = this.validateOddsData(game);
+            const isValid = this.validateOddsData(enhancedGame);
             
             // 🆕 야구 전용 디버깅 로그 추가
             if (clientCategory.includes('KBO') || clientCategory.includes('MLB')) {
               console.log(`[야구 디버깅] ✅ 검증 결과: ${isValid ? '성공' : '실패'}`);
             }
             
-            console.log(`[DEBUG] ${clientCategory} Validation result: ${isValid} for ${game.home_team} vs ${game.away_team}`);
+            console.log(`[DEBUG] ${clientCategory} Validation result: ${isValid} for ${enhancedGame.home_team} vs ${enhancedGame.away_team}`);
             
             if (isValid) {
               const mainCategory = this.determineMainCategory(clientCategory);
@@ -804,7 +861,7 @@ class OddsApiService {
               let commenceTime;
               try {
                 // OddsAPI에서 받은 시간이 이미 UTC 형식인지 확인
-                let timeString = game.commence_time;
+                let timeString = enhancedGame.commence_time;
                 if (!timeString.endsWith('Z') && !timeString.includes('+') && !timeString.includes('-', 10)) {
                   timeString = timeString + 'Z';
                 }
@@ -812,7 +869,7 @@ class OddsApiService {
                 const utcDate = new Date(timeString);
                 
                 if (isNaN(utcDate.getTime())) {
-                  console.error(`[야구 디버깅] ❌ 유효하지 않은 시간: ${game.commence_time} (변환 시도: ${timeString})`);
+                  console.error(`[야구 디버깅] ❌ 유효하지 않은 시간: ${enhancedGame.commence_time} (변환 시도: ${timeString})`);
                   continue;
                 }
                 
@@ -820,7 +877,7 @@ class OddsApiService {
                 commenceTime = utcDate.toISOString();
                 
                 // 🆕 디버깅: 시간 변환 결과 확인
-                console.log(`[야구 디버깅] 강제 UTC 변환: ${game.commence_time} → ${commenceTime}`);
+                console.log(`[야구 디버깅] 강제 UTC 변환: ${enhancedGame.commence_time} → ${commenceTime}`);
                 
               } catch (timeError) {
                 console.error(`[야구 디버깅] ❌ 시간 변환 오류: ${timeError.message}`);
@@ -832,13 +889,13 @@ class OddsApiService {
                 subCategory,
                 sportKey: sportKey,
                 sportTitle: this.getSportTitleFromSportKey(sportKey),
-                homeTeam: game.home_team,
-                awayTeam: game.away_team,
+                homeTeam: enhancedGame.home_team,
+                awayTeam: enhancedGame.away_team,
                 commenceTime: commenceTime, // ✅ UTC ISO 문자열로 저장 (이미 toISOString() 적용됨)
-                odds: game.bookmakers,
-                bookmakers: game.bookmakers,
+                odds: enhancedGame.bookmakers,
+                bookmakers: enhancedGame.bookmakers,
                 market: 'h2h',
-                officialOdds: this.calculateAverageOdds(game.bookmakers),
+                officialOdds: this.calculateAverageOdds(enhancedGame.bookmakers),
                 lastUpdated: new Date()
               };
               
@@ -871,8 +928,8 @@ class OddsApiService {
                 const [record, isCreated] = await OddsCache.findOrCreate({
                   where: {
                     sportKey: sportKey,
-                    homeTeam: game.home_team,
-                    awayTeam: game.away_team,
+                    homeTeam: enhancedGame.home_team,
+                    awayTeam: enhancedGame.away_team,
                     commenceTime: normalizedCommenceTime
                   },
                   defaults: upsertData
@@ -883,17 +940,17 @@ class OddsApiService {
                 
                 // 강제 업데이트 모드에서는 무조건 업데이트
                 await oddsRecord.update({
-                  bookmakers: game.bookmakers,
-                  officialOdds: this.calculateAverageOdds(game.bookmakers),
+                  bookmakers: enhancedGame.bookmakers,
+                  officialOdds: this.calculateAverageOdds(enhancedGame.bookmakers),
                   lastUpdated: new Date()
                 });
                 
                 if (created) {
                   totalNewCount++;
-                  console.log(`[DEBUG] ✅ 강제 새로 생성: ${game.home_team} vs ${game.away_team}`);
+                  console.log(`[DEBUG] ✅ 강제 새로 생성: ${enhancedGame.home_team} vs ${enhancedGame.away_team}`);
                 } else {
                   totalUpdatedCount++;
-                  console.log(`[DEBUG] ✅ 강제 업데이트 완료: ${game.home_team} vs ${game.away_team}`);
+                  console.log(`[DEBUG] ✅ 강제 업데이트 완료: ${enhancedGame.home_team} vs ${enhancedGame.away_team}`);
                 }
               } else {
                 // 시간 정규화: 분 단위로 정규화하여 1분 차이로 인한 중복 방지
@@ -906,8 +963,8 @@ class OddsApiService {
                 const [record, isCreated] = await OddsCache.findOrCreate({
                   where: {
                     sportKey: sportKey,
-                    homeTeam: game.home_team,
-                    awayTeam: game.away_team,
+                    homeTeam: enhancedGame.home_team,
+                    awayTeam: enhancedGame.away_team,
                     commenceTime: normalizedCommenceTime
                   },
                   defaults: upsertData
@@ -919,18 +976,18 @@ class OddsApiService {
                 // 기존 레코드면 업데이트
                 if (!created) {
                   await oddsRecord.update({
-                    bookmakers: game.bookmakers,
-                    officialOdds: this.calculateAverageOdds(game.bookmakers),
+                    bookmakers: enhancedGame.bookmakers,
+                    officialOdds: this.calculateAverageOdds(enhancedGame.bookmakers),
                     lastUpdated: new Date()
                   });
                 }
 
                 if (created) {
                   totalNewCount++;
-                  console.log(`[DEBUG] ✅ 새 배당률 저장: ${game.home_team} vs ${game.away_team}`);
+                  console.log(`[DEBUG] ✅ 새 배당률 저장: ${enhancedGame.home_team} vs ${enhancedGame.away_team}`);
                 } else {
                   totalUpdatedCount++;
-                  console.log(`[DEBUG] 🔄 기존 배당률 업데이트: ${game.home_team} vs ${game.away_team}`);
+                  console.log(`[DEBUG] 🔄 기존 배당률 업데이트: ${enhancedGame.home_team} vs ${enhancedGame.away_team}`);
                 }
               }
               
@@ -1056,6 +1113,74 @@ class OddsApiService {
       console.error(`[DEBUG] Error fetching odds for ${sportKey}:`, error.message);
       throw error;
     }
+  }
+
+  // 🆕 spreads 데이터 부족 시 전용 북메이커로 2차 API 호출
+  async fetchSpreadsData(sportKey, gamesWithoutSpreads = []) {
+    try {
+      if (!this.canMakeApiCall()) {
+        console.log('[Spreads] API 호출 한도 초과로 spreads 전용 호출 건너뜀');
+        return [];
+      }
+
+      // spreads 데이터를 많이 제공하는 북메이커들
+      const spreadsFriendlyBookmakers = [
+        'bovada',
+        'betonline.ag', 
+        'lowvig.ag',
+        'mybookie.ag',
+        'caesars',
+        'betus'
+      ];
+
+      console.log(`[Spreads] spreads 전용 API 호출 시작: ${sportKey} (${gamesWithoutSpreads.length}개 경기)`);
+      
+      this.trackApiCall();
+      
+      const params = new URLSearchParams({
+        apiKey: this.apiKey,
+        regions: 'us',
+        markets: 'spreads',  // spreads만 조회
+        bookmakers: spreadsFriendlyBookmakers.join(','),
+        oddsFormat: 'decimal',
+        dateFormat: 'iso'
+      });
+
+      const url = `${this.baseUrl}/${sportKey}/odds?${params}`;
+      console.log(`[Spreads] Fetching spreads from: ${url.replace(this.apiKey, '***')}`);
+      
+      const response = await axios.get(url, {
+        timeout: 30000,
+        headers: {
+          'User-Agent': 'LikeBetFair/1.0'
+        }
+      });
+      
+      if (response.status === 200) {
+        console.log(`[Spreads] Successfully fetched ${response.data.length} spreads data for ${sportKey}`);
+        return response.data;
+      } else {
+        throw new Error(`Spreads API 응답 오류: ${response.status}`);
+      }
+      
+    } catch (error) {
+      console.error(`[Spreads] Error fetching spreads for ${sportKey}:`, error.message);
+      return [];
+    }
+  }
+
+  // 🆕 게임에서 spreads 데이터가 있는지 확인
+  hasSpreadsData(game) {
+    if (!game.bookmakers || !Array.isArray(game.bookmakers)) {
+      return false;
+    }
+
+    return game.bookmakers.some(bookmaker => {
+      if (!bookmaker.markets || !Array.isArray(bookmaker.markets)) {
+        return false;
+      }
+      return bookmaker.markets.some(market => market.key === 'spreads');
+    });
   }
 }
 
