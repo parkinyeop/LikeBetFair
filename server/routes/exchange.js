@@ -86,7 +86,7 @@ async function processPartialMatching(orderData) {
     } else {
       // Lay 베팅: filledAmount = stake × (odds - 1) (리스크 금액)
       // ✅ Math.ceil 사용: Lay에게 유리하게 반올림 (1원 차이 방지)
-      actualFilledAmount = Math.ceil(matchAmount * (parseFloat(existingOrder.price) - 1));
+      actualFilledAmount = Math.round(matchAmount * (parseFloat(existingOrder.price) - 1));
     }
     
     const newFilledAmount = (existingOrder.filledAmount || 0) + actualFilledAmount;
@@ -118,8 +118,8 @@ async function processPartialMatching(orderData) {
     // 매칭 기록 생성
     // 🎯 Pot 계산: backStake + layStake
     // ✅ Lay Stake는 Math.ceil 사용 (1원 차이 방지)
-    const backStake = existingOrder.side === 'back' ? matchAmount : Math.ceil(matchAmount * (matchPrice - 1));
-    const layStake = existingOrder.side === 'lay' ? matchAmount : Math.ceil(matchAmount * (matchPrice - 1));
+    const backStake = existingOrder.side === 'back' ? matchAmount : Math.round(matchAmount * (matchPrice - 1));
+    const layStake = existingOrder.side === 'lay' ? matchAmount : Math.round(matchAmount * (matchPrice - 1));
     const potAmount = backStake + layStake;
 
     const matchRecord = await ExchangeOrderMatch.create({
@@ -233,7 +233,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
       }
       actualMatchAmount = Math.min(matchAmount, targetOrder.remainingAmount || targetOrder.amount);
       // ✅ Math.ceil 사용: Lay에게 유리하게 반올림 (1원 차이 방지)
-      stakeAmount = Math.ceil((parseFloat(adjustedPrice) - 1) * actualMatchAmount); // 리스크 금액 (환수율 적용된 배당율 사용)
+      stakeAmount = Math.round((parseFloat(adjustedPrice) - 1) * actualMatchAmount); // 리스크 금액 (환수율 적용된 배당율 사용)
     }
     
     if (actualMatchAmount <= 0) {
@@ -263,18 +263,17 @@ router.post('/match-order', verifyToken, async (req, res) => {
     const transaction = await sequelize.transaction();
     
     try {
-      // 사용자 잔고 확인 및 차감 (PaymentHistory 자동 기록)
-      await balanceService.deductBalance(
-        userId,
-        stakeAmount,
-        `익스체인지 매칭 배팅 차감: ${targetOrder.homeTeam} vs ${targetOrder.awayTeam}`,
-        `EXCHANGE_${Date.now()}`,
-        transaction
-      );
+      // 🆕 잔액 확인 먼저 (실제 차감은 나중에)
+      const user = await User.findByPk(userId, { transaction });
+      if (!user) {
+        throw new Error('사용자를 찾을 수 없습니다.');
+      }
       
-      console.log(`✅ 잔액 차감 완료: ${stakeAmount.toLocaleString()}원 (PaymentHistory 기록됨)`);
-    
-      // 🆕 매칭 주문 생성 (매치 배팅자용)
+      if (parseFloat(user.balance) < stakeAmount) {
+        throw new Error(`잔액 부족: 현재 ${parseFloat(user.balance).toLocaleString()}원, 필요 ${stakeAmount.toLocaleString()}원`);
+      }
+      
+      // 🆕 매칭 주문 먼저 생성 (relatedOrderId 저장을 위해)
       const matchOrder = await ExchangeOrder.create({
       userId: userId,
       gameId: targetOrder.gameId,
@@ -298,7 +297,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
       potentialWinnings: targetOrder.potentialWinnings,
       stakeAmount: stakeAmount, // 🆕 올바른 리스크 금액 사용
       // ✅ Math.ceil 사용: Back의 잠재 수익 계산 시 올림 (1원 차이 방지)
-      potentialProfit: matchType === 'back' ? Math.ceil((parseFloat(targetOrder.price) - 1) * actualMatchAmount) : actualMatchAmount, // ✅ 순수익 (담보금 제외)
+      potentialProfit: matchType === 'back' ? Math.round((parseFloat(targetOrder.price) - 1) * actualMatchAmount) : actualMatchAmount, // ✅ 순수익 (담보금 제외)
       autoSettlement: true,
       backOdds: targetOrder.backOdds,
       layOdds: targetOrder.layOdds,
@@ -310,6 +309,23 @@ router.post('/match-order', verifyToken, async (req, res) => {
       filledAmount: actualMatchAmount, // 🆕 매칭 주문의 체결된 금액
       partiallyFilled: false // 🆕 매칭 주문은 즉시 체결되므로 false
       }, { transaction });
+      
+      console.log(`✅ 매칭 주문 생성 완료: ${matchOrder.id}`);
+      
+      // 사용자 잔고 확인 및 차감 (PaymentHistory 자동 기록)
+      const { TransactionType } = await import('../types/paymentHistory.js');
+      await balanceService.deductBalance(
+        userId,
+        stakeAmount,
+        `익스체인지 매칭 배팅 차감: ${targetOrder.homeTeam} vs ${targetOrder.awayTeam}`,
+        {
+          transactionType: TransactionType.EXCHANGE_ORDER_DEDUCT,
+          relatedOrderId: matchOrder.id  // ✅ 매칭 주문 ID 저장
+        },
+        transaction
+      );
+      
+      console.log(`✅ 잔액 차감 완료: ${stakeAmount.toLocaleString()}원 (PaymentHistory에 주문 ID ${matchOrder.id} 기록됨)`);
 
     // 🆕 양방향 매칭 관계 설정 - targetOrder에도 matchedOrderId 설정
     targetOrder.matchedOrderId = matchOrder.id;
@@ -387,8 +403,8 @@ router.post('/match-order', verifyToken, async (req, res) => {
     // 🆕 ExchangeOrderMatch 레코드 생성
     // 🎯 Pot 계산: backStake + layStake
     // ✅ Lay Stake는 Math.ceil 사용 (1원 차이 방지)
-    const backStake = targetOrder.side === 'back' ? actualMatchAmount : Math.ceil(actualMatchAmount * (targetOrder.price - 1));
-    const layStake = targetOrder.side === 'lay' ? actualMatchAmount : Math.ceil(actualMatchAmount * (targetOrder.price - 1));
+    const backStake = targetOrder.side === 'back' ? actualMatchAmount : Math.round(actualMatchAmount * (targetOrder.price - 1));
+    const layStake = targetOrder.side === 'lay' ? actualMatchAmount : Math.round(actualMatchAmount * (targetOrder.price - 1));
     const potAmount = backStake + layStake;
 
     console.log('🆕 ExchangeOrderMatch 생성 시작:', {
@@ -598,7 +614,7 @@ router.post('/order', verifyToken, async (req, res) => {
     try {
       // 필요 금액 계산
       // ✅ Lay는 Math.ceil 사용 (1원 차이 방지)
-      const required = side === 'back' ? amount : Math.ceil((finalPrice - 1) * amount);
+      const required = side === 'back' ? amount : Math.round((finalPrice - 1) * amount);
       
       console.log('🔍 잔고 검증 상세:', { 
         userId,
@@ -607,15 +623,18 @@ router.post('/order', verifyToken, async (req, res) => {
         originalPrice: price,
         finalPrice: finalPrice,
         amount,
-        calculation: side === 'back' ? `${amount} (back)` : `Math.ceil((${finalPrice} - 1) * ${amount}) = ${Math.ceil((finalPrice - 1) * amount)} (lay)`
+        calculation: side === 'back' ? `${amount} (back)` : `Math.round((${finalPrice} - 1) * ${amount}) = ${Math.round((finalPrice - 1) * amount)} (lay)`
       });
       
       // 사용자 잔고 확인 및 차감 (PaymentHistory 자동 기록)
-      await balanceService.deductBalance(
+      const { TransactionType } = await import('../types/paymentHistory.js');
+      const deductResult = await balanceService.deductBalance(
         userId,
         required,
         `익스체인지 주문 생성: ${orderData.homeTeam} vs ${orderData.awayTeam} (${side})`,
-        null, // 주문 생성 시점에는 betId 없음
+        {
+          transactionType: TransactionType.EXCHANGE_ORDER_DEDUCT
+        },
         transaction
       );
       
@@ -672,9 +691,9 @@ router.post('/order', verifyToken, async (req, res) => {
       // ✅ Math.ceil 사용 (1원 차이 방지)
       const remainingStakeAmount = side === 'back'
         ? partialMatchResult.remainingAmount
-        : Math.ceil((finalPrice - 1) * partialMatchResult.remainingAmount);
+        : Math.round((finalPrice - 1) * partialMatchResult.remainingAmount);
       const remainingPotentialProfit = side === 'back'
-        ? Math.ceil((finalPrice - 1) * partialMatchResult.remainingAmount)
+        ? Math.round((finalPrice - 1) * partialMatchResult.remainingAmount)
         : partialMatchResult.remainingAmount;
 
       order = await ExchangeOrder.create({
@@ -692,6 +711,13 @@ router.post('/order', verifyToken, async (req, res) => {
         potentialProfit: remainingPotentialProfit,
         status: 'open'
       });
+      
+      // 🆕 PaymentHistory에 relatedOrderId 업데이트
+      await deductResult.paymentHistory.update(
+        { relatedOrderId: order.id },
+        { transaction }
+      );
+      console.log(`✅ PaymentHistory에 relatedOrderId 저장: ${order.id}`);
     }
     
     // 매칭된 부분에 대한 주문들 생성 및 매칭 기록 업데이트
@@ -706,7 +732,7 @@ router.post('/order', verifyToken, async (req, res) => {
       } else {
         // Lay 베팅: filledAmount = stake × (odds - 1) (리스크 금액)
         // ✅ Math.ceil 사용 (1원 차이 방지)
-        filledAmount = Math.ceil(match.matchAmount * (parseFloat(match.matchPrice) - 1));
+        filledAmount = Math.round(match.matchAmount * (parseFloat(match.matchPrice) - 1));
       }
       
       const matchedOrder = await ExchangeOrder.create({
@@ -718,9 +744,21 @@ router.post('/order', verifyToken, async (req, res) => {
         originalAmount: match.matchAmount,
         remainingAmount: 0,
         // ✅ Math.ceil 사용 (1원 차이 방지)
-        stakeAmount: side === 'back' ? match.matchAmount : Math.ceil((parseFloat(match.matchPrice) - 1) * match.matchAmount),
-        potentialProfit: side === 'back' ? Math.ceil((parseFloat(match.matchPrice) - 1) * match.matchAmount) : match.matchAmount // ✅ 순수익
+        stakeAmount: side === 'back' ? match.matchAmount : Math.round((parseFloat(match.matchPrice) - 1) * match.matchAmount),
+        potentialProfit: side === 'back' ? Math.round((parseFloat(match.matchPrice) - 1) * match.matchAmount) : match.matchAmount // ✅ 순수익
       }, { transaction });
+      
+      // 🆕 매칭된 부분도 PaymentHistory에 relatedOrderId 저장
+      // (전체 차감에서 부분 할당)
+      // Note: 차감은 전체 금액으로 한 번만 했으므로, 
+      // 첫 번째 매칭된 주문에만 relatedOrderId를 업데이트
+      if (createdMatchedOrders.length === 0) {
+        await deductResult.paymentHistory.update(
+          { relatedOrderId: matchedOrder.id },
+          { transaction }
+        );
+        console.log(`✅ PaymentHistory에 relatedOrderId 저장: ${matchedOrder.id} (매칭된 주문)`);
+      }
       
       // 매칭 기록 업데이트 (새 주문 ID 연결)
       await match.matchRecord.update({
@@ -1152,7 +1190,7 @@ async function cancelMatchedLayOrder(layOrder, transaction) {
   
   // ✅ 간단명료: 본인이 낸 담보금만 환불
   // ✅ Math.ceil 사용 (1원 차이 방지)
-  const refundAmount = layOrder.stakeAmount || Math.ceil((parseFloat(layOrder.price) - 1) * layOrder.amount);
+  const refundAmount = layOrder.stakeAmount || Math.round((parseFloat(layOrder.price) - 1) * layOrder.amount);
   
   console.log(`    💰 LAY 환불: ${refundAmount}원 (본인이 낸 담보금)`);
   
@@ -1251,7 +1289,7 @@ async function cancelOriginalOrder(order, transaction) {
   } else {
     // LAY: 담보금 환불
     // ✅ Math.ceil 사용 (1원 차이 방지)
-    refundAmount = order.stakeAmount || Math.ceil((parseFloat(order.price) - 1) * order.amount);
+    refundAmount = order.stakeAmount || Math.round((parseFloat(order.price) - 1) * order.amount);
     console.log(`    💰 LAY 환불: ${refundAmount}원 (본인이 낸 담보금)`);
   }
   
@@ -2074,8 +2112,8 @@ router.post('/match-order', verifyToken, async (req, res) => {
         sportKey: orderData.sportKey,
         selectionDetails: orderData.selectionDetails,
         // ✅ Math.ceil 사용 (1원 차이 방지)
-        stakeAmount: side === 'back' ? matchAmount : Math.ceil((parseFloat(finalPrice) - 1) * matchAmount),
-        potentialProfit: side === 'back' ? Math.ceil((parseFloat(finalPrice) - 1) * matchAmount) : matchAmount, // ✅ 순수익
+        stakeAmount: side === 'back' ? matchAmount : Math.round((parseFloat(finalPrice) - 1) * matchAmount),
+        potentialProfit: side === 'back' ? Math.round((parseFloat(finalPrice) - 1) * matchAmount) : matchAmount, // ✅ 순수익
         autoSettlement: true,
         // 🆕 스포츠북 배당율 정보 사용
         backOdds: orderData.backOdds,
@@ -2132,8 +2170,8 @@ router.post('/match-order', verifyToken, async (req, res) => {
         sportKey: orderData.sportKey,
         selectionDetails: orderData.selectionDetails,
         // ✅ Math.ceil 사용 (1원 차이 방지)
-        stakeAmount: side === 'back' ? remainingAmount : Math.ceil((parseFloat(finalPrice) - 1) * remainingAmount),
-        potentialProfit: side === 'back' ? Math.ceil((parseFloat(finalPrice) - 1) * remainingAmount) : remainingAmount, // ✅ 순수익
+        stakeAmount: side === 'back' ? remainingAmount : Math.round((parseFloat(finalPrice) - 1) * remainingAmount),
+        potentialProfit: side === 'back' ? Math.round((parseFloat(finalPrice) - 1) * remainingAmount) : remainingAmount, // ✅ 순수익
         autoSettlement: true,
         // 🆕 스포츠북 배당율 정보 사용
         backOdds: orderData.backOdds,
