@@ -74,7 +74,7 @@ export default function BetsTab() {
     {
       key: 'createdAt',
       label: '베팅 시간',
-      render: (value: string) => new Date(value).toLocaleString('ko-KR'),
+      render: (value: string) => new Date(value).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
       className: 'w-40'
     },
     {

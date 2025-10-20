@@ -75,7 +75,7 @@ export default function ProfileTab() {
         />
         <InfoField 
           label="최근 로그인" 
-          value={userData?.lastLogin ? new Date(userData.lastLogin).toLocaleString('ko-KR') : '정보 없음'} 
+          value={userData?.lastLogin ? new Date(userData.lastLogin).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '정보 없음'} 
         />
       </div>
 

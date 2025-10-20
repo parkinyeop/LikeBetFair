@@ -304,7 +304,7 @@ class MultibetSettlementService {
    */
   determineGameResult(gameResult, selection, validatedScore = null) {
     const { status, score } = gameResult;
-    const { team: selectedTeam } = selection;
+    const { team: selectedTeam, market } = selection;
 
     // 경기 취소/연기
     if (status === 'cancelled' || status === 'postponed') {
@@ -312,7 +312,7 @@ class MultibetSettlementService {
     }
 
     // ✅ 정책: result 필드 사용 금지 - 항상 스코어 기반 판정
-    console.log(`[MULTIBET] 스코어 기반 판정 시작 - status: ${status}`);
+    console.log(`[MULTIBET] 스코어 기반 판정 시작 - status: ${status}, market: ${market}`);
 
     // 스코어 기반 판정 (검증된 스코어 우선 사용)
     let actualHomeScore = null;
@@ -358,6 +358,11 @@ class MultibetSettlementService {
       return 'pending';
     }
 
+    // 🆕 총점(Under/Over) 베팅 처리
+    if (market === '총점' || market === 'totals') {
+      return this.determineTotalResult(selectedTeam, actualHomeScore, actualAwayScore);
+    }
+
     // 승부 판정
     const homeWon = actualHomeScore > actualAwayScore;
     const awayWon = actualAwayScore > actualHomeScore;
@@ -394,6 +399,49 @@ class MultibetSettlementService {
     }
 
     return 'pending';
+  }
+
+  /**
+   * 🆕 총점(Under/Over) 베팅 결과 판정
+   * @param {string} selectedTeam - 선택된 팀 (예: "Under 2", "Over 2.5")
+   * @param {number} homeScore - 홈팀 점수
+   * @param {number} awayScore - 어웨이팀 점수
+   * @returns {string} 베팅 결과 (won/lost/cancelled)
+   */
+  determineTotalResult(selectedTeam, homeScore, awayScore) {
+    const totalScore = homeScore + awayScore;
+    
+    // "Under 2", "Over 2.5" 형식에서 옵션과 포인트 추출
+    const match = selectedTeam.match(/^(Under|Over)\s+([\d.]+)$/);
+    if (!match) {
+      console.warn(`[MULTIBET] 총점 베팅 형식 오류: ${selectedTeam}`);
+      return 'cancelled';
+    }
+    
+    const option = match[1]; // "Under" 또는 "Over"
+    const point = parseFloat(match[2]); // 2 또는 2.5
+    
+    console.log(`[MULTIBET] 총점 베팅 판정: ${option} ${point}, 실제 총점: ${totalScore}`);
+    
+    // Push 조건 (총점 = 기준점)
+    if (totalScore === point) {
+      console.log(`[MULTIBET] Push 조건: 총점 ${totalScore} = 기준 ${point} → cancelled`);
+      return 'cancelled';
+    }
+    
+    // Under/Over 판정
+    if (option === 'Under') {
+      const result = totalScore < point ? 'won' : 'lost';
+      console.log(`[MULTIBET] Under ${point}: ${totalScore} < ${point} = ${result}`);
+      return result;
+    } else if (option === 'Over') {
+      const result = totalScore > point ? 'won' : 'lost';
+      console.log(`[MULTIBET] Over ${point}: ${totalScore} > ${point} = ${result}`);
+      return result;
+    }
+    
+    console.warn(`[MULTIBET] 알 수 없는 옵션: ${option}`);
+    return 'cancelled';
   }
   
   /**

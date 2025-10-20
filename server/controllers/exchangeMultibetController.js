@@ -166,11 +166,34 @@ class ExchangeMultibetController {
       
       // 6. 멀티배팅 주문 생성 (기존 ExchangeOrders 테이블 사용)
       console.log('🔍 [MultibetController] ExchangeOrder.create 시작...');
+      
+      // 🆕 단일 경기 멀티배팅인 경우 line과 selection 추출
+      let lineValue = 0;
+      let selectionValue = null;
+      
+      if (selections.length === 1) {
+        const firstSelection = selections[0];
+        
+        // "Under 2", "Over 2.5" 형식에서 line 추출
+        if (firstSelection.team || firstSelection.selection) {
+          const teamOrSelection = firstSelection.team || firstSelection.selection;
+          const match = teamOrSelection.match(/^(Under|Over)\s+([\d.]+)$/);
+          if (match) {
+            lineValue = parseFloat(match[2]); // 2 또는 2.5
+            selectionValue = teamOrSelection; // "Under 2"
+            console.log(`🔍 [MultibetController] line 추출 성공: ${lineValue}, selection: ${selectionValue}`);
+          } else {
+            selectionValue = teamOrSelection;
+            console.log(`🔍 [MultibetController] selection 설정: ${selectionValue}`);
+          }
+        }
+      }
+      
       const multibetOrder = await ExchangeOrder.create({
         userId,
         gameId: 'multibet_' + Date.now(), // 멀티배팅용 고유 ID
         market: 'multibet',
-        line: 0,
+        line: lineValue, // 🆕 단일 경기인 경우 line 저장
         // ⚠️ 중요: 멀티배팅은 항상 'back'으로 생성됩니다.
         // Lay 멀티배팅은 매칭을 통해서만 생성되며, 정산 시에는 ExchangeOrderMatch.originalSide를 사용하므로
         // 이 필드가 'back'이어도 정산에는 영향을 주지 않습니다.
@@ -178,6 +201,7 @@ class ExchangeMultibetController {
         price: adjustedTotalOdds, // ✅ 환수율 적용된 totalOdds 사용
         amount: stake,
         status: 'open',
+        selection: selectionValue, // 🆕 단일 경기인 경우 selection 저장
         stakeAmount: stake,
         potentialProfit: parseFloat((stake * adjustedTotalOdds - stake).toFixed(2)), // ✅ 환수율 적용된 수익 계산
         isMultibet: true,

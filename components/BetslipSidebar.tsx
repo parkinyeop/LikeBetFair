@@ -265,7 +265,14 @@ function MyBetsPanel() {
               try {
                 const dateObj = new Date(bet.createdAt);
                 dateStr = !isNaN(dateObj.getTime())
-                  ? dateObj.toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+                  ? dateObj.toLocaleString('ko-KR', { 
+                      year: 'numeric', 
+                      month: '2-digit', 
+                      day: '2-digit', 
+                      hour: '2-digit', 
+                      minute: '2-digit',
+                      timeZone: 'Asia/Seoul'
+                    })
                   : '날짜 정보 없음';
               } catch {
                 dateStr = '날짜 정보 없음';
@@ -461,7 +468,8 @@ function MyBetsPanel() {
                                         day: '2-digit',
                                         hour: '2-digit',
                                         minute: '2-digit',
-                                        hour12: false
+                                        hour12: false,
+                                        timeZone: 'Asia/Seoul'
                                       })}
                                     </div>
                                   )}

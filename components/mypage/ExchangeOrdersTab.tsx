@@ -87,7 +87,7 @@ export default function ExchangeOrdersTab() {
     {
       key: 'createdAt',
       label: '주문 시간',
-      render: (value: string) => new Date(value).toLocaleString('ko-KR'),
+      render: (value: string) => new Date(value).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
       className: 'w-40'
     },
     {

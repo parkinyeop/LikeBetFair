@@ -1188,7 +1188,8 @@ function OrderHistoryPanel() {
                                         day: '2-digit',
                                         hour: '2-digit',
                                         minute: '2-digit',
-                                        hour12: false
+                                        hour12: false,
+                                        timeZone: 'Asia/Seoul'
                                       })}
                                     </span>
                                   )}
@@ -1232,7 +1233,8 @@ function OrderHistoryPanel() {
                                   day: '2-digit',
                                   hour: '2-digit',
                                   minute: '2-digit',
-                                  hour12: false
+                                  hour12: false,
+                                  timeZone: 'Asia/Seoul'
                                 })}
                               </span>
                             )}
@@ -1400,7 +1402,7 @@ function OrderHistoryPanel() {
                             <span className="text-sm font-bold text-gray-800">#{order.id}</span>
                           </div>
                           <div className="text-xs text-gray-500 mt-1">
-                            <div>생성: {new Date(order.createdAt).toLocaleString('ko-KR')}</div>
+                            <div>생성: {new Date(order.createdAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</div>
                           </div>
                         </div>
                         

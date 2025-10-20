@@ -58,7 +58,7 @@ export default function PaymentsTab() {
     {
       key: 'paidAt',
       label: '일시',
-      render: (value: string) => new Date(value).toLocaleString('ko-KR'),
+      render: (value: string) => new Date(value).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
       className: 'w-40'
     },
     {

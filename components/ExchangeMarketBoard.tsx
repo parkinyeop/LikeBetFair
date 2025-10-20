@@ -398,6 +398,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                           return gameTime.toLocaleString('ko-KR', {
                             month: '2-digit',
                             day: '2-digit',
+                            timeZone: 'Asia/Seoul',
                             hour: '2-digit',
                             minute: '2-digit'
                           });
