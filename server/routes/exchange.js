@@ -126,19 +126,17 @@ async function processPartialMatching(orderData) {
       matchedAmount: matchAmount,
       matchedPrice: matchPrice,
       potAmount: potAmount,  // 🆕 Pot 저장
+      backStake: backStake,  // ✅ 직접 컬럼에 저장
+      layStake: layStake,    // ✅ 직접 컬럼에 저장
       originalSide: existingOrder.side,
       matchingSide: side,
       gameId,
       market,
       line,
       status: 'active',
-      settlementResult: {  // ✅ Pot 계산 근거 저장
-        backStake: backStake,
-        layStake: layStake,
+      settlementResult: {  // ✅ 추가 정보 (선택사항)
         potCalculation: `${backStake} + ${layStake} = ${potAmount}`,
-        createdAt: new Date(),
-        matchedAmount: matchAmount,
-        matchedPrice: matchPrice
+        createdAt: new Date()
       }
     });
     
@@ -410,19 +408,17 @@ router.post('/match-order', verifyToken, async (req, res) => {
       matchedAmount: actualMatchAmount,
       matchedPrice: targetOrder.price,
       potAmount: potAmount,  // 🆕 Pot 저장
+      backStake: backStake,  // ✅ DB 컬럼에 직접 저장
+      layStake: layStake,    // ✅ DB 컬럼에 직접 저장
       originalSide: targetOrder.side,
       matchingSide: matchType,
       gameId: targetOrder.gameId,
       market: targetOrder.market,
       line: targetOrder.line,
       status: 'active',
-      settlementResult: {  // ✅ Pot 계산 근거 저장
-        backStake: backStake,
-        layStake: layStake,
+      settlementResult: {  // ✅ 추가 정보만 JSONB에 저장
         potCalculation: `${backStake} + ${layStake} = ${potAmount}`,
-        createdAt: new Date(),
-        matchedAmount: actualMatchAmount,
-        matchedPrice: targetOrder.price
+        createdAt: new Date()
       }
     }, { transaction });
     

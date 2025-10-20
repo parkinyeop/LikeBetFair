@@ -45,6 +45,18 @@ const ExchangeOrderMatch = sequelize.define('ExchangeOrderMatch', {
     defaultValue: 0,
     comment: 'Pot 금액 (backStake + layStake)'
   },
+  backStake: {
+    type: DataTypes.DECIMAL(15, 2),
+    allowNull: false,
+    defaultValue: 0,
+    comment: 'Back 주문 담보금'
+  },
+  layStake: {
+    type: DataTypes.DECIMAL(15, 2),
+    allowNull: false,
+    defaultValue: 0,
+    comment: 'Lay 주문 담보금'
+  },
   originalSide: {
     type: DataTypes.ENUM('back', 'lay'),
     allowNull: false,
