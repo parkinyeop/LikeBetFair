@@ -519,7 +519,7 @@ export default function BetslipSidebar({
   onTabChange, 
   onBettingAreaSelect 
 }: BetslipSidebarProps) {
-  const { isLoggedIn, balance, forceRefreshBalance } = useAuth();
+  const { isLoggedIn } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleTabChange = (newTab: 'betslip' | 'mybets') => {
@@ -548,16 +548,6 @@ export default function BetslipSidebar({
     <aside className="w-80 bg-white text-black p-4 space-y-4 border-l border-gray-200 h-full flex flex-col min-h-0 overflow-y-auto">
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-lg font-bold">BET</h2>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-blue-600">Balance: {balance !== null ? Math.round(Number(balance)).toLocaleString() : '-'} KRW</span>
-          <button
-            onClick={forceRefreshBalance}
-            className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-            title="Sync Balance"
-          >
-            🔄
-          </button>
-        </div>
       </div>
       <div className="flex space-x-2 mb-2">
         <button

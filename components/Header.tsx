@@ -17,7 +17,7 @@ export default function Header() {
   const [showMyPage, setShowMyPage] = useState(false);
   const [siteName, setSiteName] = useState("Lbetfair"); // 기본값
   const [siteDescription, setSiteDescription] = useState("스포츠 베팅 플랫폼"); // 기본값
-  const { isLoggedIn, username, logout, isAdmin, adminLevel } = useAuth();
+  const { isLoggedIn, username, logout, isAdmin, adminLevel, balance, forceRefreshBalance } = useAuth();
 
   // 현재 경로에 따라 카테고리 설정
   useEffect(() => {
@@ -169,6 +169,24 @@ export default function Header() {
                   <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
                 </svg>
               </button>
+              
+              {/* 잔액 표시 */}
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-white">Balance:</span>
+                <span className="text-sm font-bold text-white">
+                  {balance !== null ? Math.round(Number(balance)).toLocaleString() : '-'}
+                </span>
+                <span className="text-xs text-white">KRW</span>
+                <button
+                  onClick={forceRefreshBalance}
+                  className="ml-1 text-white hover:text-blue-200 transition-colors"
+                  title="잔액 새로고침"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+              </div>
               
               <button
                 onClick={logout}
