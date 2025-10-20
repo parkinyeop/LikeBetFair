@@ -39,6 +39,12 @@ const ExchangeOrderMatch = sequelize.define('ExchangeOrderMatch', {
     allowNull: false,
     comment: '매칭된 배당률'
   },
+  potAmount: {
+    type: DataTypes.DECIMAL(15, 2),
+    allowNull: true,
+    defaultValue: 0,
+    comment: 'Pot 금액 (backStake + layStake)'
+  },
   originalSide: {
     type: DataTypes.ENUM('back', 'lay'),
     allowNull: false,

@@ -115,11 +115,17 @@ async function processPartialMatching(orderData) {
     });
     
     // 매칭 기록 생성
+    // 🎯 Pot 계산: backStake + layStake
+    const backStake = existingOrder.side === 'back' ? matchAmount : Math.floor(matchAmount * (matchPrice - 1));
+    const layStake = existingOrder.side === 'lay' ? matchAmount : Math.floor(matchAmount * (matchPrice - 1));
+    const potAmount = backStake + layStake;
+    
     const matchRecord = await ExchangeOrderMatch.create({
       originalOrderId: existingOrder.id,
       matchingOrderId: null, // 나중에 새 주문 ID로 업데이트
       matchedAmount: matchAmount,
       matchedPrice: matchPrice,
+      potAmount: potAmount,  // 🆕 Pot 저장
       originalSide: existingOrder.side,
       matchingSide: side,
       gameId,
@@ -369,11 +375,17 @@ router.post('/match-order', verifyToken, async (req, res) => {
     });
 
     // 🆕 ExchangeOrderMatch 레코드 생성
+    // 🎯 Pot 계산: backStake + layStake
+    const backStake = targetOrder.side === 'back' ? actualMatchAmount : Math.floor(actualMatchAmount * (targetOrder.price - 1));
+    const layStake = targetOrder.side === 'lay' ? actualMatchAmount : Math.floor(actualMatchAmount * (targetOrder.price - 1));
+    const potAmount = backStake + layStake;
+    
     console.log('🆕 ExchangeOrderMatch 생성 시작:', {
       originalOrderId: targetOrder.id,
       matchingOrderId: matchOrder.id,
       matchedAmount: actualMatchAmount,
       matchedPrice: targetOrder.price,
+      potAmount: potAmount,
       originalSide: targetOrder.side,
       matchingSide: matchType,
       gameId: targetOrder.gameId,
@@ -387,6 +399,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
       matchingOrderId: parseInt(matchOrder.id), // 🆕 정수로 변환
       matchedAmount: actualMatchAmount,
       matchedPrice: targetOrder.price,
+      potAmount: potAmount,  // 🆕 Pot 저장
       originalSide: targetOrder.side,
       matchingSide: matchType,
       gameId: targetOrder.gameId,

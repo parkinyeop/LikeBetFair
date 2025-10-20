@@ -1309,17 +1309,24 @@ function OrderHistoryPanel() {
                         
                         // ✅ 익스체인지 정산 판정 (담보금 미리 차감 방식)
                         const isWin = profit > 0;
-                        const isRefund = Math.abs(profit - stakeAmount) < 1;
-                        const isLoss = profit === 0 && !isRefund; // 0원 = 패배
+                        const isFullRefund = Math.abs(profit - stakeAmount) < 1;
+                        const isLoss = profit <= 0 && !isFullRefund; // 0원 이하 = 패배
+                        
+                        // 부분 환불 판정 (실제 수익이 음수이지만 전체 배팅금액보다 적게 손실)
+                        const isPartialRefund = profit < 0 && Math.abs(profit) < stakeAmount;
                         
                         return (
                           <div className="flex items-center space-x-2">
                             <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                               isWin ? 'bg-green-100 text-green-700' :
                               isLoss ? 'bg-red-100 text-red-700' :
+                              isPartialRefund ? 'bg-yellow-100 text-yellow-700' :
                               'bg-gray-100 text-gray-700'
                             }`}>
-                              {isWin ? '✅ 승리' : isLoss ? '❌ 패배' : '✅ 환불'}
+                              {isWin ? '✅ 승리' : 
+                               isLoss ? '❌ 패배' : 
+                               isPartialRefund ? '🔄 부분환불' : 
+                               '✅ 환불'}
                             </span>
                           </div>
                         );
@@ -1605,14 +1612,15 @@ function OrderHistoryPanel() {
                           // - actualProfit = 0: 패배 (담보금 못 돌려받음)
                           // - actualProfit = stakeAmount: 환불 (담보금만 반환)
                           const isWin = actualProfit > 0;
-                          const isRefund = Math.abs(actualProfit - stakeAmount) < 1; // 환불 (거의 없음)
-                          const isLoss = actualProfit === 0 && !isRefund; // 0원 = 패배
-                          const isDraw = false; // 익스체인지에는 무승부 없음
+                          const isFullRefund = Math.abs(actualProfit - stakeAmount) < 1; // 환불 (거의 없음)
+                          const isLoss = actualProfit <= 0 && !isFullRefund; // 0원 이하 = 패배
+                          const isPartialRefund = actualProfit < 0 && Math.abs(actualProfit) < stakeAmount;
                           
                           return (
                             <div className={`p-3 rounded-lg border ${
                               isWin ? 'bg-green-50 border-green-200' :
                               isLoss ? 'bg-red-50 border-red-200' :
+                              isPartialRefund ? 'bg-yellow-50 border-yellow-200' :
                               'bg-gray-50 border-gray-200'
                             }`}>
                               <div className="flex justify-between items-center mb-2">
@@ -1620,9 +1628,13 @@ function OrderHistoryPanel() {
                                 <span className={`text-xs font-bold px-2 py-1 rounded-full ${
                                   isWin ? 'bg-green-100 text-green-700' :
                                   isLoss ? 'bg-red-100 text-red-700' :
+                                  isPartialRefund ? 'bg-yellow-100 text-yellow-700' :
                                   'bg-gray-100 text-gray-700'
                                 }`}>
-                                  {isWin ? '✅ 승리' : isLoss ? '❌ 패배' : '➖ 무승부'}
+                                  {isWin ? '✅ 승리' : 
+                                   isLoss ? '❌ 패배' : 
+                                   isPartialRefund ? '🔄 부분환불' : 
+                                   '✅ 환불'}
                                 </span>
                               </div>
                               
