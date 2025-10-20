@@ -209,12 +209,12 @@ async function resettleOrder(order, transaction) {
       } else if (currentSide === 'lay') {
         stake = parseFloat(match.layStake);
         if (correctResult === 'won') {
-          // Lay 입장에서 won은 Back이 진 것 (Lay 승리)
-          // 실제로는 Back이 진 경우이므로 Lay가 Pot을 가져감
-          profit = parseFloat(match.potAmount);
-        } else if (correctResult === 'lost') {
-          // Lay 입장에서 lost는 Back이 이긴 것 (Lay 패배)
+          // correctResult는 Back 기준 결과
+          // Back이 이기면 Lay는 패배
           profit = 0;
+        } else if (correctResult === 'lost') {
+          // Back이 지면 Lay가 승리하여 Pot을 가져감
+          profit = parseFloat(match.potAmount);
         } else if (correctResult === 'cancelled') {
           // Push면 stake 환불
           profit = stake;
