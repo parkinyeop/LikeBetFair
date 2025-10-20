@@ -511,11 +511,14 @@ function OrderPanel() {
                     if (value === '' || /^\d*$/.test(value)) {
                       let numValue = value === '' ? 0 : parseInt(value);
                       
+                      // 🆕 10원 단위로 반올림
+                      numValue = Math.round(numValue / 10) * 10;
+                      
                       if (isMatchMode) {
                         // 매칭 모드에서 최대 리스크 금액 초과 시 제한
                         const maxRiskAmount = getAvailableMatchAmount();
                         if (numValue > maxRiskAmount) {
-                          numValue = Math.floor(maxRiskAmount);
+                          numValue = Math.floor(maxRiskAmount / 10) * 10; // 10원 단위로 내림
                         }
                         setForm(f => ({ ...f, amount: numValue }));
                       } else {
@@ -523,7 +526,7 @@ function OrderPanel() {
                       }
                     }
                   }}
-                  placeholder={isMatchMode ? "원하는 금액 입력" : "베팅 금액 입력"}
+                  placeholder={isMatchMode ? "원하는 금액 입력 (10원 단위)" : "베팅 금액 입력 (10원 단위)"}
                   className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 />
                 {/* 매칭 모드에서 빠른 금액 선택 버튼 */}
@@ -534,7 +537,7 @@ function OrderPanel() {
                         key={ratio}
                         onClick={() => {
                           const maxAmount = getAvailableMatchAmount();
-                          const quickAmount = Math.floor(maxAmount * ratio);
+                          const quickAmount = Math.floor(maxAmount * ratio / 10) * 10; // 🆕 10원 단위로 내림
                           setForm(f => ({ ...f, amount: quickAmount }));
                         }}
                         className="flex-1 py-1 px-2 text-xs bg-blue-100 hover:bg-blue-200 rounded text-blue-700"

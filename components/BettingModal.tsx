@@ -58,8 +58,16 @@ export default function BettingModal({ isOpen, onClose, onConfirm, selection }: 
       return;
     }
 
-    if (stake < 1000) {
-      setError('Minimum bet amount is 1,000 KRW.');
+    if (stake < 10) {
+      setError('Minimum bet amount is 10 KRW.');
+      return;
+    }
+
+    // 🆕 10원 단위가 아니면 반올림
+    const roundedStake = Math.round(stake / 10) * 10;
+    if (roundedStake !== stake) {
+      setError(`Amount will be rounded to ${roundedStake.toLocaleString()} KRW (10 KRW unit).`);
+      setAmount(roundedStake.toString());
       return;
     }
 
@@ -123,10 +131,10 @@ export default function BettingModal({ isOpen, onClose, onConfirm, selection }: 
               type="number"
               value={amount}
               onChange={(e) => handleAmountChange(e.target.value)}
-              placeholder="Enter bet amount"
+              placeholder="Enter bet amount (10 KRW unit)"
               className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              min="1000"
-              step="1000"
+              min="10"
+              step="10"
             />
             {error && (
               <p className="text-red-500 text-sm mt-1">{error}</p>
