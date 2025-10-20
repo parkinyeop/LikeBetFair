@@ -31,6 +31,9 @@ export const TransactionType = {
   EXCHANGE_MULTIBET_DEDUCT: 'EXCHANGE_MULTIBET_DEDUCT',     // 익스체인지 멀티베팅 차감
   EXCHANGE_MULTIBET_SETTLEMENT: 'EXCHANGE_MULTIBET_SETTLEMENT', // 익스체인지 멀티베팅 정산
 
+  // 수수료
+  EXCHANGE_COMMISSION: 'EXCHANGE_COMMISSION',               // 익스체인지 수수료
+
   // 기타
   INITIAL_BALANCE: 'INITIAL_BALANCE',                       // 초기 잔액
   ROLLBACK_FIX: 'ROLLBACK_FIX',                             // 롤백/수정 거래
@@ -71,6 +74,7 @@ export const TransactionTypeLabels = {
   [TransactionType.EXCHANGE_SETTLEMENT]: '익스체인지 정산',
   [TransactionType.EXCHANGE_MULTIBET_DEDUCT]: '익스체인지 멀티베팅 차감',
   [TransactionType.EXCHANGE_MULTIBET_SETTLEMENT]: '익스체인지 멀티베팅 정산',
+  [TransactionType.EXCHANGE_COMMISSION]: '익스체인지 수수료',
   [TransactionType.INITIAL_BALANCE]: '초기 잔액',
   [TransactionType.ROLLBACK_FIX]: '롤백/수정',
   [TransactionType.MANUAL_ADJUSTMENT]: '수동 조정',

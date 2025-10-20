@@ -676,10 +676,41 @@ class MultibetSettlementService {
         return;
       }
 
-      // 2단계: 수익 계산 (성능 측정)
+      // 2단계: 수익 계산 및 매치 정보 수집 (성능 측정)
       const profitStartTime = Date.now();
       const profit = await this.calculateProfit(order, result);
-      console.log(`⏱️ 수익 계산 완료: ${Date.now() - profitStartTime}ms`);
+
+      // 🎯 매치 정보 수집 (Pot 정보 추적용)
+      const matches = await ExchangeOrderMatch.findAll({
+        where: {
+          [Op.or]: [
+            { originalOrderId: order.id },
+            { matchingOrderId: order.id }
+          ]
+        },
+        transaction
+      });
+
+      // Pot 정보 집계
+      const potInfo = {
+        totalPot: 0,
+        matches: []
+      };
+
+      for (const match of matches) {
+        const potAmount = Number(match.potAmount || 0);
+        potInfo.totalPot += potAmount;
+        potInfo.matches.push({
+          matchId: match.id,
+          potAmount: potAmount,
+          matchedAmount: match.matchedAmount,
+          matchedPrice: match.matchedPrice,
+          originalSide: match.originalSide,
+          matchingSide: match.matchingSide
+        });
+      }
+
+      console.log(`⏱️ 수익 계산 완료: ${Date.now() - profitStartTime}ms (Pot 총액: ${potInfo.totalPot.toLocaleString()}원)`);
 
       // 🎯 3단계: actualProfit = Pot 획득 금액 (담보금 포함)
       let actualProfit = Math.round(parseFloat(profit) || 0);
@@ -722,6 +753,10 @@ class MultibetSettlementService {
 
       // 6단계: 데이터베이스 업데이트 (병렬 실행 + 성능 측정)
       const saveStartTime = Date.now();
+
+      // ✅ TransactionType import
+      const { TransactionType } = await import('../types/paymentHistory.js');
+
       await Promise.all([
         user.update({ balance: newBalance }, { transaction }),
         PaymentHistory.create({
@@ -730,6 +765,31 @@ class MultibetSettlementService {
           amount: actualProfit,  // ✅ Pot 획득 금액
           balanceAfter: newBalance,
           memo: memo,
+          transactionType: TransactionType.EXCHANGE_MULTIBET_SETTLEMENT,
+          status: 'completed',
+          relatedOrderId: order.id,
+          metadata: {
+            // 🎯 Pot 정보 추적
+            totalPot: potInfo.totalPot,
+            actualProfit: actualProfit,
+            result: result,
+            side: order.side,
+            commissionAmount: commissionAmount,
+
+            // 매치 상세 정보
+            matches: potInfo.matches,
+            matchCount: potInfo.matches.length,
+
+            // 주문 정보
+            orderId: order.id,
+            isMultibet: order.isMultibet,
+            selectionCount: order.selectionCount,
+            totalOdds: order.totalOdds,
+
+            // 정산 결과 정보
+            settlementReason: settlementResult.reason,
+            gameResults: settlementResult.summary
+          },
           paidAt: new Date()
         }, { transaction })
       ]);
@@ -750,6 +810,15 @@ class MultibetSettlementService {
           amount: -commissionAmount,
           memo: `익스체인지 수수료 (상대 담보금 기준)`,
           balanceAfter: newBalance,
+          transactionType: 'EXCHANGE_COMMISSION',  // ✅ 수수료 타입
+          status: 'completed',
+          relatedOrderId: order.id,
+          metadata: {
+            orderId: order.id,
+            commissionAmount: commissionAmount,
+            totalPot: potInfo.totalPot,
+            side: order.side
+          },
           paidAt: new Date()
         }, { transaction });
         console.log(`⏱️ 수수료 차감 기록 완료: -${commissionAmount}원`);
