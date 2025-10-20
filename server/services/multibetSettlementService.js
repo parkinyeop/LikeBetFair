@@ -8,6 +8,7 @@ import createScriptSequelize from '../config/scriptDatabase.js';
 import settlementValidation from '../utils/settlementValidation.js';
 import GameResultQuery from '../utils/gameResultQuery.js';
 import { getLocationConfig } from '../config/gameResultQuery.js';
+import { getSettlementWaitHours } from '../config/settlementConfig.js';
 
 // 스크립트 전용 Sequelize 인스턴스 생성
 const sequelize = createScriptSequelize();
@@ -311,6 +312,23 @@ class MultibetSettlementService {
       return 'cancelled';
     }
 
+    // 경기가 finished 상태가 아니면 pending
+    if (status !== 'finished') {
+      return 'pending';
+    }
+
+    // 🛡️ 안전장치: 경기 시작 후 일정 시간 경과 확인 (스포츠별)
+    const requiredHours = getSettlementWaitHours(gameResult.sportKey);
+    
+    const commenceTime = new Date(gameResult.commenceTime);
+    const now = new Date();
+    const hoursSinceStart = (now - commenceTime) / (1000 * 60 * 60);
+    
+    if (hoursSinceStart < requiredHours) {
+      console.log(`[정산 대기] 경기 시작 후 ${hoursSinceStart.toFixed(1)}시간 - ${requiredHours}시간 대기 (${gameResult.sportKey})`);
+      return 'pending';
+    }
+
     // ✅ 정책: result 필드 사용 금지 - 항상 스코어 기반 판정
     console.log(`[MULTIBET] 스코어 기반 판정 시작 - status: ${status}, market: ${market}`);
 
@@ -368,11 +386,14 @@ class MultibetSettlementService {
     const awayWon = actualAwayScore > actualHomeScore;
     const isDraw = actualHomeScore === actualAwayScore;
 
-    // ✅ Draw 선택 처리 (Draw, 무승부 등)
-    if (selectedTeam === 'Draw' || selectedTeam === '무승부') {
+    // ✅ Draw 선택 처리 (Draw, 무승부 등) - 대소문자 무관
+    const selectedTeamLower = selectedTeam?.toLowerCase() || '';
+    if (selectedTeamLower === 'draw' || selectedTeam === '무승부' || selectedTeamLower === 'x') {
       if (isDraw) {
+        console.log(`[승/패 판정] Draw 선택 맞음 (${actualHomeScore}-${actualAwayScore}) → won`);
         return 'won';
       } else {
+        console.log(`[승/패 판정] Draw 선택 틀림 (${actualHomeScore}-${actualAwayScore}) → lost`);
         return 'lost';
       }
     }

@@ -163,7 +163,7 @@ function normalizeTeamNameForComparison(teamName) {
     .replace(/sporting$/, '')
     .replace(/real$/, '')
     .replace(/atletico$/, '')
-    .replace(/atletico$/, '')
+    .replace(/^deportivo/, '')  // ✅ 앞에 있는 deportivo 제거
     .replace(/deportivo$/, '')
     .replace(/club$/, '')
     .replace(/association$/, '')

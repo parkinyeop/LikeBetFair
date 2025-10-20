@@ -12,6 +12,7 @@ import { normalizeTeamName, normalizeTeamNameForComparison, normalizeCategory, n
 import { ADMIN_CONFIG } from '../config/centralizedConfig.js';
 import settlementValidation from '../utils/settlementValidation.js';
 import { isGameCancelledOrPostponed, isGameFinished, isGamePending } from '../utils/gameStatusHelpers.js';
+import { getSettlementWaitHours } from '../config/settlementConfig.js';
 
 // 배당률 제공 카테고리만 허용 (gameResultService와 동일하게 유지)
 const allowedCategories = ['baseball', 'soccer', 'basketball'];
@@ -875,8 +876,26 @@ class BetResultService {
     }
 
     // 🟢 3순위: 경기 종료 (결과 판정 - 스코어 확인 필수)
-    // ✅ status가 finished이고 스코어가 있으면 스코어로 직접 계산
-    if (isGameFinished(gameResult) && gameResult.score && Array.isArray(gameResult.score) && gameResult.score.length >= 2) {
+    // ✅ status가 finished인지 확인
+    if (!isGameFinished(gameResult)) {
+      return 'pending';
+    }
+
+    // 🛡️ 안전장치: 경기 시작 후 일정 시간 경과 확인 (스포츠별)
+    // 이유: API가 경기 중간 점수를 finished로 잘못 반환하는 경우 방지
+    const requiredHours = getSettlementWaitHours(gameResult.sportKey);
+    
+    const commenceTime = new Date(gameResult.commenceTime);
+    const now = new Date();
+    const hoursSinceStart = (now - commenceTime) / (1000 * 60 * 60);
+    
+    if (hoursSinceStart < requiredHours) {
+      console.log(`[정산 대기] 경기 시작 후 ${hoursSinceStart.toFixed(1)}시간 - ${requiredHours}시간 대기 (${gameResult.sportKey})`);
+      return 'pending';
+    }
+
+    // ✅ 스코어가 있으면 스코어로 직접 계산
+    if (gameResult.score && Array.isArray(gameResult.score) && gameResult.score.length >= 2) {
       const homeScoreData = gameResult.score.find(s => s.name === gameResult.homeTeam);
       const awayScoreData = gameResult.score.find(s => s.name === gameResult.awayTeam);
       
@@ -976,7 +995,23 @@ class BetResultService {
     }
 
     // 🟢 3순위: 경기 종료 (결과 판정 - 스코어 확인 필수)
-    if (!isGameFinished(gameResult) || !gameResult.score || !Array.isArray(gameResult.score) || gameResult.score.length < 2) {
+    if (!isGameFinished(gameResult)) {
+      return 'pending';
+    }
+
+    // 🛡️ 안전장치: 경기 시작 후 일정 시간 경과 확인 (스포츠별)
+    const requiredHours = getSettlementWaitHours(gameResult.sportKey);
+    
+    const commenceTime = new Date(gameResult.commenceTime);
+    const now = new Date();
+    const hoursSinceStart = (now - commenceTime) / (1000 * 60 * 60);
+    
+    if (hoursSinceStart < requiredHours) {
+      console.log(`[정산 대기] 경기 시작 후 ${hoursSinceStart.toFixed(1)}시간 - ${requiredHours}시간 대기 (${gameResult.sportKey})`);
+      return 'pending';
+    }
+
+    if (!gameResult.score || !Array.isArray(gameResult.score) || gameResult.score.length < 2) {
       console.warn(`[언더/오버 판정] 경기 종료 상태이지만 스코어 없음 - pending 유지`);
       return 'pending';
     }
@@ -1057,7 +1092,23 @@ class BetResultService {
     }
 
     // 🟢 3순위: 경기 종료 (결과 판정 - 스코어 확인 필수)
-    if (!isGameFinished(gameResult) || !gameResult.score || !Array.isArray(gameResult.score) || gameResult.score.length < 2) {
+    if (!isGameFinished(gameResult)) {
+      return 'pending';
+    }
+
+    // 🛡️ 안전장치: 경기 시작 후 일정 시간 경과 확인 (스포츠별)
+    const requiredHours = getSettlementWaitHours(gameResult.sportKey);
+    
+    const commenceTime = new Date(gameResult.commenceTime);
+    const now = new Date();
+    const hoursSinceStart = (now - commenceTime) / (1000 * 60 * 60);
+    
+    if (hoursSinceStart < requiredHours) {
+      console.log(`[정산 대기] 경기 시작 후 ${hoursSinceStart.toFixed(1)}시간 - ${requiredHours}시간 대기 (${gameResult.sportKey})`);
+      return 'pending';
+    }
+
+    if (!gameResult.score || !Array.isArray(gameResult.score) || gameResult.score.length < 2) {
       console.warn(`[핸디캡 판정] 경기 종료 상태이지만 스코어 없음 - pending 유지`);
       return 'pending';
     }

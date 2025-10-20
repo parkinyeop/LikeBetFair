@@ -429,7 +429,8 @@ function normalizeTeamNameForComparison(team) {
   // 4. 확장명 및 전치사 제거
   normalized = normalized
     .replace(/\b(club|clube|fc|sc|cf|ac)\b/gi, '')
-    .replace(/\b(do|de|da|del|dels|de la|los|las|el|la)\b/gi, '');
+    .replace(/\b(do|de|da|del|dels|de la|los|las|el|la)\b/gi, '')
+    .replace(/\b(deportivo)\b/gi, '');  // deportivo 제거 (접두사/접미사 모두)
   
   // 5. 모든 공백 및 특수문자 제거
   normalized = normalized

@@ -968,10 +968,6 @@ class ExchangeSettlementService {
     // ✅ 정책: result 필드 사용 금지 - score로 판정
     const { homeTeam, awayTeam, score, homeScore, awayScore } = gameResult;
     
-    // 선택한 팀이 홈팀인지 확인
-    const isHomeSelection = selection.includes(homeTeam) || 
-                           selection.toLowerCase().includes('home');
-    
     // 스코어에서 홈/어웨이 점수 추출
     let actualHomeScore = homeScore;
     let actualAwayScore = awayScore;
@@ -1007,10 +1003,24 @@ class ExchangeSettlementService {
     const awayWin = actualAwayScore > actualHomeScore;
     const isDraw = actualHomeScore === actualAwayScore;
     
-    console.log(`      선택팀: ${selection}, 홈팀여부: ${isHomeSelection}, 스코어: ${actualHomeScore}-${actualAwayScore}`);
+    // ✅ Draw 선택 처리 (대소문자 무관)
+    const selectionLower = selection?.toLowerCase() || '';
+    const isDrawSelection = selectionLower === 'draw' || selection === '무승부' || selectionLower === 'x';
     
+    // 선택한 팀이 홈팀인지 확인
+    const isHomeSelection = selection.includes(homeTeam) || 
+                           selection.toLowerCase().includes('home');
+    
+    console.log(`      선택팀: ${selection}, 홈팀여부: ${isHomeSelection}, Draw선택: ${isDrawSelection}, 스코어: ${actualHomeScore}-${actualAwayScore}`);
+    
+    // ✅ Draw 선택인 경우
+    if (isDrawSelection) {
+      return isDraw; // 무승부면 승리, 아니면 패배
+    }
+    
+    // ✅ 무승부인데 Draw 선택이 아니면 패배
     if (isDraw) {
-      return false; // 무승부는 일반적으로 패배 처리
+      return false;
     }
     
     if (isHomeSelection) {
