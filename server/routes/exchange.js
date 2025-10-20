@@ -119,7 +119,7 @@ async function processPartialMatching(orderData) {
     const backStake = existingOrder.side === 'back' ? matchAmount : Math.floor(matchAmount * (matchPrice - 1));
     const layStake = existingOrder.side === 'lay' ? matchAmount : Math.floor(matchAmount * (matchPrice - 1));
     const potAmount = backStake + layStake;
-    
+
     const matchRecord = await ExchangeOrderMatch.create({
       originalOrderId: existingOrder.id,
       matchingOrderId: null, // 나중에 새 주문 ID로 업데이트
@@ -131,7 +131,15 @@ async function processPartialMatching(orderData) {
       gameId,
       market,
       line,
-      status: 'active'
+      status: 'active',
+      settlementResult: {  // ✅ Pot 계산 근거 저장
+        backStake: backStake,
+        layStake: layStake,
+        potCalculation: `${backStake} + ${layStake} = ${potAmount}`,
+        createdAt: new Date(),
+        matchedAmount: matchAmount,
+        matchedPrice: matchPrice
+      }
     });
     
     matches.push({
@@ -379,13 +387,15 @@ router.post('/match-order', verifyToken, async (req, res) => {
     const backStake = targetOrder.side === 'back' ? actualMatchAmount : Math.floor(actualMatchAmount * (targetOrder.price - 1));
     const layStake = targetOrder.side === 'lay' ? actualMatchAmount : Math.floor(actualMatchAmount * (targetOrder.price - 1));
     const potAmount = backStake + layStake;
-    
+
     console.log('🆕 ExchangeOrderMatch 생성 시작:', {
       originalOrderId: targetOrder.id,
       matchingOrderId: matchOrder.id,
       matchedAmount: actualMatchAmount,
       matchedPrice: targetOrder.price,
       potAmount: potAmount,
+      backStake: backStake,
+      layStake: layStake,
       originalSide: targetOrder.side,
       matchingSide: matchType,
       gameId: targetOrder.gameId,
@@ -393,7 +403,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
       line: targetOrder.line,
       status: 'active'
     });
-    
+
       const exchangeOrderMatch = await ExchangeOrderMatch.create({
       originalOrderId: parseInt(targetOrder.id), // 🆕 정수로 변환
       matchingOrderId: parseInt(matchOrder.id), // 🆕 정수로 변환
@@ -405,7 +415,15 @@ router.post('/match-order', verifyToken, async (req, res) => {
       gameId: targetOrder.gameId,
       market: targetOrder.market,
       line: targetOrder.line,
-      status: 'active'
+      status: 'active',
+      settlementResult: {  // ✅ Pot 계산 근거 저장
+        backStake: backStake,
+        layStake: layStake,
+        potCalculation: `${backStake} + ${layStake} = ${potAmount}`,
+        createdAt: new Date(),
+        matchedAmount: actualMatchAmount,
+        matchedPrice: targetOrder.price
+      }
     }, { transaction });
     
       console.log('✅ ExchangeOrderMatch 생성 완료:', exchangeOrderMatch.id);

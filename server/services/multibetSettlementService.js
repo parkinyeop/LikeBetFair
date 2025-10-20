@@ -694,15 +694,42 @@ class MultibetSettlementService {
       // Pot 정보 집계
       const potInfo = {
         totalPot: 0,
+        totalBackStake: 0,
+        totalLayStake: 0,
         matches: []
       };
 
       for (const match of matches) {
         const potAmount = Number(match.potAmount || 0);
+
+        // ✅ settlementResult에서 backStake/layStake 추출 (있으면)
+        let backStake = 0;
+        let layStake = 0;
+
+        if (match.settlementResult) {
+          backStake = Number(match.settlementResult.backStake || 0);
+          layStake = Number(match.settlementResult.layStake || 0);
+        } else {
+          // fallback: 역계산
+          if (match.originalSide === 'back') {
+            backStake = match.matchedAmount;
+            layStake = Math.floor(match.matchedAmount * (match.matchedPrice - 1));
+          } else {
+            backStake = Math.floor(match.matchedAmount * (match.matchedPrice - 1));
+            layStake = match.matchedAmount;
+          }
+        }
+
         potInfo.totalPot += potAmount;
+        potInfo.totalBackStake += backStake;
+        potInfo.totalLayStake += layStake;
+
         potInfo.matches.push({
           matchId: match.id,
           potAmount: potAmount,
+          backStake: backStake,  // ✅ 추가
+          layStake: layStake,    // ✅ 추가
+          potCalculation: `${backStake} + ${layStake} = ${potAmount}`,  // ✅ 추가
           matchedAmount: match.matchedAmount,
           matchedPrice: match.matchedPrice,
           originalSide: match.originalSide,
@@ -771,12 +798,15 @@ class MultibetSettlementService {
           metadata: {
             // 🎯 Pot 정보 추적
             totalPot: potInfo.totalPot,
+            totalBackStake: potInfo.totalBackStake,  // ✅ 추가
+            totalLayStake: potInfo.totalLayStake,    // ✅ 추가
+            potCalculation: `${potInfo.totalBackStake} + ${potInfo.totalLayStake} = ${potInfo.totalPot}`,  // ✅ 추가
             actualProfit: actualProfit,
             result: result,
             side: order.side,
             commissionAmount: commissionAmount,
 
-            // 매치 상세 정보
+            // 매치 상세 정보 (backStake/layStake 포함)
             matches: potInfo.matches,
             matchCount: potInfo.matches.length,
 

@@ -108,6 +108,19 @@ async function verifyPotZeroSum() {
       } else {
         console.log(`✅ Match #${matchId}: 제로섬 OK (Pot: ${Number(data.potAmount).toLocaleString()}원, 오차: ${error.toFixed(2)}원)`);
       }
+
+      // ✅ Pot 계산 근거 검증 (settlementResult에 backStake/layStake가 있는 경우)
+      if (data.payments.length > 0 && data.payments[0].metadata && data.payments[0].metadata.matches) {
+        const matchData = data.payments[0].metadata.matches.find(m => m.matchId === matchId);
+        if (matchData && matchData.backStake && matchData.layStake) {
+          const calculatedPot = matchData.backStake + matchData.layStake;
+          const potError = Math.abs(calculatedPot - data.potAmount);
+
+          if (potError > 0.01) {
+            console.log(`  ⚠️ Pot 계산 오류: ${matchData.backStake} + ${matchData.layStake} = ${calculatedPot} ≠ ${data.potAmount}`);
+          }
+        }
+      }
     }
 
     // 4. 요약 통계
