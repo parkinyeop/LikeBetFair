@@ -794,7 +794,8 @@ class MultibetSettlementService {
           memo: memo,
           transactionType: TransactionType.EXCHANGE_MULTIBET_SETTLEMENT,
           status: 'completed',
-          relatedOrderId: order.id,
+          relatedOrderId: order.id,  // ✅ 주문 ID 저장
+          relatedMatchId: matches.length > 0 ? matches[0].id : null,  // 🆕 대표 매치 ID 저장
           metadata: {
             // 🎯 Pot 정보 추적
             totalPot: potInfo.totalPot,
@@ -1132,15 +1133,28 @@ class MultibetSettlementService {
 
         // ✅ PaymentHistory 기록
         if (layActualProfit !== 0) {
+          const { TransactionType } = await import('../types/paymentHistory.js');
+          
           await PaymentHistory.create({
             userId: layOrder.userId,
             betId: `EXCHANGE_${layOrder.id}_MATCH_${match.id}`,
             amount: layActualProfit,  // ✅ Pot 획득 금액
             balanceAfter: newLayBalance,
             memo: `Exchange 멀티베팅 제로썸 정산 (백 주문 ${backOrder.id} 매치 ${match.id}: ${layResult})`,
+            transactionType: TransactionType.EXCHANGE_MULTIBET_SETTLEMENT,
+            status: 'completed',
+            relatedOrderId: layOrder.id,  // 🆕 레이 주문 ID 저장
+            relatedMatchId: match.id,  // 🆕 매치 ID 저장
+            metadata: {
+              backOrderId: backOrder.id,
+              matchId: match.id,
+              layResult: layResult,
+              potAmount: potAmount,
+              settlementType: 'zero_sum'
+            },
             paidAt: new Date()
           }, { transaction });
-          console.log(`       📝 PaymentHistory 기록: ${layActualProfit.toLocaleString()}원`);
+          console.log(`       📝 PaymentHistory 기록: ${layActualProfit.toLocaleString()}원 (주문: ${layOrder.id}, 매치: ${match.id})`);
         }
 
       }

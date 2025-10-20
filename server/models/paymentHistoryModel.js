@@ -44,9 +44,13 @@ const PaymentHistory = sequelize.define('PaymentHistory', {
     comment: 'Transaction status: completed, rolled_back, pending, failed'
   },
   relatedOrderId: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,  // 🔧 UUID → INTEGER로 수정
     allowNull: true,
-    comment: 'Reference to ExchangeOrder.id'
+    references: {
+      model: 'ExchangeOrders',
+      key: 'id'
+    },
+    comment: 'Reference to ExchangeOrder.id (INTEGER)'
   },
   relatedBetId: {
     type: DataTypes.UUID,
@@ -59,9 +63,13 @@ const PaymentHistory = sequelize.define('PaymentHistory', {
     comment: 'Reference to ExchangeMultibet.id (if exists)'
   },
   relatedMatchId: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,  // 🔧 UUID → INTEGER로 수정
     allowNull: true,
-    comment: 'Reference to ExchangeOrderMatch.id'
+    references: {
+      model: 'ExchangeOrderMatches',
+      key: 'id'
+    },
+    comment: 'Reference to ExchangeOrderMatch.id (INTEGER)'
   },
   metadata: {
     type: DataTypes.JSONB,
