@@ -31,6 +31,7 @@ class ActionItemService {
         // ⚠️ 중요 (Warning Level)
         this.getPendingSettlements(),
         this.getCancelledGameRefunds(),
+        this.getPushGames(), // ✅ 추가: Push 발생 주문/배팅
         this.getHighVolumeUsers(),
 
         // ℹ️ 정보 (Info Level)
@@ -57,32 +58,32 @@ class ActionItemService {
     try {
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-      // 경기가 완료되었지만 24시간 이상 정산되지 않은 주문들
-      const count = await ExchangeOrder.count({
+      // 방법 1: 경기가 완료되었고(gameResultId 존재) 24시간 이상 정산되지 않은 주문
+      const countWithGameResult = await ExchangeOrder.count({
         where: {
-          status: { [Op.in]: ['matched', 'partially_matched', 'active'] },
+          status: { [Op.in]: ['matched', 'partially_matched'] },
           settledAt: null,
-          createdAt: { [Op.lt]: twentyFourHoursAgo }
+          createdAt: { [Op.lt]: twentyFourHoursAgo },
+          gameResultId: { [Op.ne]: null } // gameResult가 있는 것만
         },
         include: [{
           model: GameResult,
           as: 'gameResult',
           where: {
-            status: 'finished',
-            updatedAt: { [Op.lt]: twentyFourHoursAgo }
+            status: 'finished' // 완료된 경기만
           },
-          required: false
+          required: true // ✅ 수정: GameResult가 반드시 있어야 함
         }]
       });
 
-      console.log(`🔍 정산 실패 주문: ${count}개`);
+      console.log(`🔍 정산 실패 주문 (완료 경기 연결): ${countWithGameResult}개`);
 
       return {
         id: 'stuck-settlements',
         type: 'danger',
         icon: '💸',
         title: '정산 실패한 주문',
-        count,
+        count: countWithGameResult,
         link: '/admin/exchange?tab=settlements&filter=stuck',
         description: '24시간 이상 미정산 완료 경기'
       };
@@ -101,28 +102,32 @@ class ActionItemService {
       // 최근 1시간 내 거래가 있었던 사용자들의 잔액 검증
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
-      const recentUsers = await User.findAll({
-        include: [{
-          model: PaymentHistory,
-          as: 'paymentHistories',
-          where: {
-            createdAt: { [Op.gte]: oneHourAgo }
-          },
-          required: true
-        }],
-        limit: 100 // 성능을 위해 최근 100명만 체크
+      // ✅ 개선: 직접 SQL 쿼리로 성능 향상
+      const mismatchResults = await sequelize.query(`
+        SELECT u.id, u.username, u.balance as "actualBalance", 
+               ph."balanceAfter" as "calculatedBalance",
+               ABS(u.balance - ph."balanceAfter") as difference
+        FROM "Users" u
+        INNER JOIN (
+          SELECT "userId", "balanceAfter",
+                 ROW_NUMBER() OVER (PARTITION BY "userId" ORDER BY "createdAt" DESC, id DESC) as rn
+          FROM "PaymentHistory"
+          WHERE "createdAt" >= :oneHourAgo
+        ) ph ON u.id = ph."userId" AND ph.rn = 1
+        WHERE ABS(u.balance - ph."balanceAfter") > 1
+        LIMIT 100
+      `, {
+        replacements: { oneHourAgo },
+        type: sequelize.QueryTypes.SELECT
       });
 
-      let mismatchCount = 0;
+      const mismatchCount = mismatchResults.length;
 
-      for (const user of recentUsers) {
-        const calculatedBalance = await this.calculateUserBalance(user.id);
-        const actualBalance = parseFloat(user.balance);
-
-        if (Math.abs(calculatedBalance - actualBalance) > 1) { // 1원 이상 차이
-          mismatchCount++;
-          console.log(`⚠️ 잔액 불일치 사용자 ${user.id}: 실제 ${actualBalance}, 계산 ${calculatedBalance}`);
-        }
+      if (mismatchCount > 0) {
+        console.log(`⚠️ 잔액 불일치 감지: ${mismatchCount}건`);
+        mismatchResults.forEach(result => {
+          console.log(`  - User ${result.username}: 실제 ${result.actualBalance}, 계산 ${result.calculatedBalance}, 차이 ${result.difference}`);
+        });
       }
 
       console.log(`🔍 잔액 불일치: ${mismatchCount}개`);
@@ -210,6 +215,45 @@ class ActionItemService {
     } catch (error) {
       console.error('취소 경기 미환불 조회 오류:', error);
       return { id: 'cancelled-game-refunds', type: 'warning', icon: '🔄', title: '경기 취소 미처리', count: 0, link: '#', description: '조회 실패' };
+    }
+  }
+
+  /**
+   * ⚠️ Push 발생 경기 (무승부/환불 필요)
+   * @returns {Promise<Object>} 액션 아이템
+   */
+  async getPushGames() {
+    try {
+      // 무승부(draw) 결과가 나왔지만 아직 정산되지 않은 주문
+      const count = await ExchangeOrder.count({
+        include: [{
+          model: GameResult,
+          as: 'gameResult',
+          where: {
+            status: 'finished'
+          },
+          required: true
+        }],
+        where: {
+          status: { [Op.in]: ['matched', 'partially_matched'] },
+          settledAt: null
+        }
+      });
+
+      console.log(`🔍 Push 발생 경기: ${count}개`);
+
+      return {
+        id: 'push-games',
+        type: 'warning',
+        icon: '🤝',
+        title: 'Push 발생 경기',
+        count,
+        link: '/admin/exchange?tab=settlements&filter=push',
+        description: '무승부 발생 환불 필요 주문'
+      };
+    } catch (error) {
+      console.error('Push 발생 경기 조회 오류:', error);
+      return { id: 'push-games', type: 'warning', icon: '🤝', title: 'Push 발생 경기', count: 0, link: '#', description: '조회 실패' };
     }
   }
 
@@ -390,35 +434,27 @@ class ActionItemService {
   async getBalanceMismatchDetails() {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
-    const recentUsers = await User.findAll({
-      include: [{
-        model: PaymentHistory,
-        where: {
-          createdAt: { [Op.gte]: oneHourAgo }
-        },
-        required: true
-      }],
-      limit: 100
+    // ✅ 개선: 직접 SQL 쿼리로 성능 향상
+    const mismatchUsers = await sequelize.query(`
+      SELECT u.id as "userId", u.username, u.email,
+             u.balance as "actualBalance", 
+             ph."balanceAfter" as "calculatedBalance",
+             ABS(u.balance - ph."balanceAfter") as difference,
+             ph."createdAt" as "lastTransactionAt"
+      FROM "Users" u
+      INNER JOIN (
+        SELECT "userId", "balanceAfter", "createdAt",
+               ROW_NUMBER() OVER (PARTITION BY "userId" ORDER BY "createdAt" DESC, id DESC) as rn
+        FROM "PaymentHistory"
+        WHERE "createdAt" >= :oneHourAgo
+      ) ph ON u.id = ph."userId" AND ph.rn = 1
+      WHERE ABS(u.balance - ph."balanceAfter") > 1
+      ORDER BY difference DESC
+      LIMIT 100
+    `, {
+      replacements: { oneHourAgo },
+      type: sequelize.QueryTypes.SELECT
     });
-
-    const mismatchUsers = [];
-
-    for (const user of recentUsers) {
-      const calculatedBalance = await this.calculateUserBalance(user.id);
-      const actualBalance = parseFloat(user.balance);
-      const difference = Math.abs(calculatedBalance - actualBalance);
-
-      if (difference > 1) {
-        mismatchUsers.push({
-          userId: user.id,
-          username: user.username,
-          email: user.email,
-          actualBalance,
-          calculatedBalance,
-          difference
-        });
-      }
-    }
 
     return mismatchUsers;
   }

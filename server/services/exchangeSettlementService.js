@@ -1328,28 +1328,36 @@ class ExchangeSettlementService {
     
     // 🆕 개선된 결제 내역 메모 생성
     const isPartialMatch = order.partiallyFilled;
-    const matchType = isPartialMatch ? '부분 매칭' : '완전 매칭';
-    const matchAmount = isPartialMatch ? `(체결: ${order.filledAmount}원)` : '';
+    const selection = this.getSelectionFromOrder(order);  // ✅ selectionDetails 우선 사용
     
     let memo = '';
     if (amount > 0) {
+      // 승리
       if (order.side === 'back') {
-        memo = `Exchange Back ${matchType} 베팅 승리 수익 ${matchAmount} (수수료 없음)`;
+        memo = isPartialMatch 
+          ? `Back 수익 (부분 체결 ${order.filledAmount.toLocaleString()}원)` 
+          : 'Back 수익';
       } else {
-        memo = `Exchange Lay ${matchType} 베팅 승리 수익 ${matchAmount}`;
-        if (commissionAmount > 0) {
-          memo += ` (수수료 ${commissionAmount}원 차감 후)`;
-        }
+        memo = 'Lay 수익';
       }
     } else {
-      memo = `Exchange ${order.side.toUpperCase()} ${matchType} 베팅 손실 ${matchAmount}`;
+      // 손실
+      if (order.side === 'back') {
+        memo = isPartialMatch 
+          ? `Back 손실 (부분 체결 ${order.filledAmount.toLocaleString()}원)` 
+          : 'Back 손실';
+      } else {
+        memo = 'Lay 담보금 손실';
+      }
     }
     
-    const selection = this.getSelectionFromOrder(order);  // ✅ selectionDetails 우선 사용
-    memo += ` - ${order.side.toUpperCase()}: ${selection}, ` +
-            `경기: ${gameResult.homeTeam} vs ${gameResult.awayTeam}, ` +
-            `배당: ${order.price}배, ` +
-            `결과: ${gameResult.status}`;
+    // 경기 정보 추가 (간결하게)
+    memo += ` - ${selection}, ${gameResult.homeTeam} vs ${gameResult.awayTeam}, 배당 ${order.price}배`;
+    
+    // 수수료 정보 (Lay 승리 시에만)
+    if (amount > 0 && order.side === 'lay' && commissionAmount > 0) {
+      memo += ` (수수료 ${commissionAmount.toLocaleString()}원 차감)`;
+    }
     
     // 🆕 실제 상금 지급 기록
     await PaymentHistory.create({
@@ -2119,6 +2127,8 @@ class ExchangeSettlementService {
     let allSelectionsWon = true;
     let allSelectionsHaveResults = true; // 🆕 모든 선택사항이 경기 결과를 가지고 있는지 확인
     const selectionResults = [];
+    let hasPush = false; // 🆕 Push 발생 여부
+    let adjustedOdds = 1.0; // 🆕 조정된 배당률 계산
     
     for (const selection of order.selectionDetails.selections) {
       console.log(`🔍 선택사항 확인: ${selection.homeTeam} vs ${selection.awayTeam} - ${selection.selection}`);
@@ -2130,34 +2140,65 @@ class ExchangeSettlementService {
         selection.commenceTime
       );
       
-      if (!selectionGameResult || selectionGameResult.status !== 'finished') {
+      // 경기 결과가 없거나 진행 중인 경우
+      if (!selectionGameResult) {
         console.log(`❌ 선택사항 경기 결과 없음: ${selection.homeTeam} vs ${selection.awayTeam}`);
         allSelectionsWon = false;
-        allSelectionsHaveResults = false; // 🆕 경기 결과가 없으면 정산 불가
+        allSelectionsHaveResults = false;
         selectionResults.push({
           selection: selection.selection,
           game: `${selection.homeTeam} vs ${selection.awayTeam}`,
           result: 'no_result',
-          won: false
+          won: false,
+          isPush: false,
+          odds: selection.odds
         });
         continue;
       }
       
-      // 승부 판정
-      const isWinner = this.determineSelectionWinner(selection, selectionGameResult);
+      // 경기가 완료되지 않았으면 대기
+      if (selectionGameResult.status !== 'finished' && 
+          selectionGameResult.status !== 'cancelled' && 
+          selectionGameResult.status !== 'postponed') {
+        console.log(`⏳ 선택사항 경기 진행 중: ${selection.homeTeam} vs ${selection.awayTeam} (${selectionGameResult.status})`);
+        allSelectionsWon = false;
+        allSelectionsHaveResults = false;
+        selectionResults.push({
+          selection: selection.selection,
+          game: `${selection.homeTeam} vs ${selection.awayTeam}`,
+          result: selectionGameResult.status,
+          won: false,
+          isPush: false,
+          odds: selection.odds
+        });
+        continue;
+      }
+      
+      // ✅ 승부 판정 (Push 감지 포함)
+      const selectionResult = this.determineSelectionResult(selection, selectionGameResult);
+      
       selectionResults.push({
         selection: selection.selection,
         game: `${selection.homeTeam} vs ${selection.awayTeam}`,
-        result: selectionGameResult.result,
+        result: selectionResult.result,
         score: selectionGameResult.score,
-        won: isWinner
+        won: selectionResult.won,
+        isPush: selectionResult.isPush,
+        odds: selection.odds
       });
       
-      if (!isWinner) {
+      // ✅ 배당률 재계산 (Push 발생 시 1.0으로 처리)
+      if (selectionResult.isPush) {
+        hasPush = true;
+        adjustedOdds *= 1.0; // Push는 배당률 1.0
+        console.log(`   🤝 Push 발생: ${selection.homeTeam} vs ${selection.awayTeam} → 배당률 1.0 적용`);
+      } else if (selectionResult.won) {
+        adjustedOdds *= (selection.odds || 1.0); // 승리한 경기의 배당률
+        console.log(`   ✅ 승리: ${selection.homeTeam} vs ${selection.awayTeam} → 배당률 ${selection.odds} 적용`);
+      } else {
         allSelectionsWon = false;
+        console.log(`   ❌ 패배: ${selection.homeTeam} vs ${selection.awayTeam}`);
       }
-      
-      console.log(`✅ 선택사항 결과: ${isWinner ? '승리' : '패배'} (${selectionGameResult.result})`);
     }
     
     // 🆕 모든 선택사항의 경기 결과가 없으면 정산하지 않음
@@ -2174,33 +2215,87 @@ class ExchangeSettlementService {
       };
     }
     
+    // ✅ 모든 선택이 Push인 경우 전액 환불
+    const allPush = selectionResults.every(s => s.isPush);
+    if (allPush) {
+      console.log(`🤝 멀티베팅 전체 Push! 전액 환불`);
+      const multibetStakeAmount = order.partiallyFilled ? (order.filledAmount || 0) : order.amount;
+      const pushActualProfit = 0; // 환불 (본금만 돌려줌, 이미 차감되어 있으므로 0)
+      
+      await order.update({
+        status: 'cancelled',
+        actualProfit: pushActualProfit,
+        settledAt: new Date(),
+        settlementNote: 'Push (무승부/취소)로 인한 전액 환불'
+      }, { transaction });
+      
+      // 잔액 환불 (stakeAmount 돌려줌)
+      const user = await User.findByPk(order.userId, { transaction });
+      if (user) {
+        const currentBalance = parseFloat(user.balance);
+        const newBalance = currentBalance + multibetStakeAmount;
+        await user.update({ balance: newBalance }, { transaction });
+        
+        await PaymentHistory.create({
+          userId: order.userId,
+          betId: `EXCHANGE_${order.id}`,
+          amount: multibetStakeAmount,
+          memo: `Exchange 멀티베팅 Push (무승부/취소) 환불 (${selectionResults.length}개 선택사항)`,
+          balanceAfter: newBalance,
+          paidAt: new Date()
+        }, { transaction });
+      }
+      
+      return {
+        orderId: order.id,
+        userId: order.userId,
+        type: 'multibet_push',
+        totalWinnings: 0,
+        isMultibet: true,
+        selectionResults: selectionResults
+      };
+    }
+    
     // 멀티베팅 결과 계산 (모든 선택사항이 승리해야 함)
     // 부분 매칭된 경우 실제 체결된 금액으로 계산
     const multibetStakeAmount = order.partiallyFilled ? (order.filledAmount || 0) : order.amount;
     
     let actualProfit = 0;
     if (allSelectionsWon) {
-      // 모든 선택사항이 승리한 경우 - 총 수익 계산 (부분 매칭 고려)
-      if (order.potentialWinnings) {
-        // potentialWinnings가 있으면 체결된 비율로 계산 (본금 포함)
-        const matchRatio = order.partiallyFilled ? (multibetStakeAmount / order.amount) : 1;
-        actualProfit = parseFloat(order.potentialWinnings) * matchRatio;
+      // ✅ Push가 있으면 조정된 배당률로 재계산
+      if (hasPush) {
+        actualProfit = multibetStakeAmount * adjustedOdds;
+        const originalTotalOdds = parseFloat(order.totalOdds);
+        console.log(`🎉 멀티베팅 승리 (Push 포함)! 원래 배당: ${originalTotalOdds}배 → 조정 배당: ${adjustedOdds.toFixed(3)}배, 수익: ${actualProfit}원 (체결: ${multibetStakeAmount}원)`);
       } else {
-        // potentialWinnings가 없으면 배당률로 총 수익 계산 (본금 포함)
-        actualProfit = multibetStakeAmount * parseFloat(order.totalOdds);
+        // Push 없으면 기존 로직 유지
+        if (order.potentialWinnings) {
+          const matchRatio = order.partiallyFilled ? (multibetStakeAmount / order.amount) : 1;
+          actualProfit = parseFloat(order.potentialWinnings) * matchRatio;
+        } else {
+          actualProfit = multibetStakeAmount * parseFloat(order.totalOdds);
+        }
+        console.log(`🎉 멀티베팅 승리! 수익: ${actualProfit}원 (체결: ${multibetStakeAmount}원)`);
       }
-      console.log(`🎉 멀티베팅 승리! 수익: ${actualProfit}원 (체결: ${multibetStakeAmount}원)`);
     } else {
       // 하나라도 패배한 경우 - 체결된 금액만 손실
       actualProfit = -multibetStakeAmount;
       console.log(`❌ 멀티베팅 패배! 손실: ${Math.abs(actualProfit)}원 (체결: ${multibetStakeAmount}원)`);
     }
     
+    // ✅ 정산 메모 생성 (Push 포함 여부 표시)
+    const pushCount = selectionResults.filter(s => s.isPush).length;
+    let settlementNote = allSelectionsWon ? '멀티베팅 승리' : '멀티베팅 패배';
+    if (pushCount > 0 && allSelectionsWon) {
+      settlementNote += ` (${pushCount}개 경기 Push, 배당률 조정)`;
+    }
+    
     await order.update({
       status: 'settled',
       actualProfit: actualProfit,
       settledAt: new Date(),
-      profitLoss: actualProfit
+      profitLoss: actualProfit,
+      settlementNote: settlementNote
     }, { transaction });
     
     // 사용자 잔액 업데이트
@@ -2221,12 +2316,19 @@ class ExchangeSettlementService {
       
       await user.update({ balance: newBalance }, { transaction });
       
-      // 결제 이력 추가
+      // ✅ 결제 이력 추가 (Push 포함 여부 표시)
+      const pushCount = selectionResults.filter(s => s.isPush).length;
+      let memo = `Exchange 멀티베팅 정산: ${allSelectionsWon ? '승리' : '패배'} (${selectionResults.length}개 선택사항`;
+      if (pushCount > 0) {
+        memo += `, ${pushCount}개 Push 포함`;
+      }
+      memo += ')';
+      
       await PaymentHistory.create({
         userId: order.userId,
         betId: `EXCHANGE_${order.id}`,
         amount: actualProfit,
-        memo: `Exchange 멀티베팅 정산: ${allSelectionsWon ? '승리' : '패배'} (${selectionResults.length}개 선택사항)`,
+        memo: memo,
         balanceAfter: newBalance,
         paidAt: new Date()
       }, { transaction });
@@ -2244,6 +2346,17 @@ class ExchangeSettlementService {
       await this.cancelRemainingAmount(order, transaction);
     }
     
+    // 🔥 Push 발생 시 담보금 차액 환불
+    if (hasPush && allSelectionsWon) {
+      if (order.side === 'back') {
+        // Back 주문 승리 → 매칭된 Lay에게 담보금 차액 환불
+        await this.refundLayLiabilityForPush(order, adjustedOdds, transaction, selectionResults);
+      } else if (order.side === 'lay') {
+        // Lay 주문 승리 → 매칭된 Back에게는 환불 없음 (Lay가 손해본 것)
+        console.log(`   ℹ️ Lay 멀티베팅 승리 (Push 포함): Lay 담보금 감소는 Lay에게 유리 (환불 없음)`);
+      }
+    }
+    
     return {
       orderId: order.id,
       userId: order.userId,
@@ -2253,6 +2366,114 @@ class ExchangeSettlementService {
       selectionResults: selectionResults
     };
   }
+
+  /**
+   * 🔥 Push 발생 시 Lay 담보금 차액 환불
+   * Back 멀티베팅 주문에서 Push 발생 시, 매칭된 Lay 주문들에게 초과 담보금 환불
+   * @param {Object} backOrder - Back 멀티베팅 주문
+   * @param {number} adjustedOdds - Push 반영된 조정 배당률
+   * @param {Object} transaction - DB 트랜잭션
+   * @param {Array} selectionResults - 각 선택사항 결과
+   */
+  async refundLayLiabilityForPush(backOrder, adjustedOdds, transaction, selectionResults) {
+    try {
+      console.log(`\n💰 Push 발생으로 Lay 담보금 차액 환불 처리 시작`);
+      console.log(`   Back 주문 ID: ${backOrder.id}`);
+      console.log(`   원래 배당: ${backOrder.totalOdds}배`);
+      console.log(`   조정 배당: ${adjustedOdds.toFixed(3)}배`);
+      
+      // 1. 이 Back 주문과 매칭된 모든 Lay 주문 찾기
+      const matches = await ExchangeOrderMatch.findAll({
+        where: {
+          [Op.or]: [
+            { originalOrderId: backOrder.id, originalSide: 'back' },
+            { matchingOrderId: backOrder.id, matchingSide: 'back' }
+          ],
+          status: { [Op.in]: ['active', 'settled'] }
+        },
+        transaction
+      });
+      
+      console.log(`   매칭 기록: ${matches.length}개 발견`);
+      
+      if (matches.length === 0) {
+        console.log(`   ⚠️ 매칭된 Lay 주문이 없어 환불 처리 건너뜀`);
+        return;
+      }
+      
+      // 2. 각 매칭에 대해 Lay 담보금 차액 계산 및 환불
+      for (const match of matches) {
+        // Lay 주문 ID 찾기
+        const layOrderId = match.originalSide === 'lay' 
+          ? match.originalOrderId 
+          : match.matchingOrderId;
+        
+        const layOrder = await ExchangeOrder.findByPk(layOrderId, { transaction });
+        
+        if (!layOrder || layOrder.side !== 'lay') {
+          console.log(`   ⚠️ Lay 주문 ${layOrderId} 찾을 수 없음 또는 side 불일치`);
+          continue;
+        }
+        
+        // 3. 담보금 재계산
+        const matchedAmount = match.matchedAmount || 0;
+        const originalLiability = matchedAmount * (parseFloat(backOrder.totalOdds) - 1);
+        const adjustedLiability = matchedAmount * (adjustedOdds - 1);
+        const refundAmount = Math.floor(originalLiability - adjustedLiability);
+        
+        if (refundAmount <= 0) {
+          console.log(`   ℹ️ Lay 주문 ${layOrder.id}: 환불 금액 없음 (${refundAmount}원)`);
+          continue;
+        }
+        
+        console.log(`   💸 Lay 주문 ${layOrder.id} 담보금 차액 환불:`);
+        console.log(`      원래 담보: ${originalLiability.toLocaleString()}원 (${matchedAmount} × ${backOrder.totalOdds - 1})`);
+        console.log(`      조정 담보: ${adjustedLiability.toLocaleString()}원 (${matchedAmount} × ${(adjustedOdds - 1).toFixed(3)})`);
+        console.log(`      환불 금액: ${refundAmount.toLocaleString()}원`);
+        
+        // 4. Lay 사용자 잔액 환불
+        const layUser = await User.findByPk(layOrder.userId, { 
+          transaction,
+          lock: transaction.LOCK.UPDATE 
+        });
+        
+        if (!layUser) {
+          console.log(`   ❌ Lay 사용자 ${layOrder.userId} 찾을 수 없음`);
+          continue;
+        }
+        
+        const layCurrentBalance = parseFloat(layUser.balance);
+        const layNewBalance = layCurrentBalance + refundAmount;
+        
+        await layUser.update({ balance: layNewBalance }, { transaction });
+        
+        // 5. PaymentHistory에 상세 기록
+        const pushSelections = selectionResults.filter(s => s.isPush);
+        const pushGamesCount = pushSelections.length;
+        const pushGames = pushSelections.map(s => s.game).join(', ');
+        
+        await PaymentHistory.create({
+          userId: layOrder.userId,
+          betId: `EXCHANGE_${layOrder.id}`,
+          amount: refundAmount,
+          memo: `Exchange 멀티베팅 Push 발생으로 Lay 담보금 차액 환불 - ` +
+                `Back 주문 #${backOrder.id}의 ${pushGamesCount}개 경기 Push (${pushGames}) - ` +
+                `원래 담보 ${originalLiability.toLocaleString()}원 → 조정 담보 ${adjustedLiability.toLocaleString()}원 = 환불 ${refundAmount.toLocaleString()}원`,
+          balanceAfter: layNewBalance,
+          paidAt: new Date()
+        }, { transaction });
+        
+        console.log(`   ✅ Lay 사용자 ${layOrder.userId} 환불 완료: ${refundAmount.toLocaleString()}원`);
+        console.log(`      잔액: ${layCurrentBalance.toLocaleString()}원 → ${layNewBalance.toLocaleString()}원`);
+      }
+      
+      console.log(`✅ Lay 담보금 차액 환불 처리 완료: ${matches.length}개 매칭`);
+      
+    } catch (error) {
+      console.error(`❌ Lay 담보금 환불 처리 실패:`, error);
+      throw error;
+    }
+  }
   
   /**
    * 🆕 선택사항 승부 판정
@@ -2260,39 +2481,109 @@ class ExchangeSettlementService {
    * @param {Object} gameResult - 경기 결과
    * @returns {boolean} 승리 여부
    */
-  determineSelectionWinner(selection, gameResult) {
+  /**
+   * 선택사항 결과 판정 (Push 감지 포함)
+   * @returns {Object} { won: boolean, isPush: boolean, result: string }
+   */
+  determineSelectionResult(selection, gameResult) {
     const selectedTeam = selection.selection;
     const homeTeam = selection.homeTeam;
     const awayTeam = selection.awayTeam;
     
-    // 승패 마켓의 경우
+    // 1. 경기 취소/연기 → Push
+    if (gameResult.status === 'cancelled' || gameResult.status === 'postponed') {
+      return { won: false, isPush: true, result: 'cancelled' };
+    }
+    
+    // 2. 승패 마켓
     if (selection.market === '승패' || selection.market === 'h2h') {
       if (gameResult.status === 'home_win' && selectedTeam === homeTeam) {
-        return true;
+        return { won: true, isPush: false, result: 'won' };
       }
       if (gameResult.status === 'away_win' && selectedTeam === awayTeam) {
-        return true;
+        return { won: true, isPush: false, result: 'won' };
       }
       if (gameResult.status === 'draw' && selectedTeam === 'Draw') {
-        return true;
+        return { won: true, isPush: false, result: 'won' };
       }
-      return false;
+      // Draw인데 Draw 선택 안 했으면 패배
+      return { won: false, isPush: false, result: 'lost' };
     }
     
-    // 핸디캡 마켓의 경우 (향후 구현)
+    // 3. 핸디캡 마켓
     if (selection.market === '핸디캡' || selection.market === 'spreads') {
-      // TODO: 핸디캡 로직 구현
-      return false;
+      const line = parseFloat(selection.line || 0);
+      const score = gameResult.score;
+      
+      if (!score || !Array.isArray(score) || score.length < 2) {
+        return { won: false, isPush: false, result: 'no_score' };
+      }
+      
+      const homeScore = parseInt(score.find(s => s.name === gameResult.homeTeam)?.score || 0);
+      const awayScore = parseInt(score.find(s => s.name === gameResult.awayTeam)?.score || 0);
+      
+      // 핸디캡 적용
+      const adjustedHomeScore = homeScore + line;
+      const adjustedAwayScore = awayScore;
+      
+      // Push 조건: 핸디캡 적용 후 동점
+      if (adjustedHomeScore === adjustedAwayScore) {
+        console.log(`   🤝 핸디캡 Push: ${homeScore}+${line} = ${awayScore} → 1.0배`);
+        return { won: false, isPush: true, result: 'push' };
+      }
+      
+      // 승부 판정
+      if (selectedTeam === homeTeam && adjustedHomeScore > adjustedAwayScore) {
+        return { won: true, isPush: false, result: 'won' };
+      }
+      if (selectedTeam === awayTeam && adjustedAwayScore > adjustedHomeScore) {
+        return { won: true, isPush: false, result: 'won' };
+      }
+      
+      return { won: false, isPush: false, result: 'lost' };
     }
     
-    // 오버/언더 마켓의 경우 (향후 구현)
+    // 4. 오버/언더 마켓
     if (selection.market === '총점' || selection.market === 'totals') {
-      // TODO: 오버/언더 로직 구현
-      return false;
+      const line = parseFloat(selection.line || 0);
+      const score = gameResult.score;
+      
+      if (!score || !Array.isArray(score) || score.length < 2) {
+        return { won: false, isPush: false, result: 'no_score' };
+      }
+      
+      const homeScore = parseInt(score.find(s => s.name === gameResult.homeTeam)?.score || 0);
+      const awayScore = parseInt(score.find(s => s.name === gameResult.awayTeam)?.score || 0);
+      const totalScore = homeScore + awayScore;
+      
+      // Push 조건: 총점 = 기준점
+      if (totalScore === line) {
+        console.log(`   🤝 Over/Under Push: 총점 ${totalScore} = 기준 ${line} → 1.0배`);
+        return { won: false, isPush: true, result: 'push' };
+      }
+      
+      const isOverSelection = selectedTeam.toLowerCase().includes('over');
+      
+      if (isOverSelection && totalScore > line) {
+        return { won: true, isPush: false, result: 'won' };
+      }
+      if (!isOverSelection && totalScore < line) {
+        return { won: true, isPush: false, result: 'won' };
+      }
+      
+      return { won: false, isPush: false, result: 'lost' };
     }
     
     // 기본적으로 패배 처리
-    return false;
+    return { won: false, isPush: false, result: 'unknown_market' };
+  }
+
+  /**
+   * 하위 호환성을 위한 기존 함수 유지
+   */
+  determineSelectionWinner(selection, gameResult) {
+    const result = this.determineSelectionResult(selection, gameResult);
+    return result.won;
   }
 
   /**

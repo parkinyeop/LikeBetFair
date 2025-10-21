@@ -311,12 +311,27 @@ class GameResultService {
           commenceTime = `${event.dateEvent}T${event.strTime}`;
         }
         
+        // 경기 상태 매핑 (TheSportsDB strStatus → 표준 status)
+        let status = 'scheduled';
+        const statusText = (event.strStatus || '').toLowerCase();
+        
+        // 취소/연기 상태 감지
+        if (statusText.includes('postponed') || statusText.includes('delayed') || statusText.includes('suspended')) {
+          status = 'postponed';
+        } else if (statusText.includes('cancelled') || statusText.includes('abandoned') || statusText.includes('canceled')) {
+          status = 'cancelled';
+        } else if (['ft', 'match finished', 'aet', 'pen', 'ht'].includes(statusText)) {
+          status = 'finished';
+        }
+        
         return {
           id: event.idEvent,
           home_team: event.strHomeTeam,
           away_team: event.strAwayTeam,
           commence_time: commenceTime,
           completed: ['FT', 'Match Finished', 'AET', 'PEN', 'HT'].includes(event.strStatus),
+          status: status, // ✅ 상태 정보 추가
+          strStatus: event.strStatus, // ✅ 원본 상태도 보존
           scores: event.intHomeScore !== null && event.intAwayScore !== null ? [
             { name: event.strHomeTeam, score: event.intHomeScore?.toString() || '0' },
             { name: event.strAwayTeam, score: event.intAwayScore?.toString() || '0' }
@@ -449,12 +464,27 @@ class GameResultService {
           commenceTime = `${event.dateEvent}T${event.strTime}`;
         }
         
+        // 경기 상태 매핑 (TheSportsDB strStatus → 표준 status)
+        let status = 'scheduled';
+        const statusText = (event.strStatus || '').toLowerCase();
+        
+        // 취소/연기 상태 감지
+        if (statusText.includes('postponed') || statusText.includes('delayed') || statusText.includes('suspended')) {
+          status = 'postponed';
+        } else if (statusText.includes('cancelled') || statusText.includes('abandoned') || statusText.includes('canceled')) {
+          status = 'cancelled';
+        } else if (['ft', 'match finished', 'aet', 'pen', 'ht'].includes(statusText)) {
+          status = 'finished';
+        }
+        
         return {
           id: event.idEvent,
           home_team: event.strHomeTeam,
           away_team: event.strAwayTeam,
           commence_time: commenceTime,
           completed: ['FT', 'Match Finished', 'AET', 'PEN', 'HT'].includes(event.strStatus),
+          status: status, // ✅ 상태 정보 추가
+          strStatus: event.strStatus, // ✅ 원본 상태도 보존
           scores: event.intHomeScore !== null && event.intAwayScore !== null ? [
             { name: event.strHomeTeam, score: event.intHomeScore?.toString() || '0' },
             { name: event.strAwayTeam, score: event.intAwayScore?.toString() || '0' }
@@ -581,8 +611,8 @@ class GameResultService {
         console.log(`Found ${events.length} events for ${league} from TheSportsDB API`);
 
         for (const event of events) {
-          // ✅ FT(Full Time) 상태일 때만 저장
-          if (this.validateGameData(event) && event.completed === true) {
+          // ✅ FT(Full Time) 상태 또는 취소/연기 상태일 때 저장
+          if (this.validateGameData(event) && (event.completed === true || event.status === 'cancelled' || event.status === 'postponed')) {
             const mainCategory = this.determineMainCategory(sportKey);
             const subCategory = this.determineSubCategory(sportKey);
             
@@ -604,8 +634,9 @@ class GameResultService {
           }
         });
             savedCount++;
-            console.log(`✅ Saved FT result: ${event.home_team} vs ${event.away_team}`);
-          } else if (!event.completed) {
+            const statusText = event.status === 'cancelled' ? '취소' : event.status === 'postponed' ? '연기' : 'FT';
+            console.log(`✅ Saved ${statusText} result: ${event.home_team} vs ${event.away_team}`);
+          } else if (!event.completed && event.status !== 'cancelled' && event.status !== 'postponed') {
             console.log(`⏭️ Skipped non-FT game: ${event.home_team} vs ${event.away_team} (Status: ${event.strStatus || 'Unknown'})`);
           }
         }
@@ -670,8 +701,8 @@ class GameResultService {
           return false;
         }
         
-        // ✅ FT(Full Time) 상태일 때만 저장
-        if (!matchingGame.completed) {
+        // ✅ FT(Full Time) 상태 또는 취소/연기 상태일 때 저장
+        if (!matchingGame.completed && matchingGame.status !== 'cancelled' && matchingGame.status !== 'postponed') {
           console.log(`⏭️ Skipped non-FT game: ${desc}`);
           return false;
         }
@@ -679,13 +710,14 @@ class GameResultService {
         // 경기 결과 저장
         const mainCategory = this.determineMainCategory(sportKey);
         const subCategory = this.determineSubCategory(sportKey);
+        const gameStatus = this.determineGameStatus(matchingGame);
         await GameResult.upsert({
           mainCategory,
           subCategory,
           homeTeam: matchingGame.home_team,
           awayTeam: matchingGame.away_team,
           commenceTime,
-          status: this.determineGameStatus(matchingGame),
+          status: gameStatus,
           score: matchingGame.scores,
           // result 필드 제거 - status로 대체
           lastUpdated: new Date()
@@ -696,7 +728,8 @@ class GameResultService {
             commenceTime
           }
         });
-        console.log(`✅ [결과수집] 성공: ${desc} 결과 저장 완료 (FT)`);
+        const statusText = gameStatus === 'cancelled' ? '취소' : gameStatus === 'postponed' ? '연기' : 'FT';
+        console.log(`✅ [결과수집] 성공: ${desc} 결과 저장 완료 (${statusText})`);
         return true;
       } else {
         console.log(`[결과수집] 실패: API 응답에서 ${desc} 경기를 찾을 수 없음`);
@@ -1116,12 +1149,25 @@ class GameResultService {
   }
 
   determineGameStatus(game) {
-    // 변환된 데이터 형식에 맞게 상태 결정
+    // 1. 변환 시 생성된 status 필드가 있으면 우선 사용 (취소/연기 상태 포함)
+    if (game.status) {
+      // 취소/연기 상태는 그대로 반환
+      if (game.status === 'postponed' || game.status === 'cancelled') {
+        console.log(`[GameStatus] ${game.home_team} vs ${game.away_team}: ${game.status} (from strStatus: ${game.strStatus})`);
+        return game.status;
+      }
+      // finished 상태도 그대로 반환
+      if (game.status === 'finished') {
+        return 'finished';
+      }
+    }
+    
+    // 2. completed 필드로 판단 (기존 로직 유지)
     if (game.completed === true) {
       return 'finished';
     }
     
-    // 경기 시간이 지났지만 완료되지 않은 경우
+    // 3. 경기 시간이 지났지만 완료되지 않은 경우
     const gameTime = new Date(game.commence_time + 'Z');
     const now = new Date();
     if (gameTime < now) {
@@ -1134,6 +1180,7 @@ class GameResultService {
   determineGameResult(game) {
     // 1. 연기/취소 상태 우선 확인
     if (game.status === 'postponed' || game.status === 'cancelled') {
+      console.log(`[GameResult] Game ${game.id || game.homeTeam + ' vs ' + game.awayTeam}: Status detected as ${game.status}`);
       return game.status;
     }
     
@@ -1257,13 +1304,15 @@ class GameResultService {
 
   async cleanupOldData() {
     try {
-      // 30일 이상 된 cancelled 데이터 삭제
+      // 30일 이상 된 cancelled/postponed 데이터 삭제
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
       const deletedCount = await GameResult.destroy({
         where: {
-          result: 'cancelled',
+          status: {
+            [Op.in]: ['cancelled', 'postponed']
+          },
           commenceTime: {
             [Op.lt]: thirtyDaysAgo
           }
@@ -1271,7 +1320,7 @@ class GameResultService {
       });
       
       if (deletedCount > 0) {
-        console.log(`Cleaned up ${deletedCount} old cancelled games`);
+        console.log(`✅ Cleaned up ${deletedCount} old cancelled/postponed games`);
       }
     } catch (error) {
       console.error('Error cleaning up old data:', error);
