@@ -371,6 +371,14 @@ class BetResultService {
       
       selection.result = selectionResult;
       
+      // ✅ Push 여부 판단: cancelled인데 경기는 정상 종료된 경우
+      if (selection.result === 'cancelled' && !isGameCancelledOrPostponed(gameResult)) {
+        selection.isPush = true;
+        console.log(`   - Push 감지: 경기는 정상 종료되었으나 무승부 조건`);
+      } else {
+        selection.isPush = false;
+      }
+      
       if (selection.result === 'pending') hasPending = true;
       else if (selection.result === 'lost' || selection.result === 'draw') hasLost = true;
       else if (selection.result === 'won') hasWon = true;
@@ -576,24 +584,22 @@ class BetResultService {
     const allCancelled = results.every(r => r === 'cancelled');
     const someCancelled = results.some(r => r === 'cancelled');
     
-    // 경기 취소/연기 여부 확인 (GameResult status 기반)
-    const hasGameCancelled = selections.some(s => {
-      // selection에 gameResult 정보가 있는 경우
-      if (s.gameResult && (s.gameResult.status === 'cancelled' || s.gameResult.status === 'postponed')) {
-        return true;
-      }
-      // 또는 selection 자체의 status
-      if (s.status === 'cancelled' || s.status === 'postponed') {
-        return true;
-      }
-      return false;
-    });
+    // ✅ Push 여부 확인 (isPush 플래그 사용)
+    const hasPush = selections.some(s => s.isPush === true);
+    const allPush = selections.every(s => s.result === 'cancelled' && s.isPush === true);
     
-    // 우선순위: 경기 취소 > Push > 일부 취소 > 기본
-    if (hasGameCancelled) {
-      return '경기 취소/연기로 인한 환불';
-    } else if (allCancelled && !hasGameCancelled) {
+    // ✅ 실제 경기 취소/연기 여부 확인 (isPush가 아닌 cancelled)
+    const hasGameCancelled = selections.some(s => 
+      s.result === 'cancelled' && s.isPush !== true
+    );
+    
+    // 우선순위: 경기 취소 > Push > 혼합 > 기본
+    if (allPush) {
       return 'Push (무승부)로 인한 환불';
+    } else if (hasGameCancelled && !hasPush) {
+      return '경기 취소/연기로 인한 환불';
+    } else if (hasGameCancelled && hasPush) {
+      return '일부 경기 취소 및 Push로 인한 환불';
     } else if (someCancelled) {
       return '일부 경기 취소로 인한 환불';
     } else {
