@@ -389,6 +389,13 @@ export default function ExchangeAdmin() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'analytics'>('dashboard');
   const [activeSubTab, setActiveSubTab] = useState<string>('all');
   
+  // 통계 필터 상태
+  const [statsFilter, setStatsFilter] = useState<'daily' | 'cumulative'>('daily');
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
+  const [statsData, setStatsData] = useState<any>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  
   // Phase 2: 네비게이션 컨텍스트
   const [navigationContext, setNavigationContext] = useState<NavigationContext>({
     currentPath: ['dashboard'],
@@ -490,8 +497,6 @@ export default function ExchangeAdmin() {
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
   const [monthlySummary, setMonthlySummary] = useState<MonthlySummary | null>(null);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   // 통합된 로딩 상태 (기존 loading 제거)
   // const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -573,6 +578,43 @@ export default function ExchangeAdmin() {
   }, []);
 
   // 정산 관련 함수들 - 제거됨
+
+  // 통계 데이터 가져오기
+  const fetchStatsData = useCallback(async () => {
+    if (!isLoggedIn || !isAdmin) return;
+    
+    setStatsLoading(true);
+    try {
+      const headers = getAuthHeaders();
+      let url = '';
+      
+      if (statsFilter === 'daily') {
+        url = buildApiUrl(`/api/admin/exchange/daily-stats?year=${selectedYear}&month=${selectedMonth}`);
+      } else {
+        url = buildApiUrl('/api/admin/exchange/cumulative-stats');
+      }
+      
+      const response = await fetch(url, { headers });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setStatsData(data);
+      } else {
+        console.error('통계 데이터 조회 실패:', response.status);
+        toast.error('통계 데이터를 불러오는데 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('통계 데이터 조회 오류:', error);
+      toast.error('통계 데이터를 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [statsFilter, selectedYear, selectedMonth, isLoggedIn, isAdmin, getAuthHeaders]);
+
+  // 통계 필터 변경 시 데이터 다시 조회
+  useEffect(() => {
+    fetchStatsData();
+  }, [fetchStatsData]);
 
   // 정산 내역 내보내기
   const handleExportSettlements = useCallback(async () => {
@@ -1938,6 +1980,123 @@ export default function ExchangeAdmin() {
                   {/* 대시보드 탭 */}
                   {activeTab === 'dashboard' && (
                     <div className="space-y-6">
+                      {/* 통계 필터 */}
+                      <div className="bg-white p-6 rounded-lg shadow">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-semibold text-gray-900">통계 분석</h3>
+                          <div className="flex items-center space-x-4">
+                            {/* 통계 타입 선택 */}
+                            <div className="flex bg-gray-100 rounded-lg p-1">
+                              <button
+                                onClick={() => setStatsFilter('daily')}
+                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                                  statsFilter === 'daily'
+                                    ? 'bg-white text-gray-900 shadow-sm'
+                                    : 'text-gray-600 hover:text-gray-900'
+                                }`}
+                              >
+                                월별 통계
+                              </button>
+                              <button
+                                onClick={() => setStatsFilter('cumulative')}
+                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                                  statsFilter === 'cumulative'
+                                    ? 'bg-white text-gray-900 shadow-sm'
+                                    : 'text-gray-600 hover:text-gray-900'
+                                }`}
+                              >
+                                전체누적 통계
+                              </button>
+                            </div>
+                            
+                            {/* 월별 통계일 때만 년/월 선택 */}
+                            {statsFilter === 'daily' && (
+                              <div className="flex items-center space-x-2">
+                                <select
+                                  value={selectedYear}
+                                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                                  className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                >
+                                  {Array.from({ length: 5 }, (_, i) => {
+                                    const year = new Date().getFullYear() - i;
+                                    return (
+                                      <option key={year} value={year}>
+                                        {year}년
+                                      </option>
+                                    );
+                                  })}
+                                </select>
+                                <select
+                                  value={selectedMonth}
+                                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                                  className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                >
+                                  {Array.from({ length: 12 }, (_, i) => (
+                                    <option key={i + 1} value={i + 1}>
+                                      {i + 1}월
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* 통계 데이터 표시 */}
+                        {statsLoading ? (
+                          <div className="flex items-center justify-center py-8">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                            <span className="ml-2 text-gray-600">통계 데이터를 불러오는 중...</span>
+                          </div>
+                        ) : statsData ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {statsFilter === 'daily' ? (
+                              <>
+                                <div className="bg-blue-50 p-4 rounded-lg">
+                                  <h4 className="text-sm font-medium text-blue-800">총 주문</h4>
+                                  <p className="text-2xl font-bold text-blue-900">{statsData.monthlySummary?.totalOrders || 0}</p>
+                                </div>
+                                <div className="bg-green-50 p-4 rounded-lg">
+                                  <h4 className="text-sm font-medium text-green-800">매칭된 주문</h4>
+                                  <p className="text-2xl font-bold text-green-900">{statsData.monthlySummary?.matchedOrders || 0}</p>
+                                </div>
+                                <div className="bg-orange-50 p-4 rounded-lg">
+                                  <h4 className="text-sm font-medium text-orange-800">정산 완료</h4>
+                                  <p className="text-2xl font-bold text-orange-900">{statsData.monthlySummary?.settledOrders || 0}</p>
+                                </div>
+                                <div className="bg-purple-50 p-4 rounded-lg">
+                                  <h4 className="text-sm font-medium text-purple-800">거래량</h4>
+                                  <p className="text-2xl font-bold text-purple-900">₩{(Number(statsData.monthlySummary?.totalVolume) || 0).toLocaleString()}</p>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="bg-blue-50 p-4 rounded-lg">
+                                  <h4 className="text-sm font-medium text-blue-800">전체 주문</h4>
+                                  <p className="text-2xl font-bold text-blue-900">{statsData.total?.totalOrders || 0}</p>
+                                </div>
+                                <div className="bg-green-50 p-4 rounded-lg">
+                                  <h4 className="text-sm font-medium text-green-800">전체 거래량</h4>
+                                  <p className="text-2xl font-bold text-green-900">₩{(Number(statsData.total?.totalVolume) || 0).toLocaleString()}</p>
+                                </div>
+                                <div className="bg-orange-50 p-4 rounded-lg">
+                                  <h4 className="text-sm font-medium text-orange-800">전체 수수료</h4>
+                                  <p className="text-2xl font-bold text-orange-900">₩{(statsData.total?.totalCommission || 0).toLocaleString()}</p>
+                                </div>
+                                <div className="bg-purple-50 p-4 rounded-lg">
+                                  <h4 className="text-sm font-medium text-purple-800">멀티배팅</h4>
+                                  <p className="text-2xl font-bold text-purple-900">{statsData.total?.multibets || 0}</p>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 text-gray-500">
+                            통계 데이터를 불러올 수 없습니다.
+                          </div>
+                        )}
+                      </div>
+
                       {/* KPI 카드 */}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <div className="bg-white p-6 rounded-lg shadow">
@@ -1951,7 +2110,7 @@ export default function ExchangeAdmin() {
                           </p>
                         </div>
                         <div className="bg-white p-6 rounded-lg shadow">
-                          <h3 className="text-sm font-medium text-gray-500">총 거래량</h3>
+                          <h3 className="text-sm font-medium text-gray-500">오늘 거래량</h3>
                           <p className="text-2xl font-bold text-gray-900">
                             {adminState.tabs.dashboard.loading ? (
                               <div className="animate-pulse bg-gray-200 h-8 w-20 rounded"></div>
@@ -2040,7 +2199,7 @@ export default function ExchangeAdmin() {
                           <h3 className="text-sm font-medium text-gray-500">정산 완료</h3>
                           <p className="text-2xl font-bold text-green-600">{exchangeStats?.total?.settlements || 0}</p>
                           <div className="mt-2 text-sm text-gray-600">
-                            총 정산 금액: ₩{settlements.reduce((sum, s) => sum + (s.totalVolume || 0), 0).toLocaleString()}
+                            총 정산 금액: ₩{settlements.reduce((sum, s) => sum + (Number(s.totalVolume) || 0), 0).toLocaleString()}
                           </div>
                         </div>
                         <div className="bg-white p-6 rounded-lg shadow">
@@ -3229,7 +3388,7 @@ export default function ExchangeAdmin() {
               <div className="bg-purple-50 p-4 rounded-lg">
                 <h4 className="text-sm font-medium text-purple-700">총 거래량</h4>
                 <p className="text-2xl font-bold text-purple-900">
-                  ₩{settlements.reduce((sum, s) => sum + (s.totalVolume || 0), 0).toLocaleString()}
+                  ₩{settlements.reduce((sum, s) => sum + (Number(s.totalVolume) || 0), 0).toLocaleString()}
                 </p>
               </div>
             </div>
@@ -3246,7 +3405,7 @@ export default function ExchangeAdmin() {
                     <span className="text-sm">{settlement.homeTeam} vs {settlement.awayTeam}</span>
                     <div className="flex items-center space-x-2">
                       <span className="text-sm text-gray-600">
-                        {settlement.settledOrders || 0}개 주문 • ₩{(settlement.totalVolume || 0).toLocaleString()}
+                        {settlement.settledOrders || 0}개 주문 • ₩{(Number(settlement.totalVolume) || 0).toLocaleString()}
                       </span>
                       <span className="text-xs text-blue-600">클릭하여 상세보기</span>
                     </div>

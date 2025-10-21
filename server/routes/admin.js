@@ -1667,6 +1667,212 @@ router.get('/bets/daily-stats', verifyToken, requireAdmin(1), async (req, res) =
   }
 });
 
+// 익스체인지 일별 통계
+router.get('/exchange/daily-stats', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    const { year, month } = req.query;
+    
+    if (!year || !month) {
+      return res.status(400).json({ message: '년도와 월을 입력해주세요.' });
+    }
+
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+
+    console.log(`📊 익스체인지 일별 통계 조회: ${year}-${month}`);
+    console.log(`   기간: ${startDate.toISOString()} ~ ${endDate.toISOString()}`);
+
+    // 해당 월의 모든 익스체인지 주문 조회
+    const orders = await ExchangeOrder.findAll({
+      where: {
+        createdAt: {
+          [Op.gte]: startDate,
+          [Op.lte]: endDate
+        }
+      },
+      include: [
+        {
+          model: User,
+          attributes: ['id', 'username', 'email']
+        }
+      ],
+      order: [['createdAt', 'ASC']]
+    });
+
+    // 해당 월의 모든 익스체인지 매치 조회 (거래량 계산용)
+    const matches = await ExchangeOrderMatch.findAll({
+      where: {
+        createdAt: {
+          [Op.gte]: startDate,
+          [Op.lte]: endDate
+        },
+        status: { [Op.in]: ['active', 'settled'] }
+      },
+      attributes: ['createdAt', 'potAmount']
+    });
+
+    // 일별 통계 생성
+    const dailyStats = [];
+    const daysInMonth = new Date(year, month, 0).getDate();
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      const currentDate = new Date(year, month - 1, day);
+      const dayStart = new Date(currentDate);
+      const dayEnd = new Date(currentDate);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const dayOrders = orders.filter(order => {
+        const orderDate = new Date(order.createdAt);
+        return orderDate >= dayStart && orderDate <= dayEnd;
+      });
+
+      const dayMatches = matches.filter(match => {
+        const matchDate = new Date(match.createdAt);
+        return matchDate >= dayStart && matchDate <= dayEnd;
+      });
+
+      const totalOrders = dayOrders.length;
+      const matchedOrders = dayOrders.filter(order => order.status === 'matched').length;
+      const openOrders = dayOrders.filter(order => order.status === 'open').length;
+      const settledOrders = dayOrders.filter(order => order.status === 'settled').length;
+      const cancelledOrders = dayOrders.filter(order => order.status === 'cancelled').length;
+      const multibets = dayOrders.filter(order => order.isMultibet).length;
+      const volume = dayMatches.reduce((sum, match) => sum + (match.potAmount || 0), 0);
+
+      dailyStats.push({
+        date: currentDate.toISOString().split('T')[0],
+        totalOrders,
+        matchedOrders,
+        openOrders,
+        settledOrders,
+        cancelledOrders,
+        multibets,
+        volume
+      });
+    }
+
+    // 월별 요약 통계
+    const totalOrders = orders.length;
+    const matchedOrders = orders.filter(order => order.status === 'matched').length;
+    const openOrders = orders.filter(order => order.status === 'open').length;
+    const settledOrders = orders.filter(order => order.status === 'settled').length;
+    const cancelledOrders = orders.filter(order => order.status === 'cancelled').length;
+    const multibets = orders.filter(order => order.isMultibet).length;
+    const totalVolume = matches.reduce((sum, match) => sum + (match.potAmount || 0), 0);
+
+    const monthlySummary = {
+      totalOrders,
+      matchedOrders,
+      openOrders,
+      settledOrders,
+      cancelledOrders,
+      multibets,
+      totalVolume: Math.round(totalVolume || 0)
+    };
+
+    res.json({
+      dailyStats,
+      monthlySummary
+    });
+  } catch (error) {
+    console.error('익스체인지 일별 통계 조회 오류:', error);
+    res.status(500).json({ message: '익스체인지 일별 통계를 불러오는 중 오류가 발생했습니다.' });
+  }
+});
+
+// 익스체인지 전체누적 통계
+router.get('/exchange/cumulative-stats', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    console.log(`📊 익스체인지 전체누적 통계 조회`);
+
+    // 전체 통계
+    const totalOrders = await ExchangeOrder.count();
+    const matchedOrders = await ExchangeOrder.count({
+      where: { status: 'matched' }
+    });
+    const openOrders = await ExchangeOrder.count({
+      where: { status: 'open' }
+    });
+    const settledOrders = await ExchangeOrder.count({
+      where: { status: 'settled' }
+    });
+    const cancelledOrders = await ExchangeOrder.count({
+      where: { status: 'cancelled' }
+    });
+    const multibets = await ExchangeOrder.count({
+      where: { isMultibet: true }
+    });
+
+    // 전체 거래량 (ExchangeOrderMatch의 potAmount 합계)
+    const totalVolume = await ExchangeOrderMatch.sum('potAmount', {
+      where: {
+        status: { [Op.in]: ['active', 'settled'] }
+      }
+    });
+
+    // 전체 수수료 (PaymentHistory에서 Exchange 관련 수수료)
+    const totalCommission = await PaymentHistory.sum('amount', {
+      where: {
+        memo: { [Op.like]: '%EXCHANGE%' }
+      }
+    });
+
+    // 월별 누적 통계 (최근 12개월)
+    const monthlyStats = [];
+    const now = new Date();
+    
+    for (let i = 11; i >= 0; i--) {
+      const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+      
+      const monthOrders = await ExchangeOrder.count({
+        where: {
+          createdAt: {
+            [Op.gte]: monthStart,
+            [Op.lte]: monthEnd
+          }
+        }
+      });
+
+      const monthMatches = await ExchangeOrderMatch.findAll({
+        where: {
+          createdAt: {
+            [Op.gte]: monthStart,
+            [Op.lte]: monthEnd
+          },
+          status: { [Op.in]: ['active', 'settled'] }
+        },
+        attributes: ['potAmount']
+      });
+
+      const monthVolume = monthMatches.reduce((sum, match) => sum + (match.potAmount || 0), 0);
+
+      monthlyStats.push({
+        month: `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}`,
+        orders: monthOrders,
+        volume: monthVolume
+      });
+    }
+
+    res.json({
+      total: {
+        totalOrders,
+        matchedOrders,
+        openOrders,
+        settledOrders,
+        cancelledOrders,
+        multibets,
+        totalVolume: totalVolume || 0,
+        totalCommission: totalCommission || 0
+      },
+      monthlyStats
+    });
+  } catch (error) {
+    console.error('익스체인지 전체누적 통계 조회 오류:', error);
+    res.status(500).json({ message: '익스체인지 전체누적 통계를 불러오는 중 오류가 발생했습니다.' });
+  }
+});
+
 // 베팅 상세 정보
 router.get('/bets/:id', verifyToken, requireAdmin(1), async (req, res) => {
   try {
