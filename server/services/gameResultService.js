@@ -14,9 +14,9 @@ dotenv.config();
 // 스크립트 전용 Sequelize 인스턴스 생성
 const sequelize = createScriptSequelize();
 
-// 클라이언트에서 사용하는 sport key 매핑 (영문으로 통일)
+// ✨ oddsApiService와 완벽하게 일치하는 매핑 (배당률 = 경기결과)
 const clientSportKeyMap = {
-  // 영문 카테고리명
+  // 영문 카테고리명 (oddsApiService와 동일)
   'KLEAGUE': 'soccer_korea_kleague1',
   'JLEAGUE': 'soccer_japan_j_league',
   'SERIEA': 'soccer_italy_serie_a',
@@ -26,25 +26,14 @@ const clientSportKeyMap = {
   'CSL': 'soccer_china_superleague',
   'LALIGA': 'soccer_spain_la_liga',
   'BUNDESLIGA': 'soccer_germany_bundesliga',
-  'EPL': 'soccer_england_premier_league',
+  'EPL': 'soccer_epl',
   'NBA': 'basketball_nba',
   'MLB': 'baseball_mlb',
   'KBO': 'baseball_kbo',
-  'NFL': 'americanfootball_nfl',
-  
-  // 한글 카테고리명
-  '프리미어리그': 'soccer_england_premier_league',
-  
-  // 기타 영문 변형
-  'LaLiga': 'soccer_spain_la_liga',
-  'SerieA': 'soccer_italy_serie_a',
-  'Ligue1': 'soccer_france_ligue_1',
-  'JLeague': 'soccer_japan_j_league',
-  'ArgentinaPrimera': 'soccer_argentina_primera_division',
-  'Brasileirao': 'soccer_brazil_campeonato'
+  'NFL': 'americanfootball_nfl'
 };
 
-// 표준화된 카테고리 매핑 (영문으로 통일)
+// 표준화된 카테고리 매핑 (The Odds API 호환)
 const standardizedCategoryMap = {
   // 축구
   'soccer_korea_kleague1': { main: 'soccer', sub: 'KLEAGUE' },
@@ -57,8 +46,8 @@ const standardizedCategoryMap = {
   'soccer_spain_primera_division': { main: 'soccer', sub: 'LALIGA' },
   'soccer_spain_la_liga': { main: 'soccer', sub: 'LALIGA' },
   'soccer_germany_bundesliga': { main: 'soccer', sub: 'BUNDESLIGA' },
-  'soccer_england_premier_league': { main: 'soccer', sub: 'EPL' },
-  'soccer_epl': { main: 'soccer', sub: 'EPL' },
+  'soccer_epl': { main: 'soccer', sub: 'EPL' },  // ✅ The Odds API 호환 키
+  'soccer_france_ligue_1': { main: 'soccer', sub: 'LIGUE1' },
   
   // 농구
   'basketball_nba': { main: 'basketball', sub: 'NBA' },
@@ -330,11 +319,19 @@ class GameResultService {
           await new Promise(resolve => setTimeout(resolve, 1000));
 
         } catch (error) {
-          console.error(`[GameResult] ❌ ${sportKey} 업데이트 실패:`, error.message);
+          // 422 에러는 경고로 처리 (스포츠가 scores를 지원하지 않음)
+          if (error.response?.status === 422) {
+            console.warn(`[GameResult] ⚠️ ${sportKey}: scores 미지원 - 건너뜀`);
+      } else {
+            console.error(`[GameResult] ❌ ${sportKey} 업데이트 실패:`, error.message);
+          }
           results.push({
             sportKey,
             success: false,
-            error: error.message
+            error: error.message,
+            saved: 0,
+            updated: 0,
+            skipped: 0
           });
         }
       }

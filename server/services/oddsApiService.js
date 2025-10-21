@@ -1230,8 +1230,14 @@ class OddsApiService {
     } catch (error) {
       if (error.response?.status === 429) {
         console.error(`[Scores] ❌ Rate limit 초과: ${sportKey}`);
+      } else if (error.response?.status === 422) {
+        console.warn(`[Scores] ⚠️ ${sportKey}: scores 엔드포인트 미지원 또는 잘못된 파라미터`);
+        console.warn(`[Scores] ℹ️ 이 스포츠는 scores 데이터를 제공하지 않을 수 있습니다.`);
       } else {
         console.error(`[Scores] ❌ Error fetching scores for ${sportKey}:`, error.message);
+        if (error.response) {
+          console.error(`[Scores] Status: ${error.response.status}, Data:`, error.response.data);
+        }
       }
       throw error;
     }

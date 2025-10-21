@@ -223,9 +223,9 @@ cron.schedule('0 */2 * * *', async () => {
   isUpdatingResults = true;
 
   try {
-    // ✨ The Odds API scores로 경기 결과 업데이트 (7일치)
+    // ✨ The Odds API scores로 경기 결과 업데이트 (3일치 - API 제한)
     const updateResults = await withTimeout(
-      gameResultService.updateAllResults(null, 7),
+      gameResultService.updateAllResults(null, 3),
       10 * 60 * 1000, // 10분
       'Game results update'
     );
@@ -301,7 +301,7 @@ cron.schedule('0 */2 * * *', async () => {
       try {
         saveUpdateLog('results', 'start', { message: 'Retrying game results update', isRetry: true });
         const retryResults = await withTimeout(
-          gameResultService.updateAllResults(null, 7),
+          gameResultService.updateAllResults(null, 3),
           10 * 60 * 1000, // 10분
           'Game results retry'
         );
@@ -713,9 +713,9 @@ const initializeData = async () => {
       'Initial odds caching'
     );
     
-    // ✨ The Odds API scores로 경기 결과 초기 로드 (7일치)
+    // ✨ The Odds API scores로 경기 결과 초기 로드 (3일치 - API 제한)
     const resultsResult = await withTimeout(
-      gameResultService.updateAllResults(null, 7),
+      gameResultService.updateAllResults(null, 3),
       10 * 60 * 1000, // 10분
       'Initial game results loading'
     );
@@ -760,7 +760,7 @@ const initializeData = async () => {
           'Initial odds retry'
         );
         await withTimeout(
-          gameResultService.updateAllResults(null, 7),
+          gameResultService.updateAllResults(null, 3),
           10 * 60 * 1000, // 10분
           'Initial game results retry'
         );
