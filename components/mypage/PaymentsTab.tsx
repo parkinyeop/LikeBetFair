@@ -57,8 +57,12 @@ export default function PaymentsTab() {
   const columns = [
     {
       key: 'paidAt',
-      label: '일시',
-      render: (value: string) => new Date(value).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
+      label: '주문시간',
+      render: (value: string) => (
+        <span className="text-xs">
+          {new Date(value).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
+        </span>
+      ),
       className: 'w-40'
     },
     {
@@ -114,6 +118,9 @@ export default function PaymentsTab() {
     {
       key: 'memo',
       label: '내용',
+      render: (value: string) => (
+        <span className="text-xs">{value}</span>
+      ),
       className: 'flex-1'
     }
   ];
