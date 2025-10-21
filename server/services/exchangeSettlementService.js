@@ -28,6 +28,29 @@ import multibetSettlementService from './multibetSettlementService.js';
 class ExchangeSettlementService {
 
   /**
+   * 🆕 selectionDetails에서 선택 정보 추출 헬퍼 함수
+   * @param {Object} order - Exchange 주문
+   * @returns {string} 선택 요약
+   */
+  getSelectionFromOrder(order) {
+    // selectionDetails가 있으면 우선 사용
+    if (order.selectionDetails?.selections) {
+      const selections = order.selectionDetails.selections;
+      
+      if (selections.length === 1) {
+        // 1개 경기: 팀명 또는 선택 반환
+        return selections[0].team || selections[0].selection || order.selection || '선택 없음';
+      } else if (selections.length > 1) {
+        // 2개 이상: 멀티배팅 요약
+        return `멀티배팅 (${selections.length}개 경기)`;
+      }
+    }
+    
+    // fallback: order.selection 사용
+    return order.selection || '선택 없음';
+  }
+
+  /**
    * 🎯 [최신] 주문 ID 기반 제로썸 정산
    * @param {number} orderId - 정산할 주문 ID (백 또는 레이)
    * @param {Object} gameResult - 경기 결과
@@ -641,10 +664,11 @@ class ExchangeSettlementService {
       // 같은 선택(selection)을 가진 Back/Lay 주문들을 쌍으로 만들기
       const ordersBySelection = {};
       remainingOrders.forEach(order => {
-        if (!ordersBySelection[order.selection]) {
-          ordersBySelection[order.selection] = { back: [], lay: [] };
+        const selection = this.getSelectionFromOrder(order);  // ✅ selectionDetails 우선 사용
+        if (!ordersBySelection[selection]) {
+          ordersBySelection[selection] = { back: [], lay: [] };
         }
-        ordersBySelection[order.selection][order.side].push(order);
+        ordersBySelection[selection][order.side].push(order);
       });
       
       for (const [selection, sideOrders] of Object.entries(ordersBySelection)) {
@@ -698,8 +722,10 @@ class ExchangeSettlementService {
     const layOrder = order1.side === 'lay' ? order1 : order2;
     
     console.log(`\n🔍 주문 쌍 분석:`);
-    console.log(`  Back 주문: ID ${backOrder.id}, ${backOrder.selection}, 배당 ${backOrder.price}`);
-    console.log(`  Lay 주문: ID ${layOrder.id}, ${layOrder.selection}, 배당 ${layOrder.price}`);
+    const backSelection = this.getSelectionFromOrder(backOrder);  // ✅ selectionDetails 우선 사용
+    const laySelection = this.getSelectionFromOrder(layOrder);    // ✅ selectionDetails 우선 사용
+    console.log(`  Back 주문: ID ${backOrder.id}, ${backSelection}, 배당 ${backOrder.price}`);
+    console.log(`  Lay 주문: ID ${layOrder.id}, ${laySelection}, 배당 ${layOrder.price}`);
     
     // 🆕 부분 매칭 정보 로깅
     if (backOrder.partiallyFilled || layOrder.partiallyFilled) {
@@ -1319,7 +1345,8 @@ class ExchangeSettlementService {
       memo = `Exchange ${order.side.toUpperCase()} ${matchType} 베팅 손실 ${matchAmount}`;
     }
     
-    memo += ` - ${order.side.toUpperCase()}: ${order.selection}, ` +
+    const selection = this.getSelectionFromOrder(order);  // ✅ selectionDetails 우선 사용
+    memo += ` - ${order.side.toUpperCase()}: ${selection}, ` +
             `경기: ${gameResult.homeTeam} vs ${gameResult.awayTeam}, ` +
             `배당: ${order.price}배, ` +
             `결과: ${gameResult.status}`;
@@ -1348,7 +1375,7 @@ class ExchangeSettlementService {
   generateSettlementNote(order, gameResult, isWin) {
     const result = isWin ? '승리' : '패배';
     const market = order.market || '승패';
-    const selection = order.selection || '선택 없음';
+    const selection = this.getSelectionFromOrder(order);  // ✅ selectionDetails 우선 사용
     
     // 🆕 부분 매칭 정보 추가
     let partialMatchInfo = '';

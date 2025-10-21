@@ -15,6 +15,23 @@ import { ADMIN_CONFIG } from '../config/centralizedConfig.js';
  * - gameResultId는 보조적 수단으로만 사용
  */
 class NewExchangeSettlementService {
+  
+  /**
+   * 🆕 selectionDetails에서 선택 정보 추출 헬퍼 함수
+   * @param {Object} order - Exchange 주문
+   * @returns {string} 선택한 팀/선수명
+   */
+  getSelectionFromOrder(order) {
+    // selectionDetails가 있으면 우선 사용
+    if (order.selectionDetails?.selections && order.selectionDetails.selections.length > 0) {
+      const firstSelection = order.selectionDetails.selections[0];
+      return firstSelection.team || firstSelection.selection || order.selection || null;
+    }
+    
+    // fallback: order.selection 사용
+    return order.selection || null;
+  }
+
   constructor() {
     this.teamMatching = teamMatchingService;
   }
@@ -274,10 +291,12 @@ class NewExchangeSettlementService {
   determineOrderResult(order, winner, gameResult) {
     // 🔒 CRITICAL FIX: selection이 NULL이면 정산 불가 (단일 베팅만)
     // Zero-Sum 위반 방지 - selection=NULL일 때 Lay가 무조건 승리 처리되는 버그 수정
-    // 멀티배팅(isMultibet=true)은 selection=NULL이어도 정상 (selectionDetails 사용)
-    if (!order.isMultibet && !order.selection) {
+    // ✅ selectionDetails 우선 사용, selection 필드는 fallback
+    const selection = this.getSelectionFromOrder(order);
+    
+    if (!order.isMultibet && !selection) {
       throw new Error(
-        `[Zero-Sum 위반 방지] 주문 ${order.id}의 selection 필드가 없습니다. ` +
+        `[Zero-Sum 위반 방지] 주문 ${order.id}의 선택 정보가 없습니다. ` +
         `정산할 수 없습니다. (side: ${order.side}, homeTeam: ${order.homeTeam}, awayTeam: ${order.awayTeam})`
       );
     }
@@ -332,7 +351,7 @@ class NewExchangeSettlementService {
 
     // 단일 베팅 정산 로직
     const isCorrect = this.isSelectionCorrect(
-      order.selection,
+      selection,  // ✅ selectionDetails에서 추출한 selection 사용
       winner,
       gameResult.homeTeam,
       gameResult.awayTeam
