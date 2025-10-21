@@ -6,11 +6,77 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import next from 'next';
+import fs from 'fs';
 
 // 환경변수 로드 (여러 파일 시도)
 dotenv.config({ path: '.env.local' });
 dotenv.config({ path: '.env' });
 dotenv.config();
+
+// ✅ 서버 로그 파일 기록 설정 (데일리)
+const __filename_early = fileURLToPath(import.meta.url);
+const __dirname_early = path.dirname(__filename_early);
+const logsDir = path.join(path.dirname(__dirname_early), 'logs');
+
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
+
+// 로그 파일 경로 생성 함수 (데일리)
+function getLogFilePath() {
+  const now = new Date();
+  const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+  return path.join(logsDir, `server-${dateStr}.log`);
+}
+
+// console.log override (터미널 + 파일 동시 기록)
+const originalLog = console.log;
+const originalError = console.error;
+const originalWarn = console.warn;
+
+console.log = (...args) => {
+  const timestamp = new Date().toISOString();
+  const message = args.map(arg => 
+    typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+  ).join(' ');
+  
+  originalLog(...args); // 터미널 출력
+  try {
+    fs.appendFileSync(getLogFilePath(), `[${timestamp}] [LOG] ${message}\n`);
+  } catch (err) {
+    originalError('로그 파일 쓰기 실패:', err);
+  }
+};
+
+console.error = (...args) => {
+  const timestamp = new Date().toISOString();
+  const message = args.map(arg => 
+    typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+  ).join(' ');
+  
+  originalError(...args); // 터미널 출력
+  try {
+    fs.appendFileSync(getLogFilePath(), `[${timestamp}] [ERROR] ${message}\n`);
+  } catch (err) {
+    originalError('로그 파일 쓰기 실패:', err);
+  }
+};
+
+console.warn = (...args) => {
+  const timestamp = new Date().toISOString();
+  const message = args.map(arg => 
+    typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+  ).join(' ');
+  
+  originalWarn(...args); // 터미널 출력
+  try {
+    fs.appendFileSync(getLogFilePath(), `[${timestamp}] [WARN] ${message}\n`);
+  } catch (err) {
+    originalError('로그 파일 쓰기 실패:', err);
+  }
+};
+
+console.log('✅ [Server] 데일리 로그 파일 기록 활성화:', getLogFilePath());
 
 // 환경 변수 확인
 console.log('[환경변수] ODDS_API_KEY:', process.env.ODDS_API_KEY ? '설정됨' : '미설정');

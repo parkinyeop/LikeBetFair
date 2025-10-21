@@ -6,6 +6,7 @@ import ReferralCode from '../models/referralCodeModel.js';
 import AdminCommission from '../models/adminCommissionModel.js';
 import Bet from '../models/betModel.js';
 import ExchangeOrder from '../models/exchangeOrderModel.js';
+import ExchangeOrderMatch from '../models/exchangeOrderMatchModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
 import GameResult from '../models/gameResultModel.js';
 import OddsCache from '../models/oddsCacheModel.js';
@@ -172,12 +173,14 @@ router.get('/dashboard', verifyToken, requireAdmin(1), async (req, res) => {
       }
     });
 
-    const todayExchangeVolume = await ExchangeOrder.sum('amount', {
+    // ✅ ExchangeOrderMatch 기반 실제 거래량 (Pot 합산)
+    const todayExchangeVolume = await ExchangeOrderMatch.sum('potAmount', {
       where: {
         createdAt: {
           [Op.gte]: todayStart,
           [Op.lt]: todayEnd
-        }
+        },
+        status: { [Op.in]: ['active', 'settled'] } // 취소된 매치 제외
       }
     });
 
@@ -271,12 +274,14 @@ router.get('/exchange/stats', verifyToken, requireAdmin(1), async (req, res) => 
       }
     });
 
-    const todayVolume = await ExchangeOrder.sum('amount', {
+    // ✅ ExchangeOrderMatch 기반 실제 거래량 (Pot 합산)
+    const todayVolume = await ExchangeOrderMatch.sum('potAmount', {
       where: {
         createdAt: {
           [Op.gte]: todayStart,
           [Op.lt]: todayEnd
-        }
+        },
+        status: { [Op.in]: ['active', 'settled'] } // 취소된 매치 제외
       }
     });
 
@@ -379,6 +384,18 @@ router.get('/exchange/daily-stats', verifyToken, requireAdmin(1), async (req, re
       };
     }
     
+    // ✅ 매치 데이터 조회 (실제 거래량 계산용)
+    const matches = await ExchangeOrderMatch.findAll({
+      where: {
+        createdAt: {
+          [Op.gte]: monthStart,
+          [Op.lt]: monthEnd
+        },
+        status: { [Op.in]: ['active', 'settled'] }
+      },
+      attributes: ['createdAt', 'potAmount']
+    });
+    
     // 주문 데이터로 통계 계산
     orders.forEach(order => {
       const orderDate = new Date(order.createdAt);
@@ -386,7 +403,7 @@ router.get('/exchange/daily-stats', verifyToken, requireAdmin(1), async (req, re
       
       if (dailyStats[dateKey]) {
         dailyStats[dateKey].totalOrders++;
-        dailyStats[dateKey].volume += order.amount || 0;
+        // volume은 나중에 매치 데이터로 계산
         
         if (order.isMultibet) {
           dailyStats[dateKey].multibets++;
@@ -409,13 +426,23 @@ router.get('/exchange/daily-stats', verifyToken, requireAdmin(1), async (req, re
       }
     });
     
+    // ✅ 매치 데이터로 실제 거래량 계산
+    matches.forEach(match => {
+      const matchDate = new Date(match.createdAt);
+      const dateKey = `${matchDate.getFullYear()}-${String(matchDate.getMonth() + 1).padStart(2, '0')}-${String(matchDate.getDate()).padStart(2, '0')}`;
+      
+      if (dailyStats[dateKey]) {
+        dailyStats[dateKey].volume += match.potAmount || 0;
+      }
+    });
+    
     // 배열로 변환
     const dailyStatsArray = Object.values(dailyStats);
     
     // 월별 요약 통계
     const monthlySummary = {
       totalOrders: orders.length,
-      totalVolume: orders.reduce((sum, order) => sum + (order.amount || 0), 0),
+      totalVolume: matches.reduce((sum, match) => sum + (match.potAmount || 0), 0),
       totalMultibets: orders.filter(order => order.isMultibet).length,
       matchedOrders: orders.filter(order => order.status === 'matched').length,
       openOrders: orders.filter(order => order.status === 'open').length,
