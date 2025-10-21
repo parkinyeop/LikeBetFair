@@ -31,14 +31,16 @@ let totalSchedulerRuns = 0;
 let skippedRuns = 0;
 let lastEfficiencyLog = Date.now();
 
-// ✅ ORIGINAL SCHEDULER RESTORED - NEW API KEY AVAILABLE
-// 새로운 API 키가 적용되어 원래 스케줄러로 복구되었습니다.
+// 💰 API 예산 최적화 스케줄러
+// 월간 20,000 크레딧 한도 내 운영을 위한 최적화 적용
 // 
-// 📅 원래 스케줄러 일정:
-// - 고우선순위: 30분마다
-// - 중우선순위: 2시간마다  
-// - 저우선순위: 24시간마다
-// - 전체 업데이트: 1일마다
+// 📅 최적화된 스케줄러 일정:
+// - 고우선순위: 4시간마다 (일 6회)
+// - 중우선순위: 6시간마다 (일 4회)
+// - 저우선순위: 24시간마다 (일 1회)
+// - 경기 결과: 2시간마다 (일 12회)
+// - Regions: us만 사용
+// - 예상 비용: 17,370 크레딧/월 (86.9% 사용)
 
 // 서버 시작 로그
 console.log('🚀 [SCHEDULER_SYSTEM] Odds Update Scheduler Starting...');
@@ -46,7 +48,7 @@ console.log('🚀 [SCHEDULER_SYSTEM] Process ID:', process.pid);
 console.log('🚀 [SCHEDULER_SYSTEM] Start Time:', new Date().toISOString());
 console.log('🚀 [SCHEDULER_SYSTEM] Node Version:', process.version);
 console.log('🚀 [SCHEDULER_SYSTEM] Environment:', process.env.NODE_ENV || 'development');
-console.log('✅ [SCHEDULER_SYSTEM] ORIGINAL SCHEDULER RESTORED - NEW API KEY AVAILABLE');
+console.log('💰 [SCHEDULER_SYSTEM] API BUDGET OPTIMIZED - 17,370 CREDITS/MONTH (86.9%)');
 
 // 🔧 데드락 방지: 서버 시작 시 플래그 강제 리셋
 console.log(`[SCHEDULER_SYSTEM_FLAG] 🔧 Server startup - Force resetting flags to prevent deadlock`);
@@ -208,8 +210,8 @@ function withTimeout(promise, timeoutMs, operationName) {
   ]);
 }
 
-// 경기 결과 업데이트 - 30분마다 실행 (로그인 문제 해결 후 복구)
-cron.schedule('*/30 * * * *', async () => {
+// 경기 결과 업데이트 - 2시간마다 실행 (💰 API 예산 최적화)
+cron.schedule('0 */2 * * *', async () => {
   console.log('[SCHEDULER_RESULTS] 🚀 Starting game results update at:', new Date().toISOString());
   
   if (isUpdatingResults) {
@@ -339,9 +341,9 @@ cron.schedule('*/30 * * * *', async () => {
   }
 });
 
-// ✅ ORIGINAL SCHEDULER RESTORED - NEW API KEY AVAILABLE
-// 고우선순위 리그 - 30분마다 업데이트 (원래 설정)
-cron.schedule('*/30 * * * *', async () => {
+// 💰 API 예산 최적화 - 고우선순위 리그
+// 고우선순위 리그 - 4시간마다 업데이트 (예산 최적화)
+cron.schedule('0 */4 * * *', async () => {
   console.log('[SCHEDULER_ODDS] 🔔 Cron job triggered at:', new Date().toISOString());
   
   if (isUpdatingOdds) {
@@ -457,9 +459,9 @@ cron.schedule('*/30 * * * *', async () => {
   }
 });
 
-// ✅ ORIGINAL SCHEDULER RESTORED - NEW API KEY AVAILABLE
-// 중우선순위 리그 - 2시간마다 업데이트 (원래 설정)
-cron.schedule('0 */2 * * *', async () => {
+// 💰 API 예산 최적화 - 중우선순위 리그
+// 중우선순위 리그 - 6시간마다 업데이트 (예산 최적화)
+cron.schedule('0 */6 * * *', async () => {
   // 중복 실행 방지
   if (isUpdatingOdds) {
     console.log('[SCHEDULER_ODDS_MEDIUM] ⏭️ Previous odds update is still running, skipping medium-priority update');

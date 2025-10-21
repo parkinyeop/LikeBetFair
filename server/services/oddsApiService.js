@@ -274,7 +274,7 @@ class OddsApiService {
           const oddsResponse = await axios.get(`${this.baseUrl}/${sportKey}/odds`, {
             params: {
               apiKey: this.apiKey,
-              regions: 'us,uk,eu,au',  // 🆕 regions 확장: 미국, 영국, 유럽, 호주
+              regions: 'us',  // 💰 비용 최적화: 미국만 (75% 절감)
               markets: 'h2h,spreads,totals',
               oddsFormat: 'decimal',
               dateFormat: 'iso'
@@ -701,7 +701,7 @@ class OddsApiService {
           const oddsResponse = await axios.get(`${this.baseUrl}/${sportKey}/odds`, {
             params: {
               apiKey: this.apiKey,
-              regions: 'us,uk,eu,au',  // 🆕 regions 확장: 미국, 영국, 유럽, 호주
+              regions: 'us',  // 💰 비용 최적화: 미국만 (75% 절감)
               markets: 'h2h,spreads,totals',
               oddsFormat: 'decimal',
               dateFormat: 'iso'
