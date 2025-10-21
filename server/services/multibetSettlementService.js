@@ -9,6 +9,7 @@ import settlementValidation from '../utils/settlementValidation.js';
 import GameResultQuery from '../utils/gameResultQuery.js';
 import { getLocationConfig } from '../config/gameResultQuery.js';
 import { getSettlementWaitHours } from '../config/settlementConfig.js';
+import settlementLogger from '../utils/settlementLogger.js';
 
 // 스크립트 전용 Sequelize 인스턴스 생성
 const sequelize = createScriptSequelize();
@@ -35,6 +36,17 @@ class MultibetSettlementService {
 
     try {
       console.log(`🎯 멀티배팅 정산 시작: 주문 ${order.id}`);
+      
+      // ✅ 정산 시작 로깅
+      settlementLogger.logSettlement('MULTIBET_START', order.id, {
+        userId: order.userId,
+        originalAmount: order.originalAmount,
+        filledAmount: order.filledAmount,
+        remainingAmount: order.remainingAmount,
+        partiallyFilled: order.partiallyFilled,
+        status: order.status,
+        isMultibet: order.isMultibet
+      });
 
       if (!order.isMultibet) {
         throw new Error('멀티배팅 주문이 아닙니다.');
@@ -632,6 +644,9 @@ class MultibetSettlementService {
       const currentBalance = parseFloat(user.balance);
       const newBalance = currentBalance + refundAmount;
       
+      // ✅ 환불 전 로깅
+      settlementLogger.logRefund(order.id, refundAmount, `부분 매칭 환불 - 남은 금액: ${refundAmount}, 체결: ${order.filledAmount}`);
+      
       await user.update({ balance: newBalance }, { transaction });
       
       await PaymentHistory.create({
@@ -644,6 +659,9 @@ class MultibetSettlementService {
       }, { transaction });
       
       await order.update({ remainingAmount: 0 }, { transaction });
+      
+      // ✅ 환불 후 로깅
+      settlementLogger.logPayment(order.id, refundAmount, currentBalance, newBalance, '부분 매칭 환불 완료');
       
       console.log(`   ✅ 환불 완료: ${refundAmount.toLocaleString()}원`);
     }
@@ -996,6 +1014,17 @@ class MultibetSettlementService {
       // ✅ TransactionType import
       const { TransactionType } = await import('../types/paymentHistory.js');
 
+      // ✅ PaymentHistory 생성 전 로깅
+      settlementLogger.log(`[BEFORE_PAYMENT] 주문 ${order.id} PaymentHistory 생성 직전`, {
+        orderId: order.id,
+        userId: order.userId,
+        currentBalance,
+        actualProfit,
+        newBalance,
+        result,
+        memo
+      });
+
       await Promise.all([
         user.update({ balance: newBalance }, { transaction }),
         PaymentHistory.create({
@@ -1036,6 +1065,15 @@ class MultibetSettlementService {
           paidAt: new Date()
         }, { transaction })
       ]);
+      
+      // ✅ PaymentHistory 생성 후 로깅
+      settlementLogger.log(`[AFTER_PAYMENT] 주문 ${order.id} PaymentHistory 생성 완료`, {
+        orderId: order.id,
+        amount: actualProfit,
+        balanceAfter: newBalance,
+        memo
+      });
+      
       console.log(`⏱️ DB 저장 완료: ${Date.now() - saveStartTime}ms`);
 
       // ❌ 제거: 매치 상태 업데이트는 settleMatchedLayOrders에서 수행

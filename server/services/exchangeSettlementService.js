@@ -13,6 +13,7 @@ import PrecisionCalculation from '../utils/precisionCalculation.js';
 import GameResultQuery from '../utils/gameResultQuery.js';
 import { getLocationConfig } from '../config/gameResultQuery.js';
 import { isGameFinished, isGameCancelledOrPostponed } from '../utils/gameStatusHelpers.js';
+import settlementLogger from '../utils/settlementLogger.js';
 
 // 스크립트 전용 Sequelize 인스턴스 생성
 const sequelize = createScriptSequelize();
@@ -2178,7 +2179,19 @@ class ExchangeSettlementService {
     // 사용자 잔액 업데이트
     const user = await User.findByPk(order.userId, { transaction });
     if (user) {
-      const newBalance = parseFloat(user.balance) + actualProfit;
+      const currentBalance = parseFloat(user.balance);
+      const newBalance = currentBalance + actualProfit;
+      
+      // ✅ PaymentHistory 생성 전 로깅
+      settlementLogger.log(`[EXCHANGE_SERVICE] 주문 ${order.id} PaymentHistory 생성 직전`, {
+        orderId: order.id,
+        currentBalance,
+        actualProfit,
+        newBalance,
+        allSelectionsWon,
+        multibetStakeAmount
+      });
+      
       await user.update({ balance: newBalance }, { transaction });
       
       // 결제 이력 추가
@@ -2190,6 +2203,13 @@ class ExchangeSettlementService {
         balanceAfter: newBalance,
         paidAt: new Date()
       }, { transaction });
+      
+      // ✅ PaymentHistory 생성 후 로깅
+      settlementLogger.log(`[EXCHANGE_SERVICE] 주문 ${order.id} PaymentHistory 생성 완료`, {
+        orderId: order.id,
+        amount: actualProfit,
+        balanceAfter: newBalance
+      });
     }
     
     // 🆕 멀티베팅 부분 매칭 환불 처리
