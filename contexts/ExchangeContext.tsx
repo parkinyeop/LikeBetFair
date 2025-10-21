@@ -174,8 +174,8 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
     setMultiBetTotalOdds(roundedTotalOdds);
     
     if (multiBetStake > 0) {
-      // ✅ 정확한 Exchange 멀티배팅 수익 계산: 부동소수점 오차 방지
-      const potentialWinnings = Math.floor(Math.round(multiBetStake * roundedTotalOdds * 100) / 100);
+      // ✅ 정확한 Exchange 멀티배팅 수익 계산: 부동소수점 오차 방지 + 10원 단위 올림
+      const potentialWinnings = Math.ceil(Math.round(multiBetStake * roundedTotalOdds * 100) / 100 / 10) * 10;
 
       setMultiBetPotentialWinnings(potentialWinnings);
     }

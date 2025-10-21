@@ -402,7 +402,9 @@ class BetResultService {
         if (betStatus === 'won') {
           await this.processBetWinnings(bet, t);
         } else if (betStatus === 'cancelled') {
-          await this.processBetRefund(bet, t);
+          // ✅ 취소 사유를 구분하여 memo 생성
+          const memo = this.getCancellationMemo(bet);
+          await this.processBetRefund(bet, t, memo);
         }
         await t.commit();
       } catch (err) {
@@ -558,6 +560,44 @@ class BetResultService {
       console.log(`[적중 지급] 베팅 ${bet.id}: 총 ${adjustedWinnings}원 → 수수료 ${commissionAmount}원 차감 → 실제 지급 ${netWinnings}원`);
     } else {
       throw new Error(`[BetResultService] 적중 지급 실패: userId=${bet.userId} (유저 없음)`);
+    }
+  }
+
+  // 🆕 환불 사유 메시지 생성 (Push vs 경기 취소 구분)
+  getCancellationMemo(bet) {
+    const selections = bet.selections || [];
+    
+    if (selections.length === 0) {
+      return '베팅 취소로 인한 환불';
+    }
+    
+    // 모든 선택의 result 확인
+    const results = selections.map(s => s.result);
+    const allCancelled = results.every(r => r === 'cancelled');
+    const someCancelled = results.some(r => r === 'cancelled');
+    
+    // 경기 취소/연기 여부 확인 (GameResult status 기반)
+    const hasGameCancelled = selections.some(s => {
+      // selection에 gameResult 정보가 있는 경우
+      if (s.gameResult && (s.gameResult.status === 'cancelled' || s.gameResult.status === 'postponed')) {
+        return true;
+      }
+      // 또는 selection 자체의 status
+      if (s.status === 'cancelled' || s.status === 'postponed') {
+        return true;
+      }
+      return false;
+    });
+    
+    // 우선순위: 경기 취소 > Push > 일부 취소 > 기본
+    if (hasGameCancelled) {
+      return '경기 취소/연기로 인한 환불';
+    } else if (allCancelled && !hasGameCancelled) {
+      return 'Push (무승부)로 인한 환불';
+    } else if (someCancelled) {
+      return '일부 경기 취소로 인한 환불';
+    } else {
+      return '베팅 취소로 인한 환불';
     }
   }
 

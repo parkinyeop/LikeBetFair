@@ -203,10 +203,10 @@ class ExchangeMultibetController {
         status: 'open',
         selection: selectionValue, // 🆕 단일 경기인 경우 selection 저장
         stakeAmount: stake,
-        potentialProfit: parseFloat((stake * adjustedTotalOdds - stake).toFixed(2)), // ✅ 환수율 적용된 수익 계산
+        potentialProfit: Math.ceil((stake * adjustedTotalOdds - stake) / 10) * 10, // ✅ 10원 단위 올림
         isMultibet: true,
         totalOdds: adjustedTotalOdds, // ✅ 환수율 적용된 totalOdds 사용
-        potentialWinnings: parseFloat((stake * adjustedTotalOdds).toFixed(2)), // ✅ 환수율 적용된 수익 계산
+        potentialWinnings: Math.ceil((stake * adjustedTotalOdds) / 10) * 10, // ✅ 10원 단위 올림
         selectionCount: selections.length,
         selectionDetails: {
           selections: selections.map(s => ({

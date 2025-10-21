@@ -1124,6 +1124,12 @@ class ExchangeSettlementService {
     console.log(`      총점: ${totalScore}, 기준선: ${line}`);
     console.log(`      선택: ${isOverSelection ? 'Over' : 'Under'}`);
     
+    // ✅ Push 조건 추가 (총점 = 기준점이면 무효)
+    if (totalScore === line) {
+      console.log(`      Push 조건: 총점 ${totalScore} = 기준 ${line} → 무효 (환불 처리)`);
+      return false; // Push는 승패 없음 (환불)
+    }
+    
     if (isOverSelection) {
       return totalScore > line;
     } else {
@@ -3319,6 +3325,69 @@ class ExchangeSettlementService {
     console.log(`\n🎉 고아 정산 완료: ${settledCount}/${orphanMatches.length}개`);
 
     return { settledCount, results };
+  }
+
+  /**
+   * 승부 결과 판정 함수
+   * @param {string} selection - 선택한 팀/옵션
+   * @param {Object} gameResult - 경기 결과
+   * @returns {boolean} 승리 여부
+   */
+  determineWinResult(selection, gameResult) {
+    if (!selection || !gameResult) {
+      console.warn('determineWinResult: selection 또는 gameResult가 없습니다');
+      return false;
+    }
+
+    // 스코어 파싱
+    const scores = gameResult.scores || [];
+    if (scores.length < 2) {
+      console.warn('determineWinResult: 스코어 정보가 부족합니다', scores);
+      return false;
+    }
+
+    const homeScore = parseInt(scores[0]?.score) || 0;
+    const awayScore = parseInt(scores[1]?.score) || 0;
+
+    console.log(`🎯 승부 판정: ${selection} vs ${gameResult.homeTeam} ${homeScore}:${awayScore} ${gameResult.awayTeam}`);
+
+    // 팀명 정규화
+    const normalizedSelection = this.normalizeTeamName(selection);
+    const normalizedHomeTeam = this.normalizeTeamName(gameResult.homeTeam);
+    const normalizedAwayTeam = this.normalizeTeamName(gameResult.awayTeam);
+
+    // 승부 판정
+    if (normalizedSelection === normalizedHomeTeam) {
+      const isWin = homeScore > awayScore;
+      console.log(`   홈팀 선택: ${isWin ? '승리' : '패배'}`);
+      return isWin;
+    } else if (normalizedSelection === normalizedAwayTeam) {
+      const isWin = awayScore > homeScore;
+      console.log(`   어웨이팀 선택: ${isWin ? '승리' : '패배'}`);
+      return isWin;
+    } else if (selection === 'Draw' || selection === '무승부') {
+      const isDraw = homeScore === awayScore;
+      console.log(`   무승부 선택: ${isDraw ? '승리' : '패배'}`);
+      return isDraw;
+    }
+
+    console.warn(`determineWinResult: 알 수 없는 선택 "${selection}"`);
+    return false;
+  }
+
+  /**
+   * 팀명 정규화 헬퍼 함수
+   * @param {string} teamName - 팀명
+   * @returns {string} 정규화된 팀명
+   */
+  normalizeTeamName(teamName) {
+    if (!teamName) return '';
+    
+    return teamName
+      .toLowerCase()
+      .replace(/[^a-z0-9가-힣\s]/g, '') // 특수문자 제거
+      .replace(/\s+/g, '') // 공백 제거
+      .trim();
   }
 }
 
