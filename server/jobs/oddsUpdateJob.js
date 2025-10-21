@@ -223,12 +223,21 @@ cron.schedule('0 */2 * * *', async () => {
   isUpdatingResults = true;
 
   try {
-    // 3분 타임아웃 설정 (8분에서 단축)
-    const updateResult = await withTimeout(
-      gameResultService.fetchAndUpdateResultsForCategories(Array.from(activeCategories)),
-      3 * 60 * 1000, // 3분
+    // ✨ The Odds API scores로 경기 결과 업데이트 (7일치)
+    const updateResults = await withTimeout(
+      gameResultService.updateAllResults(null, 7),
+      10 * 60 * 1000, // 10분
       'Game results update'
     );
+    
+    // 결과 집계
+    const updateResult = {
+      updatedCount: updateResults.reduce((sum, r) => sum + (r.saved || 0) + (r.updated || 0), 0),
+      newCount: updateResults.reduce((sum, r) => sum + (r.saved || 0), 0),
+      updatedExistingCount: updateResults.reduce((sum, r) => sum + (r.updated || 0), 0),
+      skippedCount: updateResults.reduce((sum, r) => sum + (r.skipped || 0), 0),
+      categories: updateResults.filter(r => r.success).map(r => r.sportKey)
+    };
     
     // --- ✅ 효율성 최적화: 경기 결과 업데이트가 있을 때만 베팅 정산 실행 ---
     if (updateResult?.updatedCount > 0) {
@@ -291,11 +300,18 @@ cron.schedule('0 */2 * * *', async () => {
     setTimeout(async () => {
       try {
         saveUpdateLog('results', 'start', { message: 'Retrying game results update', isRetry: true });
-        const retryResult = await withTimeout(
-          gameResultService.fetchAndUpdateResultsForCategories(Array.from(activeCategories)),
-          3 * 60 * 1000, // 3분으로 단축
+        const retryResults = await withTimeout(
+          gameResultService.updateAllResults(null, 7),
+          10 * 60 * 1000, // 10분
           'Game results retry'
         );
+        
+        const retryResult = {
+          updatedCount: retryResults.reduce((sum, r) => sum + (r.saved || 0) + (r.updated || 0), 0),
+          newCount: retryResults.reduce((sum, r) => sum + (r.saved || 0), 0),
+          updatedExistingCount: retryResults.reduce((sum, r) => sum + (r.updated || 0), 0),
+          skippedCount: retryResults.reduce((sum, r) => sum + (r.skipped || 0), 0)
+        };
 
         // --- ✅ 효율성 최적화: 재시도에서도 경기 결과 업데이트가 있을 때만 베팅 정산 실행 ---
         let betRetryResult;
@@ -691,13 +707,17 @@ const initializeData = async () => {
   
   try {
     // 활성 카테고리만 초기 로드 (20분 타임아웃)
-    const [oddsResult, resultsResult] = await withTimeout(
-      Promise.all([
-        oddsApiService.fetchAndCacheOddsForCategories(Array.from(activeCategories)),
-        gameResultService.fetchAndUpdateResultsForCategories(Array.from(activeCategories))
-      ]),
+    const oddsResult = await withTimeout(
+      oddsApiService.fetchAndCacheOddsForCategories(Array.from(activeCategories)),
       20 * 60 * 1000, // 20분
-      'Initial data caching'
+      'Initial odds caching'
+    );
+    
+    // ✨ The Odds API scores로 경기 결과 초기 로드 (7일치)
+    const resultsResult = await withTimeout(
+      gameResultService.updateAllResults(null, 7),
+      10 * 60 * 1000, // 10분
+      'Initial game results loading'
     );
     
     // 초기 배팅 결과 업데이트 (3분 타임아웃)
@@ -708,11 +728,15 @@ const initializeData = async () => {
     );
     
     lastUpdateTime = new Date();
+    
+    // 결과 집계
+    const totalResults = resultsResult.reduce((sum, r) => sum + (r.saved || 0) + (r.updated || 0), 0);
+    
     saveUpdateLog('init', 'success', { 
       message: 'Initial data cached successfully for active categories',
       categories: Array.from(activeCategories),
       oddsUpdated: oddsResult?.updatedCount || 0,
-      resultsUpdated: resultsResult?.updatedCount || 'N/A',
+      resultsUpdated: totalResults || 0,
       betsUpdated: betResult?.updatedCount || 0
     });
   } catch (error) {
@@ -731,12 +755,14 @@ const initializeData = async () => {
       try {
         saveUpdateLog('init', 'start', { message: 'Retrying initial data caching', isRetry: true });
         await withTimeout(
-          Promise.all([
-            oddsApiService.fetchAndCacheOddsForCategories(Array.from(activeCategories)),
-            gameResultService.fetchAndUpdateResultsForCategories(Array.from(activeCategories))
-          ]),
+          oddsApiService.fetchAndCacheOddsForCategories(Array.from(activeCategories)),
           20 * 60 * 1000, // 20분
-          'Initial data retry'
+          'Initial odds retry'
+        );
+        await withTimeout(
+          gameResultService.updateAllResults(null, 7),
+          10 * 60 * 1000, // 10분
+          'Initial game results retry'
         );
         await withTimeout(
           betResultService.updateBetResults(),
