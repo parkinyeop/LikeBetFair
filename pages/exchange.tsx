@@ -758,10 +758,28 @@ export default function Exchange() {
 
         await Promise.all(apiPromises);
 
-        // 시간순 정렬
-        const sortedAllGames = allGames.sort((a, b) =>
-          new Date(a.localGameTime).getTime() - new Date(b.localGameTime).getTime()
-        );
+        // ✅ 미래 경기 우선 정렬 (가까운 순)
+        const now = getCurrentLocalTime();
+        const sortedAllGames = allGames.sort((a, b) => {
+          const currentTime = now.getTime();
+          const aTime = new Date(a.localGameTime).getTime();
+          const bTime = new Date(b.localGameTime).getTime();
+          
+          const aIsFuture = aTime >= currentTime;
+          const bIsFuture = bTime >= currentTime;
+          
+          // 미래 vs 과거: 미래 우선
+          if (aIsFuture && !bIsFuture) return -1;
+          if (!aIsFuture && bIsFuture) return 1;
+          
+          // 둘 다 미래: 가까운 순
+          if (aIsFuture && bIsFuture) {
+            return aTime - bTime;
+          }
+          
+          // 둘 다 과거: 최근 순
+          return bTime - aTime;
+        });
 
         setGames(sortedAllGames);
 

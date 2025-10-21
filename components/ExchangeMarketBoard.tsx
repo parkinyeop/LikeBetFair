@@ -117,61 +117,67 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
   // 스포츠북 스타일: 현재에 가까운 미래 순으로 정렬
   // 1. 현재 시간 기준으로 진행 중이거나 예정된 경기만 필터링
   // 2. 시작 시간 순으로 정렬 (가장 가까운 경기부터)
-  const now = new Date();
-  console.log('🕐 현재 시간:', now.toISOString());
-  
-  const sortedGames = Array.from(uniqueGamesMap.values())
-    .filter(game => {
-      // 🚨 수정: 하드코딩된 KST 변환 제거
-      // 브라우저의 로컬 시간대 설정을 사용하여 자동 변환
-      const utcDate = new Date(game.commenceTime);
-      const gameTime = utcDate;
-      const timeDiff = gameTime.getTime() - now.getTime();
-      const shouldDisplay = shouldDisplayGame(game.commenceTime);
-      
-      // 디버깅: 각 경기의 시간 정보 로그
-      console.log(`🏈 경기: ${game.homeTeam} vs ${game.awayTeam}`, {
-        gameTime: gameTime.toISOString(),
-        timeDiff: timeDiff,
-        timeDiffHours: Math.round(timeDiff / (1000 * 60 * 60) * 100) / 100,
-        shouldDisplay: shouldDisplay,
-        status: timeDiff > 0 ? '미래' : timeDiff > -2 * 60 * 60 * 1000 ? '진행중' : '과거'
+  const filteredGames = React.useMemo(() => {
+    const now = new Date();
+    console.log('🕐 현재 시간:', now.toISOString());
+    
+    const sorted = Array.from(uniqueGamesMap.values())
+      .filter(game => {
+        // 🚨 수정: 하드코딩된 KST 변환 제거
+        // 브라우저의 로컬 시간대 설정을 사용하여 자동 변환
+        const utcDate = new Date(game.commenceTime);
+        const gameTime = utcDate;
+        const timeDiff = gameTime.getTime() - now.getTime();
+        const shouldDisplay = shouldDisplayGame(game.commenceTime);
+        
+        // 디버깅: 각 경기의 시간 정보 로그
+        console.log(`🏈 경기: ${game.homeTeam} vs ${game.awayTeam}`, {
+          gameTime: gameTime.toISOString(),
+          timeDiff: timeDiff,
+          timeDiffHours: Math.round(timeDiff / (1000 * 60 * 60) * 100) / 100,
+          shouldDisplay: shouldDisplay,
+          status: timeDiff > 0 ? '미래' : timeDiff > -2 * 60 * 60 * 1000 ? '진행중' : '과거'
+        });
+        
+        // 스포츠북 규칙 적용: 표시 여부 결정
+        return shouldDisplay;
+      })
+      .sort((a, b) => {
+        // 🚨 수정: 하드코딩된 KST 변환 제거
+        // 브라우저의 로컬 시간대 설정을 사용하여 자동 변환
+        const utcDateA = new Date(a.commenceTime);
+        const utcDateB = new Date(b.commenceTime);
+        const timeA = utcDateA;
+        const timeB = utcDateB;
+        const now = new Date();
+        
+        // 1. 미래 경기 우선 (가까운 순)
+        // 2. 과거 경기는 나중에 (최근 순)
+        
+        const timeDiffA = timeA.getTime() - now.getTime();
+        const timeDiffB = timeB.getTime() - now.getTime();
+        
+        // 둘 다 미래: 가까운 순
+        if (timeDiffA > 0 && timeDiffB > 0) {
+          return timeA.getTime() - timeB.getTime(); // 오름차순
+        }
+        
+        // 둘 다 과거: 최근 순  
+        if (timeDiffA < 0 && timeDiffB < 0) {
+          return timeB.getTime() - timeA.getTime(); // 내림차순
+        }
+        
+        // 미래 vs 과거: 미래가 우선
+        return timeDiffA > 0 ? -1 : 1;
       });
-      
-      // 스포츠북 규칙 적용: 표시 여부 결정
-      return shouldDisplay;
-    })
-    .sort((a, b) => {
-      // 🚨 수정: 하드코딩된 KST 변환 제거
-      // 브라우저의 로컬 시간대 설정을 사용하여 자동 변환
-      const utcDateA = new Date(a.commenceTime);
-      const utcDateB = new Date(b.commenceTime);
-      const timeA = utcDateA;
-      const timeB = utcDateB;
-      const now = new Date();
-      
-      // 1. 미래 경기 우선 (가까운 순)
-      // 2. 과거 경기는 나중에 (최근 순)
-      
-      const timeDiffA = timeA.getTime() - now.getTime();
-      const timeDiffB = timeB.getTime() - now.getTime();
-      
-      // 둘 다 미래: 가까운 순
-      if (timeDiffA > 0 && timeDiffB > 0) {
-        return timeA.getTime() - timeB.getTime(); // 오름차순
-      }
-      
-      // 둘 다 과거: 최근 순  
-      if (timeDiffA < 0 && timeDiffB < 0) {
-        return timeB.getTime() - timeA.getTime(); // 내림차순
-      }
-      
-      // 미래 vs 과거: 미래가 우선
-      return timeDiffA > 0 ? -1 : 1;
-    });
-  
-  console.log('✅ 필터링 후 경기 수:', sortedGames.length);
-  const filteredGames = sortedGames;
+    
+    console.log('✅ 필터링 후 경기 수:', sorted.length);
+    if (sorted.length > 0) {
+      console.log('🎯 첫 번째 경기:', sorted[0].homeTeam, 'vs', sorted[0].awayTeam, '-', sorted[0].commenceTime);
+    }
+    
+    return sorted;
+  }, [uniqueGamesMap, selectedCategory]); // uniqueGamesMap 의존성 추가
 
   // 체크박스 방식 마켓 토글 핸들러
   const toggleGameMarket = (gameId: string, market: string) => {
