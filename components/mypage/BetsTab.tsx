@@ -9,6 +9,14 @@ interface Bet {
   totalOdds: number;
   potentialWinnings: number;
   status: 'pending' | 'won' | 'lost' | 'cancelled';
+  selections?: Array<{
+    desc: string;
+    odds: number;
+    result?: string;
+    team?: string;
+    selection?: string;
+    market?: string;
+  }>;
 }
 
 export default function BetsTab() {
@@ -74,26 +82,51 @@ export default function BetsTab() {
     {
       key: 'createdAt',
       label: '베팅 시간',
-      render: (value: string) => new Date(value).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
+      render: (value: string) => (
+        <span className="text-xs">
+          {new Date(value).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
+        </span>
+      ),
       className: 'w-40'
+    },
+    {
+      key: 'selections',
+      label: '경기 정보',
+      render: (value: any[], row: Bet) => {
+        if (!value || value.length === 0) return '-';
+        
+        return (
+          <div className="space-y-1">
+            {value.map((sel, idx) => (
+              <div key={idx} className="text-xs">
+                <div className="font-medium text-gray-900">{sel.desc}</div>
+                <div className="text-gray-600">
+                  {sel.team || sel.selection} • {sel.market || '-'} • {Number(sel.odds).toFixed(2)}배
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      },
+      className: 'w-64'
     },
     {
       key: 'stake',
       label: '베팅 금액',
       render: (value: number) => `${value.toLocaleString()}원`,
-      className: 'w-32'
+      className: 'w-28'
     },
     {
       key: 'totalOdds',
       label: '총 배당률',
-      render: (value: number) => `${value}`,
+      render: (value: number) => `${Number(value).toFixed(2)}`,
       className: 'w-24'
     },
     {
       key: 'potentialWinnings',
       label: '예상 상금',
       render: (value: number) => `${value.toLocaleString()}원`,
-      className: 'w-32'
+      className: 'w-28'
     },
     {
       key: 'status',

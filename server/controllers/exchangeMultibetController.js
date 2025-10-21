@@ -242,11 +242,28 @@ class ExchangeMultibetController {
 
       // 6. 사용자 잔액 차감 (✅ balanceService 사용)
       console.log('🔍 [MultibetController] 사용자 잔액 차감 시작...');
+      
+      // 🆕 상세 메모 생성 (경기 정보 포함)
+      let detailedMemo = `익스체인지 ${side === 'back' ? 'BACK' : 'LAY'} 멀티배팅 (${selections.length}개 경기)`;
+      if (selections.length === 1) {
+        const sel = selections[0];
+        detailedMemo += ` - ${sel.desc || `${sel.homeTeam} vs ${sel.awayTeam}`}, ${sel.team || sel.selection}, ${Number(sel.odds).toFixed(2)}배`;
+      } else if (selections.length <= 3) {
+        // 3개 이하면 모든 경기 표시
+        detailedMemo += ': ' + selections.map(s => 
+          `${s.homeTeam} vs ${s.awayTeam} (${s.team || s.selection})`
+        ).join(', ');
+      } else {
+        // 4개 이상이면 첫 경기만 + ...
+        const first = selections[0];
+        detailedMemo += `: ${first.homeTeam} vs ${first.awayTeam} 외 ${selections.length - 1}개`;
+      }
+      
       await balanceService.deductBalance(
         userId,
         stake,
-        `익스체인지 멀티배팅 주문 생성 (${selections.length}개 경기)`,
-        null, // 주문 생성 시점에는 betId 없음
+        detailedMemo,
+        `EXCHANGE_${multibetOrder.id}`, // ✅ 주문번호 전달
         transaction
       );
       console.log('✅ [MultibetController] 사용자 잔액 차감 완료 (PaymentHistory 기록됨)');

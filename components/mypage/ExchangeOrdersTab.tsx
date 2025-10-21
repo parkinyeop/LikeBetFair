@@ -9,7 +9,20 @@ interface ExchangeOrder {
   price: number;
   amount: number;
   filledAmount: number;
-  status: 'open' | 'matched' | 'partially_matched' | 'cancelled';
+  status: 'open' | 'matched' | 'partially_matched' | 'cancelled' | 'settled';
+  homeTeam?: string;
+  awayTeam?: string;
+  selection?: string;
+  market?: string;
+  isMultibet?: boolean;
+  selectionDetails?: {
+    selections?: Array<{
+      desc: string;
+      team: string;
+      odds: number;
+      market: string;
+    }>;
+  };
 }
 
 export default function ExchangeOrdersTab() {
@@ -69,6 +82,7 @@ export default function ExchangeOrdersTab() {
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       matched: { text: '매칭완료', className: 'bg-green-100 text-green-800' },
+      settled: { text: '정산완료', className: 'bg-purple-100 text-purple-800' },
       open: { text: '대기중', className: 'bg-yellow-100 text-yellow-800' },
       partially_matched: { text: '부분매칭', className: 'bg-blue-100 text-blue-800' },
       cancelled: { text: '취소', className: 'bg-gray-100 text-gray-800' }
@@ -87,8 +101,49 @@ export default function ExchangeOrdersTab() {
     {
       key: 'createdAt',
       label: '주문 시간',
-      render: (value: string) => new Date(value).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
+      render: (value: string) => (
+        <span className="text-xs">
+          {new Date(value).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
+        </span>
+      ),
       className: 'w-40'
+    },
+    {
+      key: 'homeTeam',
+      label: '경기 정보',
+      render: (value: string, row: ExchangeOrder) => {
+        // 멀티배팅인 경우
+        if (row.isMultibet && row.selectionDetails?.selections) {
+          const selections = row.selectionDetails.selections;
+          return (
+            <div className="space-y-1">
+              {selections.map((sel, idx) => (
+                <div key={idx} className="text-xs">
+                  <div className="font-medium text-gray-900">{sel.desc}</div>
+                  <div className="text-gray-600">
+                    {sel.team} • {sel.market} • {Number(sel.odds).toFixed(2)}배
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        }
+        
+        // 단일 경기인 경우
+        if (row.homeTeam && row.awayTeam) {
+          return (
+            <div className="text-xs">
+              <div className="font-medium text-gray-900">{row.homeTeam} vs {row.awayTeam}</div>
+              <div className="text-gray-600">
+                {row.selection || '-'} • {row.market || '-'}
+              </div>
+            </div>
+          );
+        }
+        
+        return '-';
+      },
+      className: 'w-64'
     },
     {
       key: 'side',
@@ -106,19 +161,19 @@ export default function ExchangeOrdersTab() {
       key: 'amount',
       label: '금액',
       render: (value: number) => `${value.toLocaleString()}원`,
-      className: 'w-32'
+      className: 'w-28'
     },
     {
       key: 'filledAmount',
       label: '매칭액',
       render: (value: number) => `${value.toLocaleString()}원`,
-      className: 'w-32'
+      className: 'w-28'
     },
     {
       key: 'status',
       label: '상태',
       render: (value: string) => getStatusBadge(value),
-      className: 'w-28'
+      className: 'w-24'
     }
   ];
 
