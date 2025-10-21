@@ -5,7 +5,7 @@ import createScriptSequelize from '../config/scriptDatabase.js';
 import betResultService from './betResultService.js';
 import OddsCache from '../models/oddsCacheModel.js';
 import oddsApiService from './oddsApiService.js';
-import { normalizeTeamName, normalizeCategory, normalizeCommenceTime, normalizeCategoryPair } from '../normalizeUtils.js';
+import { normalizeTeamNameForComparison, normalizeCategory, normalizeCommenceTime, normalizeCategoryPair } from '../normalizeUtils.js';
 import dotenv from 'dotenv';
 
 // 환경변수 로드
@@ -161,8 +161,9 @@ class GameResultService {
           continue;
         }
 
-          const homeTeam = normalizeTeamName(result.home_team);
-          const awayTeam = normalizeTeamName(result.away_team);
+          // ✅ The Odds API 원본 팀명 그대로 저장 (OddsCache와 일치)
+          const homeTeam = result.home_team;
+          const awayTeam = result.away_team;
           const commenceTime = new Date(result.commence_time);
 
           // 기존 레코드 확인 (eventId 또는 팀명+시간으로)
@@ -362,13 +363,11 @@ class GameResultService {
    */
   async getGameResult(homeTeam, awayTeam, sportKey) {
     try {
-      const normalizedHome = normalizeTeamName(homeTeam);
-      const normalizedAway = normalizeTeamName(awayTeam);
-
+      // ✅ 원본 팀명으로 대소문자 구분 없이 검색 (OddsCache와 동일 방식)
       const result = await GameResult.findOne({
         where: {
-          homeTeam: normalizedHome,
-          awayTeam: normalizedAway,
+          homeTeam: { [Op.iLike]: homeTeam },
+          awayTeam: { [Op.iLike]: awayTeam },
           sportKey: sportKey,
           status: 'finished'
         },

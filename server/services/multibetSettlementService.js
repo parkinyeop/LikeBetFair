@@ -8,7 +8,7 @@ import createScriptSequelize from '../config/scriptDatabase.js';
 import settlementValidation from '../utils/settlementValidation.js';
 import GameResultQuery from '../utils/gameResultQuery.js';
 import { getLocationConfig } from '../config/gameResultQuery.js';
-import { getSettlementWaitHours } from '../config/settlementConfig.js';
+// import { getSettlementWaitHours } from '../config/settlementConfig.js'; // ✅ The Odds API 신뢰로 제거
 import settlementLogger from '../utils/settlementLogger.js';
 
 // 스크립트 전용 Sequelize 인스턴스 생성
@@ -333,17 +333,7 @@ class MultibetSettlementService {
       return 'pending';
     }
 
-    // 🛡️ 안전장치: 경기 시작 후 일정 시간 경과 확인 (스포츠별)
-    const requiredHours = getSettlementWaitHours(gameResult.sportKey);
-    
-    const commenceTime = new Date(gameResult.commenceTime);
-    const now = new Date();
-    const hoursSinceStart = (now - commenceTime) / (1000 * 60 * 60);
-    
-    if (hoursSinceStart < requiredHours) {
-      console.log(`[정산 대기] 경기 시작 후 ${hoursSinceStart.toFixed(1)}시간 - ${requiredHours}시간 대기 (${gameResult.sportKey})`);
-      return 'pending';
-    }
+    // ✅ The Odds API의 completed: true를 신뢰 (시간 대기 제거)
 
     // ✅ 정책: result 필드 사용 금지 - 항상 스코어 기반 판정
     console.log(`[MULTIBET] 스코어 기반 판정 시작 - status: ${status}, market: ${market}`);

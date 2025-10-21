@@ -12,7 +12,6 @@ import { normalizeTeamName, normalizeTeamNameForComparison, normalizeCategory, n
 import { ADMIN_CONFIG } from '../config/centralizedConfig.js';
 import settlementValidation from '../utils/settlementValidation.js';
 import { isGameCancelledOrPostponed, isGameFinished, isGamePending } from '../utils/gameStatusHelpers.js';
-import { getSettlementWaitHours } from '../config/settlementConfig.js';
 
 // 배당률 제공 카테고리만 허용 (gameResultService와 동일하게 유지)
 const allowedCategories = ['baseball', 'soccer', 'basketball'];
@@ -44,23 +43,7 @@ class BetResultService {
     try {
       console.log('Starting bet results update...');
       // ✅ 정책: GameResult의 result 필드 사용 금지
-      // GameResult status 자동 보정: score가 있고 status가 finished가 아니면 finished로 변경
-      const unfinished = await GameResult.findAll({ where: { status: { [Op.not]: 'finished' } } });
-      let fixedCount = 0;
-      for (const gr of unfinished) {
-        // score가 있고 유효한 데이터가 있으면 finished로 보정
-        if (gr.score && Array.isArray(gr.score) && gr.score.length > 0) {
-          // score 배열에 유효한 점수 데이터가 있는지 확인
-          const hasValidScore = gr.score.some(s => s && s.score !== null && s.score !== undefined);
-          if (hasValidScore) {
-            await gr.update({ status: 'finished' });
-            fixedCount++;
-          }
-        }
-      }
-      if (fixedCount > 0) {
-        console.log(`[자동보정] status가 finished가 아닌데 스코어가 있는 GameResult ${fixedCount}건을 finished로 보정함`);
-      }
+      // ✅ The Odds API의 completed: true를 신뢰 (자동 보정 제거)
       
       // pending 상태의 배팅들 조회
       const pendingBets = await Bet.findAll({
@@ -922,21 +905,8 @@ class BetResultService {
     }
 
     // 🟢 3순위: 경기 종료 (결과 판정 - 스코어 확인 필수)
-    // ✅ status가 finished인지 확인
+    // ✅ The Odds API의 completed: true를 신뢰 (status: finished만 확인)
     if (!isGameFinished(gameResult)) {
-      return 'pending';
-    }
-
-    // 🛡️ 안전장치: 경기 시작 후 일정 시간 경과 확인 (스포츠별)
-    // 이유: API가 경기 중간 점수를 finished로 잘못 반환하는 경우 방지
-    const requiredHours = getSettlementWaitHours(gameResult.sportKey);
-    
-    const commenceTime = new Date(gameResult.commenceTime);
-    const now = new Date();
-    const hoursSinceStart = (now - commenceTime) / (1000 * 60 * 60);
-    
-    if (hoursSinceStart < requiredHours) {
-      console.log(`[정산 대기] 경기 시작 후 ${hoursSinceStart.toFixed(1)}시간 - ${requiredHours}시간 대기 (${gameResult.sportKey})`);
       return 'pending';
     }
 
@@ -1045,17 +1015,7 @@ class BetResultService {
       return 'pending';
     }
 
-    // 🛡️ 안전장치: 경기 시작 후 일정 시간 경과 확인 (스포츠별)
-    const requiredHours = getSettlementWaitHours(gameResult.sportKey);
-    
-    const commenceTime = new Date(gameResult.commenceTime);
-    const now = new Date();
-    const hoursSinceStart = (now - commenceTime) / (1000 * 60 * 60);
-    
-    if (hoursSinceStart < requiredHours) {
-      console.log(`[정산 대기] 경기 시작 후 ${hoursSinceStart.toFixed(1)}시간 - ${requiredHours}시간 대기 (${gameResult.sportKey})`);
-      return 'pending';
-    }
+    // ✅ The Odds API의 completed: true를 신뢰 (시간 대기 제거)
 
     if (!gameResult.score || !Array.isArray(gameResult.score) || gameResult.score.length < 2) {
       console.warn(`[언더/오버 판정] 경기 종료 상태이지만 스코어 없음 - pending 유지`);
@@ -1142,17 +1102,7 @@ class BetResultService {
       return 'pending';
     }
 
-    // 🛡️ 안전장치: 경기 시작 후 일정 시간 경과 확인 (스포츠별)
-    const requiredHours = getSettlementWaitHours(gameResult.sportKey);
-    
-    const commenceTime = new Date(gameResult.commenceTime);
-    const now = new Date();
-    const hoursSinceStart = (now - commenceTime) / (1000 * 60 * 60);
-    
-    if (hoursSinceStart < requiredHours) {
-      console.log(`[정산 대기] 경기 시작 후 ${hoursSinceStart.toFixed(1)}시간 - ${requiredHours}시간 대기 (${gameResult.sportKey})`);
-      return 'pending';
-    }
+    // ✅ The Odds API의 completed: true를 신뢰 (시간 대기 제거)
 
     if (!gameResult.score || !Array.isArray(gameResult.score) || gameResult.score.length < 2) {
       console.warn(`[핸디캡 판정] 경기 종료 상태이지만 스코어 없음 - pending 유지`);
