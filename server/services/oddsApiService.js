@@ -1182,6 +1182,60 @@ class OddsApiService {
       return bookmaker.markets.some(market => market.key === 'spreads');
     });
   }
+
+  /**
+   * ✨ 경기 스코어 조회 (The Odds API Scores Endpoint)
+   * @param {string} sportKey - 스포츠 키 (예: soccer_epl, basketball_nba)
+   * @param {number} daysFrom - 과거 며칠간의 결과 조회 (기본값: 3일)
+   * @returns {Promise<Array>} 경기 결과 배열
+   */
+  async fetchScores(sportKey, daysFrom = 3) {
+    try {
+      if (!this.canMakeApiCall()) {
+        console.log(`[Scores] API 호출 한도 초과: ${sportKey}`);
+        throw new Error('API 호출 한도 초과');
+      }
+
+      this.trackApiCall();
+
+      const params = new URLSearchParams({
+        apiKey: this.apiKey,
+        daysFrom: daysFrom.toString(),
+        dateFormat: 'iso'
+      });
+
+      const url = `${this.baseUrl}/${sportKey}/scores?${params}`;
+      console.log(`[Scores] Fetching scores for ${sportKey} (${daysFrom} days)`);
+
+      const response = await axios.get(url, {
+        timeout: 30000,
+        headers: {
+          'User-Agent': 'LikeBetFair/1.0'
+        }
+      });
+
+      if (response.status === 200) {
+        console.log(`[Scores] ✅ ${sportKey}: ${response.data.length}개 경기 조회 성공`);
+        
+        // API 사용량 로깅
+        if (response.headers['x-requests-remaining']) {
+          console.log(`[Scores] 💰 남은 API 호출: ${response.headers['x-requests-remaining']}`);
+        }
+
+        return response.data;
+      } else {
+        throw new Error(`Scores API 응답 오류: ${response.status}`);
+      }
+
+    } catch (error) {
+      if (error.response?.status === 429) {
+        console.error(`[Scores] ❌ Rate limit 초과: ${sportKey}`);
+      } else {
+        console.error(`[Scores] ❌ Error fetching scores for ${sportKey}:`, error.message);
+      }
+      throw error;
+    }
+  }
 }
 
 const oddsApiService = new OddsApiService();
