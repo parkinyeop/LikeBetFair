@@ -225,7 +225,33 @@ class GameResultService {
 
       console.log(`[GameResult] TheSportsDB eventsseason API 호출: ${sportKey} (시즌: ${seasonParam})`)
 
-      const events = response.data?.events || [];
+      let events = response.data?.events || [];
+      
+      // ✅ eventsseason이 null이면 eventspastleague + eventsnextleague로 fallback
+      if (events === null || events.length === 0) {
+        console.log(`[GameResult] ⚠️ eventsseason 데이터 없음 → eventspastleague + eventsnextleague로 fallback`);
+        try {
+          const [lastResponse, nextResponse] = await Promise.all([
+            axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventspastleague.php`, {
+              params: { id: leagueId },
+              timeout: 15000
+            }),
+            axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsnextleague.php`, {
+              params: { id: leagueId },
+              timeout: 15000
+            })
+          ]);
+          
+          const lastEvents = lastResponse.data?.results || [];
+          const nextEvents = nextResponse.data?.events || [];
+          events = [...lastEvents, ...nextEvents];
+          console.log(`[GameResult] ✅ Fallback 성공: ${lastEvents.length}+${nextEvents.length}=${events.length}개 경기`);
+        } catch (fallbackError) {
+          console.error(`[GameResult] ❌ Fallback 실패: ${fallbackError.message}`);
+          events = [];
+        }
+      }
+      
       console.log(`[GameResult] TheSportsDB API 성공: ${events.length}개 경기`);
 
       // 🆕 시간 범위 수정: 과거 15일 + 미래 1일 (누락 데이터 복구용 임시 확장)
@@ -365,17 +391,17 @@ class GameResultService {
       } else {
         // 유럽 리그: 최근 + 예정 경기 조합으로 시간 범위 내 데이터 수집
         const [lastResponse, nextResponse] = await Promise.all([
-          axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventslast.php`, {
+          axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventspastleague.php`, {
             params: { id: leagueId },
             timeout: 15000
           }),
-          axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsnext.php`, {
+          axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsnextleague.php`, {
             params: { id: leagueId },
             timeout: 15000
           })
         ]);
         
-        const lastEvents = lastResponse.data?.events || [];
+        const lastEvents = lastResponse.data?.results || [];
         const nextEvents = nextResponse.data?.events || [];
         const allEvents = [...lastEvents, ...nextEvents];
         

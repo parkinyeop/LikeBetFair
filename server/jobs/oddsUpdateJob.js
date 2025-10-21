@@ -210,8 +210,8 @@ function withTimeout(promise, timeoutMs, operationName) {
   ]);
 }
 
-// 경기 결과 업데이트 - 2시간마다 실행 (💰 API 예산 최적화)
-cron.schedule('0 */2 * * *', async () => {
+// 경기 결과 업데이트 - 10분마다 실행 (✅ TheSportsDB 무료 API 사용)
+cron.schedule('*/10 * * * *', async () => {
   console.log('[SCHEDULER_RESULTS] 🚀 Starting game results update at:', new Date().toISOString());
   
   if (isUpdatingResults) {
@@ -827,7 +827,7 @@ const getHealthStatus = () => {
   };
 };
 
-// TheSportsDB 결과 업데이트 스케줄러 (2시간마다, 1시간에서 변경)
+// TheSportsDB 결과 업데이트 스케줄러 (10분마다 - TheSportsDB 무료 API 사용)
 setInterval(async () => {
   try {
     console.log('[Scheduler] TheSportsDB에서 경기 결과 업데이트 시작');
@@ -840,9 +840,9 @@ setInterval(async () => {
   } catch (error) {
     console.error('[Scheduler] TheSportsDB 결과 업데이트 에러:', error);
   }
-}, 2 * 60 * 60 * 1000); // 2시간마다
+}, 10 * 60 * 1000); // 10분마다
 
-// 배팅내역 기반 누락 경기 결과 자동 보충 (2시간마다, 1시간에서 변경)
+// 배팅내역 기반 누락 경기 결과 자동 보충 (30분마다 - 더 자주 보충)
 setInterval(async () => {
   try {
     console.log('[Scheduler] 배팅내역 기반 누락 경기 결과 자동 보충 시작');
@@ -855,7 +855,7 @@ setInterval(async () => {
   } catch (error) {
     console.error('[Scheduler] 배팅내역 기반 누락 경기 결과 자동 보충 에러:', error);
   }
-}, 2 * 60 * 60 * 1000); // 2시간마다
+}, 30 * 60 * 1000); // 30분마다
 
 const getActiveCategories = () => Array.from(activeCategories);
 
