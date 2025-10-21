@@ -511,8 +511,11 @@ function OrderPanel() {
                     if (value === '' || /^\d*$/.test(value)) {
                       let numValue = value === '' ? 0 : parseInt(value);
                       
-                      // 🆕 10원 단위로 반올림
-                      numValue = Math.round(numValue / 10) * 10;
+                      // 🆕 10원 단위로 반올림 (단, 0이 아닐 때만)
+                      if (numValue > 0) {
+                        numValue = Math.round(numValue / 10) * 10;
+                        if (numValue === 0) numValue = 10; // 최소 10원
+                      }
                       
                       if (isMatchMode) {
                         // 매칭 모드에서 최대 리스크 금액 초과 시 제한

@@ -117,9 +117,10 @@ async function processPartialMatching(orderData) {
     
     // 매칭 기록 생성
     // 🎯 Pot 계산: backStake + layStake
-    // ✅ 10원 단위 올림: Lay 담보금 올림 (9원 끝자리 완전 차단)
-    const backStake = existingOrder.side === 'back' ? matchAmount : Math.ceil(matchAmount * (matchPrice - 1) / 10) * 10;
-    const layStake = existingOrder.side === 'lay' ? matchAmount : Math.ceil(matchAmount * (matchPrice - 1) / 10) * 10;
+    // ✅ 10원 단위 정책: matchAmount를 10원 단위로 올림
+    const roundedMatchAmount = Math.ceil(matchAmount / 10) * 10;
+    const backStake = existingOrder.side === 'back' ? roundedMatchAmount : Math.ceil(roundedMatchAmount * (matchPrice - 1) / 10) * 10;
+    const layStake = existingOrder.side === 'lay' ? roundedMatchAmount : Math.ceil(roundedMatchAmount * (matchPrice - 1) / 10) * 10;
     const potAmount = backStake + layStake;
 
     const matchRecord = await ExchangeOrderMatch.create({
@@ -410,9 +411,10 @@ router.post('/match-order', verifyToken, async (req, res) => {
 
     // 🆕 ExchangeOrderMatch 레코드 생성
     // 🎯 Pot 계산: backStake + layStake
-    // ✅ 10원 단위 올림: Lay 담보금 올림 (9원 끝자리 완전 차단)
-    const backStake = targetOrder.side === 'back' ? actualMatchAmount : Math.ceil(actualMatchAmount * (targetOrder.price - 1) / 10) * 10;
-    const layStake = targetOrder.side === 'lay' ? actualMatchAmount : Math.ceil(actualMatchAmount * (targetOrder.price - 1) / 10) * 10;
+    // ✅ 10원 단위 정책: actualMatchAmount를 10원 단위로 올림
+    const roundedMatchAmount = Math.ceil(actualMatchAmount / 10) * 10;
+    const backStake = targetOrder.side === 'back' ? roundedMatchAmount : Math.ceil(roundedMatchAmount * (targetOrder.price - 1) / 10) * 10;
+    const layStake = targetOrder.side === 'lay' ? roundedMatchAmount : Math.ceil(roundedMatchAmount * (targetOrder.price - 1) / 10) * 10;
     const potAmount = backStake + layStake;
 
     console.log('🆕 ExchangeOrderMatch 생성 시작:', {
