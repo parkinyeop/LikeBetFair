@@ -5,6 +5,7 @@ import gameResultService from '../services/gameResultService.js';
 import betResultService from '../services/betResultService.js';
 import ExchangeSettlementService from '../services/exchangeSettlementService.js';
 import multibetSettlementService from '../services/multibetSettlementService.js';
+import { cleanupOldLogs, getLogStats } from '../utils/logCleanup.js';
 import fs from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
@@ -858,6 +859,34 @@ setInterval(async () => {
 }, 30 * 60 * 1000); // 30분마다
 
 const getActiveCategories = () => Array.from(activeCategories);
+
+// 🧹 로그 파일 자동 정리 - 매일 새벽 2시에 실행 (7일 이상 된 로그 삭제)
+cron.schedule('0 2 * * *', async () => {
+  try {
+    console.log('🧹 [LogCleanup] 오래된 로그 파일 정리 시작');
+    
+    // 로그 통계 확인
+    const statsBefore = getLogStats();
+    console.log(`[LogCleanup] 현재 로그: ${statsBefore.totalFiles}개 파일, ${statsBefore.totalSizeInMB} MB`);
+    
+    // 7일 이상 된 로그 삭제
+    cleanupOldLogs(7);
+    
+    // 정리 후 통계
+    const statsAfter = getLogStats();
+    console.log(`[LogCleanup] 정리 후: ${statsAfter.totalFiles}개 파일, ${statsAfter.totalSizeInMB} MB`);
+    
+    saveUpdateLog('log_cleanup', 'success', {
+      before: statsBefore,
+      after: statsAfter,
+      deletedFiles: statsBefore.totalFiles - statsAfter.totalFiles,
+      freedSpace: `${(statsBefore.totalSize - statsAfter.totalSize) / 1024 / 1024} MB`
+    });
+  } catch (error) {
+    console.error('🧹 [LogCleanup] 로그 정리 실패:', error);
+    saveUpdateLog('log_cleanup', 'error', { error: error.message });
+  }
+});
 
 // 🔒 보안 감사 작업 - 매일 새벽 3시에 실행
 cron.schedule('0 3 * * *', async () => {
