@@ -19,15 +19,17 @@ interface Bet {
   }>;
 }
 
-export default function BetsTab() {
+export default function BetsTab({ viewUserId }: { viewUserId?: string }) {
   const [bets, setBets] = useState<Bet[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all'); // all, pending, won, lost, cancelled
   const [dateRange, setDateRange] = useState('30d'); // 7d, 30d, 90d, all
+  
+  const isAdminViewing = !!viewUserId;
 
   useEffect(() => {
     fetchBets();
-  }, [statusFilter, dateRange]);
+  }, [statusFilter, dateRange, viewUserId]);
 
   const fetchBets = async () => {
     setLoading(true);
@@ -42,7 +44,12 @@ export default function BetsTab() {
         return;
       }
 
-      const res = await fetch(buildApiUrl(`/api/mypage/bets?status=${statusFilter}&range=${dateRange}`), {
+      // 관리자 조회용 API 사용
+      const apiUrl = isAdminViewing
+        ? buildApiUrl(`/api/admin/users/${viewUserId}/bets?status=${statusFilter}&range=${dateRange}`)
+        : buildApiUrl(`/api/mypage/bets?status=${statusFilter}&range=${dateRange}`);
+
+      const res = await fetch(apiUrl, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

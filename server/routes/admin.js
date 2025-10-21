@@ -1216,6 +1216,152 @@ router.patch('/users/detail/:id', verifyToken, requireAdmin(3), async (req, res)
   }
 });
 
+// =============================================================================
+// 관리자 - 특정 사용자 정보 조회 (마이페이지)
+// =============================================================================
+
+// 특정 사용자 프로필 조회
+router.get('/users/:userId/profile', verifyToken, requireAdmin(2), async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const user = await User.findByPk(userId, {
+      attributes: ['id', 'username', 'email', 'createdAt', 'lastLogin', 'isActive']
+    });
+    
+    if (!user) {
+      return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+    }
+    
+    res.json(user);
+  } catch (error) {
+    console.error('사용자 프로필 조회 오류:', error);
+    res.status(500).json({ error: '프로필 조회 중 오류가 발생했습니다.' });
+  }
+});
+
+// 특정 사용자 입출금 내역 조회
+router.get('/users/:userId/payment-history', verifyToken, requireAdmin(2), async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { range = '30d', type = 'all' } = req.query;
+    
+    // 사용자 존재 여부 확인
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+    }
+    
+    const where = { userId };
+    
+    // 날짜 범위 필터
+    if (range !== 'all') {
+      const days = parseInt(range);
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      where.paidAt = { [Op.gte]: startDate };
+    }
+    
+    // 입출금 타입 필터
+    if (type === 'deposit') {
+      where.amount = { [Op.gt]: 0 };
+    } else if (type === 'withdrawal') {
+      where.amount = { [Op.lt]: 0 };
+    }
+    
+    const payments = await PaymentHistory.findAll({
+      where,
+      order: [['paidAt', 'DESC']],
+      limit: 1000
+    });
+    
+    res.json({ payments });
+  } catch (error) {
+    console.error('입출금 내역 조회 오류:', error);
+    res.status(500).json({ error: '입출금 내역 조회 중 오류가 발생했습니다.' });
+  }
+});
+
+// 특정 사용자 베팅 내역 조회
+router.get('/users/:userId/bets', verifyToken, requireAdmin(2), async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { status = 'all', range = '30d' } = req.query;
+    
+    // 사용자 존재 여부 확인
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+    }
+    
+    const where = { userId };
+    
+    // 날짜 범위 필터
+    if (range !== 'all') {
+      const days = parseInt(range);
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      where.createdAt = { [Op.gte]: startDate };
+    }
+    
+    // 상태 필터
+    if (status !== 'all') {
+      where.status = status;
+    }
+    
+    const bets = await Bet.findAll({
+      where,
+      order: [['createdAt', 'DESC']],
+      limit: 1000
+    });
+    
+    res.json({ bets });
+  } catch (error) {
+    console.error('베팅 내역 조회 오류:', error);
+    res.status(500).json({ error: '베팅 내역 조회 중 오류가 발생했습니다.' });
+  }
+});
+
+// 특정 사용자 익스체인지 주문 조회
+router.get('/users/:userId/exchange-orders', verifyToken, requireAdmin(2), async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { status = 'all', range = '30d' } = req.query;
+    
+    // 사용자 존재 여부 확인
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+    }
+    
+    const where = { userId };
+    
+    // 날짜 범위 필터
+    if (range !== 'all') {
+      const days = parseInt(range);
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      where.createdAt = { [Op.gte]: startDate };
+    }
+    
+    // 상태 필터
+    if (status !== 'all') {
+      where.status = status;
+    }
+    
+    const orders = await ExchangeOrder.findAll({
+      where,
+      order: [['createdAt', 'DESC']],
+      limit: 1000
+    });
+    
+    res.json({ orders });
+  } catch (error) {
+    console.error('주문 내역 조회 오류:', error);
+    res.status(500).json({ error: '주문 내역 조회 중 오류가 발생했습니다.' });
+  }
+});
+
 // 사용자 생성
 router.post('/users', verifyToken, requireAdmin(3), async (req, res) => {
   try {

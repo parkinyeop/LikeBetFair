@@ -12,11 +12,13 @@ interface UserData {
   isActive: boolean;
 }
 
-export default function ProfileTab() {
+export default function ProfileTab({ viewUserId }: { viewUserId?: string }) {
   const { username, userId } = useAuth();
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  
+  const isAdminViewing = !!viewUserId; // 관리자가 다른 사용자 정보를 보는지
 
   // 사용자 정보 로드
   useEffect(() => {
@@ -32,7 +34,12 @@ export default function ProfileTab() {
           return;
         }
 
-        const response = await fetch(buildApiUrl('/api/mypage/profile'), {
+        // 관리자가 다른 사용자 정보를 조회하는 경우
+        const apiUrl = isAdminViewing 
+          ? buildApiUrl(`/api/admin/users/${viewUserId}/profile`)
+          : buildApiUrl('/api/mypage/profile');
+
+        const response = await fetch(apiUrl, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -52,7 +59,7 @@ export default function ProfileTab() {
     };
 
     fetchUserData();
-  }, []);
+  }, [viewUserId, isAdminViewing]);
 
   if (loading) {
     return (
@@ -79,14 +86,17 @@ export default function ProfileTab() {
         />
       </div>
 
-      <div className="pt-4">
-        <button
-          onClick={() => setShowPasswordModal(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-        >
-          비밀번호 변경
-        </button>
-      </div>
+      {/* 관리자 조회 시에는 비밀번호 변경 버튼 숨김 */}
+      {!isAdminViewing && (
+        <div className="pt-4">
+          <button
+            onClick={() => setShowPasswordModal(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+          >
+            비밀번호 변경
+          </button>
+        </div>
+      )}
 
       {showPasswordModal && (
         <PasswordChangeModal onClose={() => setShowPasswordModal(false)} />

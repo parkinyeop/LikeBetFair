@@ -25,15 +25,17 @@ interface ExchangeOrder {
   };
 }
 
-export default function ExchangeOrdersTab() {
+export default function ExchangeOrdersTab({ viewUserId }: { viewUserId?: string }) {
   const [orders, setOrders] = useState<ExchangeOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateRange, setDateRange] = useState('30d'); // 7d, 30d, 90d, all
+  
+  const isAdminViewing = !!viewUserId;
 
   useEffect(() => {
     fetchOrders();
-  }, [statusFilter, dateRange]);
+  }, [statusFilter, dateRange, viewUserId]);
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -48,7 +50,12 @@ export default function ExchangeOrdersTab() {
         return;
       }
 
-      const res = await fetch(buildApiUrl(`/api/mypage/exchange-orders?status=${statusFilter}&range=${dateRange}`), {
+      // 관리자 조회용 API 사용
+      const apiUrl = isAdminViewing
+        ? buildApiUrl(`/api/admin/users/${viewUserId}/exchange-orders?status=${statusFilter}&range=${dateRange}`)
+        : buildApiUrl(`/api/mypage/exchange-orders?status=${statusFilter}&range=${dateRange}`);
+
+      const res = await fetch(apiUrl, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

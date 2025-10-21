@@ -10,11 +10,17 @@ import ExchangeOrdersTab from './mypage/ExchangeOrdersTab';
 interface MyPageModalProps {
   isOpen: boolean;
   onClose: () => void;
+  viewUserId?: string; // 관리자가 조회할 사용자 ID
+  viewUsername?: string; // 관리자가 조회할 사용자명
 }
 
-export default function MyPageModal({ isOpen, onClose }: MyPageModalProps) {
+export default function MyPageModal({ isOpen, onClose, viewUserId, viewUsername }: MyPageModalProps) {
   const { username } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
+  
+  // 조회 대상 사용자명 결정
+  const displayUsername = viewUsername || username;
+  const isAdminViewing = !!viewUserId; // 관리자가 다른 사용자 정보를 보는지 여부
 
   if (!isOpen) return null;
 
@@ -33,9 +39,11 @@ export default function MyPageModal({ isOpen, onClose }: MyPageModalProps) {
           {/* 모달 헤더 */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6 rounded-t-lg flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold">마이페이지</h1>
+              <h1 className="text-2xl font-bold">
+                마이페이지 {isAdminViewing && '(관리자 조회)'}
+              </h1>
               <p className="text-blue-100 text-sm mt-1">
-                안녕하세요, {username}님
+                {isAdminViewing ? `${displayUsername}님의 정보` : `안녕하세요, ${displayUsername}님`}
               </p>
             </div>
             <button
@@ -89,10 +97,10 @@ export default function MyPageModal({ isOpen, onClose }: MyPageModalProps) {
 
           {/* 탭 컨텐츠 */}
           <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
-            {activeTab === 'profile' && <ProfileTab />}
-            {activeTab === 'payments' && <PaymentsTab />}
-            {activeTab === 'bets' && <BetsTab />}
-            {activeTab === 'orders' && <ExchangeOrdersTab />}
+            {activeTab === 'profile' && <ProfileTab viewUserId={viewUserId} />}
+            {activeTab === 'payments' && <PaymentsTab viewUserId={viewUserId} />}
+            {activeTab === 'bets' && <BetsTab viewUserId={viewUserId} />}
+            {activeTab === 'orders' && <ExchangeOrdersTab viewUserId={viewUserId} />}
           </div>
         </div>
       </div>

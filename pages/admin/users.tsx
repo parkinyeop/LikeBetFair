@@ -3,6 +3,7 @@ import AdminLayout from '../../components/AdminLayout';
 import AdminTable from '../../components/admin/AdminTable';
 import FilterBar from '../../components/admin/FilterBar';
 import ConfirmationModal from '../../components/admin/ConfirmationModal';
+import MyPageModal from '../../components/MyPageModal';
 import { useAdminApi, useAdminApiMutation } from '../../hooks/useAdminApi';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -23,6 +24,7 @@ export default function UsersManagement() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showMyPageModal, setShowMyPageModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [confirmationModal, setConfirmationModal] = useState<{
@@ -160,13 +162,19 @@ export default function UsersManagement() {
       render: (_: any, user: User) => (
         <div className="flex space-x-2">
           <button
-            onClick={() => handleEditUser(user)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEditUser(user);
+            }}
             className="text-blue-600 hover:text-blue-800 text-sm"
           >
             수정
           </button>
           <button
-            onClick={() => handleDeleteUser(user)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteUser(user);
+            }}
             className="text-red-600 hover:text-red-800 text-sm"
           >
             삭제
@@ -331,6 +339,10 @@ export default function UsersManagement() {
         columns={userColumns}
         loading={usersLoading}
         emptyMessage="사용자 데이터가 없습니다."
+        onRowClick={(user) => {
+          setSelectedUser(user);
+          setShowMyPageModal(true);
+        }}
       />
 
       {/* 새 사용자 추가 모달 */}
@@ -525,6 +537,19 @@ export default function UsersManagement() {
         cancelText="취소"
         confirmButtonColor="red"
       />
+
+      {/* 사용자 마이페이지 모달 */}
+      {showMyPageModal && selectedUser && (
+        <MyPageModal
+          isOpen={showMyPageModal}
+          onClose={() => {
+            setShowMyPageModal(false);
+            setSelectedUser(null);
+          }}
+          viewUserId={selectedUser.id}
+          viewUsername={selectedUser.username}
+        />
+      )}
     </AdminLayout>
   );
 }

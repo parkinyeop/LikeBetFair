@@ -11,16 +11,18 @@ interface Payment {
   betId?: string;
 }
 
-export default function PaymentsTab() {
+export default function PaymentsTab({ viewUserId }: { viewUserId?: string }) {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('30d'); // 7d, 30d, 90d, all
   const [typeFilter, setTypeFilter] = useState('all'); // all, deposit, withdrawal
+  
+  const isAdminViewing = !!viewUserId;
 
   // 입출금 내역 로드
   useEffect(() => {
     fetchPayments();
-  }, [dateRange, typeFilter]);
+  }, [dateRange, typeFilter, viewUserId]);
 
   const fetchPayments = async () => {
     setLoading(true);
@@ -35,7 +37,12 @@ export default function PaymentsTab() {
         return;
       }
 
-      const res = await fetch(buildApiUrl(`/api/mypage/payment-history?range=${dateRange}&type=${typeFilter}`), {
+      // 관리자 조회용 API 사용
+      const apiUrl = isAdminViewing
+        ? buildApiUrl(`/api/admin/users/${viewUserId}/payment-history?range=${dateRange}&type=${typeFilter}`)
+        : buildApiUrl(`/api/mypage/payment-history?range=${dateRange}&type=${typeFilter}`);
+
+      const res = await fetch(apiUrl, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
