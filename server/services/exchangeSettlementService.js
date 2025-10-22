@@ -743,6 +743,10 @@ class ExchangeSettlementService {
     
     console.log(`  🎲 승부 판정: Back ${isBackWin ? '승리' : '패배'}`);
     
+    // 🔧 레이 주문 정산 시 백 주문의 결과 반전
+    const isLayWin = !isBackWin;
+    console.log(`  🔧 레이 주문 결과 반전: Back ${isBackWin ? '승리' : '패배'} → Lay ${isLayWin ? '승리' : '패배'}`);
+    
     // ✅ 수정: match 객체가 있으면 matchedAmount 사용, 없으면 기존 로직
     let backStakeAmount, layStakeAmount;
     
@@ -804,6 +808,7 @@ class ExchangeSettlementService {
     let backWinAmount, layWinAmount;
 
     // 🔑 핵심: 담보금은 이미 차감되었으므로, 정산 시에는 승자에게만 총 담보금 지급
+    // 🔧 레이 주문 정산 시 백 주문의 결과 반전 적용
     if (isBackWin) {
       // Back 승리: 총 담보금 지급 (Back담보 + Lay담보)
       // ✅ 정수 연산 보장: Number() 명시적 변환
@@ -824,7 +829,7 @@ class ExchangeSettlementService {
     
     // 사용자 잔고 업데이트
     await this.updateUserBalance(backOrder, backWinAmount, gameResult, isBackWin, transaction);
-    await this.updateUserBalance(layOrder, layWinAmount, gameResult, isBackWin, transaction);
+    await this.updateUserBalance(layOrder, layWinAmount, gameResult, isLayWin, transaction);
     
     // 🆕 주문 상태 업데이트 (부분 매칭 고려)
     const settledAt = new Date();
@@ -904,7 +909,7 @@ class ExchangeSettlementService {
     } else {
       // 기존 로직 (1:1 쌍 정산): 덮어쓰기
       if (layOrder.partiallyFilled) {
-        const laySettlementNote = this.generateDetailedPartialMatchingSettlementNote(layOrder, gameResult, isBackWin, layStakeAmount);
+        const laySettlementNote = this.generateDetailedPartialMatchingSettlementNote(layOrder, gameResult, isLayWin, layStakeAmount);
         await layOrder.update({
           status: 'settled',
           actualProfit: layWinAmount,
@@ -920,7 +925,7 @@ class ExchangeSettlementService {
           status: 'settled',
           actualProfit: layWinAmount,
           settledAt,
-          settlementNote: this.generateSettlementNote(layOrder, gameResult, isBackWin)
+          settlementNote: this.generateSettlementNote(layOrder, gameResult, isLayWin)
         }, { transaction });
       }
     }
@@ -2860,9 +2865,11 @@ class ExchangeSettlementService {
       const refundResult = await this.refundUnmatchedOpenOrders();
       
       // 2. 연결된 모든 매칭 주문들 조회 (부분 매치 포함) - 정산된 주문도 포함
+      // 🔧 레이 주문만 정산하도록 수정 (백은 멀티배팅 서비스에서 처리)
       const allMatchedOrders = await ExchangeOrder.findAll({
         where: {
-          status: { [Op.in]: ['open', 'active', 'matched', 'partially_matched'] }
+          status: { [Op.in]: ['open', 'active', 'matched', 'partially_matched'] },
+          side: 'lay'  // 🔧 레이 주문만 정산
           // settledAt 조건 제거 - 정산된 주문도 포함해서 쌍을 찾기 위해
         }
       });

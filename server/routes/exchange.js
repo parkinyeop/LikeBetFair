@@ -241,8 +241,11 @@ router.post('/match-order', verifyToken, async (req, res) => {
         });
       }
       actualMatchAmount = Math.min(matchAmount, targetOrder.remainingAmount || targetOrder.amount);
-      // ✅ 10원 단위 올림: Lay 담보금 올림 (9원 끝자리 완전 차단)
-      stakeAmount = Math.ceil((parseFloat(adjustedPrice) - 1) * actualMatchAmount / 10) * 10; // 리스크 금액 (환수율 적용된 배당율 사용)
+      // ✅ 10원 단위 올림: Lay 담보금 올림 (부동소수점 오차 방지)
+      // 정수 연산 사용: (price - 1) * 1000 → 정수로 변환 후 계산
+      const priceMultiplier = Math.round((parseFloat(adjustedPrice) - 1) * 1000);
+      const liabilityInWon = Math.floor(priceMultiplier * actualMatchAmount / 1000);
+      stakeAmount = Math.ceil(liabilityInWon / 10) * 10; // 10원 단위 올림
     }
     
     if (actualMatchAmount <= 0) {
@@ -631,8 +634,16 @@ router.post('/order', verifyToken, async (req, res) => {
     
     try {
       // 필요 금액 계산
-      // ✅ 10원 단위 올림: Lay 담보금 올림 (9원 끝자리 완전 차단)
-      const required = side === 'back' ? amount : Math.ceil((finalPrice - 1) * amount / 10) * 10;
+      // ✅ 10원 단위 올림: Lay 담보금 올림 (부동소수점 오차 방지)
+      let required;
+      if (side === 'back') {
+        required = amount;
+      } else {
+        // 정수 연산 사용: (price - 1) * 1000 → 정수로 변환 후 계산
+        const priceMultiplier = Math.round((finalPrice - 1) * 1000);
+        const liabilityInWon = Math.floor(priceMultiplier * amount / 1000);
+        required = Math.ceil(liabilityInWon / 10) * 10; // 10원 단위 올림
+      }
       
       console.log('🔍 잔고 검증 상세:', { 
         userId,

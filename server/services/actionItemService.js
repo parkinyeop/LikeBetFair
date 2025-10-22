@@ -111,7 +111,7 @@ class ActionItemService {
         INNER JOIN (
           SELECT "userId", "balanceAfter",
                  ROW_NUMBER() OVER (PARTITION BY "userId" ORDER BY "createdAt" DESC, id DESC) as rn
-          FROM "PaymentHistory"
+          FROM "PaymentHistories"
           WHERE "createdAt" >= :oneHourAgo
         ) ph ON u.id = ph."userId" AND ph.rn = 1
         WHERE ABS(u.balance - ph."balanceAfter") > 1

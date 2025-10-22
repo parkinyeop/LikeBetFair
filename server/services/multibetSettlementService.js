@@ -70,24 +70,89 @@ class MultibetSettlementService {
         return { message: 'Unmatched order cancelled', orderId: order.id };
       }
 
-      // 이미 정산된 경우 스킵
+      // 🔧 settled 상태여도 미정산 매칭이 있으면 정산 진행
       if (order.status === 'settled') {
-        console.log(`⚠️ 이미 정산된 주문: ${order.id}`);
-        await transaction.commit();
-        const totalTime = Date.now() - settlementStartTime;
-        console.log(`⚠️ 중복 정산 방지: ${order.id} (총 ${totalTime}ms)`);
-        return { message: 'Already settled', orderId: order.id };
+        // 미정산 매칭이 있는지 확인
+        const activeMatches = await ExchangeOrderMatch.findAll({
+          where: {
+            [Op.or]: [
+              { originalOrderId: order.id },
+              { matchingOrderId: order.id }
+            ],
+            status: 'active',
+            settledAt: null
+          },
+          transaction
+        });
+
+        if (activeMatches.length === 0) {
+          console.log(`⚠️ 이미 정산된 주문: ${order.id} (미정산 매칭 없음)`);
+          await transaction.commit();
+          const totalTime = Date.now() - settlementStartTime;
+          console.log(`⚠️ 중복 정산 방지: ${order.id} (총 ${totalTime}ms)`);
+          return { message: 'Already settled', orderId: order.id };
+        } else {
+          console.log(`🔧 settled 상태지만 미정산 매칭 ${activeMatches.length}개 발견 → 재정산 진행`);
+        }
       }
 
-      // 2단계: 모든 경기 결과 수집 (성능 측정)
+      // 2단계: selectionDetails 결정
+      // 🔧 레이 주문: 백 주문의 selectionDetails 사용 (백 기준으로 판정)
+      let selectionsToUse = order.selectionDetails.selections;
+      let isLayOrder = (order.side === 'lay');
+      
+      console.log(`🔍 주문 ${order.id} side 확인: ${order.side}, isLayOrder: ${isLayOrder}`);
+      
+      if (isLayOrder) {
+        // 레이 주문이면 매칭된 백 주문 찾기
+        const matches = await ExchangeOrderMatch.findAll({
+          where: {
+            [Op.or]: [
+              { originalOrderId: order.id },
+              { matchingOrderId: order.id }
+            ]
+          },
+          transaction,
+          limit: 1
+        });
+        
+        if (matches.length > 0) {
+          const match = matches[0];
+          const backOrderId = match.originalOrderId === order.id ? match.matchingOrderId : match.originalOrderId;
+          const backOrder = await ExchangeOrder.findByPk(backOrderId, { transaction });
+          
+          if (backOrder && backOrder.selectionDetails?.selections) {
+            selectionsToUse = backOrder.selectionDetails.selections;
+            console.log(`🔧 레이 주문 ${order.id}: 백 주문 ${backOrderId}의 selectionDetails 사용`);
+          }
+        }
+      }
+      
+      // 모든 경기 결과 수집 (성능 측정)
       const gameResultsStartTime = Date.now();
-      const gameResults = await this.collectAllGameResults(order.selectionDetails.selections);
+      const gameResults = await this.collectAllGameResults(selectionsToUse);
       console.log(`⏱️ 경기 결과 수집 완료: ${Date.now() - gameResultsStartTime}ms (${gameResults.length}개)`);
 
-      // 3단계: 멀티배팅 승패 판정
+      // 3단계: 멀티배팅 승패 판정 (백 기준으로 판정)
       const judgmentStartTime = Date.now();
       const settlementResult = this.determineMultibetResult(gameResults);
-      console.log(`⏱️ 승패 판정 완료: ${Date.now() - judgmentStartTime}ms (결과: ${settlementResult.finalResult})`);
+      const backResult = settlementResult.finalResult;
+      
+      // 레이 주문이면 결과 반전
+      let finalResult = backResult;
+      if (isLayOrder) {
+        if (backResult === 'won') {
+          finalResult = 'lost';
+          console.log(`🔧 레이 주문: 백 결과(won) → 레이 결과(lost)`);
+        } else if (backResult === 'lost') {
+          finalResult = 'won';
+          console.log(`🔧 레이 주문: 백 결과(lost) → 레이 결과(won)`);
+        }
+        // cancelled는 그대로
+        settlementResult.finalResult = finalResult;
+      }
+      
+      console.log(`⏱️ 승패 판정 완료: ${Date.now() - judgmentStartTime}ms (백 결과: ${backResult}, 최종 결과: ${finalResult})`);
 
       // 4단계: 정산 처리 (성능 측정)
       const processStartTime = Date.now();
@@ -601,20 +666,44 @@ class MultibetSettlementService {
       };
     }
     
-    // 주문 상태 업데이트
-    let orderStatus;
-    if (finalResult === 'cancelled') {
-      orderStatus = 'cancelled';
-    } else {
-      orderStatus = 'settled';
-    }
-    
     // ✅ gameResults 전달하여 Push 처리
     const profit = await this.calculateProfit(order, finalResult, settlementResult.gameResults);
 
+    // 🔧 모든 매칭이 정산되었는지 확인하여 status와 settledAt 결정
+    const matches = await ExchangeOrderMatch.findAll({
+      where: {
+        [Op.or]: [
+          { originalOrderId: order.id },
+          { matchingOrderId: order.id }
+        ]
+      },
+      transaction
+    });
+
+    // 미정산 매칭 확인
+    const unsettledMatches = matches.filter(m => m.status === 'active' || !m.settledAt);
+    
+    let orderStatus;
+    let shouldSetSettledAt;
+    
+    if (finalResult === 'cancelled') {
+      orderStatus = 'cancelled';
+      shouldSetSettledAt = true;
+    } else if (unsettledMatches.length === 0) {
+      // 모든 매칭이 정산됨 → status: settled, settledAt 설정
+      orderStatus = 'settled';
+      shouldSetSettledAt = true;
+      console.log(`   ✅ 모든 매칭 정산 완료 → status: settled, settledAt 설정`);
+    } else {
+      // 일부만 정산됨 → status: partially_matched, settledAt null
+      orderStatus = 'partially_matched';
+      shouldSetSettledAt = false;
+      console.log(`   ⚠️ 주문 ${order.id}: ${unsettledMatches.length}개 매칭 미정산 → status: partially_matched, settledAt: null`);
+    }
+
     await order.update({
       status: orderStatus,
-      settledAt: new Date(),
+      settledAt: shouldSetSettledAt ? new Date() : null,
       actualProfit: profit,
       profitLoss: profit
     }, { transaction });
@@ -622,8 +711,8 @@ class MultibetSettlementService {
     // 정산 결과에 따른 결제 처리
     await this.processPayment(order, finalResult, settlementResult, transaction);
     
-    // ✅ 제로썸 정산: 백 주문 정산 시 매칭된 레이 주문들을 함께 정산
-    await this.settleMatchedLayOrders(order, finalResult, transaction);
+    // ✅ 제로썸 정산: 레이 주문 정산 시 매칭된 백 주문들을 함께 정산
+    await this.settleMatchedBackOrders(order, finalResult, transaction);
     
     // ✅ 부분 매칭 환불 처리
     if (order.partiallyFilled && order.remainingAmount > 0) {
@@ -1138,17 +1227,49 @@ class MultibetSettlementService {
       console.log('🎯 모든 멀티배팅 주문 정산 시작...');
       
       // 정산 가능한 멀티배팅 주문들 조회
-      // ✅ 수정: 레이 주문 제외 (레이는 ExchangeOrderMatch 기반 제로썸 정산만 사용)
-      const unsettledOrders = await ExchangeOrder.findAll({
+      // 🔧 중요: 레이 주문 기준으로 정산 (백은 부분 매칭 없음, 레이만 부분 매칭)
+      // 레이 정산 시 제로썸으로 백 주문도 함께 정산
+      
+      // 1단계: settledAt null인 레이 주문
+      const unsettledLayOrders = await ExchangeOrder.findAll({
         where: {
           isMultibet: true,
-          side: 'back',  // ✅ 백 주문만 조회 (레이는 제외)
+          side: 'lay',
           status: { [Op.in]: ['matched', 'partially_matched', 'active'] },
           settledAt: null
         },
         order: [['createdAt', 'ASC']],
-        limit: 50 // 한 번에 최대 50개 처리 (10에서 증대)
+        limit: 50
       });
+
+      // 2단계: settled 상태지만 미정산 매칭이 있는 레이 주문 추가
+      const settledLaysWithActiveMatches = await sequelize.query(`
+        SELECT DISTINCT eo.id
+        FROM "ExchangeOrders" eo
+        INNER JOIN "ExchangeOrderMatches" eom ON (eom."originalOrderId" = eo.id OR eom."matchingOrderId" = eo.id)
+        WHERE eo."isMultibet" = true
+          AND eo.side = 'lay'
+          AND eo.status = 'settled'
+          AND eo."settledAt" IS NOT NULL
+          AND eom.status = 'active'
+          AND eom."settledAt" IS NULL
+        LIMIT 50
+      `, {
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      const additionalLayOrderIds = settledLaysWithActiveMatches.map(row => row.id);
+      
+      let additionalLayOrders = [];
+      if (additionalLayOrderIds.length > 0) {
+        additionalLayOrders = await ExchangeOrder.findAll({
+          where: { id: additionalLayOrderIds }
+        });
+        console.log(`🔧 settled 상태지만 미정산 매칭이 있는 레이 주문: ${additionalLayOrders.length}개 추가`);
+      }
+
+      // 합치기
+      const unsettledOrders = [...unsettledLayOrders, ...additionalLayOrders];
 
       console.log(`📋 정산 대상 멀티배팅 주문: ${unsettledOrders.length}개`);
 
@@ -1218,24 +1339,24 @@ class MultibetSettlementService {
   }
   
   /**
-   * ✅ 백 주문 정산 시 매칭된 레이 주문들을 제로썸 정산
-   * @param {Object} backOrder - 백 주문 (멀티베팅)
-   * @param {string} backResult - 백 주문의 정산 결과 ('won', 'lost', 'cancelled')
+   * 🔧 레이 주문 정산 시 매칭된 백 주문들을 제로썸 정산
+   * @param {Object} layOrder - 레이 주문 (멀티베팅)
+   * @param {string} layResult - 레이 주문의 정산 결과 ('won', 'lost', 'cancelled')
    * @param {Object} transaction - 트랜잭션
    */
-  async settleMatchedLayOrders(backOrder, backResult, transaction) {
+  async settleMatchedBackOrders(layOrder, layResult, transaction) {
     try {
-      console.log(`\n🔄 제로썸 정산: 백 주문 ${backOrder.id}에 매칭된 레이 주문들 정산 시작...`);
+      console.log(`\n🔄 제로썸 정산: 레이 주문 ${layOrder.id}에 매칭된 백 주문들 정산 시작...`);
       
-      // 1. ExchangeOrderMatch에서 매칭된 레이 주문 조회
+      // 1. ExchangeOrderMatch에서 매칭된 백 주문 조회
       const ExchangeOrderMatch = (await import('../models/exchangeOrderMatchModel.js')).default;
       
       // ✅ FIX: status가 'active'인 매칭만 조회 (이미 settled된 매치는 제외)
       const matches = await ExchangeOrderMatch.findAll({
         where: {
           [Op.or]: [
-            { originalOrderId: backOrder.id },
-            { matchingOrderId: backOrder.id }
+            { originalOrderId: layOrder.id },
+            { matchingOrderId: layOrder.id }
           ],
           status: 'active'  // ✅ 아직 정산되지 않은 매치만
         },
@@ -1249,82 +1370,82 @@ class MultibetSettlementService {
 
       console.log(`   📊 정산할 매칭: ${matches.length}개\n`);
       
-      // 2. 각 매칭된 레이 주문 정산
+      // 2. 각 매칭된 백 주문 정산
       for (let i = 0; i < matches.length; i++) {
         const match = matches[i];
 
-        // ✅ FIX: originalSide와 matchingSide를 확인하여 레이 주문 찾기
-        let layOrderId;
-        let isBackOriginal = false;
+        // ✅ FIX: originalSide와 matchingSide를 확인하여 백 주문 찾기
+        let backOrderId;
+        let isLayOriginal = false;
 
-        if (match.originalOrderId === backOrder.id) {
-          // 백 주문이 original인 경우
-          isBackOriginal = true;
-          if (match.originalSide === 'back' && match.matchingSide === 'lay') {
-            layOrderId = match.matchingOrderId;
+        if (match.originalOrderId === layOrder.id) {
+          // 레이 주문이 original인 경우
+          isLayOriginal = true;
+          if (match.originalSide === 'lay' && match.matchingSide === 'back') {
+            backOrderId = match.matchingOrderId;
           } else {
-            console.log(`   ⚠️  매치 ${match.id}: 백이 original인데 side가 잘못됨 (original: ${match.originalSide}, matching: ${match.matchingSide})`);
+            console.log(`   ⚠️  매치 ${match.id}: 레이가 original인데 side가 잘못됨 (original: ${match.originalSide}, matching: ${match.matchingSide})`);
             continue;
           }
-        } else if (match.matchingOrderId === backOrder.id) {
-          // 백 주문이 matching인 경우
-          isBackOriginal = false;
-          if (match.matchingSide === 'back' && match.originalSide === 'lay') {
-            layOrderId = match.originalOrderId;
+        } else if (match.matchingOrderId === layOrder.id) {
+          // 레이 주문이 matching인 경우
+          isLayOriginal = false;
+          if (match.matchingSide === 'lay' && match.originalSide === 'back') {
+            backOrderId = match.originalOrderId;
           } else {
-            console.log(`   ⚠️  매치 ${match.id}: 백이 matching인데 side가 잘못됨 (original: ${match.originalSide}, matching: ${match.matchingSide})`);
+            console.log(`   ⚠️  매치 ${match.id}: 레이가 matching인데 side가 잘못됨 (original: ${match.originalSide}, matching: ${match.matchingSide})`);
             continue;
           }
         } else {
-          console.log(`   ⚠️  매치 ${match.id}: 백 주문 ${backOrder.id}를 찾을 수 없음`);
+          console.log(`   ⚠️  매치 ${match.id}: 레이 주문 ${layOrder.id}를 찾을 수 없음`);
           continue;
         }
 
-        const layOrder = await ExchangeOrder.findByPk(layOrderId, { transaction });
+        const backOrder = await ExchangeOrder.findByPk(backOrderId, { transaction });
 
-        if (!layOrder) {
-          console.log(`   ❌ 레이 주문 ${layOrderId}를 찾을 수 없음`);
+        if (!backOrder) {
+          console.log(`   ❌ 백 주문 ${backOrderId}를 찾을 수 없음`);
           continue;
         }
 
-        console.log(`   [${i+1}/${matches.length}] 매치 ${match.id}: 레이 주문 ${layOrderId} 정산 중...`);
+        console.log(`   [${i+1}/${matches.length}] 매치 ${match.id}: 백 주문 ${backOrderId} 정산 중...`);
 
-        // 제로썸 로직: 레이는 백의 반대 결과
-        const layResult = backResult === 'won' ? 'lost' :
-                          backResult === 'lost' ? 'won' :
+        // 제로썸 로직: 백은 레이의 반대 결과
+        const backResult = layResult === 'won' ? 'lost' :
+                          layResult === 'lost' ? 'won' :
                           'cancelled';
 
-        console.log(`       백 결과: ${backResult} → 레이 결과: ${layResult}`);
+        console.log(`       레이 결과: ${layResult} → 백 결과: ${backResult}`);
 
         // 🎯 Pot 기반 정산
         const potAmount = Number(match.potAmount || 0);
-        let layActualProfit = 0;
+        let backActualProfit = 0;
 
-        if (layResult === 'won') {
-          // 레이 승리: Pot 전체 획득
-          layActualProfit = potAmount;
-          console.log(`       🏆 레이 승리: Pot ${potAmount.toLocaleString()}원 획득`);
-        } else if (layResult === 'lost') {
-          // 레이 패배: 0원
-          layActualProfit = 0;
-          console.log(`       💸 레이 패배: Pot 손실`);
+        if (backResult === 'won') {
+          // 백 승리: Pot 전체 획득
+          backActualProfit = potAmount;
+          console.log(`       🏆 백 승리: Pot ${potAmount.toLocaleString()}원 획득`);
+        } else if (backResult === 'lost') {
+          // 백 패배: 0원
+          backActualProfit = 0;
+          console.log(`       💸 백 패배: Pot 손실`);
         } else {
           // 취소: 담보금 환불
-          const layStake = layOrder.stakeAmount || 0;
-          layActualProfit = layStake;
-          console.log(`       🔄 취소 환불: ${layActualProfit.toLocaleString()}원`);
+          const backStake = backOrder.stakeAmount || 0;
+          backActualProfit = backStake;
+          console.log(`       🔄 취소 환불: ${backActualProfit.toLocaleString()}원`);
         }
 
-        // ✅ FIX: 레이 주문 업데이트 (actualProfit 누적)
-        const currentActualProfit = parseFloat(layOrder.actualProfit || 0);
-        const newActualProfit = currentActualProfit + layActualProfit;
+        // ✅ FIX: 백 주문 업데이트 (actualProfit 누적)
+        const currentActualProfit = parseFloat(backOrder.actualProfit || 0);
+        const newActualProfit = currentActualProfit + backActualProfit;
 
-        // ✅ FIX: 레이 주문의 모든 매칭이 정산되었는지 확인
+        // ✅ FIX: 백 주문의 모든 매칭이 정산되었는지 확인
         const allMatches = await ExchangeOrderMatch.findAll({
           where: {
             [Op.or]: [
-              { originalOrderId: layOrder.id },
-              { matchingOrderId: layOrder.id }
+              { originalOrderId: backOrder.id },
+              { matchingOrderId: backOrder.id }
             ]
           },
           transaction
@@ -1332,7 +1453,7 @@ class MultibetSettlementService {
 
         // 현재 매치를 settled로 업데이트
         // ✅ settlementResult는 문자열로 저장 ('back_won' 또는 'lay_won')
-        const settlementResultString = backResult === 'won' ? 'back_won' : 'lay_won';
+        const settlementResultString = layResult === 'won' ? 'lay_won' : 'back_won';
 
         await match.update({
           status: 'settled',
@@ -1351,55 +1472,55 @@ class MultibetSettlementService {
           {
             status: newStatus,
             settledAt: remainingActiveMatches > 0 ? null : new Date(),
-            actualProfit: sequelize.literal(`COALESCE("actualProfit", 0) + ${layActualProfit}`)
+            actualProfit: sequelize.literal(`COALESCE("actualProfit", 0) + ${backActualProfit}`)
           },
           {
-            where: { id: layOrder.id },
+            where: { id: backOrder.id },
             transaction
           }
         );
 
-        console.log(`       ✅ 레이 주문 actualProfit 누적: ${currentActualProfit.toLocaleString()} + ${layActualProfit.toLocaleString()} = ${newActualProfit.toLocaleString()}원`);
-        console.log(`       ✅ 레이 주문 상태: ${newStatus} (남은 매치: ${remainingActiveMatches}개)`);
+        console.log(`       ✅ 백 주문 actualProfit 누적: ${currentActualProfit.toLocaleString()} + ${backActualProfit.toLocaleString()} = ${newActualProfit.toLocaleString()}원`);
+        console.log(`       ✅ 백 주문 상태: ${newStatus} (남은 매치: ${remainingActiveMatches}개)`);
         
-        // ✅ 레이 사용자 잔액 업데이트 (단순화)
-        const layUser = await User.findByPk(layOrder.userId, { transaction });
-        const currentLayBalance = parseFloat(layUser.balance);
-        const newLayBalance = currentLayBalance + layActualProfit;
+        // ✅ 백 사용자 잔액 업데이트 (단순화)
+        const backUser = await User.findByPk(backOrder.userId, { transaction });
+        const currentBackBalance = parseFloat(backUser.balance);
+        const newBackBalance = currentBackBalance + backActualProfit;
         
-        await layUser.update({ balance: newLayBalance }, { transaction });
+        await backUser.update({ balance: newBackBalance }, { transaction });
 
-        console.log(`       💰 레이 잔액: ${currentLayBalance.toLocaleString()} + ${layActualProfit.toLocaleString()} = ${newLayBalance.toLocaleString()}원`);
+        console.log(`       💰 백 잔액: ${currentBackBalance.toLocaleString()} + ${backActualProfit.toLocaleString()} = ${newBackBalance.toLocaleString()}원`);
 
         // ✅ PaymentHistory 기록
-        if (layActualProfit !== 0) {
+        if (backActualProfit !== 0) {
           const { TransactionType } = await import('../types/paymentHistory.js');
           
           await PaymentHistory.create({
-            userId: layOrder.userId,
-            betId: `EXCHANGE_${layOrder.id}_MATCH_${match.id}`,
-            amount: layActualProfit,  // ✅ Pot 획득 금액
-            balanceAfter: newLayBalance,
-            memo: `Exchange 멀티베팅 제로썸 정산 (백 주문 ${backOrder.id} 매치 ${match.id}: ${layResult})`,
+            userId: backOrder.userId,
+            betId: `EXCHANGE_${backOrder.id}_MATCH_${match.id}`,
+            amount: backActualProfit,  // ✅ Pot 획득 금액
+            balanceAfter: newBackBalance,
+            memo: `Exchange 멀티베팅 제로썸 정산 (레이 주문 ${layOrder.id} 매치 ${match.id}: ${backResult})`,
             transactionType: TransactionType.EXCHANGE_MULTIBET_SETTLEMENT,
             status: 'completed',
-            relatedOrderId: layOrder.id,  // 🆕 레이 주문 ID 저장
+            relatedOrderId: backOrder.id,  // 🆕 백 주문 ID 저장
             relatedMatchId: match.id,  // 🆕 매치 ID 저장
             metadata: {
-              backOrderId: backOrder.id,
+              layOrderId: layOrder.id,
               matchId: match.id,
-              layResult: layResult,
+              backResult: backResult,
               potAmount: potAmount,
               settlementType: 'zero_sum'
             },
             paidAt: new Date()
           }, { transaction });
-          console.log(`       📝 PaymentHistory 기록: ${layActualProfit.toLocaleString()}원 (주문: ${layOrder.id}, 매치: ${match.id})`);
+          console.log(`       📝 PaymentHistory 기록: ${backActualProfit.toLocaleString()}원 (주문: ${backOrder.id}, 매치: ${match.id})`);
         }
 
       }
       
-      console.log(`\n   ✅ 제로썸 정산 완료: ${matches.length}개 레이 주문 정산됨\n`);
+      console.log(`\n   ✅ 제로썸 정산 완료: ${matches.length}개 백 주문 정산됨\n`);
       
     } catch (error) {
       console.error(`   ❌ 제로썸 정산 실패:`, error);
