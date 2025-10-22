@@ -3,6 +3,8 @@ import ExchangeOrderMatch from '../models/exchangeOrderMatchModel.js';
 import PaymentHistory from '../models/paymentHistoryModel.js';
 import User from '../models/userModel.js';
 import GameResult from '../models/gameResultModel.js';
+import AdminCommission from '../models/adminCommissionModel.js';
+import ReferralCode from '../models/referralCodeModel.js';
 import { Op } from 'sequelize';
 import createScriptSequelize from '../config/scriptDatabase.js';
 import settlementValidation from '../utils/settlementValidation.js';
@@ -10,6 +12,8 @@ import GameResultQuery from '../utils/gameResultQuery.js';
 import { getLocationConfig } from '../config/gameResultQuery.js';
 // import { getSettlementWaitHours } from '../config/settlementConfig.js'; // ✅ The Odds API 신뢰로 제거
 import settlementLogger from '../utils/settlementLogger.js';
+import CommissionSettingsService from './commissionSettingsService.js';
+import ADMIN_CONFIG from '../config/adminConfig.js';
 
 // 스크립트 전용 Sequelize 인스턴스 생성
 const sequelize = createScriptSequelize();
@@ -1055,13 +1059,15 @@ class MultibetSettlementService {
       // 수수료 계산 (Lay 승리 시만)
       if (actualProfit > 0 && order.side === 'lay' && result === 'won') {
         const layStake = order.stakeAmount || 0;
-        const backStake = actualProfit - layStake;  // Pot에서 상대방 담보금
+        const backStake = actualProfit - layStake;  // Pot에서 상대방 담보금 (Lay의 순수익)
         
         if (backStake > 0) {
           const CommissionService = (await import('./commissionService.js')).default;
+          // ✅ 수정: Lay의 순수익 = backStake (상대방 담보금)
+          // winnings는 Lay가 받은 총 금액(actualProfit), stake는 Lay가 낸 담보금(layStake)
           const commissionCalculation = await CommissionService.calculate({
-            winnings: backStake,
-            stake: layStake,
+            winnings: actualProfit,  // ✅ 수정: Pot 전체 (= layStake + backStake)
+            stake: layStake,         // Lay가 낸 담보금
             platform: 'exchange',
             user: user,
             bet: { id: order.id, userId: order.userId },
@@ -1070,7 +1076,7 @@ class MultibetSettlementService {
           
           commissionAmount = commissionCalculation.commissionAmount;
           actualProfit -= commissionAmount;
-          console.log(`💰 수수료 차감: ${commissionAmount.toLocaleString()}원`);
+          console.log(`💰 수수료 차감: ${commissionAmount.toLocaleString()}원 (순수익 ${backStake.toLocaleString()}원의 ${(commissionCalculation.appliedRate * 100).toFixed(2)}%)`);
         }
       }
 
@@ -1162,15 +1168,92 @@ class MultibetSettlementService {
       // 7단계: 매치 상태 업데이트 (settled로 변경) → settleMatchedLayOrders로 이동
       console.log(`⏱️ 매치 상태 업데이트는 레이 정산 시점에 수행됨`);
       
-      // 7단계: 수수료 차감 기록 (Lay 승리 시)
+      // 7단계: 수수료 차감 및 AdminCommission 기록 (Lay 승리 시)
       if (commissionAmount > 0) {
+        // 7-1. 추천인 확인
+        const findOptions = { transaction, lock: transaction.LOCK.UPDATE };
+        const referralCode = await ReferralCode.findOne({
+          where: { userId: order.userId },
+          ...findOptions
+        });
+
+        let commissionRecipientId = null;
+        let commissionType = 'exchange';
+
+        if (referralCode && referralCode.adminId) {
+          // 추천인이 있는 경우 → 추천인 수수료 처리
+          const referrerUser = await User.findByPk(referralCode.adminId, findOptions);
+
+          if (referrerUser) {
+            const referralCommissionRate = referralCode.commissionRate || 0;
+            const referralCommissionAmount = Math.floor(actualProfit * referralCommissionRate);
+
+            if (referralCommissionAmount > 0) {
+              // 추천인 잔액에 실제 입금
+              const referrerNewBalance = parseFloat(referrerUser.balance) + referralCommissionAmount;
+              await referrerUser.update({ balance: referrerNewBalance }, { transaction });
+
+              // AdminCommission 기록 (type: 'referral')
+              await AdminCommission.create({
+                adminId: referrerUser.id,
+                userId: order.userId,
+                betId: null,
+                exchangeOrderId: order.id,
+                betAmount: order.stakeAmount || 0,
+                winAmount: actualProfit,
+                commissionRate: referralCommissionRate,
+                commissionAmount: referralCommissionAmount,
+                status: 'paid',
+                paidAt: new Date(),
+                type: 'referral'
+              }, { transaction });
+
+              // 추천인에게 지급된 수수료 기록
+              await PaymentHistory.create({
+                userId: referrerUser.id,
+                betId: `EXCHANGE_${order.id}`,
+                amount: referralCommissionAmount,
+                memo: `익스체인지 추천인 수수료 (주문 ${order.id} 승리, ${(referralCommissionRate * 100).toFixed(2)}%)`,
+                paidAt: new Date(),
+                balanceAfter: referrerNewBalance,
+                transactionType: 'REFERRAL_COMMISSION'
+              }, { transaction });
+
+              console.log(`      💰 추천인 수수료: ${referrerUser.email}에게 ${referralCommissionAmount}원 지급 (${(referralCommissionRate * 100).toFixed(2)}%)`);
+
+              commissionRecipientId = referrerUser.id;
+              commissionType = 'referral';
+            }
+          }
+        } else {
+          // 추천인이 없는 경우 → 시스템 관리자에게 기록만 (회계용)
+          const exchangeCommissionRate = await CommissionSettingsService.getCommissionRate('exchange');
+          
+          await AdminCommission.create({
+            adminId: ADMIN_CONFIG.SYSTEM_ADMIN_ID,
+            userId: order.userId,
+            betId: null,
+            exchangeOrderId: order.id,
+            betAmount: order.stakeAmount || 0,
+            winAmount: actualProfit,
+            commissionRate: exchangeCommissionRate,
+            commissionAmount: commissionAmount,
+            status: 'paid',
+            paidAt: new Date(),
+            type: 'exchange'
+          }, { transaction });
+
+          console.log(`      💰 수수료 기록: ${commissionAmount}원 (시스템 회계 기록)`);
+        }
+
+        // 7-2. 수수료 차감 PaymentHistory 기록
         await PaymentHistory.create({
           userId: order.userId,
-          betId: `EXCHANGE_${order.id}_COMMISSION`,  // ✅ 중복 방지를 위해 suffix 추가
+          betId: `EXCHANGE_${order.id}_COMMISSION`,
           amount: -commissionAmount,
-          memo: `익스체인지 수수료 (상대 담보금 기준)`,
+          memo: `익스체인지 수수료 (${((await CommissionSettingsService.getCommissionRate('exchange')) * 100).toFixed(2)}%)`,
           balanceAfter: newBalance,
-          transactionType: 'EXCHANGE_COMMISSION',  // ✅ 수수료 타입
+          transactionType: 'EXCHANGE_COMMISSION',
           status: 'completed',
           relatedOrderId: order.id,
           metadata: {
@@ -1181,6 +1264,7 @@ class MultibetSettlementService {
           },
           paidAt: new Date()
         }, { transaction });
+        
         console.log(`⏱️ 수수료 차감 기록 완료: -${commissionAmount}원`);
       }
 
