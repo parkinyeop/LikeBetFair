@@ -674,7 +674,9 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                                   <div className="text-xs">{adjustedHomeOdds ? adjustedHomeOdds.toFixed(3) : 'N/A'}</div>
                                 </button>
                               )}
-                              <div className="w-12 text-sm font-medium text-blue-400 text-center">{pointValue}</div>
+                              <div className="w-12 text-sm font-medium text-blue-400 text-center">
+                                {homeHandicap != null ? formatHandicap(homeHandicap) : `-${pointValue}`}
+                              </div>
                               {awayOdds != null && (
                                 <button
                                   onClick={() => handleBetClick(game, `${game.awayTeam} ${formatHandicap(awayHandicap)}`, adjustedAwayOdds, 'back', '핸디캡')}

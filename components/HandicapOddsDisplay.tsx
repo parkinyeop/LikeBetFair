@@ -125,9 +125,9 @@ const HandicapOddsDisplay: React.FC<HandicapOddsDisplayProps> = ({
               </button>
             )}
 
-            {/* 중앙 핸디캡 표시 */}
+            {/* 중앙 핸디캡 표시 - 홈팀 기준으로 음수 표시 */}
             <div className={centerClass}>
-              {homeHandicap != null ? formatHandicap(homeHandicap) : absPoint}
+              {homeHandicap != null ? formatHandicap(homeHandicap) : `-${absPoint}`}
             </div>
 
             {/* 원정팀 버튼 */}

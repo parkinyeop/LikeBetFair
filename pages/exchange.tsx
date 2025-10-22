@@ -1334,7 +1334,9 @@ export default function Exchange() {
                                   <div className="text-xs">{adjustedHomeOdds ? adjustedHomeOdds.toFixed(3) : 'N/A'}</div>
                                 </button>
                               )}
-                              <div className="w-12 text-sm font-medium text-blue-400 text-center">{pointValue}</div>
+                              <div className="w-12 text-sm font-medium text-blue-400 text-center">
+                                {homeHandicap != null ? formatHandicap(homeHandicap) : `-${pointValue}`}
+                              </div>
                               {adjustedAwayOdds != null && (
                                 <button
                                   onClick={() => {
@@ -1998,7 +2000,9 @@ export default function Exchange() {
                                         <div className="text-xs">{adjustedHomeOdds ? adjustedHomeOdds.toFixed(3) : 'N/A'}</div>
                                       </button>
                                     )}
-                                    <div className="w-12 text-sm font-medium text-blue-400 text-center">{pointValue}</div>
+                                    <div className="w-12 text-sm font-medium text-blue-400 text-center">
+                                      {homeHandicap != null ? formatHandicap(homeHandicap) : `-${pointValue}`}
+                                    </div>
                                     {awayOdds != null && (
                                       <button
                                         onClick={() => {
