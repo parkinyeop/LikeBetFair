@@ -44,7 +44,7 @@ class OddsApiService {
       lastResetDate: new Date().toDateString(),
       // 🚨 임시 설정 (디버깅용) - 나중에 원래 값으로 복구 필요
       dailyLimit: 999999,    // 원래: 500 (무료 플랜)
-      monthlyLimit: 10000,   // 원래: 10000 (무료 플랜)
+      monthlyLimit: 20000,   // 원래: 10000 (무료 플랜) → 20000으로 변경
       currentHourCalls: 0,
       hourlyLimit: 999999    // 원래: 100 (무료 플랜)
       

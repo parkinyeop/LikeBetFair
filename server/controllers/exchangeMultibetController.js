@@ -22,13 +22,17 @@ class ExchangeMultibetController {
     try {
       const { selections, stake, totalOdds, description } = req.body;
       const userId = req.user.userId;
+      
+      // side는 selections[0].side에서 가져옴
+      const side = selections?.[0]?.side || 'back';
 
       console.log('🎯 [MultibetController] 멀티배팅 주문 생성 시작:', {
         userId,
         selectionCount: selections?.length,
         stake,
         totalOdds,
-        description
+        description,
+        side
       });
 
       // 🆕 selections 데이터 상세 로그 (별도 파일로 저장)

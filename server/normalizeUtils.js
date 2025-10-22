@@ -80,7 +80,10 @@ function normalizeTeamName(team) {
   if (normalized.includes('talleres') && normalized.includes('cordoba')) {
     normalized = 'talleresdecrdoba';
   }
-  if (normalized.includes('union')) {
+  if (normalized.includes('union') && normalized.includes('santafe')) {
+    normalized = 'unin';
+  }
+  if (normalized === 'union') {
     normalized = 'unin';
   }
   if (normalized.includes('argentinos') && normalized.includes('juniors')) {
@@ -402,6 +405,9 @@ const globalTeamMapping = {
   'racingclub': 'racingclub',
   'talleresdecrdoba': 'talleresdecrdoba',
   'unin': 'unin',
+  'union': 'unin',
+  'unionsantafe': 'unin',
+  'uniondesantafe': 'unin',
   'argentinosjuniors': 'argentinosjuniors',
 
   // === 기타 리그들 ===

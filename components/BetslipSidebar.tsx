@@ -342,6 +342,19 @@ function MyBetsPanel() {
                                 {sel.desc}
                               </div>
                             )}
+                            {/* 경기 시간 표시 */}
+                            {sel.commence_time && (
+                              <div className="text-xs text-gray-400 mt-0.5">
+                                {new Date(sel.commence_time).toLocaleString('ko-KR', {
+                                  month: '2-digit',
+                                  day: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  hour12: false,
+                                  timeZone: 'Asia/Seoul'
+                                })}
+                              </div>
+                            )}
                           </div>
                         );
                       })
