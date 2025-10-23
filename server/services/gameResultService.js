@@ -42,7 +42,8 @@ const clientSportKeyMap = {
   'Ligue1': 'soccer_france_ligue_1',
   'JLeague': 'soccer_japan_j_league',
   'ArgentinaPrimera': 'soccer_argentina_primera_division',
-  'Brasileirao': 'soccer_brazil_campeonato'  // ✅ 첫 글자만 대문자 추가
+  'Brasileirao': 'soccer_brazil_campeonato',  // ✅ 첫 글자만 대문자
+  'BRASILEIRAO': 'soccer_brazil_campeonato'   // ✅ 대문자 추가
 };
 
 // TheSportsDB 리그ID 매핑 (sportKey 기준, 반드시 clientSportKeyMap 값과 일치)
