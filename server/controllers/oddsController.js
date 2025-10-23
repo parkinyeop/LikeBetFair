@@ -1,5 +1,7 @@
 import OddsCache from '../models/oddsCacheModel.js';
 import OddsApiService from '../services/oddsApiService.js';
+import SportsbookOddsReturnRateService from '../services/sportsbookOddsReturnRateService.js';
+import { adjustOddsPayout } from '../utils/oddsUtils.js';
 import { Op } from 'sequelize';
 
 const oddsController = {
@@ -264,6 +266,157 @@ const oddsController = {
           hasOdds: !!formattedData[0].odds,
           hasBookmakers: !!formattedData[0].bookmakers
         });
+      }
+
+      // 🎯 스포츠북 환수율 적용 (정교한 확률 기반 계산)
+      const returnRateSettings = await SportsbookOddsReturnRateService.getOddsReturnRateSettings();
+      console.log(`[oddsController] 스포츠북 환수율 설정:`, returnRateSettings);
+
+      if (returnRateSettings.enabled && returnRateSettings.returnRate) {
+        const returnRate = returnRateSettings.returnRate;
+        console.log(`[oddsController] 배당율에 환수율 ${returnRate * 100}% 적용 시작 (확률 기반 정교한 계산)`);
+
+        formattedData.forEach(game => {
+          // officialOdds 배당율 조정
+          if (game.odds) {
+            // h2h (승무패) - 배열로 변환 후 adjustOddsPayout 적용
+            if (game.odds.h2h) {
+              const h2hKeys = Object.keys(game.odds.h2h);
+
+              // 객체({count, averagePrice}) 또는 숫자 형태 모두 처리
+              const h2hOdds = h2hKeys.map(key => {
+                const oddsValue = game.odds.h2h[key];
+                if (typeof oddsValue === 'number') {
+                  return oddsValue;
+                } else if (oddsValue && typeof oddsValue === 'object' && oddsValue.averagePrice) {
+                  return oddsValue.averagePrice;
+                }
+                return null;
+              }).filter(odds => odds !== null && !isNaN(odds));
+
+              if (h2hOdds.length > 0) {
+                console.log(`[oddsController] h2h 원본 배당률:`, h2hOdds);
+                const adjustedH2hOdds = adjustOddsPayout(h2hOdds, returnRate);
+                console.log(`[oddsController] h2h 조정된 배당률:`, adjustedH2hOdds);
+
+                let adjustedIndex = 0;
+                h2hKeys.forEach(key => {
+                  const oddsValue = game.odds.h2h[key];
+                  if (typeof oddsValue === 'number') {
+                    const original = oddsValue;
+                    game.odds.h2h[key] = adjustedH2hOdds[adjustedIndex];
+                    console.log(`[oddsController] h2h ${key}: ${original.toFixed(3)} → ${adjustedH2hOdds[adjustedIndex].toFixed(3)}`);
+                    adjustedIndex++;
+                  } else if (oddsValue && typeof oddsValue === 'object' && oddsValue.averagePrice) {
+                    const original = oddsValue.averagePrice;
+                    game.odds.h2h[key] = adjustedH2hOdds[adjustedIndex];
+                    console.log(`[oddsController] h2h ${key}: ${original.toFixed(3)} → ${adjustedH2hOdds[adjustedIndex].toFixed(3)} (객체를 숫자로 변환)`);
+                    adjustedIndex++;
+                  }
+                });
+              }
+            }
+
+            // spreads (핸디캡) - 모든 스프레드 배당률을 함께 처리
+            if (game.odds.spreads) {
+              const spreadKeys = Object.keys(game.odds.spreads);
+              const spreadOdds = spreadKeys.map(key => {
+                const oddsValue = game.odds.spreads[key].odds;
+                if (typeof oddsValue === 'number') {
+                  return oddsValue;
+                } else if (oddsValue && typeof oddsValue === 'object' && oddsValue.averagePrice) {
+                  return oddsValue.averagePrice;
+                }
+                return null;
+              }).filter(odds => odds !== null && !isNaN(odds));
+
+              if (spreadOdds.length > 0) {
+                const adjustedSpreadOdds = adjustOddsPayout(spreadOdds, returnRate);
+                let adjustedIndex = 0;
+                spreadKeys.forEach(key => {
+                  const oddsValue = game.odds.spreads[key].odds;
+                  if (typeof oddsValue === 'number') {
+                    const original = oddsValue;
+                    game.odds.spreads[key].odds = adjustedSpreadOdds[adjustedIndex];
+                    console.log(`[oddsController] spread ${key}: ${original.toFixed(3)} → ${adjustedSpreadOdds[adjustedIndex].toFixed(3)}`);
+                    adjustedIndex++;
+                  } else if (oddsValue && typeof oddsValue === 'object' && oddsValue.averagePrice) {
+                    const original = oddsValue.averagePrice;
+                    game.odds.spreads[key].odds = adjustedSpreadOdds[adjustedIndex];
+                    console.log(`[oddsController] spread ${key}: ${original.toFixed(3)} → ${adjustedSpreadOdds[adjustedIndex].toFixed(3)} (객체를 숫자로 변환)`);
+                    adjustedIndex++;
+                  }
+                });
+              }
+            }
+
+            // totals (오버/언더) - 모든 토탈 배당률을 함께 처리
+            if (game.odds.totals) {
+              const totalKeys = Object.keys(game.odds.totals);
+              const totalOdds = totalKeys.map(key => {
+                const oddsValue = game.odds.totals[key].odds;
+                if (typeof oddsValue === 'number') {
+                  return oddsValue;
+                } else if (oddsValue && typeof oddsValue === 'object' && oddsValue.averagePrice) {
+                  return oddsValue.averagePrice;
+                }
+                return null;
+              }).filter(odds => odds !== null && !isNaN(odds));
+
+              if (totalOdds.length > 0) {
+                const adjustedTotalOdds = adjustOddsPayout(totalOdds, returnRate);
+                let adjustedIndex = 0;
+                totalKeys.forEach(key => {
+                  const oddsValue = game.odds.totals[key].odds;
+                  if (typeof oddsValue === 'number') {
+                    const original = oddsValue;
+                    game.odds.totals[key].odds = adjustedTotalOdds[adjustedIndex];
+                    console.log(`[oddsController] total ${key}: ${original.toFixed(3)} → ${adjustedTotalOdds[adjustedIndex].toFixed(3)}`);
+                    adjustedIndex++;
+                  } else if (oddsValue && typeof oddsValue === 'object' && oddsValue.averagePrice) {
+                    const original = oddsValue.averagePrice;
+                    game.odds.totals[key].odds = adjustedTotalOdds[adjustedIndex];
+                    console.log(`[oddsController] total ${key}: ${original.toFixed(3)} → ${adjustedTotalOdds[adjustedIndex].toFixed(3)} (객체를 숫자로 변환)`);
+                    adjustedIndex++;
+                  }
+                });
+              }
+            }
+          }
+
+          // bookmakers 배당율도 조정 (있는 경우)
+          if (game.bookmakers && Array.isArray(game.bookmakers)) {
+            game.bookmakers.forEach(bookmaker => {
+              if (bookmaker.markets && Array.isArray(bookmaker.markets)) {
+                bookmaker.markets.forEach(market => {
+                  if (market.outcomes && Array.isArray(market.outcomes)) {
+                    // 각 마켓의 모든 outcomes를 배열로 모아서 함께 처리
+                    const outcomeOdds = market.outcomes
+                      .map(outcome => outcome.price)
+                      .filter(price => typeof price === 'number' && !isNaN(price) && price > 0);
+
+                    if (outcomeOdds.length > 0) {
+                      const adjustedOutcomeOdds = adjustOddsPayout(outcomeOdds, returnRate);
+                      let adjustedIndex = 0;
+                      market.outcomes.forEach(outcome => {
+                        if (typeof outcome.price === 'number' && !isNaN(outcome.price) && outcome.price > 0) {
+                          const original = outcome.price;
+                          outcome.price = adjustedOutcomeOdds[adjustedIndex];
+                          console.log(`[oddsController] bookmaker ${outcome.name}: ${original.toFixed(3)} → ${adjustedOutcomeOdds[adjustedIndex].toFixed(3)}`);
+                          adjustedIndex++;
+                        }
+                      });
+                    }
+                  }
+                });
+              }
+            });
+          }
+        });
+
+        console.log(`[oddsController] 환수율 적용 완료: ${formattedData.length}개 게임`);
+      } else {
+        console.log(`[oddsController] 환수율 적용 비활성화 - 원본 배당율 반환`);
       }
 
       res.json(formattedData);
