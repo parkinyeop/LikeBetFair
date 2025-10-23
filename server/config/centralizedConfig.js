@@ -311,6 +311,12 @@ export function getEnvironmentConfig() {
   return envConfigs[env] || envConfigs.development;
 }
 
+// 로그 레벨 가져오기 함수
+export function getLogLevel() {
+  const envConfig = getEnvironmentConfig();
+  return envConfig.LOG_LEVEL || 'info';
+}
+
 // ===== 초기화 함수 =====
 export async function initializeCentralizedConfig() {
   console.log('[설정] 중앙화된 설정 초기화 시작...');

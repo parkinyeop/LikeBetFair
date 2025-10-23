@@ -29,8 +29,9 @@ function getLogFilePath() {
   return path.join(logsDir, `server-${dateStr}.log`);
 }
 
-// 로그 레벨 확인 함수
+// 로그 레벨 확인 함수 (동기적)
 function shouldLog(level) {
+  // 환경변수에서 직접 가져오기 (개발환경에서는 'info')
   const logLevel = process.env.LOG_LEVEL || 'info';
   const levels = { 'debug': 0, 'info': 1, 'warn': 2, 'error': 3 };
   return levels[level] >= levels[logLevel];
