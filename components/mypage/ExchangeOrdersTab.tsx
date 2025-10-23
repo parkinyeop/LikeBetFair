@@ -205,13 +205,13 @@ export default function ExchangeOrdersTab({ viewUserId }: { viewUserId?: string 
     {
       key: 'amount',
       label: '금액',
-      render: (value: number) => `${value.toLocaleString()}원`,
+      render: (value: number) => `${Math.floor(value).toLocaleString()} KRW`,
       className: 'w-28'
     },
     {
       key: 'filledAmount',
       label: '매칭액',
-      render: (value: number) => `${value.toLocaleString()}원`,
+      render: (value: number) => `${Math.floor(value).toLocaleString()} KRW`,
       className: 'w-28'
     },
     {

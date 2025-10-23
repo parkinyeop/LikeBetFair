@@ -120,7 +120,7 @@ export default function BetsTab({ viewUserId }: { viewUserId?: string }) {
     {
       key: 'stake',
       label: '베팅 금액',
-      render: (value: number) => `${value.toLocaleString()}원`,
+      render: (value: number) => `${Math.floor(value).toLocaleString()} KRW`,
       className: 'w-28'
     },
     {
@@ -132,7 +132,7 @@ export default function BetsTab({ viewUserId }: { viewUserId?: string }) {
     {
       key: 'potentialWinnings',
       label: '예상 상금',
-      render: (value: number) => `${value.toLocaleString()}원`,
+      render: (value: number) => `${Math.floor(value).toLocaleString()} KRW`,
       className: 'w-28'
     },
     {
