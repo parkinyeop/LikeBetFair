@@ -8,6 +8,7 @@ import GameResult from '../models/gameResultModel.js';
 import createScriptSequelize from '../config/scriptDatabase.js';
 import GameResultQuery from '../utils/gameResultQuery.js';
 import { getLocationConfig } from '../config/gameResultQuery.js';
+import SportsbookOddsReturnRateService from '../services/sportsbookOddsReturnRateService.js';
 
 // 스크립트 전용 Sequelize 인스턴스 생성
 const sequelize = createScriptSequelize();
@@ -233,8 +234,37 @@ export async function placeBet(req, res) {
       return res.status(400).json({ message: 'Insufficient balance' });
     }
 
+    // 스포츠북 환수율 적용
+    console.log('🎯 [PlaceBet] 스포츠북 환수율 적용 시작');
+    
+    let adjustedTotalOdds;
+    if (selections.length === 1) {
+      // 단일 배팅: 단일 배당률 적용
+      adjustedTotalOdds = await SportsbookOddsReturnRateService.applyReturnRateToSingleOdds(totalOdds);
+      console.log('🎯 [PlaceBet] 단일 배팅 배당율 조정:', { 
+        original: totalOdds, 
+        adjusted: adjustedTotalOdds,
+        adjustment: ((adjustedTotalOdds / totalOdds - 1) * 100).toFixed(2) + '%'
+      });
+    } else {
+      // 멀티배팅: 배당률 배열로 환수율 적용
+      const individualOdds = selections.map(sel => sel.odds);
+      const adjustedOddsArray = await SportsbookOddsReturnRateService.applyReturnRateToOddsArray(individualOdds);
+      
+      // 조정된 배당률로 총 배당률 재계산
+      adjustedTotalOdds = adjustedOddsArray.reduce((total, odds) => total * odds, 1);
+      
+      console.log('🎯 [PlaceBet] 멀티배팅 배당율 조정:', { 
+        originalOdds: individualOdds,
+        adjustedOdds: adjustedOddsArray,
+        originalTotal: totalOdds,
+        adjustedTotal: adjustedTotalOdds,
+        adjustment: ((adjustedTotalOdds / totalOdds - 1) * 100).toFixed(2) + '%'
+      });
+    }
+
     // Create bet with precise decimal calculation (floor to 3 decimal places)
-    const potentialWinnings = Math.floor(stake * totalOdds * 100) / 100; // 소수점 2자리로 내림
+    const potentialWinnings = Math.floor(stake * adjustedTotalOdds * 100) / 100; // 소수점 2자리로 내림
     
     // ✅ selections 데이터 검증 및 정규화
     console.log('🔍 [PlaceBet] selections 데이터 검증 시작');
@@ -323,7 +353,7 @@ export async function placeBet(req, res) {
         userId,
         selections: normalizedSelections, // ✅ 정규화된 데이터 저장
         stake,
-        totalOdds,
+        totalOdds: adjustedTotalOdds,
         potentialWinnings,
         status: 'pending'
       }, { transaction });

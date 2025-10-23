@@ -80,8 +80,10 @@ class ExchangeOddsReturnRateService {
     }
 
     const settings = await this.getOddsReturnRateSettings();
+    console.log(`[ExchangeOddsReturnRate] 설정 확인:`, settings);
 
     if (!settings.enabled) {
+      console.log(`[ExchangeOddsReturnRate] 환수율 적용 비활성화됨 - 원본 반환`);
       return oddsArray; // 환수율 적용 비활성화 시 원본 반환
     }
 
@@ -90,18 +92,18 @@ class ExchangeOddsReturnRateService {
     // oddsUtils의 adjustOddsPayout 함수 사용
     const adjustedOdds = adjustOddsPayout(oddsArray, returnRate);
     
-    console.log(`[ExchangeOddsReturnRate] 배당율 배열 조정: [${oddsArray.join(', ')}] × ${returnRate} = [${adjustedOdds.join(', ')}]`);
+    console.log(`[ExchangeOddsReturnRate] 배당율 배열 조정: [${oddsArray.join(', ')}] → [${adjustedOdds.join(', ')}] (환수율: ${(returnRate * 100).toFixed(1)}%)`);
     
     return adjustedOdds;
   }
 
   /**
-   * 단일 배당율에 환수율 적용
+   * 단일 배당율에 환수율 적용 (단일 배당률용)
    * @param {number} odds - 원본 배당율
    * @returns {number} - 환수율이 적용된 배당율
    */
   static async applyReturnRateToSingleOdds(odds) {
-    if (!odds || odds <= 0) {
+    if (!odds || typeof odds !== 'number' || odds <= 0) {
       return odds;
     }
 
@@ -113,10 +115,10 @@ class ExchangeOddsReturnRateService {
 
     const returnRate = settings.returnRate || 0.95;
     
-    // 환수율 적용: odds / returnRate
+    // 단일 배당률의 경우: odds / returnRate
     const adjustedOdds = odds / returnRate;
     
-    console.log(`[ExchangeOddsReturnRate] 단일 배당율 조정: ${odds} / ${returnRate} = ${adjustedOdds}`);
+    console.log(`[ExchangeOddsReturnRate] 단일 배당율 조정: ${odds} / ${returnRate} = ${adjustedOdds.toFixed(3)} (환수율: ${(returnRate * 100).toFixed(1)}%)`);
     
     return adjustedOdds;
   }

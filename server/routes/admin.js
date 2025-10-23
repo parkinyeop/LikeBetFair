@@ -17,6 +17,7 @@ import BettingAmountSettingsService from '../services/bettingAmountSettingsServi
 import ExchangeOddsReturnRateService from '../services/exchangeOddsReturnRateService.js';
 import CommissionSettingsService from '../services/commissionSettingsService.js';
 import SportsbookPayoutRateService from '../services/sportsbookPayoutRateService.js';
+import SportsbookOddsReturnRateService from '../services/sportsbookOddsReturnRateService.js';
 import bcrypt from 'bcryptjs';
 import { Op } from 'sequelize';
 import sequelize from '../models/sequelize.js';
@@ -3861,6 +3862,75 @@ router.post('/sportsbook-payout-rate/update', verifyToken, requireAdmin(2), asyn
     res.status(500).json({
       success: false,
       error: '평균 환수율 업데이트 중 오류가 발생했습니다.'
+    });
+  }
+});
+
+// =============================================================================
+// 스포츠북 환수율 설정 관리 API
+// =============================================================================
+
+// 스포츠북 환수율 설정 조회
+router.get('/settings/sportsbook-odds-return-rate', verifyToken, requireAdmin(1), async (req, res) => {
+  try {
+    console.log('📊 스포츠북 환수율 설정 조회 요청:', {
+      admin: req.admin.username
+    });
+
+    const settings = await SportsbookOddsReturnRateService.getOddsReturnRateSettings();
+    
+    res.json({
+      success: true,
+      data: settings
+    });
+  } catch (error) {
+    console.error('스포츠북 환수율 설정 조회 실패:', error);
+    res.status(500).json({ 
+      success: false,
+      error: '스포츠북 환수율 설정 조회에 실패했습니다.' 
+    });
+  }
+});
+
+// 스포츠북 환수율 설정 업데이트
+router.post('/settings/sportsbook-odds-return-rate', verifyToken, requireAdmin(2), async (req, res) => {
+  console.log('🔧 스포츠북 환수율 설정 업데이트 라우트 진입');
+  try {
+    const { returnRate, enabled } = req.body;
+    
+    console.log('🔧 스포츠북 환수율 설정 업데이트 요청:', {
+      admin: req.admin.username,
+      returnRate,
+      enabled
+    });
+
+    console.log('🔧 SportsbookOddsReturnRateService 확인:', {
+      serviceExists: !!SportsbookOddsReturnRateService,
+      methodExists: !!SportsbookOddsReturnRateService.updateOddsReturnRateSettings
+    });
+
+    const result = await SportsbookOddsReturnRateService.updateOddsReturnRateSettings({ 
+      returnRate, 
+      enabled 
+    });
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: result.message,
+        data: await SportsbookOddsReturnRateService.getOddsReturnRateSettings()
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('스포츠북 환수율 설정 업데이트 실패:', error);
+    res.status(500).json({ 
+      success: false,
+      error: '스포츠북 환수율 설정 업데이트에 실패했습니다.' 
     });
   }
 });

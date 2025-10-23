@@ -104,6 +104,12 @@ export default function SystemSettings() {
   const [sportsbookPayoutRate, setSportsbookPayoutRate] = useState<SportsbookPayoutRateData | null>(null);
   const [sportsbookPayoutRateLoading, setSportsbookPayoutRateLoading] = useState(false);
 
+  // 스포츠북 환수율 설정 상태
+  const [sportsbookOddsReturnRate, setSportsbookOddsReturnRate] = useState<ExchangeOddsReturnRateSettings>({
+    returnRate: 0.95,
+    enabled: true
+  });
+
   // 수수료율 설정 상태
   const [commissionRates, setCommissionRates] = useState({
     sportsbook: 0.05,
@@ -193,23 +199,25 @@ export default function SystemSettings() {
         const commissionUrl = buildApiUrl('/api/admin/settings/commission-rates');
         console.log('🔍 [Settings] 수수료율 API URL:', commissionUrl);
 
-        const [settingsRes, adminsRes, logsRes, backupRes, bettingRes, oddsWeightRes, commissionRes] = await Promise.all([
+        const [settingsRes, adminsRes, logsRes, backupRes, bettingRes, oddsWeightRes, sportsbookOddsRes, commissionRes] = await Promise.all([
           fetch(buildApiUrl('/api/admin/settings'), { headers, cache: 'no-store' }),
           fetch(buildApiUrl('/api/admin/settings/admins'), { headers, cache: 'no-store' }),
           fetch(buildApiUrl('/api/admin/settings/logs'), { headers, cache: 'no-store' }),
           fetch(buildApiUrl('/api/admin/settings/backup'), { headers, cache: 'no-store' }),
           fetch(buildApiUrl('/api/admin/settings/betting-amounts'), { headers, cache: 'no-store' }),
           fetch(buildApiUrl('/api/admin/settings/exchange-odds-return-rate'), { headers, cache: 'no-store' }),
+          fetch(buildApiUrl('/api/admin/settings/sportsbook-odds-return-rate'), { headers, cache: 'no-store' }),
           fetch(commissionUrl, { headers, cache: 'no-store' })
         ]);
 
-        const [settingsData, adminsData, logsData, backupData, bettingData, oddsWeightData, commissionData] = await Promise.all([
+        const [settingsData, adminsData, logsData, backupData, bettingData, oddsWeightData, sportsbookOddsData, commissionData] = await Promise.all([
           settingsRes.json(),
           adminsRes.json(),
           logsRes.json(),
           backupRes.json(),
           bettingRes.json(),
           oddsWeightRes.json(),
+          sportsbookOddsRes.json(),
           commissionRes.json()
         ]);
 
@@ -220,6 +228,10 @@ export default function SystemSettings() {
       
       if (oddsWeightData.success) {
         setExchangeOddsReturnRate(oddsWeightData.data);
+      }
+      
+      if (sportsbookOddsData.success) {
+        setSportsbookOddsReturnRate(sportsbookOddsData.data);
       }
 
       if (commissionData.success) {
@@ -269,6 +281,35 @@ export default function SystemSettings() {
       }
     } catch (error) {
       console.error('익스체인지 배당율 환수율 설정 저장 오류:', error);
+      alert('설정 저장 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 스포츠북 환수율 설정 저장
+  const handleSaveSportsbookOddsReturnRate = async () => {
+    try {
+      const tabId = sessionStorage.getItem('tabId');
+      const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
+      
+      const response = await fetch(buildApiUrl('/api/admin/settings/sportsbook-odds-return-rate'), {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify(sportsbookOddsReturnRate)
+      });
+
+      const result = await response.json();
+      if (response.ok && result.success) {
+        alert('스포츠북 배당율 환수율 설정이 저장되었습니다.');
+        // 🆕 환수율 설정 변경 이벤트 발생
+        window.dispatchEvent(new CustomEvent('sportsbookPayoutRateChanged'));
+      } else {
+        alert(`설정 저장에 실패했습니다: ${result.error || '알 수 없는 오류'}`);
+      }
+    } catch (error) {
+      console.error('스포츠북 배당율 환수율 설정 저장 오류:', error);
       alert('설정 저장 중 오류가 발생했습니다.');
     }
   };
@@ -774,6 +815,75 @@ export default function SystemSettings() {
                     </button>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* 스포츠북 배당율 환수율 설정 */}
+            <div className="bg-gradient-to-r from-purple-50 to-violet-50 p-6 rounded-lg shadow border border-purple-200">
+              <h3 className="text-lg font-medium text-purple-900 mb-4 flex items-center">
+                <span className="w-3 h-3 bg-purple-500 rounded-full mr-2"></span>
+                스포츠북 배당율 환수율 설정
+              </h3>
+              <div className="bg-white p-4 rounded-lg border border-purple-100">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">환수율 (%)</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="99.8"
+                        value={sportsbookOddsReturnRate.returnRate * 100}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value) / 100 || 0;
+                          if (value <= 0.998) {
+                            setSportsbookOddsReturnRate({
+                              ...sportsbookOddsReturnRate,
+                              returnRate: value
+                            });
+                          }
+                        }}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 pr-12 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        placeholder="95"
+                      />
+                      <span className="absolute right-3 top-2 text-sm text-gray-500">%</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      예: 95% = 원본 배당률에 95% 적용 (2.0 → 1.9). 최대 99.8%까지 설정 가능
+                    </p>
+                    {sportsbookOddsReturnRate.returnRate < 0.9 && (
+                      <p className="text-xs text-red-500 mt-1">
+                        ⚠️ 환수율이 너무 낮습니다. 사용자 경험에 영향을 줄 수 있습니다.
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={sportsbookOddsReturnRate.enabled}
+                        onChange={(e) => setSportsbookOddsReturnRate({
+                          ...sportsbookOddsReturnRate,
+                          enabled: e.target.checked
+                        })}
+                        className="mr-2 h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                      />
+                      <span className="text-sm font-medium text-gray-700">환수율 적용 활성화</span>
+                    </label>
+                    <p className="text-xs text-gray-500 mt-1">체크 해제 시 원본 배당율 사용</p>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={() => handleSaveSportsbookOddsReturnRate()}
+                    className="bg-purple-600 text-white px-6 py-2 rounded hover:bg-purple-700 transition-colors"
+                  >
+                    스포츠북 환수율 설정 저장
+                  </button>
+                </div>
               </div>
             </div>
 

@@ -29,6 +29,13 @@ function getLogFilePath() {
   return path.join(logsDir, `server-${dateStr}.log`);
 }
 
+// 로그 레벨 확인 함수
+function shouldLog(level) {
+  const logLevel = process.env.LOG_LEVEL || 'info';
+  const levels = { 'debug': 0, 'info': 1, 'warn': 2, 'error': 3 };
+  return levels[level] >= levels[logLevel];
+}
+
 // console.log override (터미널 + 파일 동시 기록)
 const originalLog = console.log;
 const originalError = console.error;
@@ -41,10 +48,14 @@ console.log = (...args) => {
   ).join(' ');
   
   originalLog(...args); // 터미널 출력
-  try {
-    fs.appendFileSync(getLogFilePath(), `[${timestamp}] [LOG] ${message}\n`);
-  } catch (err) {
-    originalError('로그 파일 쓰기 실패:', err);
+  
+  // INFO 레벨 이상만 파일에 기록
+  if (shouldLog('info')) {
+    try {
+      fs.appendFileSync(getLogFilePath(), `[${timestamp}] [LOG] ${message}\n`);
+    } catch (err) {
+      originalError('로그 파일 쓰기 실패:', err);
+    }
   }
 };
 
@@ -55,10 +66,14 @@ console.error = (...args) => {
   ).join(' ');
   
   originalError(...args); // 터미널 출력
-  try {
-    fs.appendFileSync(getLogFilePath(), `[${timestamp}] [ERROR] ${message}\n`);
-  } catch (err) {
-    originalError('로그 파일 쓰기 실패:', err);
+  
+  // ERROR 레벨만 파일에 기록
+  if (shouldLog('error')) {
+    try {
+      fs.appendFileSync(getLogFilePath(), `[${timestamp}] [ERROR] ${message}\n`);
+    } catch (err) {
+      originalError('로그 파일 쓰기 실패:', err);
+    }
   }
 };
 
@@ -69,10 +84,14 @@ console.warn = (...args) => {
   ).join(' ');
   
   originalWarn(...args); // 터미널 출력
-  try {
-    fs.appendFileSync(getLogFilePath(), `[${timestamp}] [WARN] ${message}\n`);
-  } catch (err) {
-    originalError('로그 파일 쓰기 실패:', err);
+  
+  // WARN 레벨 이상만 파일에 기록
+  if (shouldLog('warn')) {
+    try {
+      fs.appendFileSync(getLogFilePath(), `[${timestamp}] [WARN] ${message}\n`);
+    } catch (err) {
+      originalError('로그 파일 쓰기 실패:', err);
+    }
   }
 };
 
