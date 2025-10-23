@@ -40,17 +40,36 @@ function shouldLog(level) {
 const originalLog = console.log;
 const originalError = console.error;
 const originalWarn = console.warn;
+const originalDebug = console.debug;
+
+// 🆕 디버그 전용 로그 (콘솔에만 출력, 파일에는 기록 안함)
+console.debug = (...args) => {
+  originalLog(...args); // 터미널에만 출력
+};
 
 console.log = (...args) => {
   const timestamp = new Date().toISOString();
-  const message = args.map(arg => 
+  const message = args.map(arg =>
     typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
   ).join(' ');
-  
+
   originalLog(...args); // 터미널 출력
-  
-  // INFO 레벨 이상만 파일에 기록
-  if (shouldLog('info')) {
+
+  // 🔧 특정 패턴은 파일에 기록하지 않음 (개발용 디버그 로그)
+  const skipPatterns = [
+    '⏱️',  // 성능 측정
+    '🔍',  // 디버그 조회
+    '🔧',  // 내부 처리
+    'executeTwoStageQuery',
+    '경기 결과 조회',
+    'h2h 원본 배당률',
+    'h2h 조정된 배당률'
+  ];
+
+  const shouldSkipFile = skipPatterns.some(pattern => message.includes(pattern));
+
+  // INFO 레벨 이상 + 디버그 패턴 아닌 경우만 파일에 기록
+  if (shouldLog('info') && !shouldSkipFile) {
     try {
       fs.appendFileSync(getLogFilePath(), `[${timestamp}] [LOG] ${message}\n`);
     } catch (err) {

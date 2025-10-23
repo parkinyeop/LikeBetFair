@@ -39,9 +39,9 @@ class MultibetSettlementService {
     const transaction = await sequelize.transaction();
 
     try {
-      console.log(`🎯 멀티배팅 정산 시작: 주문 ${order.id}`);
-      
-      // ✅ 정산 시작 로깅
+      console.debug(`🎯 멀티배팅 정산 시작: 주문 ${order.id}`);
+
+      // ✅ 정산 시작 로깅 (파일)
       settlementLogger.logSettlement('MULTIBET_START', order.id, {
         userId: order.userId,
         originalAmount: order.originalAmount,
@@ -60,17 +60,13 @@ class MultibetSettlementService {
         throw new Error('선택된 경기가 없습니다.');
       }
 
-      // 1단계: 매치 여부 확인 (성능 측정)
-      const matchCheckStartTime = Date.now();
+      // 1단계: 매치 여부 확인
       const hasMatches = await this.checkOrderMatches(order.id);
-      console.log(`⏱️ 매치 확인 완료: ${Date.now() - matchCheckStartTime}ms`);
 
       if (!hasMatches) {
-        console.log(`⚠️ 매치되지 않은 주문: ${order.id} - 만료 취소 처리`);
+        console.log(`⚠️ 매치되지 않은 주문 취소: 주문 ${order.id}`);
         await this.processUnmatchedOrderCancellation(order, transaction);
         await transaction.commit();
-        const totalTime = Date.now() - settlementStartTime;
-        console.log(`🔄 주문 취소 완료: ${order.id} (총 ${totalTime}ms)`);
         return { message: 'Unmatched order cancelled', orderId: order.id };
       }
 
@@ -90,13 +86,8 @@ class MultibetSettlementService {
         });
 
         if (activeMatches.length === 0) {
-          console.log(`⚠️ 이미 정산된 주문: ${order.id} (미정산 매칭 없음)`);
           await transaction.commit();
-          const totalTime = Date.now() - settlementStartTime;
-          console.log(`⚠️ 중복 정산 방지: ${order.id} (총 ${totalTime}ms)`);
           return { message: 'Already settled', orderId: order.id };
-        } else {
-          console.log(`🔧 settled 상태지만 미정산 매칭 ${activeMatches.length}개 발견 → 재정산 진행`);
         }
       }
 
@@ -104,9 +95,7 @@ class MultibetSettlementService {
       // 🔧 레이 주문: 백 주문의 selectionDetails 사용 (백 기준으로 판정)
       let selectionsToUse = order.selectionDetails.selections;
       let isLayOrder = (order.side === 'lay');
-      
-      console.log(`🔍 주문 ${order.id} side 확인: ${order.side}, isLayOrder: ${isLayOrder}`);
-      
+
       if (isLayOrder) {
         // 레이 주문이면 매칭된 백 주문 찾기
         const matches = await ExchangeOrderMatch.findAll({
@@ -119,23 +108,20 @@ class MultibetSettlementService {
           transaction,
           limit: 1
         });
-        
+
         if (matches.length > 0) {
           const match = matches[0];
           const backOrderId = match.originalOrderId === order.id ? match.matchingOrderId : match.originalOrderId;
           const backOrder = await ExchangeOrder.findByPk(backOrderId, { transaction });
-          
+
           if (backOrder && backOrder.selectionDetails?.selections) {
             selectionsToUse = backOrder.selectionDetails.selections;
-            console.log(`🔧 레이 주문 ${order.id}: 백 주문 ${backOrderId}의 selectionDetails 사용`);
           }
         }
       }
-      
-      // 모든 경기 결과 수집 (성능 측정)
-      const gameResultsStartTime = Date.now();
+
+      // 모든 경기 결과 수집
       const gameResults = await this.collectAllGameResults(selectionsToUse);
-      console.log(`⏱️ 경기 결과 수집 완료: ${Date.now() - gameResultsStartTime}ms (${gameResults.length}개)`);
 
       // 3단계: 멀티배팅 승패 판정 (백 기준으로 판정)
       const judgmentStartTime = Date.now();
