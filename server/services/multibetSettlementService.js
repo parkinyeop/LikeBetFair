@@ -24,9 +24,61 @@ import directMatchingService from './directMatchingService.js';
  * 모든 경기 결과를 종합하여 멀티배팅 정산 처리
  */
 class MultibetSettlementService {
-  
+
   constructor() {
     this.pendingLayRefund = 0; // Push로 인한 Lay 환불 금액
+    this.pendingOrderCache = new Map(); // 🆕 pending 주문 캐시 { orderId: nextCheckTime }
+  }
+
+  /**
+   * pending 주문 조회 스킵 여부 확인 (경기 시작 시간 기준)
+   * @param {Object} order - 주문 객체
+   * @returns {boolean} true: 스킵, false: 조회 필요
+   */
+  shouldSkipPendingOrder(order) {
+    // 캐시에서 다음 조회 시간 확인
+    const nextCheckTime = this.pendingOrderCache.get(order.id);
+    if (nextCheckTime && Date.now() < nextCheckTime) {
+      console.debug(`⏳ 주문 ${order.id}: pending 캐시 적중 - ${new Date(nextCheckTime).toLocaleString('ko-KR')}까지 스킵`);
+      return true;
+    }
+
+    // 캐시 없거나 만료됨 → 조회 필요
+    return false;
+  }
+
+  /**
+   * pending 주문의 다음 조회 시간 설정 (경기 시작 시간 기준)
+   * @param {Object} order - 주문 객체
+   */
+  setPendingOrderCache(order) {
+    if (!order.selectionDetails?.selections || order.selectionDetails.selections.length === 0) {
+      return;
+    }
+
+    // 모든 경기의 시작 시간 중 가장 빠른 시간 찾기
+    const earliestGameTime = order.selectionDetails.selections.reduce((earliest, selection) => {
+      const gameTime = new Date(selection.commenceTime).getTime();
+      return gameTime < earliest ? gameTime : earliest;
+    }, Infinity);
+
+    const now = Date.now();
+    let nextCheckTime;
+
+    // 경기 시작 1시간 전까지는 조회 스킵
+    const oneHourBeforeGame = earliestGameTime - (60 * 60 * 1000);
+
+    if (now < oneHourBeforeGame) {
+      // 경기 시작 1시간 전으로 설정
+      nextCheckTime = oneHourBeforeGame;
+      console.debug(`⏰ 주문 ${order.id}: 경기 시작 1시간 전까지 스킵 (${new Date(nextCheckTime).toLocaleString('ko-KR')})`);
+    } else {
+      // 경기 시작 후 또는 1시간 이내: 30분 후 재조회
+      nextCheckTime = now + (30 * 60 * 1000);
+      console.debug(`⏰ 주문 ${order.id}: 30분 후 재조회 (${new Date(nextCheckTime).toLocaleString('ko-KR')})`);
+    }
+
+    this.pendingOrderCache.set(order.id, nextCheckTime);
   }
   
   /**
@@ -39,6 +91,12 @@ class MultibetSettlementService {
     const transaction = await sequelize.transaction();
 
     try {
+      // 🆕 pending 주문 캐시 체크 (경기 시작 시간 기준)
+      if (this.shouldSkipPendingOrder(order)) {
+        await transaction.commit();
+        return { message: 'Pending order skipped (cached)', orderId: order.id };
+      }
+
       console.debug(`🎯 멀티배팅 정산 시작: 주문 ${order.id}`);
 
       // ✅ 정산 시작 로깅 (파일)
@@ -150,6 +208,12 @@ class MultibetSettlementService {
       console.log(`⏱️ 정산 처리 완료: ${Date.now() - processStartTime}ms`);
 
       await transaction.commit();
+
+      // 🆕 정산 완료 시 캐시에서 제거 (pending이 아닌 경우)
+      if (settlement.finalResult !== 'pending') {
+        this.pendingOrderCache.delete(order.id);
+        console.debug(`🗑️ 주문 ${order.id}: 정산 완료 - 캐시에서 제거`);
+      }
 
       const totalTime = Date.now() - settlementStartTime;
       console.log(`✅ 멀티배팅 정산 완료: 주문 ${order.id} (총 ${totalTime}ms)`);
@@ -705,6 +769,9 @@ class MultibetSettlementService {
     
     // ✅ [Phase 3] 이중 안전장치: pending이면 즉시 반환 (정산하지 않음)
     if (finalResult === 'pending') {
+      // 🆕 pending 주문 캐시 설정 (경기 시작 시간 기준으로 다음 조회 시간 설정)
+      this.setPendingOrderCache(order);
+
       console.log(`⏳ 주문 ${order.id}: 경기 완료 대기 중 - 정산하지 않음`);
       return {
         orderId: order.id,
