@@ -1617,7 +1617,12 @@ export default function Exchange() {
                 return (
                   <div key={index} className={`bg-gray-800 rounded-lg shadow p-4 ${!game.isBettable ? 'opacity-60' : ''}`}>
                     <div className="flex justify-between items-center mb-3">
-                      <span className="text-lg font-bold text-white">🏟️ {game.home_team} vs {game.away_team}</span>
+                      <div>
+                        <span className="text-lg font-bold text-white">🏟️ {game.home_team} vs {game.away_team}</span>
+                        <div className="text-sm text-gray-400 mt-1">
+                          {game.sport_key?.includes('soccer') && '⚽'} {game.sport_key?.includes('basketball') && '🏀'} {game.sport_key?.includes('baseball') && '⚾'} {game.sport_key?.includes('americanfootball') && '🏈'} {game.league || game.sport_title || 'Unknown League'}
+                        </div>
+                      </div>
                       <div className="text-right">
                         <span className="text-sm text-gray-300">
                           📅 {localGameTime.toLocaleDateString()} {localGameTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

@@ -13,6 +13,7 @@ interface ActionItem {
   count: number;
   link: string;
   description: string;
+  details?: any[];
 }
 
 interface DashboardData {
@@ -480,6 +481,32 @@ export default function AdminDashboard() {
                         {item.type === 'danger' && item.count > 0 && (
                           <div className="mt-2 text-xs text-red-600 font-medium">
                             ⚠️ 즉시 조치 필요
+                          </div>
+                        )}
+
+                        {/* 결과 없는 경기 상세 정보 */}
+                        {item.id === 'games-without-results' && item.details && item.details.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-yellow-200 space-y-2">
+                            {item.details.slice(0, 3).map((game: any, idx: number) => (
+                              <div key={idx} className="text-xs bg-white bg-opacity-50 rounded p-2">
+                                <div className="font-medium text-gray-800">
+                                  {game.homeTeam} vs {game.awayTeam}
+                                </div>
+                                <div className="text-gray-600 mt-1">
+                                  {new Date(game.commenceTime).toLocaleString('ko-KR', { 
+                                    month: '2-digit', 
+                                    day: '2-digit', 
+                                    hour: '2-digit', 
+                                    minute: '2-digit' 
+                                  })} ({game.hoursElapsed}시간 경과)
+                                </div>
+                              </div>
+                            ))}
+                            {item.details.length > 3 && (
+                              <div className="text-xs text-gray-500 text-center">
+                                +{item.details.length - 3}개 더보기
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

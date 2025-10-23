@@ -292,7 +292,7 @@ export function getEnvironmentConfig() {
   
   const envConfigs = {
     development: {
-      LOG_LEVEL: 'debug',
+      LOG_LEVEL: 'info',
       ODDS_UPDATE_INTERVAL: 10 * 60 * 1000, // 개발환경에서는 10분마다
       RATE_LIMIT: { WINDOW_MS: 15 * 60 * 1000, MAX_REQUESTS: 1000 }
     },

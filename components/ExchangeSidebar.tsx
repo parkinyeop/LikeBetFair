@@ -5,6 +5,7 @@ import { useExchange, ExchangeOrder, OrderForm } from '../hooks/useExchange';
 import { useAuth } from '../contexts/AuthContext';
 import { useExchangeContext } from '../contexts/ExchangeContext';
 import { parseScore } from '../utils/scoreParser';
+// 정밀 계산 함수는 프론트엔드에서 직접 구현
 
 // 🗑️ 불필요한 GameResults 관련 코드 제거 완료
 // ExchangeOrder 자체에 필요한 모든 정보가 이미 포함되어 있음
@@ -178,7 +179,7 @@ function OrderPanel() {
     return () => clearInterval(interval);
   }, [fetchOrders]);
 
-  // ✅ 올바른 Exchange 매치 주문 예상수익 계산 (10원 단위 올림)
+  // ✅ 정밀한 Exchange 매치 주문 예상수익 계산
   const calculateMatchOrderProfit = () => {
     if (!selectedBet || !form.amount || form.amount <= 0) return 0;
     
@@ -186,10 +187,10 @@ function OrderPanel() {
     const price = selectedBet.price || 1;
     
     if (selectedBet.type === 'back') {
-      // Back: 매칭된 Lay 베팅금액만큼 획득 (Exchange 원리) - 10원 단위 올림
-      return Math.ceil(amount / 10) * 10;
+      // Back: 매칭된 Lay 베팅금액만큼 획득 (Exchange 원리)
+      return amount;
     } else {
-      // ✅ 올바른 Lay 예상 수익: 자신의 베팅금액 + (Back의 실제 배팅금액 × Lay 지분율)
+      // ✅ 정밀한 Lay 예상 수익: 자신의 베팅금액 + (Back의 실제 배팅금액 × Lay 지분율)
       // 
       // Exchange 원리: 
       // 1. getMaxMatchAmount() = Back의 실제 배팅금액 (stake)
@@ -201,10 +202,10 @@ function OrderPanel() {
       const backMatchAmount = backActualAmount * (price - 1); // Back의 매치금액 (liability)
       const layShareRatio = Math.min(1, amount / backMatchAmount); // Lay 지분율 (최대 100%)
       
-      // Lay 예상 수익 = 자신의 베팅금액 + (Back의 실제 배팅금액 × Lay 지분율) - 10원 단위 올림
+      // Lay 예상 수익 = 자신의 베팅금액 + (Back의 실제 배팅금액 × Lay 지분율)
       const expectedProfit = amount + (backActualAmount * layShareRatio);
       
-      return Math.ceil(expectedProfit / 10) * 10;
+      return expectedProfit;
     }
   };
 
@@ -511,17 +512,17 @@ function OrderPanel() {
                     if (value === '' || /^\d*$/.test(value)) {
                       let numValue = value === '' ? 0 : parseInt(value);
                       
-                      // 🆕 10원 단위로 반올림 (단, 0이 아닐 때만)
+                      // 🆕 모든 금액 허용 (10원 단위 제한 제거)
                       if (numValue > 0) {
-                        numValue = Math.round(numValue / 10) * 10;
-                        if (numValue === 0) numValue = 10; // 최소 10원
+                        // 최소 1원으로 설정
+                        if (numValue === 0) numValue = 1;
                       }
                       
                       if (isMatchMode) {
                         // 매칭 모드에서 최대 리스크 금액 초과 시 제한
                         const maxRiskAmount = getAvailableMatchAmount();
                         if (numValue > maxRiskAmount) {
-                          numValue = Math.floor(maxRiskAmount / 10) * 10; // 10원 단위로 내림
+                          numValue = Math.floor(maxRiskAmount); // 최대 금액으로 제한
                         }
                         setForm(f => ({ ...f, amount: numValue }));
                       } else {
@@ -529,7 +530,7 @@ function OrderPanel() {
                       }
                     }
                   }}
-                  placeholder={isMatchMode ? "원하는 금액 입력 (10원 단위)" : "베팅 금액 입력 (10원 단위)"}
+                  placeholder={isMatchMode ? "원하는 금액 입력" : "베팅 금액 입력"}
                   className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 />
                 {/* 매칭 모드에서 빠른 금액 선택 버튼 */}
@@ -540,7 +541,7 @@ function OrderPanel() {
                         key={ratio}
                         onClick={() => {
                           const maxAmount = getAvailableMatchAmount();
-                          const quickAmount = Math.floor(maxAmount * ratio / 10) * 10; // 🆕 10원 단위로 내림
+                          const quickAmount = Math.floor(maxAmount * ratio); // 🆕 모든 금액 허용
                           setForm(f => ({ ...f, amount: quickAmount }));
                         }}
                         className="flex-1 py-1 px-2 text-xs bg-blue-100 hover:bg-blue-200 rounded text-blue-700"
@@ -834,14 +835,14 @@ function OrderHistoryPanel() {
         : (order as any).stakeAmount;
       
       if (order.side === 'back') {
-        // Back: 매칭된 Lay 베팅금액만큼 획득 (Exchange 원리) - 10원 단위 올림
-        return Math.ceil(stakeAmount / 10) * 10;
+        // Back: 매칭된 Lay 베팅금액만큼 획득 (Exchange 원리)
+        return stakeAmount;
       } else {
-        // ✅ 올바른 Lay 예상 수익: 자신의 베팅금액 + (Back의 실제 배팅금액 × Lay 지분율)
+        // ✅ 정밀한 Lay 예상 수익: 자신의 베팅금액 + (Back의 실제 배팅금액 × Lay 지분율)
         // Lay 지분율 = Lay 베팅금액 ÷ Back의 매치금액
         // Back의 매치금액 = Back 배팅금액 × (배당률 - 1)
-        // Lay 예상 수익 = stakeAmount × price / (price - 1) - 10원 단위 올림
-        return Math.ceil(stakeAmount * (order.price || 1) / ((order.price || 1) - 1) / 10) * 10;
+        // Lay 예상 수익 = stakeAmount × price / (price - 1)
+        return stakeAmount * (order.price || 1) / ((order.price || 1) - 1);
       }
     }
     
@@ -861,12 +862,12 @@ function OrderHistoryPanel() {
     }
     
     if (order.side === 'back') {
-      // Back: 본인 배팅금액 + 수익 = stakeAmount + (stakeAmount * (odds - 1)) - 10원 단위 올림
-      return Math.ceil(Math.round(stakeAmount * totalOdds * 100) / 100 / 10) * 10;
+      // Back: 본인 배팅금액 + 수익 = stakeAmount + (stakeAmount * (odds - 1))
+      return Math.round(stakeAmount * totalOdds * 100) / 100;
     } else {
-      // Lay: 본인 배팅금액 + 수익 = stakeAmount + (stakeAmount * (odds - 1) / odds) - 10원 단위 올림
+      // Lay: 본인 배팅금액 + 수익 = stakeAmount + (stakeAmount * (odds - 1) / odds)
       const expectedProfit = stakeAmount + (stakeAmount * (totalOdds - 1) / totalOdds);
-      return Math.ceil(Math.round(expectedProfit * 100) / 100 / 10) * 10;
+      return Math.round(expectedProfit * 100) / 100;
     }
   };
 

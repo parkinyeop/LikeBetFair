@@ -386,15 +386,32 @@ class OddsApiService {
                 continue;
               }
               
+              // ⏰⏰⏰ 임시 수정: NBA 경기 시간 -10분 보정 ⏰⏰⏰
+              // 📅 작성일: 2025-10-23
+              // 🎯 목적: OddsAPI NBA 경기시간 10분 오차 긴급 수정
+              // 🔍 원인: ESPN API와 비교 시 OddsAPI가 체계적으로 10분 늦음 (11/12 경기)
+              // ⚠️  위험: 우리 시간이 늦으면 결과 알고 배팅 가능 (사기 위험)
+              // 📧 조치: OddsAPI 측에 문의 중
+              // 🔄 롤백: OddsAPI 수정 확인 후 이 코드 제거 필요
+              // 🚨 중요: 이 주석과 코드를 함께 삭제해야 함!
+              let finalCommenceTime = commenceTime;
+              if (sportKey === 'basketball_nba') {
+                const originalTime = new Date(commenceTime);
+                const adjustedTime = new Date(originalTime.getTime() - 10 * 60 * 1000); // -10분
+                finalCommenceTime = adjustedTime.toISOString();
+                console.log(`[NBA_TIME_FIX] 경기시간 -10분 보정: ${commenceTime} → ${finalCommenceTime}`);
+              }
+              // ⏰⏰⏰ 임시 수정 끝 ⏰⏰⏰
+              
               const upsertData = {
+                oddsApiId: game.id, // ✅ OddsAPI 고유 ID 저장
                 mainCategory,
                 subCategory,
                 sportKey: sportKey,
                 sportTitle: this.getSportTitleFromSportKey(sportKey),
                 homeTeam: enhancedGame.home_team,
                 awayTeam: enhancedGame.away_team,
-                commenceTime: commenceTime, // ✅ UTC ISO 문자열로 저장 (이미 toISOString() 적용됨)
-                odds: enhancedGame.bookmakers, // odds 필드 추가
+                commenceTime: finalCommenceTime, // ✅ NBA는 -10분 보정 적용됨
                 bookmakers: enhancedGame.bookmakers,
                 market: 'h2h', // 기본값 추가
                 officialOdds: calculatedOdds,
@@ -659,6 +676,14 @@ class OddsApiService {
     let totalNewCount = 0;
     let totalSkippedCount = 0;
     let totalApiCalls = 0;
+    // ✨ 상세 로깅을 위한 추가 변수
+    let totalOddsAPIProvided = 0;  // OddsAPI가 제공한 총 경기 수
+    let totalFilteredOut = 0;       // 시간 필터로 제외된 경기
+    let totalDuplicatesRemoved = 0; // 중복 제거된 경기
+    let totalValidationFailed = 0;  // 검증 실패 경기
+    let totalSaved = 0;             // 실제 저장된 경기
+    const savedGamesList = [];      // 저장된 경기 목록
+    const skippedGamesList = [];    // 건너뛴 경기 목록
     
     try {
       console.log(`[DEBUG] Starting odds update for categories: ${activeCategories.join(', ')}`);
@@ -721,6 +746,9 @@ class OddsApiService {
           }
 
           console.log(`[DEBUG] Found ${oddsResponse.data.length} games for ${clientCategory}`);
+          
+          // ✨ OddsAPI가 제공한 경기 수 추적
+          totalOddsAPIProvided += oddsResponse.data.length;
 
           // === 수정: UTC 기준 과거 1일 + 미래 14일 경기만 저장 ===
           const now = new Date();
@@ -795,6 +823,10 @@ class OddsApiService {
             console.log(`[야구 디버깅]   원본 데이터: ${oddsResponse.data.length}개`);
             console.log(`[야구 디버깅]   필터링 후: ${filteredGames.length}개`);
           }
+          
+          // ✨ 필터링된 경기 수 추적
+          const filteredOutCount = oddsResponse.data.length - filteredGames.length;
+          totalFilteredOut += filteredOutCount;
 
           // 🆕 spreads 데이터 부족한 경기들 식별 (두 번째 API 호출)
           const gamesWithoutSpreads2 = filteredGames.filter(game => !this.hasSpreadsData(game));
@@ -884,15 +916,32 @@ class OddsApiService {
                 continue;
               }
               
+              // ⏰⏰⏰ 임시 수정: NBA 경기 시간 -10분 보정 ⏰⏰⏰
+              // 📅 작성일: 2025-10-23
+              // 🎯 목적: OddsAPI NBA 경기시간 10분 오차 긴급 수정
+              // 🔍 원인: ESPN API와 비교 시 OddsAPI가 체계적으로 10분 늦음 (11/12 경기)
+              // ⚠️  위험: 우리 시간이 늦으면 결과 알고 배팅 가능 (사기 위험)
+              // 📧 조치: OddsAPI 측에 문의 중
+              // 🔄 롤백: OddsAPI 수정 확인 후 이 코드 제거 필요
+              // 🚨 중요: 이 주석과 코드를 함께 삭제해야 함!
+              let finalCommenceTime = commenceTime;
+              if (sportKey === 'basketball_nba') {
+                const originalTime = new Date(commenceTime);
+                const adjustedTime = new Date(originalTime.getTime() - 10 * 60 * 1000); // -10분
+                finalCommenceTime = adjustedTime.toISOString();
+                console.log(`[NBA_TIME_FIX] 경기시간 -10분 보정: ${commenceTime} → ${finalCommenceTime}`);
+              }
+              // ⏰⏰⏰ 임시 수정 끝 ⏰⏰⏰
+              
               const upsertData = {
+                oddsApiId: game.id, // ✅ OddsAPI 고유 ID 저장
                 mainCategory,
                 subCategory,
                 sportKey: sportKey,
                 sportTitle: this.getSportTitleFromSportKey(sportKey),
                 homeTeam: enhancedGame.home_team,
                 awayTeam: enhancedGame.away_team,
-                commenceTime: commenceTime, // ✅ UTC ISO 문자열로 저장 (이미 toISOString() 적용됨)
-                odds: enhancedGame.bookmakers,
+                commenceTime: finalCommenceTime, // ✅ NBA는 -10분 보정 적용됨
                 bookmakers: enhancedGame.bookmakers,
                 market: 'h2h',
                 officialOdds: this.calculateAverageOdds(enhancedGame.bookmakers),
@@ -925,12 +974,18 @@ class OddsApiService {
                 upsertData.commenceTime = normalizedCommenceTime;
                 
                 // findOrCreate + update 방식으로 강제 업데이트
+                // ⚠️ 기존 데이터는 oddsApiId가 NULL이므로 OR 조건으로 매칭
                 const [record, isCreated] = await OddsCache.findOrCreate({
                   where: {
-                    sportKey: sportKey,
-                    homeTeam: enhancedGame.home_team,
-                    awayTeam: enhancedGame.away_team,
-                    commenceTime: normalizedCommenceTime
+                    [Op.or]: [
+                      { oddsApiId: game.id },  // ✅ OddsAPI ID로 매칭 (신규)
+                      {  // ✅ 기존 방식으로도 매칭 (레거시 데이터)
+                        sportKey: sportKey,
+                        homeTeam: enhancedGame.home_team,
+                        awayTeam: enhancedGame.away_team,
+                        commenceTime: normalizedCommenceTime
+                      }
+                    ]
                   },
                   defaults: upsertData
                 });
@@ -940,6 +995,10 @@ class OddsApiService {
                 
                 // 강제 업데이트 모드에서는 무조건 업데이트
                 await oddsRecord.update({
+                  oddsApiId: game.id,  // ✅ oddsApiId도 업데이트 (NULL → ID)
+                  commenceTime: finalCommenceTime,  // ✅ 시간도 업데이트
+                  homeTeam: enhancedGame.home_team,
+                  awayTeam: enhancedGame.away_team,
                   bookmakers: enhancedGame.bookmakers,
                   officialOdds: this.calculateAverageOdds(enhancedGame.bookmakers),
                   lastUpdated: new Date()
@@ -960,12 +1019,18 @@ class OddsApiService {
                 upsertData.commenceTime = normalizedCommenceTime;
                 
                 // findOrCreate + update 방식으로 중복 방지
+                // ⚠️ 기존 데이터는 oddsApiId가 NULL이므로 OR 조건으로 매칭
                 const [record, isCreated] = await OddsCache.findOrCreate({
                   where: {
-                    sportKey: sportKey,
-                    homeTeam: enhancedGame.home_team,
-                    awayTeam: enhancedGame.away_team,
-                    commenceTime: normalizedCommenceTime
+                    [Op.or]: [
+                      { oddsApiId: game.id },  // ✅ OddsAPI ID로 매칭 (신규)
+                      {  // ✅ 기존 방식으로도 매칭 (레거시 데이터)
+                        sportKey: sportKey,
+                        homeTeam: enhancedGame.home_team,
+                        awayTeam: enhancedGame.away_team,
+                        commenceTime: normalizedCommenceTime
+                      }
+                    ]
                   },
                   defaults: upsertData
                 });
@@ -976,6 +1041,10 @@ class OddsApiService {
                 // 기존 레코드면 업데이트
                 if (!created) {
                   await oddsRecord.update({
+                    oddsApiId: game.id,  // ✅ oddsApiId도 업데이트 (NULL → ID)
+                    commenceTime: finalCommenceTime,  // ✅ 시간도 업데이트
+                    homeTeam: enhancedGame.home_team,
+                    awayTeam: enhancedGame.away_team,
                     bookmakers: enhancedGame.bookmakers,
                     officialOdds: this.calculateAverageOdds(enhancedGame.bookmakers),
                     lastUpdated: new Date()
@@ -984,9 +1053,13 @@ class OddsApiService {
 
                 if (created) {
                   totalNewCount++;
+                  totalSaved++;
+                  savedGamesList.push(`${enhancedGame.away_team} @ ${enhancedGame.home_team}`);
                   console.log(`[DEBUG] ✅ 새 배당률 저장: ${enhancedGame.home_team} vs ${enhancedGame.away_team}`);
                 } else {
                   totalUpdatedCount++;
+                  totalSaved++;
+                  savedGamesList.push(`${enhancedGame.away_team} @ ${enhancedGame.home_team}`);
                   console.log(`[DEBUG] 🔄 기존 배당률 업데이트: ${enhancedGame.home_team} vs ${enhancedGame.away_team}`);
                 }
               }
@@ -1013,6 +1086,11 @@ class OddsApiService {
               }
             } else {
               totalSkippedCount++;
+              totalValidationFailed++;
+              skippedGamesList.push({
+                game: `${game.away_team} @ ${game.home_team}`,
+                reason: 'Validation failed'
+              });
             }
           }
           
@@ -1031,13 +1109,22 @@ class OddsApiService {
       
       console.log(`[DEBUG] Odds update completed. Total: ${totalUpdatedCount + totalNewCount} updated, ${totalNewCount} new, ${totalSkippedCount} skipped, ${totalApiCalls} API calls`);
       
+      // ✨ 상세 로깅 정보 추가
       return {
         updatedCount: totalUpdatedCount + totalNewCount,
         newCount: totalNewCount,
         updatedExistingCount: totalUpdatedCount,
         skippedCount: totalSkippedCount,
         apiCalls: totalApiCalls,
-        categories: categoriesToUpdate
+        categories: categoriesToUpdate,
+        // 상세 정보
+        oddsAPIProvided: totalOddsAPIProvided,
+        filteredOut: totalFilteredOut,
+        duplicatesRemoved: totalDuplicatesRemoved,
+        validationFailed: totalValidationFailed,
+        saved: totalSaved,
+        savedGames: savedGamesList.slice(0, 10),  // 최대 10개만
+        skippedGames: skippedGamesList.slice(0, 10)  // 최대 10개만
       };
       
     } catch (error) {

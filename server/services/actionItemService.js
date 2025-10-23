@@ -32,6 +32,7 @@ class ActionItemService {
         this.getPendingSettlements(),
         this.getCancelledGameRefunds(),
         this.getPushGames(), // ✅ 추가: Push 발생 주문/배팅
+        this.getGamesWithoutResults(), // 🆕 추가: 결과 없는 경기
         this.getHighVolumeUsers(),
 
         // ℹ️ 정보 (Info Level)
@@ -258,6 +259,102 @@ class ActionItemService {
   }
 
   /**
+   * ⚠️ 경기 시간 3시간 이상 지났는데 결과 없는 경기
+   * @returns {Promise<Object>} 액션 아이템
+   */
+  async getGamesWithoutResults() {
+    try {
+      const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+
+      // Exchange 주문과 스포츠북 배팅에서 사용된 경기 중 결과가 없는 경기
+      const gamesWithoutResults = await sequelize.query(`
+        WITH BettedGames AS (
+          -- Exchange 주문에서 사용된 경기
+          SELECT DISTINCT
+            eo."selectionDetails"->>'homeTeam' as "homeTeam",
+            eo."selectionDetails"->>'awayTeam' as "awayTeam",
+            (eo."selectionDetails"->>'commence_time')::timestamp as "commenceTime",
+            'exchange' as source
+          FROM "ExchangeOrders" eo
+          WHERE eo."selectionDetails" IS NOT NULL
+            AND (eo."selectionDetails"->>'commence_time')::timestamp < :threeHoursAgo
+            AND eo.status IN ('matched', 'partially_matched', 'active')
+            AND eo."settledAt" IS NULL
+          
+          UNION
+          
+          -- 스포츠북 배팅에서 사용된 경기 (selections 배열에서 추출)
+          SELECT DISTINCT
+            sel->>'homeTeam' as "homeTeam",
+            sel->>'awayTeam' as "awayTeam",
+            (sel->>'commence_time')::timestamp as "commenceTime",
+            'sportsbook' as source
+          FROM "Bets" b,
+            jsonb_array_elements(b."selections") AS sel
+          WHERE b."selections" IS NOT NULL
+            AND (sel->>'commence_time')::timestamp < :threeHoursAgo
+            AND b.status = 'pending'
+        )
+        SELECT 
+          bg."homeTeam",
+          bg."awayTeam",
+          bg."commenceTime",
+          bg.source,
+          COUNT(*) OVER() as total_count
+        FROM BettedGames bg
+        WHERE NOT EXISTS (
+          SELECT 1 FROM "GameResults" gr
+          WHERE (
+            (gr."homeTeam" = bg."homeTeam" AND gr."awayTeam" = bg."awayTeam")
+            OR (gr."homeTeam" = bg."awayTeam" AND gr."awayTeam" = bg."homeTeam")
+          )
+          AND gr."commenceTime" BETWEEN bg."commenceTime" - INTERVAL '1 hour' 
+                                    AND bg."commenceTime" + INTERVAL '1 hour'
+          AND gr.status IN ('finished', 'cancelled', 'postponed')
+        )
+        ORDER BY bg."commenceTime" ASC
+        LIMIT 10
+      `, {
+        replacements: { threeHoursAgo },
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      const count = gamesWithoutResults.length > 0 ? gamesWithoutResults[0].total_count : 0;
+
+      console.log(`🔍 결과 없는 경기: ${count}개`);
+
+      return {
+        id: 'games-without-results',
+        type: 'warning',
+        icon: '⏰',
+        title: '결과 없는 경기',
+        count: parseInt(count) || 0,
+        link: '/admin/games?filter=no-results',
+        description: '경기 시작 3시간 이상 경과',
+        details: gamesWithoutResults.slice(0, 10).map(game => ({
+          homeTeam: game.homeTeam,
+          awayTeam: game.awayTeam,
+          commenceTime: game.commenceTime,
+          source: game.source,
+          hoursElapsed: Math.floor((Date.now() - new Date(game.commenceTime).getTime()) / (1000 * 60 * 60))
+        }))
+      };
+    } catch (error) {
+      console.error('결과 없는 경기 조회 오류:', error);
+      return { 
+        id: 'games-without-results', 
+        type: 'warning', 
+        icon: '⏰', 
+        title: '결과 없는 경기', 
+        count: 0, 
+        link: '#', 
+        description: '조회 실패',
+        details: []
+      };
+    }
+  }
+
+  /**
    * ⚠️ 이상 거래 패턴 사용자
    * @returns {Promise<Object>} 액션 아이템
    */
@@ -375,6 +472,8 @@ class ActionItemService {
           return await this.getPendingSettlementDetails();
         case 'balance-mismatch':
           return await this.getBalanceMismatchDetails();
+        case 'games-without-results':
+          return await this.getGamesWithoutResultsDetails();
         default:
           throw new Error(`알 수 없는 액션 아이템: ${itemId}`);
       }
@@ -457,6 +556,90 @@ class ActionItemService {
     });
 
     return mismatchUsers;
+  }
+
+  /**
+   * 결과 없는 경기 상세 정보
+   * @returns {Promise<Array>} 경기 목록
+   */
+  async getGamesWithoutResultsDetails() {
+    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+
+    const gamesWithoutResults = await sequelize.query(`
+      WITH BettedGames AS (
+        -- Exchange 주문에서 사용된 경기
+        SELECT DISTINCT
+          eo."selectionDetails"->>'homeTeam' as "homeTeam",
+          eo."selectionDetails"->>'awayTeam' as "awayTeam",
+          (eo."selectionDetails"->>'commence_time')::timestamp as "commenceTime",
+          eo."selectionDetails"->>'sport_title' as "sportTitle",
+          'exchange' as source,
+          COUNT(*) OVER(PARTITION BY 
+            eo."selectionDetails"->>'homeTeam',
+            eo."selectionDetails"->>'awayTeam',
+            (eo."selectionDetails"->>'commence_time')::timestamp
+          ) as order_count
+        FROM "ExchangeOrders" eo
+        WHERE eo."selectionDetails" IS NOT NULL
+          AND (eo."selectionDetails"->>'commence_time')::timestamp < :threeHoursAgo
+          AND eo.status IN ('matched', 'partially_matched', 'active')
+          AND eo."settledAt" IS NULL
+        
+        UNION
+        
+        -- 스포츠북 배팅에서 사용된 경기
+        SELECT DISTINCT
+          sel->>'homeTeam' as "homeTeam",
+          sel->>'awayTeam' as "awayTeam",
+          (sel->>'commence_time')::timestamp as "commenceTime",
+          sel->>'sport_title' as "sportTitle",
+          'sportsbook' as source,
+          COUNT(*) OVER(PARTITION BY 
+            sel->>'homeTeam',
+            sel->>'awayTeam',
+            (sel->>'commence_time')::timestamp
+          ) as order_count
+        FROM "Bets" b,
+          jsonb_array_elements(b."selectionDetails"->'selections') AS sel
+        WHERE b."selectionDetails" IS NOT NULL
+          AND (sel->>'commence_time')::timestamp < :threeHoursAgo
+          AND b.status = 'pending'
+      )
+      SELECT 
+        bg."homeTeam",
+        bg."awayTeam",
+        bg."commenceTime",
+        bg."sportTitle",
+        bg.source,
+        bg.order_count,
+        EXTRACT(EPOCH FROM (NOW() - bg."commenceTime")) / 3600 as hours_elapsed
+      FROM BettedGames bg
+      WHERE NOT EXISTS (
+        SELECT 1 FROM "GameResults" gr
+        WHERE (
+          (gr."homeTeam" = bg."homeTeam" AND gr."awayTeam" = bg."awayTeam")
+          OR (gr."homeTeam" = bg."awayTeam" AND gr."awayTeam" = bg."homeTeam")
+        )
+        AND gr."commenceTime" BETWEEN bg."commenceTime" - INTERVAL '1 hour' 
+                                  AND bg."commenceTime" + INTERVAL '1 hour'
+        AND gr.status IN ('finished', 'cancelled', 'postponed')
+      )
+      ORDER BY bg."commenceTime" ASC
+      LIMIT 50
+    `, {
+      replacements: { threeHoursAgo },
+      type: sequelize.QueryTypes.SELECT
+    });
+
+    return gamesWithoutResults.map(game => ({
+      homeTeam: game.homeTeam,
+      awayTeam: game.awayTeam,
+      commenceTime: game.commenceTime,
+      sportTitle: game.sportTitle || 'Unknown',
+      source: game.source,
+      orderCount: parseInt(game.order_count) || 0,
+      hoursElapsed: Math.floor(parseFloat(game.hours_elapsed))
+    }));
   }
 }
 

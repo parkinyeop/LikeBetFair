@@ -231,13 +231,19 @@ cron.schedule('*/10 * * * *', async () => {
       'Game results update'
     );
     
-    // 결과 집계
+    // ✨ 결과 집계 (상세 정보 추가) - 단일 객체 처리
     const updateResult = {
-      updatedCount: updateResults.reduce((sum, r) => sum + (r.saved || 0) + (r.updated || 0), 0),
-      newCount: updateResults.reduce((sum, r) => sum + (r.saved || 0), 0),
-      updatedExistingCount: updateResults.reduce((sum, r) => sum + (r.updated || 0), 0),
-      skippedCount: updateResults.reduce((sum, r) => sum + (r.skipped || 0), 0),
-      categories: updateResults.filter(r => r.success).map(r => r.sportKey)
+      updatedCount: updateResults.updatedCount || 0,
+      newCount: updateResults.newCount || 0,
+      updatedExistingCount: updateResults.updatedExistingCount || 0,
+      skippedCount: updateResults.skippedCount || 0,
+      categories: updateResults.categories || [],
+      // 상세 정보
+      sportsDBAPIProvided: updateResults.sportsDBAPIProvided || 0,
+      saved: updateResults.saved || 0,
+      updated: updateResults.updated || 0,
+      savedGames: updateResults.savedGames || [],
+      skippedGames: updateResults.skippedGames || []
     };
     
     // --- ✅ 효율성 최적화: 경기 결과 업데이트가 있을 때만 베팅 정산 실행 ---
@@ -266,25 +272,57 @@ cron.schedule('*/10 * * * *', async () => {
     
     lastUpdateTime = new Date();
     
-    // 실제 업데이트 결과를 상세히 로그에 기록
+    // ✨ 실제 업데이트 결과를 상세히 로그에 기록 (개선됨)
     const gameResultsSummary = {
       totalUpdated: updateResult?.updatedCount || 0,
       newGames: updateResult?.newCount || 0,
       existingGamesUpdated: updateResult?.updatedExistingCount || 0,
       skippedGames: updateResult?.skippedCount || 0,
-      categoriesProcessed: updateResult?.categories?.length || 0
+      categoriesProcessed: updateResult?.categories?.length || 0,
+      // ✨ 새로운 상세 정보
+      sportsDBAPIProvided: updateResult?.sportsDBAPIProvided || 0,
+      saved: updateResult?.saved || 0,
+      updated: updateResult?.updated || 0,
+      savedGames: updateResult?.savedGames || [],
+      skippedGames: updateResult?.skippedGames || []
     };
     
-    console.log('[SCHEDULER_RESULTS] ✅ Game results and bet results update completed:', {
-      gameResultsUpdated: gameResultsSummary.totalUpdated,
-      betResultsUpdated: betUpdateResult?.updatedCount || 0
-    });
+    console.log('[SCHEDULER_RESULTS] ✅ Game results and bet results update completed:');
+    console.log('[SCHEDULER_RESULTS]   - SportsDB Provided:', gameResultsSummary.sportsDBAPIProvided);
+    console.log('[SCHEDULER_RESULTS]   - Saved:', gameResultsSummary.saved);
+    console.log('[SCHEDULER_RESULTS]   - Updated:', gameResultsSummary.updated);
+    console.log('[SCHEDULER_RESULTS]   - Skipped:', gameResultsSummary.skippedGames);
+    console.log('[SCHEDULER_RESULTS]   - Total Updated:', gameResultsSummary.totalUpdated);
+    console.log('[SCHEDULER_RESULTS]   - Bet Results Updated:', betUpdateResult?.updatedCount || 0);
+    
+    if (gameResultsSummary.savedGames.length > 0) {
+      console.log('[SCHEDULER_RESULTS] 💾 Saved Games (first 5):');
+      gameResultsSummary.savedGames.slice(0, 5).forEach(g => console.log(`[SCHEDULER_RESULTS]     - ${g}`));
+    }
+    
+    // ✨ Bet Results 상세 정보 추가
+    const betResultsSummary = {
+      pendingBetsChecked: betUpdateResult?.pendingBetsChecked || 0,
+      settled: betUpdateResult?.settled || 0,
+      failed: betUpdateResult?.failed || 0,
+      stillPending: betUpdateResult?.stillPending || 0,
+      skipped: betUpdateResult?.skipped || false
+    };
+    
+    if (!betResultsSummary.skipped) {
+      console.log('[SCHEDULER_BETS] 📊 Bet Results Summary:');
+      console.log('[SCHEDULER_BETS]   - Pending Bets Checked:', betResultsSummary.pendingBetsChecked);
+      console.log('[SCHEDULER_BETS]   - Settled:', betResultsSummary.settled);
+      console.log('[SCHEDULER_BETS]   - Failed:', betResultsSummary.failed);
+      console.log('[SCHEDULER_BETS]   - Still Pending:', betResultsSummary.stillPending);
+    }
     
     saveUpdateLog('results', 'success', { 
       message: 'Game results and bet results update completed',
       gameResultsUpdated: gameResultsSummary.totalUpdated,
       gameResultsDetail: gameResultsSummary,
       betResultsUpdated: betUpdateResult?.updatedCount || 0,
+      betResultsDetail: betResultsSummary,
       categories: Array.from(activeCategories)
     });
     
@@ -308,10 +346,10 @@ cron.schedule('*/10 * * * *', async () => {
         );
         
         const retryResult = {
-          updatedCount: retryResults.reduce((sum, r) => sum + (r.saved || 0) + (r.updated || 0), 0),
-          newCount: retryResults.reduce((sum, r) => sum + (r.saved || 0), 0),
-          updatedExistingCount: retryResults.reduce((sum, r) => sum + (r.updated || 0), 0),
-          skippedCount: retryResults.reduce((sum, r) => sum + (r.skipped || 0), 0)
+          updatedCount: retryResults.updatedCount || 0,
+          newCount: retryResults.newCount || 0,
+          updatedExistingCount: retryResults.updatedExistingCount || 0,
+          skippedCount: retryResults.skippedCount || 0
         };
 
         // --- ✅ 효율성 최적화: 재시도에서도 경기 결과 업데이트가 있을 때만 베팅 정산 실행 ---
@@ -429,23 +467,46 @@ cron.schedule('0 */4 * * *', async () => {
       console.log('[SCHEDULER_ODDS] 🔧 fetchAndCacheOddsForCategories returned:', oddsUpdateResult);
     }
     
-    // 실제 업데이트 결과를 상세히 로그에 기록
+    // ✨ 실제 업데이트 결과를 상세히 로그에 기록 (개선됨)
     const oddsSummary = {
       totalUpdated: oddsUpdateResult?.updatedCount || 0,
       newOdds: oddsUpdateResult?.newCount || 0,
       existingOddsUpdated: oddsUpdateResult?.updatedExistingCount || 0,
       skippedOdds: oddsUpdateResult?.skippedCount || 0,
       apiCalls: oddsUpdateResult?.apiCalls || 0,
-      categoriesProcessed: oddsUpdateResult?.categories?.length || 0
+      categoriesProcessed: oddsUpdateResult?.categories?.length || 0,
+      // ✨ 새로운 상세 정보
+      oddsAPIProvided: oddsUpdateResult?.oddsAPIProvided || 0,  // OddsAPI가 제공한 총 경기 수
+      filteredOut: oddsUpdateResult?.filteredOut || 0,          // 시간 필터로 제외된 경기
+      duplicatesRemoved: oddsUpdateResult?.duplicatesRemoved || 0,  // 중복 제거된 경기
+      validationFailed: oddsUpdateResult?.validationFailed || 0,    // 검증 실패 경기
+      saved: oddsUpdateResult?.saved || 0,                      // 실제 저장된 경기
+      savedGames: oddsUpdateResult?.savedGames || [],           // 저장된 경기 목록 (간략)
+      skippedGames: oddsUpdateResult?.skippedGames || []        // 건너뛴 경기 목록 (간략)
     };
     
     console.log('[SCHEDULER_ODDS] 📊 Update Summary:');
+    console.log('[SCHEDULER_ODDS]   - OddsAPI Provided:', oddsSummary.oddsAPIProvided);
+    console.log('[SCHEDULER_ODDS]   - Filtered Out:', oddsSummary.filteredOut);
+    console.log('[SCHEDULER_ODDS]   - Duplicates Removed:', oddsSummary.duplicatesRemoved);
+    console.log('[SCHEDULER_ODDS]   - Validation Failed:', oddsSummary.validationFailed);
+    console.log('[SCHEDULER_ODDS]   - Saved:', oddsSummary.saved);
     console.log('[SCHEDULER_ODDS]   - Total Updated:', oddsSummary.totalUpdated);
     console.log('[SCHEDULER_ODDS]   - New Odds:', oddsSummary.newOdds);
     console.log('[SCHEDULER_ODDS]   - Existing Updated:', oddsSummary.existingOddsUpdated);
     console.log('[SCHEDULER_ODDS]   - Skipped:', oddsSummary.skippedOdds);
     console.log('[SCHEDULER_ODDS]   - API Calls:', oddsSummary.apiCalls);
     console.log('[SCHEDULER_ODDS]   - Categories Processed:', oddsSummary.categoriesProcessed);
+    
+    if (oddsSummary.savedGames.length > 0) {
+      console.log('[SCHEDULER_ODDS] 💾 Saved Games (first 5):');
+      oddsSummary.savedGames.slice(0, 5).forEach(g => console.log(`[SCHEDULER_ODDS]     - ${g}`));
+    }
+    
+    if (oddsSummary.skippedGames.length > 0) {
+      console.log('[SCHEDULER_ODDS] ⏭️ Skipped Games (first 5):');
+      oddsSummary.skippedGames.slice(0, 5).forEach(g => console.log(`[SCHEDULER_ODDS]     - ${g.game}: ${g.reason}`));
+    }
     
     saveUpdateLog('odds', 'success', { 
       message: 'High-priority odds update completed (30min interval)',
@@ -733,12 +794,30 @@ const initializeData = async () => {
     // 결과 집계
     const totalResults = resultsResult.reduce((sum, r) => sum + (r.saved || 0) + (r.updated || 0), 0);
     
+    // ✨ 상세 로그 정보 추가
+    const oddsSummary = {
+      totalUpdated: oddsResult?.updatedCount || 0,
+      newOdds: oddsResult?.newCount || 0,
+      existingOddsUpdated: oddsResult?.updatedExistingCount || 0,
+      skippedOdds: oddsResult?.skippedCount || 0,
+      apiCalls: oddsResult?.apiCalls || 0,
+      categoriesProcessed: oddsResult?.categories?.length || 0,
+      oddsAPIProvided: oddsResult?.oddsAPIProvided || 0,
+      filteredOut: oddsResult?.filteredOut || 0,
+      duplicatesRemoved: oddsResult?.duplicatesRemoved || 0,
+      validationFailed: oddsResult?.validationFailed || 0,
+      saved: oddsResult?.saved || 0,
+      savedGames: oddsResult?.savedGames?.slice(0, 10) || [],
+      skippedGames: oddsResult?.skippedGames?.slice(0, 10) || []
+    };
+    
     saveUpdateLog('init', 'success', { 
       message: 'Initial data cached successfully for active categories',
       categories: Array.from(activeCategories),
       oddsUpdated: oddsResult?.updatedCount || 0,
       resultsUpdated: totalResults || 0,
-      betsUpdated: betResult?.updatedCount || 0
+      betsUpdated: betResult?.updatedCount || 0,
+      oddsDetail: oddsSummary  // ✨ 상세 정보 추가
     });
   } catch (error) {
     saveUpdateLog('init', 'error', { 

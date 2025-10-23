@@ -92,7 +92,17 @@ class BetResultService {
       }
 
       console.log(`Bet results update completed: ${updatedCount} updated, ${errorCount} errors`);
-      return { updatedCount, errorCount };
+      
+      // ✨ 상세 로깅 정보 추가
+      return { 
+        updatedCount, 
+        errorCount,
+        // 상세 정보
+        pendingBetsChecked: pendingBets.length,
+        settled: updatedCount,
+        failed: errorCount,
+        stillPending: pendingBets.length - updatedCount - errorCount
+      };
     } catch (error) {
       console.error('Error updating bet results:', error);
       throw error;

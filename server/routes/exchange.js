@@ -173,13 +173,13 @@ router.post('/match-order', verifyToken, async (req, res) => {
     matchType = reqMatchType;
     userId = req.user.userId;
 
-    // ✅ 금액 10원 단위 검증
-    if (matchAmount % 10 !== 0) {
-      return res.status(400).json({
-        success: false,
-        message: '매칭 금액은 10원 단위로 입력해주세요.'
-      });
-    }
+    // ✅ 금액 검증 제거 (모든 금액 허용)
+    // if (matchAmount % 10 !== 0) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: '매칭 금액은 10원 단위로 입력해주세요.'
+    //   });
+    // }
 
     console.log('🎯 매칭 배팅 요청:', { targetOrderId, matchAmount, matchType, userId });
     console.log('🆕 ExchangeOrderMatch 모델 상태:', {
@@ -529,13 +529,13 @@ router.post('/order', verifyToken, async (req, res) => {
     const { gameId, market, line, side, amount, selection } = req.body;
     const userId = req.user.userId;
 
-    // ✅ 금액 10원 단위 검증
-    if (amount % 10 !== 0) {
-      return res.status(400).json({
-        success: false,
-        message: '주문 금액은 10원 단위로 입력해주세요.'
-      });
-    }
+    // ✅ 금액 검증 제거 (모든 금액 허용)
+    // if (amount % 10 !== 0) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: '주문 금액은 10원 단위로 입력해주세요.'
+    //   });
+    // }
 
     console.log('🎯 Exchange 주문 생성 요청:', { gameId, market, line, side, amount, selection });
     console.log('🔍 [DEBUG] req.body에 price 필드 존재:', 'price' in req.body);
