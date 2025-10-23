@@ -13,7 +13,7 @@ import { getLocationConfig } from '../config/gameResultQuery.js';
 // import { getSettlementWaitHours } from '../config/settlementConfig.js'; // ✅ The Odds API 신뢰로 제거
 import settlementLogger from '../utils/settlementLogger.js';
 import CommissionSettingsService from './commissionSettingsService.js';
-import ADMIN_CONFIG from '../config/adminConfig.js';
+import { ADMIN_CONFIG } from '../config/centralizedConfig.js';
 
 // 스크립트 전용 Sequelize 인스턴스 생성
 const sequelize = createScriptSequelize();
