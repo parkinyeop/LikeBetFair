@@ -192,9 +192,9 @@ export default function Home() {
                     const awayOdds = (h2hOdds as any)[game.away_team];
                     const drawOdds = Object.entries(h2hOdds).find(([name, _]) => name.toLowerCase().includes('draw') || name === 'Draw' || name === 'Tie');
                     outcomes = [
-                      { name: game.home_team, price: (homeOdds as any)?.averagePrice },
-                      { name: 'Draw', price: (drawOdds?.[1] as any)?.averagePrice },
-                      { name: game.away_team, price: (awayOdds as any)?.averagePrice }
+                      { name: game.home_team, price: typeof homeOdds === 'number' ? homeOdds : (homeOdds as any)?.averagePrice },
+                      { name: 'Draw', price: typeof drawOdds?.[1] === 'number' ? drawOdds[1] : (drawOdds?.[1] as any)?.averagePrice },
+                      { name: game.away_team, price: typeof awayOdds === 'number' ? awayOdds : (awayOdds as any)?.averagePrice }
                     ].filter(outcome => outcome.price !== undefined);
                   } else if (game.sport_key?.includes('baseball')) {
                     // 야구 리그: Draw 없이 home/away만 outcomes에 포함 (정규화 매칭 적용)
@@ -204,13 +204,15 @@ export default function Home() {
                     const homeOdds = homeKey ? (h2hOdds as any)[homeKey] : undefined;
                     const awayOdds = awayKey ? (h2hOdds as any)[awayKey] : undefined;
                     outcomes = [
-                      { name: game.home_team, price: (homeOdds as any)?.averagePrice },
-                      { name: game.away_team, price: (awayOdds as any)?.averagePrice }
+                      { name: game.home_team, price: typeof homeOdds === 'number' ? homeOdds : (homeOdds as any)?.averagePrice },
+                      { name: game.away_team, price: typeof awayOdds === 'number' ? awayOdds : (awayOdds as any)?.averagePrice }
                     ].filter(outcome => outcome.price !== undefined);
                     // 상세 로그 (유니크 말머리 적용)
                     if (!homeOdds) console.log(`[KBO로그][${displayName}] home_team 키 미존재(정규화):`, game.home_team, '| h2h keys:', h2hKeys);
                     if (!awayOdds) console.log(`[KBO로그][${displayName}] away_team 키 미존재(정규화):`, game.away_team, '| h2h keys:', h2hKeys);
-                    if ((homeOdds && (homeOdds as any).averagePrice === undefined) || (awayOdds && (awayOdds as any).averagePrice === undefined)) {
+                    const homePrice = typeof homeOdds === 'number' ? homeOdds : (homeOdds as any)?.averagePrice;
+                    const awayPrice = typeof awayOdds === 'number' ? awayOdds : (awayOdds as any)?.averagePrice;
+                    if ((homeOdds && homePrice === undefined) || (awayOdds && awayPrice === undefined)) {
                       console.log(`[KBO로그][${displayName}] averagePrice undefined:`, {
                         home_team: game.home_team,
                         homeOdds,
@@ -221,7 +223,7 @@ export default function Home() {
                   } else {
                     outcomes = Object.entries(h2hOdds).map(([outcomeName, oddsData]) => ({
                       name: outcomeName,
-                      price: (oddsData as any).averagePrice
+                      price: typeof oddsData === 'number' ? oddsData : (oddsData as any).averagePrice
                     }));
                   }
 
@@ -953,18 +955,18 @@ export default function Home() {
                     if (isSoccer) {
                       const homeOdds = h2hOdds[game.home_team];
                       const awayOdds = h2hOdds[game.away_team];
-                      const drawOdds = Object.entries(h2hOdds).find(([name, _]) => 
+                      const drawOdds = Object.entries(h2hOdds).find(([name, _]) =>
                         name.toLowerCase().includes('draw') || name === 'Draw' || name === 'Tie'
                       );
                       outcomes = [
-                        { name: game.home_team, price: (homeOdds as any)?.averagePrice },
-                        { name: 'Draw', price: (drawOdds?.[1] as any)?.averagePrice },
-                        { name: game.away_team, price: (awayOdds as any)?.averagePrice }
+                        { name: game.home_team, price: typeof homeOdds === 'number' ? homeOdds : (homeOdds as any)?.averagePrice },
+                        { name: 'Draw', price: typeof drawOdds?.[1] === 'number' ? drawOdds[1] : (drawOdds?.[1] as any)?.averagePrice },
+                        { name: game.away_team, price: typeof awayOdds === 'number' ? awayOdds : (awayOdds as any)?.averagePrice }
                       ].filter(outcome => outcome.price !== undefined);
                     } else {
                       outcomes = Object.entries(h2hOdds).map(([outcomeName, oddsData]: [string, any]) => ({
                         name: outcomeName,
-                        price: (oddsData as any).averagePrice
+                        price: typeof oddsData === 'number' ? oddsData : (oddsData as any)?.averagePrice
                       }));
                     }
                     if (outcomes.length === 0) {
@@ -1077,8 +1079,8 @@ export default function Home() {
                       });
                     
                     return filteredTotals.map(([point, oddsPair]) => {
-                      const overOdds = oddsPair.over?.averagePrice;
-                      const underOdds = oddsPair.under?.averagePrice;
+                      const overOdds = typeof oddsPair.over?.odds === 'number' ? oddsPair.over.odds : oddsPair.over?.averagePrice;
+                      const underOdds = typeof oddsPair.under?.odds === 'number' ? oddsPair.under.odds : oddsPair.under?.averagePrice;
                       return (
                         <div key={point} className="flex items-center gap-2">
                           <button
@@ -1551,10 +1553,11 @@ export default function Home() {
                                       <button
                                         key={idx}
                                         onClick={() => {
-                                          if (game.isBettable && outcome.odds.averagePrice) {
+                                          const oddsValue = typeof outcome.odds === 'number' ? outcome.odds : outcome.odds?.averagePrice;
+                                          if (game.isBettable && oddsValue) {
                                             toggleSelection({
                                               team: outcome.name,
-                                              odds: outcome.odds.averagePrice,
+                                              odds: oddsValue,
                                               desc: `${game.home_team} vs ${game.away_team}`,
                                             commence_time: game.commence_time,
                                             market: 'Win/Loss',
@@ -1568,10 +1571,10 @@ export default function Home() {
                                             ? 'bg-yellow-500 hover:bg-yellow-600'
                                             : game.isBettable ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
                                         } text-white text-sm`}
-                                        disabled={!game.isBettable || !outcome.odds.averagePrice}
+                                        disabled={!game.isBettable || !(typeof outcome.odds === 'number' ? outcome.odds : outcome.odds?.averagePrice)}
                                       >
                                         <div className="font-medium">{label}</div>
-                                        <div className="text-xs">{outcome.odds.averagePrice.toFixed(3)}</div>
+                                        <div className="text-xs">{(typeof outcome.odds === 'number' ? outcome.odds : outcome.odds?.averagePrice)?.toFixed(3)}</div>
                                         {!game.isBettable && <div className="text-xs text-red-500 mt-1">Betting Closed</div>}
                                       </button>
                                     );
@@ -1646,8 +1649,8 @@ export default function Home() {
                               }
                               
                               return filteredTotals.map(([point, oddsPair], idx: number) => {
-                                const overOdds = oddsPair.over?.averagePrice;
-                                const underOdds = oddsPair.under?.averagePrice;
+                                const overOdds = typeof oddsPair.over?.odds === 'number' ? oddsPair.over.odds : oddsPair.over?.averagePrice;
+                                const underOdds = typeof oddsPair.under?.odds === 'number' ? oddsPair.under.odds : oddsPair.under?.averagePrice;
                                 
                                 return (
                                   <div key={idx} className="flex items-center gap-2">
@@ -1775,9 +1778,9 @@ export default function Home() {
                               return filteredSpreads.map(([absPoint, oddsPair], idx: number) => {
                                 const homeData = oddsPair.home;
                                 const awayData = oddsPair.away;
-                                
-                                const homeOdds = homeData?.oddsData?.averagePrice;
-                                const awayOdds = awayData?.oddsData?.averagePrice;
+
+                                const homeOdds = typeof homeData?.oddsData?.odds === 'number' ? homeData.oddsData.odds : homeData?.oddsData?.averagePrice;
+                                const awayOdds = typeof awayData?.oddsData?.odds === 'number' ? awayData.oddsData.odds : awayData?.oddsData?.averagePrice;
                                 const homeHandicap = homeData?.handicap || 0;
                                 const awayHandicap = awayData?.handicap || 0;
                                 const pointValue = parseFloat(absPoint);
