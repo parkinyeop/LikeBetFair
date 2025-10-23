@@ -456,7 +456,12 @@ class MultibetSettlementService {
       return this.determineTotalResult(selectedTeam, actualHomeScore, actualAwayScore);
     }
 
-    // 승부 판정
+    // 🆕 핸디캡 베팅 처리
+    if ((market === '핸디캡' || market === 'spreads') && selection.point !== undefined) {
+      return this.determineHandicapResult(selection, gameResult, actualHomeScore, actualAwayScore);
+    }
+
+    // 승부 판정 (핸디캡 없는 일반 승무패)
     const homeWon = actualHomeScore > actualAwayScore;
     const awayWon = actualAwayScore > actualHomeScore;
     const isDraw = actualHomeScore === actualAwayScore;
@@ -538,6 +543,61 @@ class MultibetSettlementService {
     
     console.warn(`[MULTIBET] 알 수 없는 옵션: ${option}`);
     return 'cancelled';
+  }
+
+  /**
+   * 🆕 핸디캡 베팅 결과 판정
+   * @param {Object} selection - 선택 정보 (team, point 포함)
+   * @param {Object} gameResult - 경기 결과
+   * @param {number} homeScore - 홈팀 점수
+   * @param {number} awayScore - 어웨이팀 점수
+   * @returns {string} 베팅 결과 (won/lost/cancelled)
+   */
+  determineHandicapResult(selection, gameResult, homeScore, awayScore) {
+    const { team: selectedTeam, point } = selection;
+    const handicap = parseFloat(point);
+    
+    console.log(`[MULTIBET] 핸디캡 베팅 판정: ${selectedTeam} ${handicap > 0 ? '+' : ''}${handicap}`);
+    console.log(`[MULTIBET] 실제 스코어: ${gameResult.homeTeam} ${homeScore} - ${awayScore} ${gameResult.awayTeam}`);
+    
+    // 선택한 팀이 홈팀인지 어웨이팀인지 확인
+    const selectedTeamLower = selectedTeam.toLowerCase();
+    const homeTeamLower = gameResult.homeTeam.toLowerCase();
+    const awayTeamLower = gameResult.awayTeam.toLowerCase();
+    
+    const isHomeTeam = selectedTeamLower.includes(homeTeamLower) || homeTeamLower.includes(selectedTeamLower);
+    
+    let adjustedHomeScore, adjustedAwayScore;
+    
+    if (isHomeTeam) {
+      // 홈팀 선택 → 홈팀에 핸디캡 적용
+      adjustedHomeScore = homeScore + handicap;
+      adjustedAwayScore = awayScore;
+      console.log(`[MULTIBET] 홈팀 선택 → 조정 스코어: ${adjustedHomeScore.toFixed(1)} vs ${adjustedAwayScore}`);
+    } else {
+      // 어웨이팀 선택 → 어웨이팀에 핸디캡 적용
+      adjustedHomeScore = homeScore;
+      adjustedAwayScore = awayScore + handicap;
+      console.log(`[MULTIBET] 어웨이팀 선택 → 조정 스코어: ${adjustedHomeScore} vs ${adjustedAwayScore.toFixed(1)}`);
+    }
+    
+    // Push 조건 (조정 스코어가 동점)
+    if (adjustedHomeScore === adjustedAwayScore) {
+      console.log(`[MULTIBET] Push 조건: 조정 스코어 ${adjustedHomeScore} = ${adjustedAwayScore} → cancelled`);
+      return 'cancelled';
+    }
+    
+    // 승패 판정
+    let result;
+    if (isHomeTeam) {
+      result = adjustedHomeScore > adjustedAwayScore ? 'won' : 'lost';
+      console.log(`[MULTIBET] 홈팀 핸디캡 결과: ${adjustedHomeScore} > ${adjustedAwayScore} = ${result}`);
+    } else {
+      result = adjustedAwayScore > adjustedHomeScore ? 'won' : 'lost';
+      console.log(`[MULTIBET] 어웨이팀 핸디캡 결과: ${adjustedAwayScore} > ${adjustedHomeScore} = ${result}`);
+    }
+    
+    return result;
   }
   
   /**
