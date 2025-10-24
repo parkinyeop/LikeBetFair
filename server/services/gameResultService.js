@@ -232,7 +232,7 @@ class GameResultService {
       if (events === null || events.length === 0) {
         console.log(`[GameResult] ⚠️ eventsseason 데이터 없음 → eventspastleague + eventsnextleague로 fallback`);
         try {
-          const [lastResponse, nextResponse] = await Promise.all([
+          const [pastResponse, nextResponse] = await Promise.all([
             axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventspastleague.php`, {
               params: { id: leagueId },
               timeout: 15000
@@ -243,10 +243,11 @@ class GameResultService {
             })
           ]);
           
-          const lastEvents = lastResponse.data?.results || [];
-          const nextEvents = nextResponse.data?.events || [];
-          events = [...lastEvents, ...nextEvents];
-          console.log(`[GameResult] ✅ Fallback 성공: ${lastEvents.length}+${nextEvents.length}=${events.length}개 경기`);
+          // 🔧 응답 키 수정: eventspastleague → results, eventsnextleague → events
+          const pastEvents = pastResponse.data?.results || [];
+          const nextEvents = nextResponse.data?.results || [];  // 🆕 events → results로 수정
+          events = [...pastEvents, ...nextEvents];
+          console.log(`[GameResult] ✅ Fallback 성공: ${pastEvents.length}+${nextEvents.length}=${events.length}개 경기`);
         } catch (fallbackError) {
           console.error(`[GameResult] ❌ Fallback 실패: ${fallbackError.message}`);
           events = [];
@@ -419,7 +420,7 @@ class GameResultService {
         ]);
         
         const lastEvents = lastResponse.data?.results || [];
-        const nextEvents = nextResponse.data?.events || [];
+        const nextEvents = nextResponse.data?.results || [];  // 🆕 events → results로 수정
         const allEvents = [...lastEvents, ...nextEvents];
         
         response = { data: { events: allEvents } };
