@@ -507,7 +507,7 @@ class MultibetSettlementService {
     }
 
     // 🆕 핸디캡 베팅 처리
-    if ((market === '핸디캡' || market === 'spreads') && selection.point !== undefined) {
+    if (market === '핸디캡' || market === 'spreads') {
       return this.determineHandicapResult(selection, gameResult, actualHomeScore, actualAwayScore);
     }
 
@@ -604,9 +604,25 @@ class MultibetSettlementService {
    * @returns {string} 베팅 결과 (won/lost/cancelled)
    */
   determineHandicapResult(selection, gameResult, homeScore, awayScore) {
-    const { team: selectedTeam, point } = selection;
-    const handicap = parseFloat(point);
-    
+    let selectedTeam, handicap;
+
+    // point 필드가 있으면 우선 사용
+    if (selection.point !== undefined) {
+      selectedTeam = selection.team;
+      handicap = parseFloat(selection.point);
+    } else {
+      // team 필드에서 핸디캡 파싱: "Indiana Pacers +7.5" → team: "Indiana Pacers", handicap: 7.5
+      const handicapMatch = selection.team.match(/^(.+?)\s+([+-])([\d.]+)$/);
+      if (handicapMatch) {
+        selectedTeam = handicapMatch[1].trim();
+        const sign = handicapMatch[2] === '-' ? -1 : 1;
+        handicap = sign * parseFloat(handicapMatch[3]);
+      } else {
+        console.error(`[MULTIBET] 핸디캡 파싱 실패: ${selection.team}`);
+        return 'cancelled';
+      }
+    }
+
     console.log(`[MULTIBET] 핸디캡 베팅 판정: ${selectedTeam} ${handicap > 0 ? '+' : ''}${handicap}`);
     console.log(`[MULTIBET] 실제 스코어: ${gameResult.homeTeam} ${homeScore} - ${awayScore} ${gameResult.awayTeam}`);
     
@@ -833,33 +849,49 @@ class MultibetSettlementService {
     
     // ✅ 부분 매칭 환불 처리
     if (order.partiallyFilled && order.remainingAmount > 0) {
-      console.log(`   🔄 부분 매칭 환불 처리: 주문 ${order.id}, 남은 금액 ${order.remainingAmount}원`);
-      
-      const user = await User.findByPk(order.userId, { transaction });
-      const refundAmount = parseFloat(order.remainingAmount);
-      const currentBalance = parseFloat(user.balance);
-      const newBalance = currentBalance + refundAmount;
-      
-      // ✅ 환불 전 로깅
-      settlementLogger.logRefund(order.id, refundAmount, `부분 매칭 환불 - 남은 금액: ${refundAmount}, 체결: ${order.filledAmount}`);
-      
-      await user.update({ balance: newBalance }, { transaction });
-      
-      await PaymentHistory.create({
-        userId: order.userId,
-        betId: `EXCHANGE_${order.id}`,
-        amount: refundAmount,
-        balanceAfter: newBalance,
-        memo: `Exchange 주문 경기 시작으로 부분 매칭된 주문의 남은 금액 자동 환불 (경기: ${order.homeTeam} vs ${order.awayTeam}, 경기 시작됨)`,
-        paidAt: new Date()
-      }, { transaction });
-      
-      await order.update({ remainingAmount: 0 }, { transaction });
-      
-      // ✅ 환불 후 로깅
-      settlementLogger.logPayment(order.id, refundAmount, currentBalance, newBalance, '부분 매칭 환불 완료');
-      
-      console.log(`   ✅ 환불 완료: ${refundAmount.toLocaleString()}원`);
+      // 🔒 중복 환불 방지: 이미 환불 기록이 있는지 확인
+      const existingRefund = await PaymentHistory.findOne({
+        where: {
+          userId: order.userId,
+          betId: `EXCHANGE_${order.id}`,
+          memo: {
+            [Op.like]: '%부분 매칭된 주문의 남은 금액 자동 환불%'
+          }
+        },
+        transaction
+      });
+
+      if (existingRefund) {
+        console.log(`   ⚠️  부분 매칭 환불 스킵: 이미 환불됨 (주문 ${order.id})`);
+      } else {
+        console.log(`   🔄 부분 매칭 환불 처리: 주문 ${order.id}, 남은 금액 ${order.remainingAmount}원`);
+
+        const user = await User.findByPk(order.userId, { transaction });
+        const refundAmount = parseFloat(order.remainingAmount);
+        const currentBalance = parseFloat(user.balance);
+        const newBalance = currentBalance + refundAmount;
+
+        // ✅ 환불 전 로깅
+        settlementLogger.logRefund(order.id, refundAmount, `부분 매칭 환불 - 남은 금액: ${refundAmount}, 체결: ${order.filledAmount}`);
+
+        await user.update({ balance: newBalance }, { transaction });
+
+        await PaymentHistory.create({
+          userId: order.userId,
+          betId: `EXCHANGE_${order.id}`,
+          amount: refundAmount,
+          balanceAfter: newBalance,
+          memo: `Exchange 주문 경기 시작으로 부분 매칭된 주문의 남은 금액 자동 환불 (경기: ${order.homeTeam} vs ${order.awayTeam}, 경기 시작됨)`,
+          paidAt: new Date()
+        }, { transaction });
+
+        await order.update({ remainingAmount: 0 }, { transaction });
+
+        // ✅ 환불 후 로깅
+        settlementLogger.logPayment(order.id, refundAmount, currentBalance, newBalance, '부분 매칭 환불 완료');
+
+        console.log(`   ✅ 환불 완료: ${refundAmount.toLocaleString()}원`);
+      }
     }
 
     return {

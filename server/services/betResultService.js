@@ -423,18 +423,19 @@ class BetResultService {
       return 'cancelled';
     }
 
-    // pending이 있으면 대기
-    if (hasPending) {
-      return 'pending';
-    }
-
-    // 멀티베팅 핵심 로직: 하나라도 실패하면 전체 실패
+    // ✅ 수정: 멀티베팅 핵심 로직 - 하나라도 실패하면 즉시 전체 실패 (pending 무시)
     // draw 결과도 lost로 처리
     const hasAnyFailure = selections.some(s => s.result === 'lost' || s.result === 'draw');
     
     if (hasAnyFailure) {
-      console.log(`[멀티베팅 판정] 실패한 선택 발견 - 전체 베팅 실패`);
-      return 'lost';
+      console.log(`[멀티베팅 판정] 실패한 선택 발견 - 전체 베팅 즉시 실패 (pending 무시)`);
+      return 'lost';  // ← pending이 있어도 즉시 lost 처리
+    }
+
+    // pending이 있으면 대기 (실패한 선택이 없을 때만)
+    if (hasPending) {
+      console.log(`[멀티베팅 판정] pending 경기 대기`);
+      return 'pending';
     }
 
     // 멀티베팅에서는 모든 선택이 성공해야 전체 성공
@@ -1182,11 +1183,21 @@ class BetResultService {
     
     if (selectedTeam === homeTeamNorm) {
       const adjustedScore = homeScore + handicap;
+      // Push 처리: 조정 스코어가 동점이면 환불
+      if (adjustedScore === awayScore) {
+        console.log(`[핸디캡 매칭] 홈팀 Push: ${adjustedScore} = ${awayScore} → cancelled`);
+        return 'cancelled';
+      }
       const result = adjustedScore > awayScore ? 'won' : 'lost';
       console.log(`[핸디캡 매칭] 홈팀 매칭: ${adjustedScore} vs ${awayScore} = ${result}`);
       return result;
     } else if (selectedTeam === awayTeamNorm) {
       const adjustedScore = awayScore + handicap;
+      // Push 처리: 조정 스코어가 동점이면 환불
+      if (adjustedScore === homeScore) {
+        console.log(`[핸디캡 매칭] 원정팀 Push: ${adjustedScore} = ${homeScore} → cancelled`);
+        return 'cancelled';
+      }
       const result = adjustedScore > homeScore ? 'won' : 'lost';
       console.log(`[핸디캡 매칭] 원정팀 매칭: ${adjustedScore} vs ${homeScore} = ${result}`);
       return result;

@@ -1930,13 +1930,14 @@ class ExchangeSettlementService {
    */
   async findGameResultByMatch(homeTeam, awayTeam, commenceTime) {
     const targetTime = this.normalizeTimezoneToUTC(commenceTime);
-    const timeRange = 12 * 60 * 60 * 1000; // ±12시간 범위
+    const timeRange = 12 * 60 * 60 * 1000; // ±12시간
     
     const startTime = new Date(targetTime.getTime() - timeRange);
     const endTime = new Date(targetTime.getTime() + timeRange);
     
     console.log(`🔍 경기 결과 검색 (시간대 보정): ${homeTeam} vs ${awayTeam}`);
-    console.log(`⏰ 대상 시간 (UTC): ${targetTime.toISOString()}`);
+    console.log(`⏰ 입력 시간: ${commenceTime}`);
+    console.log(`⏰ 정규화된 시간 (UTC): ${targetTime.toISOString()}`);
     console.log(`⏰ 검색 범위 (UTC): ${startTime.toISOString()} ~ ${endTime.toISOString()}`);
     
     const gameResults = await GameResult.findAll({
@@ -1952,6 +1953,9 @@ class ExchangeSettlementService {
     });
     
     console.log(`📊 찾은 경기 결과: ${gameResults.length}개`);
+    gameResults.forEach((gr, idx) => {
+      console.log(`   [${idx + 1}] ${gr.homeTeam} vs ${gr.awayTeam}, 상태: ${gr.status}, 시간: ${gr.commenceTime.toISOString()}, 점수: ${gr.score}`);
+    });
     
     if (gameResults.length === 0) {
       // 🆕 시간대 차이로 인한 매칭 실패 가능성 고려해서 더 넓은 범위로 재검색 (UTC 같은 날만)
@@ -2137,6 +2141,7 @@ class ExchangeSettlementService {
     
     for (const selection of order.selectionDetails.selections) {
       console.log(`🔍 선택사항 확인: ${selection.homeTeam} vs ${selection.awayTeam} - ${selection.selection}`);
+      console.log(`   선택사항 상세:`, JSON.stringify(selection));
       
       // 해당 선택사항의 경기 결과 조회
       const selectionGameResult = await this.findGameResultByMatch(
@@ -2144,6 +2149,8 @@ class ExchangeSettlementService {
         selection.awayTeam, 
         selection.commenceTime
       );
+      
+      console.log(`   🔎 findGameResultByMatch 결과:`, selectionGameResult ? `찾음 (상태: ${selectionGameResult.status})` : `찾지못함`);
       
       // 경기 결과가 없거나 진행 중인 경우
       if (!selectionGameResult) {
