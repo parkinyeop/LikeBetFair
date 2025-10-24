@@ -173,19 +173,19 @@ export default function Home() {
               
               if (sortedGames.length > 0) {
                 gamesData[displayName] = sortedGames;
-                // 점검: 첫 번째 경기의 officialOdds.h2h 구조 상세 출력
+                // 점검: 첫 번째 경기의 sportsbookOdds.h2h 구조 상세 출력
                 const firstGame = sortedGames[0];
-                console.log(`==== [${displayName}] 첫 번째 경기 officialOdds.h2h 구조 ====`);
-                if (firstGame.officialOdds && firstGame.officialOdds.h2h) {
-                  Object.entries(firstGame.officialOdds.h2h).forEach(([name, odds]) => {
+                console.log(`==== [${displayName}] 첫 번째 경기 sportsbookOdds.h2h 구조 ====`);
+                if (firstGame.sportsbookOdds && firstGame.sportsbookOdds.h2h) {
+                  Object.entries(firstGame.sportsbookOdds.h2h).forEach(([name, odds]) => {
                     console.log(`  h2h: ${name} =`, odds);
                   });
                 } else {
-                  console.log('  [배당 없음] officialOdds.h2h가 없음');
+                  console.log('  [배당 없음] sportsbookOdds.h2h가 없음');
                 }
                 // 점검: outcomes.length === 0인 경기 별도 분류
                 sortedGames.forEach((game, idx) => {
-                  let h2hOdds = (game.officialOdds && game.officialOdds.h2h) ? game.officialOdds.h2h : {};
+                  let h2hOdds = (game.sportsbookOdds && game.sportsbookOdds.h2h) ? game.sportsbookOdds.h2h : {};
                   let outcomes: any[] = [];
                   if (game.sport_key?.includes('soccer')) {
                     const homeOdds = (h2hOdds as any)[game.home_team];
@@ -833,8 +833,8 @@ export default function Home() {
           if (!selectedMarkets[game.id]) {
             setSelectedMarkets(prev => ({ ...prev, [game.id]: new Set(['Win/Loss']) }));
           }
-          const officialOdds = game.officialOdds || {};
-          
+          const sportsbookOdds = game.sportsbookOdds || {};
+
           // 모든 리그 디버깅 (첫 번째 경기만)
           if (todayFlatGames.indexOf(game) === 0) {
             console.log(`🔍 Today Betting 첫 번째 경기 렌더링:`, {
@@ -842,11 +842,11 @@ export default function Home() {
               away_team: game.away_team,
               sport_key: game.sport_key,
               sportTitle: game.sportTitle,
-              officialOdds: game.officialOdds ? '있음' : '없음',
+              sportsbookOdds: game.sportsbookOdds ? '있음' : '없음',
               bookmakers: game.bookmakers ? '있음' : '없음',
-              h2hOdds: officialOdds.h2h ? '있음' : '없음',
-              officialOddsKeys: game.officialOdds ? Object.keys(game.officialOdds) : [],
-              h2hOddsKeys: officialOdds.h2h ? Object.keys(officialOdds.h2h) : []
+              h2hOdds: sportsbookOdds.h2h ? '있음' : '없음',
+              sportsbookOddsKeys: game.sportsbookOdds ? Object.keys(game.sportsbookOdds) : [],
+              h2hOddsKeys: sportsbookOdds.h2h ? Object.keys(sportsbookOdds.h2h) : []
             });
           }
 
@@ -940,7 +940,7 @@ export default function Home() {
                 <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                   <div className="text-sm font-medium text-blue-800 mb-2">🏆 승/패</div>
                   {(() => {
-                    const h2hOdds = officialOdds.h2h || {};
+                    const h2hOdds = sportsbookOdds.h2h || {};
                     // 축구 경기인지 확인
                     const isSoccer = game.sport_key?.includes('soccer') ||
                                    game.sport_key?.includes('korea_kleague') ||
@@ -973,9 +973,9 @@ export default function Home() {
                       console.log(`🔍 ${game.home_team} vs ${game.away_team} - 배당 정보 없음:`, {
                         sport_key: game.sport_key,
                         sportTitle: game.sportTitle,
-                        hasOfficialOdds: !!game.officialOdds,
+                        hasSportsbookOdds: !!game.sportsbookOdds,
                         hasBookmakers: !!game.bookmakers,
-                        officialOddsKeys: game.officialOdds ? Object.keys(game.officialOdds) : [],
+                        sportsbookOddsKeys: game.sportsbookOdds ? Object.keys(game.sportsbookOdds) : [],
                         h2hOdds: h2hOdds
                       });
                       return (
@@ -1045,7 +1045,7 @@ export default function Home() {
                   <div className="text-sm font-medium text-blue-800 mb-2">📈 언더/오버 (Over/Under)</div>
                   <div className="space-y-2">
                   {(() => {
-                    const totalsOdds = officialOdds.totals || {};
+                    const totalsOdds = sportsbookOdds.totals || {};
                     const totalEntries = Object.entries(totalsOdds);
                     if (totalEntries.length === 0) {
                       return <div className="text-center text-gray-500 py-6">No Over/Under odds available</div>;
@@ -1492,11 +1492,11 @@ export default function Home() {
                     </div>
                     
                     {/* 승/패 배당 */}
-                    {selectedMarketsForGame.has('Win/Loss') && game.officialOdds?.h2h && Object.keys(game.officialOdds.h2h).length > 0 && (
+                    {selectedMarketsForGame.has('Win/Loss') && game.sportsbookOdds?.h2h && Object.keys(game.sportsbookOdds.h2h).length > 0 && (
                       <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                         <div className="text-sm font-medium text-blue-800 mb-2">🏆 승패</div>
                         {(() => {
-                            const h2hOdds = game.officialOdds.h2h;
+                            const h2hOdds = game.sportsbookOdds.h2h;
                             
                                 // 축구 경기인지 확인
     const isSoccer = selectedCategory === 'Soccer' || 
@@ -1596,19 +1596,19 @@ export default function Home() {
                           <details>
                             <summary className="cursor-pointer font-medium">🔍 디버깅 정보</summary>
                             <div className="mt-2 space-y-1">
-                              <div>officialOdds 존재: {game.officialOdds ? '✅' : '❌'}</div>
-                              <div>totals 키: {game.officialOdds?.totals ? Object.keys(game.officialOdds.totals).join(', ') : '없음'}</div>
-                              <div>totals 데이터 길이: {game.officialOdds?.totals ? Object.keys(game.officialOdds.totals).length : 0}</div>
+                              <div>sportsbookOdds 존재: {game.sportsbookOdds ? '✅' : '❌'}</div>
+                              <div>totals 키: {game.sportsbookOdds?.totals ? Object.keys(game.sportsbookOdds.totals).join(', ') : '없음'}</div>
+                              <div>totals 데이터 길이: {game.sportsbookOdds?.totals ? Object.keys(game.sportsbookOdds.totals).length : 0}</div>
                               <div>bookmakers 존재: {game.bookmakers ? '✅' : '❌'}</div>
                               <div>sport_key: {game.sport_key}</div>
                             </div>
                           </details>
                         </div>
-                        
-                        {game.officialOdds?.totals && Object.keys(game.officialOdds.totals).length > 0 ? (
+
+                        {game.sportsbookOdds?.totals && Object.keys(game.sportsbookOdds.totals).length > 0 ? (
                           <div className="space-y-2">
                             {(() => {
-                              const totalsOdds = game.officialOdds.totals;
+                              const totalsOdds = game.sportsbookOdds.totals;
                               const groupedTotals: { [point: string]: { over?: any, under?: any } } = {};
                               
                               Object.entries(totalsOdds).forEach(([outcomeName, oddsData]) => {
@@ -1741,19 +1741,19 @@ export default function Home() {
                           <details>
                             <summary className="cursor-pointer font-medium">🔍 디버깅 정보</summary>
                             <div className="mt-2 space-y-1">
-                              <div>officialOdds 존재: {game.officialOdds ? '✅' : '❌'}</div>
-                              <div>spreads 키: {game.officialOdds?.spreads ? Object.keys(game.officialOdds.spreads).join(', ') : '없음'}</div>
-                              <div>spreads 데이터 길이: {game.officialOdds?.spreads ? Object.keys(game.officialOdds.spreads).length : 0}</div>
+                              <div>sportsbookOdds 존재: {game.sportsbookOdds ? '✅' : '❌'}</div>
+                              <div>spreads 키: {game.sportsbookOdds?.spreads ? Object.keys(game.sportsbookOdds.spreads).join(', ') : '없음'}</div>
+                              <div>spreads 데이터 길이: {game.sportsbookOdds?.spreads ? Object.keys(game.sportsbookOdds.spreads).length : 0}</div>
                               <div>bookmakers 존재: {game.bookmakers ? '✅' : '❌'}</div>
                               <div>sport_key: {game.sport_key}</div>
                             </div>
                           </details>
                         </div>
-                        
-                        {game.officialOdds?.spreads && Object.keys(game.officialOdds.spreads).length > 0 ? (
+
+                        {game.sportsbookOdds?.spreads && Object.keys(game.sportsbookOdds.spreads).length > 0 ? (
                           <div className="space-y-2">
                             {(() => {
-                              const spreadsOdds = game.officialOdds.spreads;
+                              const spreadsOdds = game.sportsbookOdds.spreads;
                               
                               // ✅ 수정: groupHandicapsByPoint 함수 사용
                               const groupedSpreads = groupHandicapsByPoint(

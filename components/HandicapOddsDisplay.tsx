@@ -9,7 +9,7 @@ interface GameData {
   home_team: string;
   away_team: string;
   commence_time: string;
-  officialOdds?: {
+  sportsbookOdds?: {
     spreads?: Record<string, { averagePrice: number; count: number }>;
   };
 }
@@ -42,7 +42,7 @@ const HandicapOddsDisplay: React.FC<HandicapOddsDisplayProps> = ({
   onBettingAreaSelect,
   variant = 'sportsbook'
 }) => {
-  const spreadsOdds = game.officialOdds?.spreads || {};
+  const spreadsOdds = game.sportsbookOdds?.spreads || {};
 
   if (Object.keys(spreadsOdds).length === 0) {
     return (
