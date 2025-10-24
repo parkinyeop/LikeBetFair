@@ -24,8 +24,12 @@ if (!fs.existsSync(logsDir)) {
 
 // 로그 파일 경로 생성 함수 (데일리)
 function getLogFilePath() {
+  // ✅ KST 로컬 시간대 사용 (UTC 시간대 오류 수정)
   const now = new Date();
-  const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const dateStr = `${year}-${month}-${day}`;
   return path.join(logsDir, `server-${dateStr}.log`);
 }
 
