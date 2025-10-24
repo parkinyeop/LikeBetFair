@@ -36,6 +36,15 @@ class MultibetSettlementService {
    * @returns {boolean} true: 스킵, false: 조회 필요
    */
   shouldSkipPendingOrder(order) {
+    // ✅ settled, cancelled 상태의 주문은 캐시에서 제거
+    if (order.status === 'settled' || order.status === 'cancelled') {
+      if (this.pendingOrderCache.has(order.id)) {
+        this.pendingOrderCache.delete(order.id);
+        console.debug(`🗑️  주문 ${order.id}: ${order.status} 상태로 캐시 삭제`);
+      }
+      return false; // 조회 필요
+    }
+
     // 캐시에서 다음 조회 시간 확인
     const nextCheckTime = this.pendingOrderCache.get(order.id);
     if (nextCheckTime && Date.now() < nextCheckTime) {
