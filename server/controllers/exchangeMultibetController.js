@@ -3,6 +3,7 @@ import { ExchangeMultibetValidationService } from '../services/exchangeMultibetV
 import BettingAmountSettingsService from '../services/bettingAmountSettingsService.js';
 import balanceService from '../services/balanceService.js';
 import createScriptSequelize from '../config/scriptDatabase.js';
+import { calculatePreciseTotalOdds } from '../utils/preciseCalculation.js';
 
 // 스크립트 전용 Sequelize 인스턴스 생성
 const sequelize = createScriptSequelize();
@@ -156,16 +157,15 @@ class ExchangeMultibetController {
         });
       }
 
-      // 5. totalOdds 재계산 (프론트엔드와 동일한 로직)
-      const calculatedTotalOdds = selections.reduce((acc, selection) => {
-        return acc * (parseFloat(selection.odds) || 1);
-      }, 1);
+      // 5. totalOdds 재계산 (정확한 계산)
+      const oddsArray = selections.map(sel => parseFloat(sel.odds) || 1);
+      const calculatedTotalOdds = calculatePreciseTotalOdds(oddsArray);
       
       // ✅ 환수율 적용 제거 (각 레그의 배당률에 이미 적용되어 있음)
       // 프론트엔드에서 이미 환수율이 적용된 배당률을 받으므로 백엔드에서 중복 적용하지 않음
       const adjustedTotalOdds = calculatedTotalOdds;
       
-      console.log(`📊 totalOdds 계산: ${calculatedTotalOdds} (환수율 이미 적용됨)`);
+      console.log(`📊 totalOdds 계산: ${calculatedTotalOdds} (정확한 계산, 환수율 이미 적용됨)`);
       console.log(`📊 프론트엔드 ${totalOdds} vs 백엔드 ${adjustedTotalOdds}`);
       
       // 6. 멀티배팅 주문 생성 (기존 ExchangeOrders 테이블 사용)
