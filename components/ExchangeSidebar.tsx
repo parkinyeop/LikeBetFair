@@ -995,8 +995,8 @@ function OrderHistoryPanel() {
 
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="bg-gray-50 p-3 rounded">
+    <div className="h-full flex flex-col">
+      <div className="bg-gray-50 p-3 rounded flex-shrink-0">
         {/* 접을 수 있는 헤더 */}
         <div className="flex justify-between items-center mb-3">
           <button
@@ -1014,7 +1014,7 @@ function OrderHistoryPanel() {
             <h3 className="font-semibold text-sm text-gray-700">내 주문 내역</h3>
           </button>
           <div className="text-right">
-            <div className="text-xs text-gray-500">{(userOrders || []).length}개 주문</div>
+            <div className="text-xs text-gray-500">{filteredOrders.length}개 주문</div>
             <div className="text-xs text-gray-400">
               Last Update: {lastUpdate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
             </div>
@@ -1114,14 +1114,10 @@ function OrderHistoryPanel() {
         
         {/* 주문 목록 - 항상 표시 */}
         {filteredOrders.length === 0 ? (
-          <div className="text-center py-8">
-            <div className="text-gray-400 text-4xl mb-2">📋</div>
-            <p className="text-gray-500 text-sm">주문 내역이 없습니다.</p>
-            <p className="text-gray-400 text-xs mt-1">중앙에서 Back/Lay 버튼을 클릭하여 주문을 생성하세요.</p>
-          </div>
+          <div className="text-center py-4 text-gray-400 text-sm">주문 내역이 없습니다</div>
         ) : (
-          <div className="space-y-0">
-            {filteredOrders.slice(0, 10).map((order, index) => {
+          <div className="space-y-2 flex-1 overflow-y-auto">
+            {filteredOrders.map((order, index) => {
               const statusInfo = getStatusDisplay(order.status, order.commenceTime);
               const sideInfo = getSideDisplay(order.side);
               const dateInfo = formatDate(order.createdAt);
@@ -1256,10 +1252,10 @@ function OrderHistoryPanel() {
                     )}
                     
                     {/* 배팅금액과 통합배당률 정보 */}
-                    <div className="flex items-center justify-between text-sm pt-2 border-t border-gray-100">
-                      <div className="flex items-center space-x-4">
-                        <span className="text-gray-500">배팅금액</span>
-                        <span className="font-bold text-gray-800">
+                    <div className="flex items-center justify-between text-xs py-1 border-t border-gray-100">
+                      <div className="flex items-center space-x-1">
+                        <span className="text-gray-500 text-xs">배팅금액</span>
+                        <span className="font-bold text-gray-800 text-xs">
                           {(() => {
                             if ((order as any).isMultibet) {
                               const stakeAmount = (order as any).stakeAmount;
@@ -1275,9 +1271,9 @@ function OrderHistoryPanel() {
                           })()}원
                         </span>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-gray-500">배당률</span>
-                        <span className="text-sm font-bold text-blue-600">
+                      <div className="flex items-center space-x-1">
+                        <span className="text-gray-500 text-xs">배당률</span>
+                        <span className="text-xs font-bold text-blue-600">
                           @{Number(totalOdds || 0).toFixed(3)}
                         </span>
                       </div>
