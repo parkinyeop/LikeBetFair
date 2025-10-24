@@ -176,10 +176,10 @@ class GameResultService {
   /**
    * TheSportsDB API를 사용하여 경기 결과 데이터 가져오기
    * @param {string} sportKey - 스포츠 키
-   * @param {number} daysFrom - 과거 몇 일간의 데이터를 가져올지 (기본값: 15)
+   * @param {number} daysFrom - 과거 몇 일간의 데이터를 가져올지 (기본값: 3)
    * @param {boolean} includeFuture - 미래 1일 데이터 포함 여부 (기본값: true)
    */
-  async fetchResultsWithSportsDB(sportKey, daysFrom = 15, includeFuture = true) {
+  async fetchResultsWithSportsDB(sportKey, daysFrom = 3, includeFuture = true) {
     try {
       console.log(`[GameResult] TheSportsDB API 사용: ${sportKey}`);
       const leagueId = this.getSportsDbLeagueIdBySportKey(sportKey);
@@ -255,12 +255,13 @@ class GameResultService {
       
       console.log(`[GameResult] TheSportsDB API 성공: ${events.length}개 경기`);
 
-      // 🆕 시간 범위 수정: 과거 15일 + 미래 1일 (누락 데이터 복구용 임시 확장)
+      // 🆕 시간 범위 수정: 과거 3일 + 미래 1일 (정산 대기 베팅 커버용)
       // now 변수는 이미 191번 줄에서 선언됨
       const cutoffDate = new Date(now.getTime() - daysFrom * 24 * 60 * 60 * 1000);
       const futureDate = includeFuture ? new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000) : now;
       
       console.log(`[GameResult] 시간 범위 설정: ${cutoffDate.toISOString()} ~ ${futureDate.toISOString()}`);
+      console.log(`[GameResult] 🔍 NBA 수집 추적 - sportKey: ${sportKey}, 받은 경기 수: ${events.length}`);
       
       const filteredEvents = events.filter(event => {
         if (!event.dateEvent || !event.strTime) {
@@ -606,8 +607,8 @@ class GameResultService {
       if (!sportKey) continue;
       
       try {
-        // 🆕 시간 범위 수정: 과거 15일 + 미래 1일 (누락 데이터 복구용 임시 확장)
-        const resultsResponse = await this.fetchResultsWithSportsDB(sportKey, 15, true);
+        // 🆕 시간 범위 수정: 과거 3일 + 미래 1일 (정산 대기 베팅 커버용)
+        const resultsResponse = await this.fetchResultsWithSportsDB(sportKey);
         const events = resultsResponse.data || [];
         console.log(`Found ${events.length} events for ${league} from TheSportsDB API`);
 
@@ -848,8 +849,8 @@ class GameResultService {
         
         try {
           // TheSportsDB API 사용 (The Odds API 사용 금지)
-          // 🆕 시간 범위 수정: 과거 15일 + 미래 1일 (누락 데이터 복구용 임시 확장)
-          const resultsResponse = await this.fetchResultsWithSportsDB(sportKey, 15, true);
+          // 🆕 시간 범위 수정: 과거 3일 + 미래 1일 (정산 대기 베팅 커버용)
+          const resultsResponse = await this.fetchResultsWithSportsDB(sportKey);
           
           if (resultsResponse.data && Array.isArray(resultsResponse.data)) {
             console.log(`Found ${resultsResponse.data.length} events for ${clientCategory}`);
