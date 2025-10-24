@@ -83,11 +83,15 @@ export default function SportsPage() {
 
         // 샘플 배당율 추출 (첫 번째 경기의 h2h 배당율)
         let sampleOdds = null;
-        if (filteredGames.length > 0 && filteredGames[0].officialOdds?.h2h) {
-          const h2hOdds = filteredGames[0].officialOdds.h2h;
-          const firstTeam = Object.keys(h2hOdds)[0];
-          if (firstTeam) {
-            sampleOdds = h2hOdds[firstTeam].averagePrice;
+        if (filteredGames.length > 0) {
+          // ✅ sportsbookOdds 우선 사용 (환수율이 적용된 버전), 없으면 officialOdds 사용
+          const oddsToUse = filteredGames[0].sportsbookOdds || filteredGames[0].officialOdds;
+          if (oddsToUse?.h2h) {
+            const h2hOdds = oddsToUse.h2h;
+            const firstTeam = Object.keys(h2hOdds)[0];
+            if (firstTeam) {
+              sampleOdds = h2hOdds[firstTeam].averagePrice;
+            }
           }
         }
 
