@@ -115,10 +115,6 @@ export function useExchangeGames(category?: string) {
         // 1. 원본 officialOdds를 깊은 복사하여 수정 준비
         const adjustedOfficialOdds = JSON.parse(JSON.stringify(displayOdds));
         
-        // ========================= [ 디버깅 로그 추가 시작 ] =========================
-        console.log(`[환수율 디버깅] 경기: ${game.home_team} vs ${game.away_team}`);
-        console.log('표시할 배당율:', displayOdds);
-        // ========================= [  디버깅 로그 추가 끝  ] =========================
         
         // ✅ API에서 이미 환수율이 적용된 배당율을 받으므로 추가 계산 불필요
         
@@ -135,9 +131,16 @@ export function useExchangeGames(category?: string) {
           category: category || '',
           availableMarkets: game.bookmakers?.[0]?.markets || [],
           // 조정된 데이터에서 값을 가져오도록 보장
-          homeTeamOdds: adjustedOfficialOdds.h2h?.[game.home_team]?.averagePrice || null,
-          awayTeamOdds: adjustedOfficialOdds.h2h?.[game.away_team]?.averagePrice || null,
-          drawOdds: adjustedOfficialOdds.h2h?.Draw?.averagePrice || null,
+          // exchangeOdds는 직접 숫자 값, sportsbookOdds는 {averagePrice, count} 객체
+          homeTeamOdds: typeof adjustedOfficialOdds.h2h?.[game.home_team] === 'number'
+            ? adjustedOfficialOdds.h2h[game.home_team]
+            : adjustedOfficialOdds.h2h?.[game.home_team]?.averagePrice || null,
+          awayTeamOdds: typeof adjustedOfficialOdds.h2h?.[game.away_team] === 'number'
+            ? adjustedOfficialOdds.h2h[game.away_team]
+            : adjustedOfficialOdds.h2h?.[game.away_team]?.averagePrice || null,
+          drawOdds: typeof adjustedOfficialOdds.h2h?.Draw === 'number'
+            ? adjustedOfficialOdds.h2h.Draw
+            : adjustedOfficialOdds.h2h?.Draw?.averagePrice || null,
           officialOdds: adjustedOfficialOdds, // 완전히 조정된 객체로 교체
         };
       });
