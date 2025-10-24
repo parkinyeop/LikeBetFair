@@ -242,8 +242,12 @@ export async function placeBet(req, res) {
     if (selections.length === 1) {
       // 단일 배팅: 단일 배당률 적용
       adjustedTotalOdds = await SportsbookOddsReturnRateService.applyReturnRateToSingleOdds(totalOdds);
-      console.log('🎯 [PlaceBet] 단일 배팅 배당율 조정:', { 
-        original: totalOdds, 
+
+      // ✅ 소수점 3자리 버림 처리
+      adjustedTotalOdds = Math.floor(adjustedTotalOdds * 1000) / 1000;
+
+      console.log('🎯 [PlaceBet] 단일 배팅 배당율 조정:', {
+        original: totalOdds,
         adjusted: adjustedTotalOdds,
         adjustment: ((adjustedTotalOdds / totalOdds - 1) * 100).toFixed(2) + '%'
       });
@@ -254,8 +258,11 @@ export async function placeBet(req, res) {
       
       // 조정된 배당률로 총 배당률 재계산
       adjustedTotalOdds = calculatePreciseTotalOdds(adjustedOddsArray);
-      
-      console.log('🎯 [PlaceBet] 멀티배팅 배당율 조정:', { 
+
+      // ✅ 소수점 3자리 버림 처리
+      adjustedTotalOdds = Math.floor(adjustedTotalOdds * 1000) / 1000;
+
+      console.log('🎯 [PlaceBet] 멀티배팅 배당율 조정:', {
         originalOdds: individualOdds,
         adjustedOdds: adjustedOddsArray,
         originalTotal: totalOdds,

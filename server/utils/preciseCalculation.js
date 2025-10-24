@@ -51,6 +51,23 @@ export function preciseDivide(a, b) {
 }
 
 /**
+ * 정밀한 배당율 곱셈 (배당율끼리의 곱셈용)
+ * 예: 1.923 × 1.577 = 3.032571
+ * @param {number} a - 첫 번째 배당율
+ * @param {number} b - 두 번째 배당율
+ * @returns {number} 곱셈 결과 (배당율)
+ */
+export function preciseMultiplyOdds(a, b) {
+  // 배당율을 1000배로 정수화: 1.923 → 1923
+  const intA = Math.round(a * 1000);
+  const intB = Math.round(b * 1000);
+  // 곱셈: (a × 1000) × (b × 1000) / 1,000,000 = a × b
+  const result = (intA * intB) / 1000000; // ✅ 수정: Math.round 제거
+  // 결과를 다시 배당율로 변환
+  return result;
+}
+
+/**
  * 정밀한 덧셈 (부동소수점 오차 방지)
  * @param {number} a - 첫 번째 값
  * @param {number} b - 두 번째 값
@@ -172,12 +189,12 @@ export function calculatePreciseTotalOdds(oddsArray, usePayoutRate = false) {
     // 0인 값이 있으면 단순 곱셈 방식으로 fallback
     if (payoutRates.some(rate => rate === 0)) {
       return oddsArray.reduce((total, odds) => {
-        return preciseMultiply(total, odds);
+        return preciseMultiplyOdds(total, odds);
       }, 1);
     }
     
     const totalPayoutRate = payoutRates.reduce((total, rate) => {
-      return preciseMultiply(total, rate);
+      return preciseMultiplyOdds(total, rate);
     }, 1);
     
     if (totalPayoutRate === 0) {
@@ -186,9 +203,9 @@ export function calculatePreciseTotalOdds(oddsArray, usePayoutRate = false) {
     
     return preciseDivide(1, totalPayoutRate);
   } else {
-    // 단순 곱셈 방식
+    // 단순 곱셈 방식 (배당율 전용)
     return oddsArray.reduce((total, odds) => {
-      return preciseMultiply(total, odds);
+      return preciseMultiplyOdds(total, odds);
     }, 1);
   }
 }
@@ -287,6 +304,7 @@ export function testMultibetCalculation() {
 
 export default {
   preciseMultiply,
+  preciseMultiplyOdds,
   preciseDivide,
   preciseAdd,
   preciseSubtract,

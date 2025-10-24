@@ -614,7 +614,10 @@ router.post('/order', verifyToken, async (req, res) => {
       finalPrice = side === 'back' ? oddsCacheData.backOdds : oddsCacheData.layOdds;
       console.log('📊 서버 배당률 결정 (환수율 비활성화):', finalPrice);
     }
-    
+
+    // 소수점 3자리 버림 처리
+    finalPrice = Math.floor(finalPrice * 1000) / 1000;
+
     // 게임 데이터 매핑 (서버 계산된 배당률 사용)
     const orderData = await exchangeGameMappingService.mapGameDataToOrder({
       gameId, market, line, side, price: finalPrice, amount, selection, userId
@@ -691,7 +694,7 @@ router.post('/order', verifyToken, async (req, res) => {
       market,
       line,
       side,
-      price,
+      price: finalPrice,  // ✅ 수정: 서버에서 계산된 배당률 사용
       selection,
       // ✅ stakeAmount와 potentialProfit는 각 주문 생성 시점에 계산
       // 매핑된 게임 데이터 추가
@@ -730,7 +733,8 @@ router.post('/order', verifyToken, async (req, res) => {
         amount: partialMatchResult.remainingAmount,
         stakeAmount: remainingStakeAmount,
         potentialProfit: remainingPotentialProfit,
-        status: partialMatchResult.totalMatched > 0 ? 'open' : 'open'
+        status: partialMatchResult.totalMatched > 0 ? 'open' : 'open',
+        totalOdds: finalPrice // ✅ 추가: 총 배당률 명시
       }, { transaction });
       console.log('📝 새 주문 생성:', {
         orderId: order.id,
@@ -772,6 +776,7 @@ router.post('/order', verifyToken, async (req, res) => {
         filledAmount: filledAmount,
         originalAmount: match.matchAmount,
         remainingAmount: 0,
+        totalOdds: parseFloat(match.matchPrice), // ✅ 추가: 매칭된 배당률
         // ✅ 10원 단위 올림: 올림 처리 (9원 끝자리 완전 차단)
         stakeAmount: side === 'back' ? match.matchAmount : Math.ceil((parseFloat(match.matchPrice) - 1) * match.matchAmount / 10) * 10,
         potentialProfit: side === 'back' ? Math.ceil((parseFloat(match.matchPrice) - 1) * match.matchAmount / 10) * 10 : match.matchAmount // ✅ 순수익
@@ -2031,6 +2036,9 @@ router.post('/match-order', verifyToken, async (req, res) => {
       console.log('📊 매치주문 서버 배당률 결정 (환수율 비활성화):', finalPrice);
     }
 
+    // 소수점 3자리 버림 처리
+    finalPrice = Math.floor(finalPrice * 1000) / 1000;
+
     // 1. 매칭 가능한 반대편 주문 찾기 (서버 계산된 배당률 사용)
     const oppositeSide = side === 'back' ? 'lay' : 'back';
     let matchingOrders;
@@ -2116,7 +2124,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
 
       // 게임 데이터 매핑 (본인 matched 주문용)
       let orderData = await exchangeGameMappingService.mapGameDataToOrder({
-        gameId, market, line, side, price, amount: matchAmount, selection: selection || baseSelection, userId
+        gameId, market, line, side, price: finalPrice, amount: matchAmount, selection: selection || baseSelection, userId
       });
       // selection, homeTeam, awayTeam을 항상 원본 오더 우선 복사
       orderData.selection = selection || baseSelection;
@@ -2130,11 +2138,14 @@ router.post('/match-order', verifyToken, async (req, res) => {
         market,
         line,
         side,
-        price: finalPrice, // 서버 계산된 배당률 사용
+        // ✅ 멀티배팅의 경우 Back 주문의 price(합산배당율) 사용
+        // 개별 마켓의 경우 finalPrice 사용
+        price: existingOrder.isMultibet ? existingOrder.price : finalPrice,
         amount: matchAmount,
         selection: orderData.selection,
         status: side === 'lay' ? 'active' : 'matched', // 🆕 Lay는 active 상태로 생성
         matchedOrderId: existingOrder.id,
+        totalOdds: existingOrder.isMultibet ? existingOrder.price : finalPrice, // ✅ 추가: 멀티배팅/단일배팅 배당률
         homeTeam: orderData.homeTeam,
         awayTeam: orderData.awayTeam,
         commenceTime: new Date(orderData.commenceTime), // UTC로 변환하여 저장
@@ -2173,7 +2184,7 @@ router.post('/match-order', verifyToken, async (req, res) => {
       console.log(`🔧 게임 매핑 시작...`);
       // 게임 데이터 매핑
       const orderData = await exchangeGameMappingService.mapGameDataToOrder({
-        gameId, market, line, side, price, amount: remainingAmount, selection, userId
+        gameId, market, line, side, price: finalPrice, amount: remainingAmount, selection, userId
       });
       console.log(`✅ 게임 매핑 완료:`, { 
         sportKey: orderData.sportKey,
