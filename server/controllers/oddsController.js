@@ -285,77 +285,81 @@ const oddsController = {
 
         // 🆕 각 게임에 두 가지 버전의 배당율 생성
         formattedData.forEach(game => {
-          // 스포츠북 환수율 적용 버전
-          if (sportsbookRateSettings.enabled && sportsbookRateSettings.returnRate && game.originalOdds) {
-            const sportsbookRate = sportsbookRateSettings.returnRate;
+          // 스포츠북 환수율 적용 버전 (비활성화 시에도 originalOdds 복사본 생성)
+          if (game.originalOdds) {
             game.sportsbookOdds = JSON.parse(JSON.stringify(game.originalOdds)); // 복사본 생성
+
+            // 환수율이 활성화되어 있으면 조정 적용
+            if (sportsbookRateSettings.enabled && sportsbookRateSettings.returnRate) {
+              const sportsbookRate = sportsbookRateSettings.returnRate;
             
-            // h2h 적용
-            if (game.sportsbookOdds?.h2h) {
-              const h2hKeys = Object.keys(game.sportsbookOdds.h2h);
-              const h2hOdds = h2hKeys.map(key => {
-                const oddsValue = game.sportsbookOdds.h2h[key];
-                if (typeof oddsValue === 'number') return oddsValue;
-                if (oddsValue?.averagePrice) return oddsValue.averagePrice;
-                return null;
-              }).filter(o => o !== null && !isNaN(o));
-              
-              if (h2hOdds.length > 0) {
-                const adjusted = adjustOddsPayout(h2hOdds, sportsbookRate);
-                let idx = 0;
-                h2hKeys.forEach(key => {
-                  if (typeof game.sportsbookOdds.h2h[key] === 'number') {
-                    game.sportsbookOdds.h2h[key] = adjusted[idx++];
-                  } else if (game.sportsbookOdds.h2h[key]?.averagePrice) {
-                    game.sportsbookOdds.h2h[key] = adjusted[idx++];
-                  }
-                });
+              // h2h 적용
+              if (game.sportsbookOdds?.h2h) {
+                const h2hKeys = Object.keys(game.sportsbookOdds.h2h);
+                const h2hOdds = h2hKeys.map(key => {
+                  const oddsValue = game.sportsbookOdds.h2h[key];
+                  if (typeof oddsValue === 'number') return oddsValue;
+                  if (oddsValue?.averagePrice) return oddsValue.averagePrice;
+                  return null;
+                }).filter(o => o !== null && !isNaN(o));
+
+                if (h2hOdds.length > 0) {
+                  const adjusted = adjustOddsPayout(h2hOdds, sportsbookRate);
+                  let idx = 0;
+                  h2hKeys.forEach(key => {
+                    if (typeof game.sportsbookOdds.h2h[key] === 'number') {
+                      game.sportsbookOdds.h2h[key] = adjusted[idx++];
+                    } else if (game.sportsbookOdds.h2h[key]?.averagePrice) {
+                      game.sportsbookOdds.h2h[key] = adjusted[idx++];
+                    }
+                  });
+                }
               }
-            }
-            
-            // spreads 적용
-            if (game.sportsbookOdds?.spreads) {
-              const spreadKeys = Object.keys(game.sportsbookOdds.spreads);
-              const spreadOdds = spreadKeys.map(key => {
-                const oddsValue = game.sportsbookOdds.spreads[key].odds;
-                if (typeof oddsValue === 'number') return oddsValue;
-                if (oddsValue?.averagePrice) return oddsValue.averagePrice;
-                return null;
-              }).filter(o => o !== null && !isNaN(o));
-              
-              if (spreadOdds.length > 0) {
-                const adjusted = adjustOddsPayout(spreadOdds, sportsbookRate);
-                let idx = 0;
-                spreadKeys.forEach(key => {
-                  if (typeof game.sportsbookOdds.spreads[key].odds === 'number') {
-                    game.sportsbookOdds.spreads[key].odds = adjusted[idx++];
-                  } else if (game.sportsbookOdds.spreads[key].odds?.averagePrice) {
-                    game.sportsbookOdds.spreads[key].odds = adjusted[idx++];
-                  }
-                });
+
+              // spreads 적용
+              if (game.sportsbookOdds?.spreads) {
+                const spreadKeys = Object.keys(game.sportsbookOdds.spreads);
+                const spreadOdds = spreadKeys.map(key => {
+                  const oddsValue = game.sportsbookOdds.spreads[key].odds;
+                  if (typeof oddsValue === 'number') return oddsValue;
+                  if (oddsValue?.averagePrice) return oddsValue.averagePrice;
+                  return null;
+                }).filter(o => o !== null && !isNaN(o));
+
+                if (spreadOdds.length > 0) {
+                  const adjusted = adjustOddsPayout(spreadOdds, sportsbookRate);
+                  let idx = 0;
+                  spreadKeys.forEach(key => {
+                    if (typeof game.sportsbookOdds.spreads[key].odds === 'number') {
+                      game.sportsbookOdds.spreads[key].odds = adjusted[idx++];
+                    } else if (game.sportsbookOdds.spreads[key].odds?.averagePrice) {
+                      game.sportsbookOdds.spreads[key].odds = adjusted[idx++];
+                    }
+                  });
+                }
               }
-            }
-            
-            // totals 적용
-            if (game.sportsbookOdds?.totals) {
-              const totalKeys = Object.keys(game.sportsbookOdds.totals);
-              const totalOdds = totalKeys.map(key => {
-                const oddsValue = game.sportsbookOdds.totals[key].odds;
-                if (typeof oddsValue === 'number') return oddsValue;
-                if (oddsValue?.averagePrice) return oddsValue.averagePrice;
-                return null;
-              }).filter(o => o !== null && !isNaN(o));
-              
-              if (totalOdds.length > 0) {
-                const adjusted = adjustOddsPayout(totalOdds, sportsbookRate);
-                let idx = 0;
-                totalKeys.forEach(key => {
-                  if (typeof game.sportsbookOdds.totals[key].odds === 'number') {
-                    game.sportsbookOdds.totals[key].odds = adjusted[idx++];
-                  } else if (game.sportsbookOdds.totals[key].odds?.averagePrice) {
-                    game.sportsbookOdds.totals[key].odds = adjusted[idx++];
-                  }
-                });
+
+              // totals 적용
+              if (game.sportsbookOdds?.totals) {
+                const totalKeys = Object.keys(game.sportsbookOdds.totals);
+                const totalOdds = totalKeys.map(key => {
+                  const oddsValue = game.sportsbookOdds.totals[key].odds;
+                  if (typeof oddsValue === 'number') return oddsValue;
+                  if (oddsValue?.averagePrice) return oddsValue.averagePrice;
+                  return null;
+                }).filter(o => o !== null && !isNaN(o));
+
+                if (totalOdds.length > 0) {
+                  const adjusted = adjustOddsPayout(totalOdds, sportsbookRate);
+                  let idx = 0;
+                  totalKeys.forEach(key => {
+                    if (typeof game.sportsbookOdds.totals[key].odds === 'number') {
+                      game.sportsbookOdds.totals[key].odds = adjusted[idx++];
+                    } else if (game.sportsbookOdds.totals[key].odds?.averagePrice) {
+                      game.sportsbookOdds.totals[key].odds = adjusted[idx++];
+                    }
+                  });
+                }
               }
             }
           }
