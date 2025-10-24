@@ -3066,4 +3066,15 @@ router.get('/settlements/:gameKey', verifyToken, async (req, res) => {
   }
 });
 
+// 🆕 익스체인지 환수율 설정 조회
+router.get('/odds-return-rate-settings', async (req, res) => {
+  try {
+    const settings = await ExchangeOddsReturnRateService.getOddsReturnRateSettings();
+    res.json(settings);
+  } catch (error) {
+    console.error('익스체인지 환수율 설정 조회 오류:', error);
+    res.status(500).json({ message: '환수율 설정 조회 중 오류가 발생했습니다.' });
+  }
+});
+
 export default router; 
