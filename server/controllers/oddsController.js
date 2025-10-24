@@ -286,7 +286,7 @@ const oddsController = {
         // 🆕 각 게임에 두 가지 버전의 배당율 생성
         formattedData.forEach(game => {
           // 스포츠북 환수율 적용 버전
-          if (sportsbookRateSettings.enabled && sportsbookRateSettings.returnRate && game.odds) {
+          if (sportsbookRateSettings.enabled && sportsbookRateSettings.returnRate && game.originalOdds) {
             const sportsbookRate = sportsbookRateSettings.returnRate;
             game.sportsbookOdds = JSON.parse(JSON.stringify(game.originalOdds)); // 복사본 생성
             
@@ -361,7 +361,7 @@ const oddsController = {
           }
           
           // 익스체인지 환수율 적용 버전
-          if (exchangeRateSettings.enabled && exchangeRateSettings.returnRate && game.odds) {
+          if (exchangeRateSettings.enabled && exchangeRateSettings.returnRate && game.originalOdds) {
             const exchangeRate = exchangeRateSettings.returnRate;
             game.exchangeOdds = JSON.parse(JSON.stringify(game.originalOdds)); // 복사본 생성
             
