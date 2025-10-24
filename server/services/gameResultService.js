@@ -199,7 +199,21 @@ class GameResultService {
 
       if (isYearBasedSeason) {
         // 연도 기반 리그: 연도만 사용 (2025)
-        seasonParam = currentYear.toString();
+        // ⚠️ NBA는 특수: 10월~6월 시즌이므로 YYYY-YYYY+1 형식 사용
+        if (sportKey === 'basketball_nba') {
+          // NBA: 10월~6월 시즌 (예: 2025년 10월 = 2025-2026 시즌)
+          if (currentMonth >= 10) {
+            // 10월~12월: 현재년-다음년
+            seasonParam = `${currentYear}-${currentYear + 1}`;
+          } else {
+            // 1월~9월: 전년-현재년
+            seasonParam = `${currentYear - 1}-${currentYear}`;
+          }
+          console.log(`[GameResult] 🏀 NBA 시즌 조정: ${seasonParam} (10월~6월 시즌)`);
+        } else {
+          // 다른 연도기반 리그: 연도만 사용
+          seasonParam = currentYear.toString();
+        }
       } else {
         // 유럽 리그: 시즌 형식 사용 (YYYY-YYYY+1)
         // 시즌은 8월에 시작해서 다음해 5월에 종료
@@ -243,11 +257,26 @@ class GameResultService {
             })
           ]);
           
-          // 🔧 응답 키 수정: eventspastleague → results, eventsnextleague → events
-          const pastEvents = pastResponse.data?.results || [];
-          const nextEvents = nextResponse.data?.results || [];  // 🆕 events → results로 수정
-          events = [...pastEvents, ...nextEvents];
-          console.log(`[GameResult] ✅ Fallback 성공: ${pastEvents.length}+${nextEvents.length}=${events.length}개 경기`);
+          // 🔧 응답 키 수정 + 데이터 검증: 올바른 리그인지 확인
+          const pastEvents = pastResponse.data?.results || pastResponse.data?.events || [];
+          const nextEvents = nextResponse.data?.results || nextResponse.data?.events || [];
+          
+          // 🚨 데이터 검증: NBA 경기인지 확인 (팀명으로 검증)
+          const validPastEvents = pastEvents.filter(e => {
+            const teams = `${e.strHomeTeam}${e.strAwayTeam}`.toLowerCase();
+            // NBA 팀명 포함 여부 확인 (예: lakers, celtics, warriors 등)
+            const nbaTeams = ['lakers', 'celtics', 'warriors', 'nets', 'knicks', 'heat', 'bulls', 'spurs', 'thunder', 'rockets', 'mavericks', 'bucks', 'pacers', 'trail', 'suns', 'grizzlies', 'nuggets', 'kings', 'clippers', 'pistons', 'hawks', 'cavaliers', 'raptors', 'pelicans', 'magic', 'timberwolves', 'hornets', 'wizards'];
+            return nbaTeams.some(team => teams.includes(team));
+          });
+          
+          const validNextEvents = nextEvents.filter(e => {
+            const teams = `${e.strHomeTeam}${e.strAwayTeam}`.toLowerCase();
+            const nbaTeams = ['lakers', 'celtics', 'warriors', 'nets', 'knicks', 'heat', 'bulls', 'spurs', 'thunder', 'rockets', 'mavericks', 'bucks', 'pacers', 'trail', 'suns', 'grizzlies', 'nuggets', 'kings', 'clippers', 'pistons', 'hawks', 'cavaliers', 'raptors', 'pelicans', 'magic', 'timberwolves', 'hornets', 'wizards'];
+            return nbaTeams.some(team => teams.includes(team));
+          });
+          
+          events = [...validPastEvents, ...validNextEvents];
+          console.log(`[GameResult] ✅ Fallback 성공: ${validPastEvents.length}+${validNextEvents.length}=${events.length}개 경기 (NBA 팀 검증 완료)`);
         } catch (fallbackError) {
           console.error(`[GameResult] ❌ Fallback 실패: ${fallbackError.message}`);
           events = [];
@@ -398,10 +427,24 @@ class GameResultService {
       if (isYearBasedSeason) {
         // 연도 기반 리그: 시즌 기반 (북미, 아시아 리그: MLS, MLB, NBA, NFL, K리그, J리그, 중국 슈퍼리그 등)
         const currentYear = new Date().getFullYear();
+        const currentMonth = new Date().getMonth() + 1;
+        
+        let seasonParam;
+        if (sportKey === 'basketball_nba') {
+          // NBA: 10월~6월 시즌
+          if (currentMonth >= 10) {
+            seasonParam = `${currentYear}-${currentYear + 1}`;
+          } else {
+            seasonParam = `${currentYear - 1}-${currentYear}`;
+          }
+        } else {
+          seasonParam = currentYear.toString();
+        }
+        
         response = await axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsseason.php`, {
           params: {
             id: leagueId,
-            s: currentYear.toString() // 2025
+            s: seasonParam
           },
           timeout: 15000
         });
