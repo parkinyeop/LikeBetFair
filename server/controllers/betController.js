@@ -9,6 +9,7 @@ import createScriptSequelize from '../config/scriptDatabase.js';
 import GameResultQuery from '../utils/gameResultQuery.js';
 import { getLocationConfig } from '../config/gameResultQuery.js';
 import SportsbookOddsReturnRateService from '../services/sportsbookOddsReturnRateService.js';
+import { calculatePreciseTotalOdds } from '../utils/preciseCalculation.js';
 
 // 스크립트 전용 Sequelize 인스턴스 생성
 const sequelize = createScriptSequelize();
@@ -252,7 +253,7 @@ export async function placeBet(req, res) {
       const adjustedOddsArray = await SportsbookOddsReturnRateService.applyReturnRateToOddsArray(individualOdds);
       
       // 조정된 배당률로 총 배당률 재계산
-      adjustedTotalOdds = adjustedOddsArray.reduce((total, odds) => total * odds, 1);
+      adjustedTotalOdds = calculatePreciseTotalOdds(adjustedOddsArray);
       
       console.log('🎯 [PlaceBet] 멀티배팅 배당율 조정:', { 
         originalOdds: individualOdds,
