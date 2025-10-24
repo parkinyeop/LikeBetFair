@@ -9,7 +9,7 @@ interface ExchangeOrder {
   price: number;
   amount: number;
   filledAmount: number;
-  status: 'open' | 'matched' | 'partially_matched' | 'cancelled' | 'settled';
+  status: 'open' | 'matched' | 'partially_matched' | 'cancelled' | 'settled' | 'active';
   homeTeam?: string;
   awayTeam?: string;
   selection?: string;
@@ -94,7 +94,8 @@ export default function ExchangeOrdersTab({ viewUserId }: { viewUserId?: string 
       settled: { text: '정산완료', className: 'bg-purple-100 text-purple-800' },
       open: { text: '대기중', className: 'bg-yellow-100 text-yellow-800' },
       partially_matched: { text: '부분매칭', className: 'bg-blue-100 text-blue-800' },
-      cancelled: { text: '취소', className: 'bg-gray-100 text-gray-800' }
+      cancelled: { text: '취소', className: 'bg-gray-100 text-gray-800' },
+      active: { text: '대기중', className: 'bg-yellow-100 text-yellow-800' } // LAY 주문의 경우 대기중 상태
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.cancelled;
@@ -143,6 +144,14 @@ export default function ExchangeOrdersTab({ viewUserId }: { viewUserId?: string 
   };
 
   const columns = [
+    {
+      key: 'id',
+      label: '주문 ID',
+      render: (value: string) => (
+        <span className="text-xs font-medium text-gray-900">{value}</span>
+      ),
+      className: 'w-32'
+    },
     {
       key: 'createdAt',
       label: '주문 시간',
