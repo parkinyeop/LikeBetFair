@@ -34,6 +34,7 @@ export interface MatchTargetOrder {
   // 🆕 멀티배팅 필드들 추가
   isMultibet?: boolean;
   selectionDetails?: any[] | { selections: any[]; description?: string; multibetType?: string };
+  potentialProfit?: number; // 🆕 멀티배팅 잠재 수익 필드 추가
 }
 
 // 🆕 멀티배팅 선택 인터페이스
@@ -383,8 +384,8 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
                            matchTargetOrder.amount;
     
     if (matchTargetOrder.type === 'back') {
-      // Back 주문에 Lay로 매칭: amount × (odds - 1)
-      return availableAmount * (matchTargetOrder.odds - 1);
+      // ✅ DB에 저장된 정확한 potentialProfit 값 사용 (재계산으로 인한 오차 제거)
+      return matchTargetOrder.potentialProfit;
     } else {
       // Lay 주문에 Back으로 매칭: amount 그대로
       return availableAmount;
@@ -400,19 +401,18 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
       return 0; // 매칭 가능한 금액 없음
     }
 
-    // ✅ displayAmount가 있으면 사용, 없으면 remainingAmount 기반으로 계산
+    // ✅ displayAmount가 있으면 사용, 없으면 DB의 potentialProfit 사용
     if (matchTargetOrder.displayAmount !== undefined && matchTargetOrder.displayAmount !== null) {
       return matchTargetOrder.displayAmount;
     }
 
-    // displayAmount가 없으면 remainingAmount 기반으로 직접 계산
-    const remaining = matchTargetOrder.remainingAmount;
+    // displayAmount가 없으면 DB의 potentialProfit 사용 (재계산 금지)
     if (matchTargetOrder.type === 'back') {
-      // Back 주문: Lay가 내야 할 담보금 = remainingAmount × (odds - 1)
-      return Math.floor(remaining * (matchTargetOrder.odds - 1));
+      // ✅ Back 주문: Lay가 내야 할 담보금 = DB의 potentialProfit (재계산 금지)
+      return matchTargetOrder.potentialProfit || 0;
     } else {
       // Lay 주문: Back이 내야 할 배팅금 = remainingAmount
-      return remaining;
+      return matchTargetOrder.remainingAmount;
     }
   };
 

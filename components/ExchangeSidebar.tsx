@@ -184,28 +184,14 @@ function OrderPanel() {
     if (!selectedBet || !form.amount || form.amount <= 0) return 0;
     
     const amount = form.amount;
-    const price = selectedBet.price || 1;
     
     if (selectedBet.type === 'back') {
       // Back: 매칭된 Lay 베팅금액만큼 획득 (Exchange 원리)
       return amount;
     } else {
-      // ✅ 정밀한 Lay 예상 수익: 자신의 베팅금액 + (Back의 실제 배팅금액 × Lay 지분율)
-      // 
-      // Exchange 원리: 
-      // 1. getMaxMatchAmount() = Back의 실제 배팅금액 (stake)
-      // 2. Back의 매치금액 = Back의 실제 배팅금액 × (배당률 - 1)
-      // 3. Lay 지분율 = min(1, Lay 베팅금액 ÷ Back의 매치금액)
-      // 4. Lay 예상수익 = 자신의 베팅금액 + (Back의 실제 배팅금액 × Lay 지분율)
-      
-      const backActualAmount = getMaxMatchAmount(); // Back의 실제 배팅금액 (stake)
-      const backMatchAmount = backActualAmount * (price - 1); // Back의 매치금액 (liability)
-      const layShareRatio = Math.min(1, amount / backMatchAmount); // Lay 지분율 (최대 100%)
-      
-      // Lay 예상 수익 = 자신의 베팅금액 + (Back의 실제 배팅금액 × Lay 지분율)
-      const expectedProfit = amount + (backActualAmount * layShareRatio);
-      
-      return expectedProfit;
+      // ✅ Lay 주문: DB의 정확한 potentialProfit 값 사용 (재계산 금지)
+      // DB에는 이미 정확하게 계산된 값이 저장되어 있음
+      return selectedBet.potentialProfit || 0;
     }
   };
 

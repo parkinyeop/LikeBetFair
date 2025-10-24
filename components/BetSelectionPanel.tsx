@@ -75,12 +75,14 @@ const BetSelectionPanel = () => {
     data?: any;
   }>({ isOpen: false });
 
-  // ✅ 배당률 계산: floor 처리로 3자리까지 정확하게
+  // ✅ 배당율 계산: floor 처리로 3자리까지 정확하게
   const rawOdds = selections.reduce((acc, curr) => acc * curr.odds, 1);
   const totalOdds = Math.floor(rawOdds * 1000) / 1000;
   
-  // ✅ 정확한 예상 수익 계산: 부동소수점 오차 방지
-  const expectedReturn = Math.floor(Math.round(stake * totalOdds * 100) / 100);
+  // ✅ 정확한 예상 수익 계산: 서버에서 계산된 정확한 값 사용
+  // 스테이크 × 총 배당률 (부동소수점 오차 최소화)
+  const rawExpectedReturn = stake * totalOdds;
+  const expectedReturn = Math.round(rawExpectedReturn * 100) / 100;
 
   // 베팅 가능 시간 체크 (10분 전 마감)
   const now = new Date();
@@ -200,7 +202,7 @@ const BetSelectionPanel = () => {
       console.log('[BetSelectionPanel] 베팅 요청 body:', {
         selections,
         stake,
-        totalOdds: selections.reduce((acc, curr) => acc * curr.odds, 1)
+        totalOdds,
       });
       
       // 더 자세한 로깅 추가
@@ -357,7 +359,7 @@ const BetSelectionPanel = () => {
         />
       </div>
       <div className="text-sm">
-        <p className="mb-1">Total Odds: <span className="font-semibold">{totalOdds.toFixed(3)}</span></p>
+        <p className="mb-1">Total Odds: <span className="font-semibold">{(Math.floor(totalOdds * 1000) / 1000).toFixed(3)}</span></p>
         <p className="mb-1">Estimated Profit: <span className="font-semibold">{expectedReturn.toLocaleString()} KRW</span></p>
       </div>
       <button

@@ -9,6 +9,8 @@ interface BettingModalProps {
     team: string;
     price: number;
     type: 'back' | 'lay';
+    potentialProfit?: number; // 서버에서 계산된 정확한 값
+    amount?: number; // 서버에서 계산된 정확한 값
   };
 }
 
@@ -44,11 +46,16 @@ export default function BettingModal({ isOpen, onClose, onConfirm, selection }: 
     const stake = parseFloat(amount);
     if (isNaN(stake) || stake <= 0) return 0;
     
-    if (selection.type === 'back') {
-      return stake * selection.price; // 본금 포함
-    } else {
-      return stake - (stake / selection.price);
+    // ✅ 서버에서 계산된 정확한 값 사용 (재계산 금지)
+    // selection 객체에 이미 서버에서 계산된 정확한 potentialProfit이 포함되어 있어야 함
+    if (selection.potentialProfit !== undefined) {
+      // stake 비율로 스케일링
+      const ratio = selection.amount ? stake / selection.amount : 1;
+      return selection.potentialProfit * ratio;
     }
+    
+    // 폴백: 기본값
+    return stake * (selection.price - 1);
   };
 
   const handleConfirm = () => {
