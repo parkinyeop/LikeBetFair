@@ -70,17 +70,20 @@ const OrderbookPage: React.FC = () => {
   const [selectedOrderDetail, setSelectedOrderDetail] = useState<Order | null>(null);
 
   // 🆕 매칭 금액 및 비율 계산 함수
-  const calculateMatchingInfo = (order: ExchangeOrder) => {
-    // ✅ 원래 전체 매칭 금액 계산 (originalAmount 또는 amount 기준)
-    const originalAmount = order.originalAmount || order.amount || 0;
-    const totalMatchAmount = order.type === 'back'
-      ? Math.floor(originalAmount * ((order.odds || 1) - 1)) // Back: 원래 전체 LAY 담보금
-      : originalAmount; // Lay: 원래 전체 Back 배팅금
+  const calculateMatchingInfo = (order: Order) => {
+    // ✅ DB의 potentialProfit 사용 (재계산 금지)
+    const totalMatchAmount = order.type === 'back' && order.potentialProfit
+      ? order.potentialProfit // ✅ DB에 저장된 정확한 potentialProfit
+      : order.type === 'back'
+        ? Math.floor((order.originalAmount || order.amount || 0) * ((order.odds || 1) - 1)) // Back: 원래 전체 LAY 담보금 (폴백)
+        : (order.originalAmount || order.amount || 0); // Lay: 원래 전체 Back 배팅금
 
     // 남은 매칭 금액 계산
-    const remainingMatchAmount = order.type === 'back'
-      ? Math.floor((order.remainingAmount || 0) * ((order.odds || 1) - 1)) // Back: 남은 LAY 담보금
-      : (order.remainingAmount || 0); // Lay: 남은 Back 배팅금
+    const remainingMatchAmount = order.type === 'back' && order.potentialProfit && order.remainingAmount
+      ? order.potentialProfit * (order.remainingAmount / (order.originalAmount || order.amount || 1)) // ✅ 비율로 계산
+      : order.type === 'back'
+        ? Math.floor((order.remainingAmount || 0) * ((order.odds || 1) - 1)) // Back: 남은 LAY 담보금 (폴백)
+        : (order.remainingAmount || 0); // Lay: 남은 Back 배팅금
 
     // 체결된 매칭 금액 = 전체 - 남은
     const matchedAmount = totalMatchAmount - remainingMatchAmount;
@@ -710,10 +713,14 @@ const OrderbookPage: React.FC = () => {
                     >
                       {(() => {
                         const matchInfo = calculateMatchingInfo(order);
-                        // ✅ 남은 매칭 금액 = displayAmount
-                        const remainingMatchAmt = formatCurrency(order.displayAmount || order.amount);
-                        // ✅ 전체 매칭 금액 = amount × (odds - 1) for Back, amount for Lay
-                        const totalMatchAmt = order.type === 'back' 
+                        // ✅ 남은 매칭 금액 = DB의 potentialProfit 사용 (재계산 금지)
+                        const remainingMatchAmt = order.type === 'back' && order.potentialProfit
+                          ? formatCurrency(order.potentialProfit)
+                          : formatCurrency(order.displayAmount || order.amount);
+                        // ✅ 전체 매칭 금액 = DB의 potentialProfit 또는 계산값
+                        const totalMatchAmt = order.type === 'back' && order.potentialProfit
+                          ? formatCurrency(order.potentialProfit)
+                          : order.type === 'back' 
                           ? formatCurrency(Math.floor(order.amount * (order.odds - 1)))
                           : formatCurrency(order.amount);
                         const matchPercentage = matchInfo.matchPercentage;
@@ -789,7 +796,9 @@ const OrderbookPage: React.FC = () => {
                       )}
                       {/* 매칭 금액 계산 */}
                       <div className="text-sm text-orange-600 font-medium">
-                        매칭 금액: {formatCurrency(order.displayAmount || (order.type === 'back' ? 
+                        매칭 금액: {formatCurrency(order.type === 'back' && order.potentialProfit
+                          ? order.potentialProfit
+                          : order.displayAmount || (order.type === 'back' ? 
                           Math.floor(order.remainingAmount * (order.odds - 1)) : 
                           order.remainingAmount)
                         )}원
@@ -826,7 +835,7 @@ const OrderbookPage: React.FC = () => {
                     >
                       {(order.status === 'open' || order.status === 'partially_matched') && order.userId !== userId 
                         ? (order.type === 'back' ? 
-                            `📉 Lay로 매칭 (${formatCurrency(order.displayAmount || Math.floor(order.remainingAmount * (order.odds - 1)))}원)` : 
+                            `📉 Lay로 매칭 (${formatCurrency(order.type === 'back' && order.potentialProfit ? order.potentialProfit : (order.displayAmount || Math.floor(order.remainingAmount * (order.odds - 1))))}원)` : 
                             `🎯 Back으로 매칭 (${formatCurrency(order.displayAmount || order.remainingAmount)}원)`)
                         : order.userId === userId 
                           ? '내 주문' 
