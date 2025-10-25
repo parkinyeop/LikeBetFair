@@ -1044,7 +1044,7 @@ class GameResultService {
       const activeCategories = [
         'KBO', 'MLB', 'NBA', 'KBL', 'NFL', 'MLS', 'CSL',
         'EPL', 'LaLiga', 'Bundesliga', 'SerieA', 'Ligue1',
-        'JLeague', 'ArgentinaPrimera', 'Brasileirao'
+        'KLEAGUE', 'JLeague', 'ArgentinaPrimera', 'Brasileirao'
       ];
       
       const result = await this.fetchAndUpdateResultsForCategories(activeCategories);
