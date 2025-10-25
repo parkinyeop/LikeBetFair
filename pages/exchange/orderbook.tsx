@@ -379,7 +379,7 @@ const OrderbookPage: React.FC = () => {
 
   const formatCurrency = (amount: number) => {
     if (!amount || isNaN(amount)) return '0';
-    return amount.toLocaleString('ko-KR');
+    return Math.floor(amount).toLocaleString('ko-KR');
   };
 
   // 🆕 멀티배팅 총 배당 계산(백엔드 값이 없을 때 레그 배당 곱으로 보조 계산) - 환수율 적용 제거
@@ -835,7 +835,7 @@ const OrderbookPage: React.FC = () => {
                     >
                       {(order.status === 'open' || order.status === 'partially_matched') && order.userId !== userId 
                         ? (order.type === 'back' ? 
-                            `📉 Lay로 매칭 (${formatCurrency(order.type === 'back' && order.potentialProfit ? order.potentialProfit : (order.displayAmount || Math.floor(order.remainingAmount * (order.odds - 1))))}원)` : 
+                            `📉 Lay로 매칭 (${formatCurrency(order.potentialProfit || order.displayAmount || Math.floor(order.remainingAmount * (order.odds - 1)))}원)` : 
                             `🎯 Back으로 매칭 (${formatCurrency(order.displayAmount || order.remainingAmount)}원)`)
                         : order.userId === userId 
                           ? '내 주문' 

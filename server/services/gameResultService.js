@@ -363,7 +363,8 @@ class GameResultService {
           home_team: event.strHomeTeam,
           away_team: event.strAwayTeam,
           commence_time: commenceTime,
-          completed: ['FT', 'Match Finished', 'AET', 'AOT', 'PEN', 'HT'].includes(event.strStatus),
+          completed: ['FT', 'Match Finished', 'AET', 'AOT', 'PEN', 'HT'].includes(event.strStatus) || 
+                     (sportKey === 'soccer_korea_kleague1' && event.strStatus === '2H'),
           status: status, // ✅ 상태 정보 추가
           strStatus: event.strStatus, // ✅ 원본 상태도 보존
           scores: event.intHomeScore !== null && event.intAwayScore !== null ? [
@@ -530,7 +531,8 @@ class GameResultService {
           home_team: event.strHomeTeam,
           away_team: event.strAwayTeam,
           commence_time: commenceTime,
-          completed: ['FT', 'Match Finished', 'AET', 'AOT', 'PEN', 'HT'].includes(event.strStatus),
+          completed: ['FT', 'Match Finished', 'AET', 'AOT', 'PEN', 'HT'].includes(event.strStatus) || 
+                     (sportKey === 'soccer_korea_kleague1' && event.strStatus === '2H'),
           status: status, // ✅ 상태 정보 추가
           strStatus: event.strStatus, // ✅ 원본 상태도 보존
           scores: event.intHomeScore !== null && event.intAwayScore !== null ? [
