@@ -356,6 +356,8 @@ class GameResultService {
           status = 'cancelled';
         } else if (['ft', 'match finished', 'aet', 'aot', 'pen', 'ht'].includes(statusText)) {
           status = 'finished';
+        } else if (sportKey === 'soccer_korea_kleague1' && event.strStatus === '2H') {
+          status = 'finished';
         }
         
         return {
@@ -523,6 +525,8 @@ class GameResultService {
         } else if (statusText.includes('cancelled') || statusText.includes('abandoned') || statusText.includes('canceled')) {
           status = 'cancelled';
         } else if (['ft', 'match finished', 'aet', 'aot', 'pen', 'ht'].includes(statusText)) {
+          status = 'finished';
+        } else if (sportKey === 'soccer_korea_kleague1' && event.strStatus === '2H') {
           status = 'finished';
         }
         

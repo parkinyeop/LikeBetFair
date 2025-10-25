@@ -3,6 +3,21 @@
  */
 
 /**
+ * 글로벌 팀명 매핑 (베팅 사이트명 -> DB 저장명)
+ */
+const globalTeamMapping = {
+  // === K리그 (한국 프로축구) ===
+  'jejuunited': 'jejusk',
+  'jejuunitedfc': 'jejusk',
+  'jeju united fc': 'jeju sk',
+  'jeju united': 'jeju sk',
+  'ulsanhyundai': 'ulsanhd',
+  'ulsanhyundaifc': 'ulsanhd',
+  'ulsan hyundai fc': 'ulsan hd',
+  // 기타 매핑들...
+};
+
+/**
  * 🎯 중앙화된 팀명 정규화 함수
  * @param {string} teamName - 정규화할 팀명
  * @param {Object} options - 정규화 옵션
@@ -149,29 +164,36 @@ function normalizeTeamNameForComparison(teamName) {
     .replace(/[\s\-_]/g, '')
     // 특수문자 제거 (알파벳과 숫자만 유지)
     .replace(/[^a-z0-9]/g, '')
-    // 일반적인 축약형 처리
-    .replace(/fc$/, '')
-    .replace(/sc$/, '')
-    .replace(/cf$/, '')
-    .replace(/ac$/, '')
-    .replace(/united$/, '')
-    .replace(/city$/, '')
-    .replace(/town$/, '')
-    .replace(/rovers$/, '')
-    .replace(/wanderers$/, '')
-    .replace(/athletic$/, '')
-    .replace(/sporting$/, '')
-    .replace(/real$/, '')
-    .replace(/atletico$/, '')
-    .replace(/^deportivo/, '')  // ✅ 앞에 있는 deportivo 제거
-    .replace(/deportivo$/, '')
-    .replace(/club$/, '')
-    .replace(/association$/, '')
-    .replace(/football$/, '')
-    .replace(/soccer$/, '')
-    // 브라질 팀 특수 처리
-    .replace(/sportclubdorecife/, 'sportrecife')  // Sport Club do Recife → Sport Recife
-    .replace(/clubdorecife/, 'recife');           // Club do Recife → Recife
+  // 일반적인 축약형 처리
+  .replace(/fc$/, '')
+  .replace(/sc$/, '')
+  .replace(/cf$/, '')
+  .replace(/ac$/, '')
+  .replace(/united$/, '')
+  .replace(/city$/, '')
+  .replace(/town$/, '')
+  .replace(/rovers$/, '')
+  .replace(/wanderers$/, '')
+  .replace(/athletic$/, '')
+  .replace(/sporting$/, '')
+  .replace(/real$/, '')
+  .replace(/atletico$/, '')
+  .replace(/sk$/, '')
+  .replace(/^deportivo/, '')  // ✅ 앞에 있는 deportivo 제거
+  .replace(/deportivo$/, '')
+  .replace(/club$/, '')
+  .replace(/association$/, '')
+  .replace(/football$/, '')
+  .replace(/soccer$/, '')
+  // 브라질 팀 특수 처리
+  .replace(/sportclubdorecife/, 'sportrecife')  // Sport Club do Recife → Sport Recife
+  .replace(/clubdorecife/, 'recife');           // Club do Recife → Recife
+
+  // 글로벌 팀명 매핑 적용
+  const mappedName = globalTeamMapping[normalized];
+  if (mappedName) {
+    normalized = mappedName;
+  }
 
   return normalized;
 }
