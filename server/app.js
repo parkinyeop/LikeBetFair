@@ -24,62 +24,27 @@ if (!fs.existsSync(logsDir)) {
 
 // 로그 파일 경로 생성 함수 (데일리)
 function getLogFilePath() {
-  // ✅ KST 로컬 시간대 사용 (UTC 시간대 오류 수정)
   const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const dateStr = `${year}-${month}-${day}`;
+  const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
   return path.join(logsDir, `server-${dateStr}.log`);
-}
-
-// 로그 레벨 확인 함수 (동기적)
-function shouldLog(level) {
-  // 환경변수에서 직접 가져오기 (개발환경에서는 'info')
-  const logLevel = process.env.LOG_LEVEL || 'info';
-  const levels = { 'debug': 0, 'info': 1, 'warn': 2, 'error': 3 };
-  return levels[level] >= levels[logLevel];
 }
 
 // console.log override (터미널 + 파일 동시 기록)
 const originalLog = console.log;
 const originalError = console.error;
 const originalWarn = console.warn;
-const originalDebug = console.debug;
-
-// 🆕 디버그 전용 로그 (콘솔에만 출력, 파일에는 기록 안함)
-console.debug = (...args) => {
-  originalLog(...args); // 터미널에만 출력
-};
 
 console.log = (...args) => {
   const timestamp = new Date().toISOString();
-  const message = args.map(arg =>
+  const message = args.map(arg => 
     typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
   ).join(' ');
-
+  
   originalLog(...args); // 터미널 출력
-
-  // 🔧 특정 패턴은 파일에 기록하지 않음 (개발용 디버그 로그)
-  const skipPatterns = [
-    '⏱️',  // 성능 측정
-    '🔍',  // 디버그 조회
-    '🔧',  // 내부 처리
-    'executeTwoStageQuery',
-    '경기 결과 조회',
-    'h2h 원본 배당률',
-    'h2h 조정된 배당률'
-  ];
-
-  const shouldSkipFile = skipPatterns.some(pattern => message.includes(pattern));
-
-  // INFO 레벨 이상 + 디버그 패턴 아닌 경우만 파일에 기록
-  if (shouldLog('info') && !shouldSkipFile) {
-    try {
-      fs.appendFileSync(getLogFilePath(), `[${timestamp}] [LOG] ${message}\n`);
-    } catch (err) {
-      originalError('로그 파일 쓰기 실패:', err);
-    }
+  try {
+    fs.appendFileSync(getLogFilePath(), `[${timestamp}] [LOG] ${message}\n`);
+  } catch (err) {
+    originalError('로그 파일 쓰기 실패:', err);
   }
 };
 
@@ -90,14 +55,10 @@ console.error = (...args) => {
   ).join(' ');
   
   originalError(...args); // 터미널 출력
-  
-  // ERROR 레벨만 파일에 기록
-  if (shouldLog('error')) {
-    try {
-      fs.appendFileSync(getLogFilePath(), `[${timestamp}] [ERROR] ${message}\n`);
-    } catch (err) {
-      originalError('로그 파일 쓰기 실패:', err);
-    }
+  try {
+    fs.appendFileSync(getLogFilePath(), `[${timestamp}] [ERROR] ${message}\n`);
+  } catch (err) {
+    originalError('로그 파일 쓰기 실패:', err);
   }
 };
 
@@ -108,14 +69,10 @@ console.warn = (...args) => {
   ).join(' ');
   
   originalWarn(...args); // 터미널 출력
-  
-  // WARN 레벨 이상만 파일에 기록
-  if (shouldLog('warn')) {
-    try {
-      fs.appendFileSync(getLogFilePath(), `[${timestamp}] [WARN] ${message}\n`);
-    } catch (err) {
-      originalError('로그 파일 쓰기 실패:', err);
-    }
+  try {
+    fs.appendFileSync(getLogFilePath(), `[${timestamp}] [WARN] ${message}\n`);
+  } catch (err) {
+    originalError('로그 파일 쓰기 실패:', err);
   }
 };
 
