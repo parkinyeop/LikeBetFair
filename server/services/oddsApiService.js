@@ -42,16 +42,11 @@ class OddsApiService {
       dailyCalls: 0,
       monthlyCalls: 0,
       lastResetDate: new Date().toDateString(),
-      // 🚨 임시 설정 (디버깅용) - 나중에 원래 값으로 복구 필요
-      dailyLimit: 999999,    // 원래: 500 (무료 플랜)
-      monthlyLimit: 20000,   // 원래: 10000 (무료 플랜) → 20000으로 변경
+      // ✅ 실제 플랜 제한 (20,000 credits/month)
+      dailyLimit: 650,       // 일일 650회 (월 20,000 / 30일 = 약 666, 안전마진 고려)
+      monthlyLimit: 20000,   // 월 20,000회 (실제 플랜)
       currentHourCalls: 0,
-      hourlyLimit: 999999    // 원래: 100 (무료 플랜)
-      
-      // 🔧 원래 설정 (복구 시 주석 해제)
-      // dailyLimit: 500,      // 일일 500회
-      // monthlyLimit: 10000,  // 월간 10,000회
-      // hourlyLimit: 100      // 시간당 100회
+      hourlyLimit: 100       // 시간당 100회 (과도한 집중 호출 방지)
     };
     
     // 성능 모니터링
@@ -82,24 +77,20 @@ class OddsApiService {
 
   // API 호출 가능 여부 확인
   canMakeApiCall() {
-    // 🚨 임시 설정 (디버깅용) - 모든 API 호출 허용
-    console.log(`[DEBUG] API 호출 허용 - Daily: ${this.apiCallTracker.dailyCalls}, Monthly: ${this.apiCallTracker.monthlyCalls}`);
-    return true;
-    
-    // 🔧 원래 설정 (복구 시 주석 해제)
-    /*
+    // ✅ 실제 제한 체크 활성화
     const canMakeDaily = this.apiCallTracker.dailyCalls < this.apiCallTracker.dailyLimit;
     const canMakeMonthly = this.apiCallTracker.monthlyCalls < this.apiCallTracker.monthlyLimit;
     const canMakeHourly = this.apiCallTracker.currentHourCalls < this.apiCallTracker.hourlyLimit;
-    
+
     const canMake = canMakeDaily && canMakeMonthly && canMakeHourly;
-    
+
     if (!canMake) {
-      console.log(`[DEBUG] API 호출 제한 - Daily: ${this.apiCallTracker.dailyCalls}/${this.apiCallTracker.dailyLimit}, Monthly: ${this.apiCallTracker.monthlyCalls}/${this.apiCallTracker.monthlyLimit}, Hourly: ${this.apiCallTracker.currentHourCalls}/${this.apiCallTracker.hourlyLimit}`);
+      console.log(`[API_LIMIT] ⛔ API 호출 제한 도달 - Daily: ${this.apiCallTracker.dailyCalls}/${this.apiCallTracker.dailyLimit}, Monthly: ${this.apiCallTracker.monthlyCalls}/${this.apiCallTracker.monthlyLimit}, Hourly: ${this.apiCallTracker.currentHourCalls}/${this.apiCallTracker.hourlyLimit}`);
+    } else {
+      console.log(`[API_USAGE] ✅ API 호출 가능 - Daily: ${this.apiCallTracker.dailyCalls}/${this.apiCallTracker.dailyLimit}, Monthly: ${this.apiCallTracker.monthlyCalls}/${this.apiCallTracker.monthlyLimit}`);
     }
-    
+
     return canMake;
-    */
   }
 
   // 구조화된 로깅

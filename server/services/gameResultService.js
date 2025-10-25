@@ -882,6 +882,7 @@ class GameResultService {
       let updatedExistingCount = 0;
       let skippedCount = 0;
       const processedCategories = [];
+      const updatedGamesDetails = []; // <<< 상세 결과 기록용 배열 추가
 
       for (const clientCategory of activeCategories) {
         const sportKey = this.getSportKeyFromClientCategory(clientCategory);
@@ -968,13 +969,18 @@ class GameResultService {
                   if (updatedCount > 0) {
                     totalUpdated++;
                     updatedExistingCount++;
+                    updatedGamesDetails.push({ homeTeam: gameData.homeTeam, awayTeam: gameData.awayTeam, score: gameData.score, status: gameData.status, action: 'updated' });
                     console.log(`✅ Updated FT game: ${event.home_team || event.strHomeTeam} vs ${event.away_team || event.strAwayTeam}`);
+                  } else {
+                    // DB 변경이 없더라도 처리된 경기로 상세 기록에 남긴다
+                    updatedGamesDetails.push({ homeTeam: gameData.homeTeam, awayTeam: gameData.awayTeam, score: gameData.score, status: gameData.status, action: 'unchanged' });
                   }
                 } else {
                   // 새 데이터 생성
                   await GameResult.create(gameData);
                   newCount++;
                   totalUpdated++;
+                  updatedGamesDetails.push({ homeTeam: gameData.homeTeam, awayTeam: gameData.awayTeam, score: gameData.score, status: gameData.status, action: 'created' }); // <<< 상세 정보 추가
                   console.log(`✅ Created FT game: ${event.home_team || event.strHomeTeam} vs ${event.away_team || event.strAwayTeam}`);
                 }
               } else if (!event.completed) {
@@ -1011,6 +1017,7 @@ class GameResultService {
         updatedExistingCount: updatedExistingCount,
         skippedCount: skippedCount,
         categories: processedCategories,
+        updatedGamesDetails: updatedGamesDetails, // <<< 반환 객체에 추가
         // 상세 정보
         sportsDBAPIProvided: totalUpdated + newCount + skippedCount,  // SportsDB가 제공한 총 경기 수
         saved: newCount,
