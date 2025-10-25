@@ -1,6 +1,7 @@
 import GameResult from '../models/gameResultModel.js';
 import axios from 'axios';
 import createScriptSequelize from '../config/scriptDatabase.js';
+import { normalizeTeamName } from '../normalizeUtils.js';
 const sequelize = createScriptSequelize();
 
 const API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // SportsDB API 키
@@ -8,13 +9,13 @@ const BASE_URL = 'https://www.thesportsdb.com/api/v1/json';
 
 // 누락된 리그들의 SportsDB 리그 ID 매핑
 const missingLeagueMap = {
-  'SERIE_A': { id: '4332', name: 'Italian Serie A', mainCategory: 'soccer' },
-  'BRASILEIRAO': { id: '4351', name: 'Brazilian Serie A', mainCategory: 'soccer' },
-  'ARGENTINA_PRIMERA': { id: '4406', name: 'Argentinian Primera Division', mainCategory: 'soccer' },
-  'CSL': { id: '4688', name: 'Chinese Super League', mainCategory: 'soccer' },
-  'SEGUNDA_DIVISION': { id: '4396', name: 'Spanish Segunda Division', mainCategory: 'soccer' },
-  'BUNDESLIGA': { id: '4331', name: 'German Bundesliga', mainCategory: 'soccer' },
-  'NHL': { id: '4380', name: 'NHL', mainCategory: 'icehockey' }
+  'SERIE_A': { id: '4332', name: 'Italian Serie A', mainCategory: 'soccer', sportKey: 'soccer_italy_serie_a', sportTitle: 'Serie A' },
+  'BRASILEIRAO': { id: '4351', name: 'Brazilian Serie A', mainCategory: 'soccer', sportKey: 'soccer_brazil_campeonato', sportTitle: 'Brasileirao' },
+  'ARGENTINA_PRIMERA': { id: '4406', name: 'Argentinian Primera Division', mainCategory: 'soccer', sportKey: 'soccer_argentina_primera_division', sportTitle: 'Argentina Primera' },
+  'CSL': { id: '4688', name: 'Chinese Super League', mainCategory: 'soccer', sportKey: 'soccer_china_superleague', sportTitle: 'Chinese Super League' },
+  'SEGUNDA_DIVISION': { id: '4396', name: 'Spanish Segunda Division', mainCategory: 'soccer', sportKey: 'soccer_spain_segunda_division', sportTitle: 'Segunda Division' },
+  'BUNDESLIGA': { id: '4331', name: 'German Bundesliga', mainCategory: 'soccer', sportKey: 'soccer_germany_bundesliga', sportTitle: 'Bundesliga' },
+  'NHL': { id: '4380', name: 'NHL', mainCategory: 'icehockey', sportKey: 'icehockey_nhl', sportTitle: 'NHL' }
 };
 
 // 상태 매핑
@@ -78,25 +79,39 @@ async function collectMissingLeagueResults() {
             const status = mapStatus(event.strStatus);
             const result = getResult(homeScore, awayScore);
             
+            // ✅ 규칙: FT(Full Time) 또는 AOT(After Over Time)만 저장
+            const isFinished = event.strStatus === 'Match Finished' || event.strStatus === 'FT' || event.intHomeScore !== null;
+            if (!isFinished) {
+              console.log(`    [스킵] ${event.strHomeTeam} vs ${event.strAwayTeam} - FT/AOT 아님 (${event.strStatus})`);
+              continue;
+            }
+            
             // 경기 시간 파싱 (기본값: 00:00:00, UTC 기준)
             const timeStr = event.strTime || '00:00:00';
             const commenceTime = new Date(`${event.dateEvent}T${timeStr}Z`);
+            
+            // ✅ 팀명 정규화 (ExchangeOrder와 동일한 형식으로 저장)
+            const normalizedHomeTeam = normalizeTeamName(event.strHomeTeam);
+            const normalizedAwayTeam = normalizeTeamName(event.strAwayTeam);
             
             // GameResult에 upsert
             await GameResult.upsert({
               eventId: event.idEvent,
               mainCategory: leagueInfo.mainCategory,
               subCategory: subCategory,
-              homeTeam: event.strHomeTeam,
-              awayTeam: event.strAwayTeam,
+              sportKey: leagueInfo.sportKey,
+              sportTitle: leagueInfo.sportTitle,
+              homeTeam: normalizedHomeTeam,
+              awayTeam: normalizedAwayTeam,
               commenceTime: commenceTime,
-              status: status,
+              status: 'finished',
               score: (homeScore != null && awayScore != null) ? [
-                { name: event.strHomeTeam, score: homeScore.toString() },
-                { name: event.strAwayTeam, score: awayScore.toString() }
+                { name: normalizedHomeTeam, score: homeScore.toString() },
+                { name: normalizedAwayTeam, score: awayScore.toString() }
               ] : null,
-              // result 필드 제거 - status로 대체
               lastUpdated: new Date()
+            }, {
+              conflictFields: ['homeTeam', 'awayTeam', 'commenceTime']
             });
             
             leagueUpserts++;

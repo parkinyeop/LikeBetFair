@@ -32,18 +32,20 @@ const clientSportKeyMap = {
   'MLB': 'baseball_mlb',
   'KBO': 'baseball_kbo',
   'NFL': 'americanfootball_nfl',
-  
+
   // 한글 카테고리명
   '프리미어리그': 'soccer_epl',  // ✅ 통일
-  
-  // 기타 영문 변형
+
+  // 기타 영문 변형 (스케줄러 activeCategories와 호환)
   'LaLiga': 'soccer_spain_la_liga',
   'SerieA': 'soccer_italy_serie_a',
   'Ligue1': 'soccer_france_ligue_1',
   'JLeague': 'soccer_japan_j_league',
   'ArgentinaPrimera': 'soccer_argentina_primera_division',
   'Brasileirao': 'soccer_brazil_campeonato',  // ✅ 첫 글자만 대문자
-  'BRASILEIRAO': 'soccer_brazil_campeonato'   // ✅ 대문자 추가
+  'BRASILEIRAO': 'soccer_brazil_campeonato',  // ✅ 대문자 추가
+  'Bundesliga': 'soccer_germany_bundesliga',  // ✅ 첫 글자만 대문자 (스케줄러용)
+  'KBL': 'basketball_kbl'  // ✅ KBL 추가
 };
 
 // TheSportsDB 리그ID 매핑 (sportKey 기준, 반드시 clientSportKeyMap 값과 일치)
