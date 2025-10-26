@@ -51,6 +51,52 @@ export function useExchangeGames(category?: string) {
     }
   }, []);
 
+  // 🆕 배당률만 갱신하는 함수 (상태 리셋 방지)
+  const refreshOddsOnly = useCallback(async () => {
+    if (!category) return;
+    
+    try {
+      const sportKey = getSportKey(category);
+      const response = await fetch(buildApiUrl(`/api/odds/${sportKey}`));
+      
+      if (!response.ok) {
+        console.error('[useExchangeGames] 배당률 갱신 실패:', response.status);
+        return;
+      }
+      
+      const data = await response.json();
+      
+      // 기존 게임 데이터와 새 배당률 데이터를 병합
+      setGames(prevGames => {
+        return prevGames.map(prevGame => {
+          const newGame = data.find((g: any) => 
+            g.homeTeam === prevGame.homeTeam && 
+            g.awayTeam === prevGame.awayTeam &&
+            g.commenceTime === prevGame.commenceTime
+          );
+          
+          if (newGame) {
+            return {
+              ...prevGame,
+              // 배당률만 업데이트
+              homeTeamOdds: newGame.homeTeamOdds,
+              awayTeamOdds: newGame.awayTeamOdds,
+              drawOdds: newGame.drawOdds,
+              officialOdds: newGame.officialOdds,
+              availableMarkets: newGame.availableMarkets
+            };
+          }
+          
+          return prevGame;
+        });
+      });
+      
+      console.log('[useExchangeGames] 배당률만 갱신 완료 (상태 유지)');
+    } catch (error) {
+      console.error('[useExchangeGames] 배당률 갱신 오류:', error);
+    }
+  }, [category]);
+
   const fetchGames = useCallback(async () => {
     try {
       console.log('🔄 fetchGames 호출됨, category:', category);
@@ -199,6 +245,7 @@ export function useExchangeGames(category?: string) {
     loading,
     error,
     refetch: fetchGames,
+    refreshOddsOnly, // 🆕 배당률만 갱신하는 함수 추가
     getGamesByCategory,
     getGamesBySport,
     // 환수율 설정 새로고침 함수 추가

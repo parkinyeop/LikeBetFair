@@ -276,6 +276,82 @@ export default function Exchange() {
 
 
 
+  // 🆕 배당률만 갱신 (상태 유지)
+  const refreshOddsOnly = async () => {
+    try {
+      console.log('[Exchange] 🔄 배당률만 갱신 시작 (상태 유지)');
+      
+      const activeLeagues = Object.entries(SPORT_CATEGORIES);
+      
+      for (const [displayName, config] of activeLeagues) {
+        try {
+          const apiUrl = buildApiUrl(`${API_CONFIG.ENDPOINTS.ODDS}/${config.sportKey}`);
+          const response = await fetch(apiUrl);
+          
+          if (!response.ok) {
+            console.log(`⚠️ ${displayName} 배당률 갱신 실패:`, response.status);
+            continue;
+          }
+          
+          const data = await response.json();
+          
+          // 환수율 적용된 데이터 받아서 사용 (이미 서버에서 환수율이 적용된 상태)
+          setTodayFlatGames(prevGames => {
+            let matchedCount = 0;
+            let totalCount = 0;
+            
+            const updatedGames = prevGames.map(prevGame => {
+              totalCount++;
+              const newGame = data.find((g: any) => {
+                // 필드명 차이 고려 (home_team vs homeTeam)
+                const homeMatch = (g.homeTeam || g.home_team) === prevGame.homeTeam;
+                const awayMatch = (g.awayTeam || g.away_team) === prevGame.awayTeam;
+                const timeMatch = (g.commenceTime || g.commence_time) === prevGame.commenceTime;
+                
+                return homeMatch && awayMatch && timeMatch;
+              });
+              
+              if (newGame) {
+                matchedCount++;
+                console.log(`🎯 매칭 발견: ${prevGame.homeTeam} vs ${prevGame.awayTeam}`, {
+                  beforeOdds: prevGame.homeTeamOdds,
+                  afterOdds: newGame.homeTeamOdds,
+                  officialOdds: newGame.officialOdds
+                });
+                
+                // 환수율이 이미 적용된 배당률로 업데이트
+                return {
+                  ...prevGame,
+                  officialOdds: newGame.officialOdds,
+                  bookmakers: newGame.bookmakers,
+                  homeTeamOdds: newGame.homeTeamOdds,
+                  awayTeamOdds: newGame.awayTeamOdds,
+                  drawOdds: newGame.drawOdds
+                };
+              }
+              
+              return prevGame;
+            });
+            
+            if (matchedCount > 0) {
+              console.log(`✅ ${displayName}: ${matchedCount}/${totalCount} 게임 매칭 및 배당률 업데이트됨`);
+            }
+            
+            return updatedGames;
+          });
+          
+          console.log(`✅ ${displayName} 배당률 갱신 완료`);
+        } catch (error) {
+          console.error(`❌ ${displayName} 배당률 갱신 오류:`, error);
+        }
+      }
+      
+      console.log('[Exchange] ✅ 배당률 갱신 완료 (상태 유지)');
+    } catch (error) {
+      console.error('[Exchange] ❌ 배당률 갱신 오류:', error);
+    }
+  };
+
   // Today Betting 데이터 가져오기
   const fetchTodayGames = async () => {
     try {
@@ -2105,14 +2181,25 @@ export default function Exchange() {
     window.addEventListener('payoutRateChanged', handlePayoutRateChanged);
     
     if (typeof document !== 'undefined') {
-      const interval = setInterval(() => {
+      // 🆕 배당률만 갱신 (상태 유지) - 1분마다
+      const oddsInterval = setInterval(() => {
+        console.log('[Exchange] 🔄 배당률만 갱신 시도 (상태 유지)');
+        if (viewMode === 'today') {
+          refreshOddsOnly();
+        }
+      }, 1 * 60 * 1000); // 1분 간격
+      
+      // 🆕 전체 데이터 갱신 - 5분마다
+      const fullInterval = setInterval(() => {
         console.log('[Exchange Today] 주기적 경기 데이터 갱신 시도');
         if (viewMode === 'today') {
           fetchTodayGames();
         }
       }, 5 * 60 * 1000);
+      
       return () => {
-        clearInterval(interval);
+        clearInterval(oddsInterval);
+        clearInterval(fullInterval);
         window.removeEventListener('exchangeOrderPlaced', handleOrderPlaced);
         window.removeEventListener('payoutRateChanged', handlePayoutRateChanged);
       };

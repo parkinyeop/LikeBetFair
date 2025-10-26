@@ -173,11 +173,12 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
 
     fetchOdds();
     
+    // 🚫 임시 비활성화: 상태 유지 배당률 갱신 테스트를 위해
     // 5분마다 갱신 (백그라운드에서도 동작하도록 강화)
-    const interval = setInterval(() => {
-      console.log('[OddsList] 주기적 배당률 갱신 시도');
-      fetchOdds();
-    }, 5 * 60 * 1000);
+    // const interval = setInterval(() => {
+    //   console.log('[OddsList] 주기적 배당률 갱신 시도');
+    //   fetchOdds();
+    // }, 5 * 60 * 1000);
 
     // refreshOdds 이벤트 리스너 추가
     const handleRefreshOdds = () => {
@@ -187,7 +188,7 @@ const OddsList: React.FC<OddsListProps> = memo(({ sportKey, onBettingAreaSelect 
     window.addEventListener('refreshOdds', handleRefreshOdds);
 
     return () => {
-      clearInterval(interval);
+      // clearInterval(interval); // 임시 비활성화
       window.removeEventListener('refreshOdds', handleRefreshOdds);
     };
   }, [sportKey]);

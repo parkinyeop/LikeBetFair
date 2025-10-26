@@ -16,7 +16,12 @@ interface ExchangeMarketBoardProps {
 export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSidebarTabChange }: ExchangeMarketBoardProps) {
   const { isLoggedIn } = useAuth();
   const { selections, toggleSelection } = useExchangeStore();
-  const { games: exchangeGames, loading: gamesLoading, error: gamesError, refetch } = useExchangeGames(selectedCategory);
+  const { games: exchangeGames, loading: gamesLoading, error: gamesError, refetch, refreshOddsOnly } = useExchangeGames(selectedCategory);
+  
+  // 🧪 디버깅: refreshOddsOnly 존재 확인
+  useEffect(() => {
+    console.log('🔍 [ExchangeMarketBoard] refreshOddsOnly 존재 여부:', !!refreshOddsOnly);
+  }, [refreshOddsOnly]);
   // 체크박스 방식으로 변경: 여러 마켓을 동시에 선택 가능
   const [gameMarkets, setGameMarkets] = useState<{[gameId: string]: Set<string>}>({});
   
@@ -41,6 +46,24 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
     
     loadOddsReturnRateSettings();
   }, []);
+
+  // 🆕 배당률만 갱신하는 주기적 업데이트 (상태 유지)
+  useEffect(() => {
+    if (!refreshOddsOnly) return;
+    
+    console.log('🔄 [ExchangeMarketBoard] refreshOddsOnly 인터벌 설정 시작');
+    
+    // 🧪 테스트: 1분마다 배당률만 갱신 (상태 유지)
+    const interval = setInterval(() => {
+      console.log('[ExchangeMarketBoard] 배당률만 갱신 시도 (상태 유지)');
+      refreshOddsOnly();
+    }, 1 * 60 * 1000);
+    
+    return () => {
+      console.log('🔄 [ExchangeMarketBoard] refreshOddsOnly 인터벌 해제');
+      clearInterval(interval);
+    };
+  }, [refreshOddsOnly]);
 
   // ✅ Phase 2: 환수율 적용 제거 (서버에서 처리)
   // 프론트엔드에서는 원본 배당률을 그대로 표시
