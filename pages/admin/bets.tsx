@@ -492,12 +492,16 @@ export default function BettingAdmin() {
       const gameResults = selectedBet.selections?.map((selection, index) => {
         const gameId = index + 1;
         const manualData = manualGameResults[gameId] || {};
-        
+
         // desc에서 팀명 추출 (예: "LG Twins vs Doosan Bears")
         const teams = selection.desc?.split(' vs ') || [];
         const homeTeam = teams[0] || '';
         const awayTeam = teams[1] || '';
-        
+
+        // 각 selection의 sport 정보 추출
+        const sportKey = selection.sport_key || 'soccer_manual';
+        const sportTitle = selection.sport_title || 'Manual Input';
+
         return {
           gameId: gameId,
           homeTeam: homeTeam,
@@ -507,10 +511,10 @@ export default function BettingAdmin() {
           status: manualData.status || 'finished',
           result: manualData.result || null,
           commenceTime: selection.commence_time,
-          sportKey: selectedBet.sport_key,
-          sportTitle: selectedBet.sport_title,
+          sportKey: sportKey,
+          sportTitle: sportTitle,
           mainCategory: 'soccer',
-          subCategory: selectedBet.sport_key?.replace('soccer_', '').toUpperCase() || 'MANUAL_INPUT'
+          subCategory: sportKey.replace('soccer_', '').toUpperCase() || 'MANUAL_INPUT'
         };
       }) || [];
 
