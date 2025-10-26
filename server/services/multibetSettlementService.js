@@ -1068,7 +1068,7 @@ class MultibetSettlementService {
   }
   
   /**
-   * 🆕 Push 결과 판정 (단일 배팅과 동일한 로직)
+   * 🆕 Push 결과 판정 (단일 배팅과 동일한 로직) - 팀명 매칭 개선
    * @param {Object} selection - 선택 정보
    * @param {Object} gameResult - 경기 결과
    * @returns {boolean} Push 여부
@@ -1091,11 +1091,20 @@ class MultibetSettlementService {
     // 핸디캡 Push 판정
     if (market === 'spreads' || market === '핸디캡' || market === 'Handicap') {
       const line = parseFloat(selection.point);
-      const isHomeSelection = (selection.team === gameResult.homeTeam);
+      
+      // ✅ 팀명 정규화를 통한 정확한 매칭
+      const normalizedSelectionTeam = this.normalizeTeamName(selection.team);
+      const normalizedHomeTeam = this.normalizeTeamName(gameResult.homeTeam);
+      const normalizedAwayTeam = this.normalizeTeamName(gameResult.awayTeam);
+      
+      const isHomeSelection = (normalizedSelectionTeam === normalizedHomeTeam);
       const scoreDiff = homeScore - awayScore;
       const adjustedDiff = isHomeSelection ? scoreDiff + line : scoreDiff - line;
 
       console.log(`    [핸디캡] 라인: ${line}, 홈선택: ${isHomeSelection}, 점수차: ${scoreDiff}, 조정차: ${adjustedDiff}`);
+      console.log(`    [팀명 매칭] 선택팀: "${selection.team}" → "${normalizedSelectionTeam}"`);
+      console.log(`    [팀명 매칭] 홈팀: "${gameResult.homeTeam}" → "${normalizedHomeTeam}"`);
+      console.log(`    [팀명 매칭] 어웨이팀: "${gameResult.awayTeam}" → "${normalizedAwayTeam}"`);
       
       return adjustedDiff === 0; // 동점이면 Push
     }
@@ -1112,6 +1121,235 @@ class MultibetSettlementService {
 
     // 승패 배팅은 Push 없음
     return false;
+  }
+
+  /**
+   * 🆕 팀명 정규화 함수 (normalizeUtils.js와 동일한 로직)
+   * @param {string} teamName - 정규화할 팀명
+   * @returns {string} 정규화된 팀명
+   */
+  normalizeTeamName(teamName) {
+    if (!teamName) return '';
+    
+    // Accent 제거 및 기본 정규화
+    let normalized = teamName
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9가-힣]/g, '')
+      .replace(/\s+/g, '')
+      .trim();
+    
+    // 글로벌 팀 매핑 적용
+    const globalTeamMapping = {
+      // NBA 팀들
+      'lakers': 'losangeleslakers',
+      'losangeleslakers': 'losangeleslakers',
+      'warriors': 'goldenstatewarriors',
+      'goldenstatewarriors': 'goldenstatewarriors',
+      'celtics': 'bostonceltics',
+      'bostonceltics': 'bostonceltics',
+      'heat': 'miamiheat',
+      'miamiheat': 'miamiheat',
+      'bulls': 'chicagobulls',
+      'chicagobulls': 'chicagobulls',
+      'knicks': 'newyorkknicks',
+      'newyorkknicks': 'newyorkknicks',
+      'nets': 'brooklynnets',
+      'brooklynnets': 'brooklynnets',
+      'sixers': 'philadelphia76ers',
+      'philadelphia76ers': 'philadelphia76ers',
+      'raptors': 'torontoraptors',
+      'torontoraptors': 'torontoraptors',
+      'magic': 'orlandomagic',
+      'orlandomagic': 'orlandomagic',
+      'hawks': 'atlantahawks',
+      'atlantahawks': 'atlantahawks',
+      'hornets': 'charlottehornets',
+      'charlottehornets': 'charlottehornets',
+      'wizards': 'washingtonwizards',
+      'washingtonwizards': 'washingtonwizards',
+      'cavaliers': 'clevelandcavaliers',
+      'clevelandcavaliers': 'clevelandcavaliers',
+      'pistons': 'detroitpistons',
+      'detroitpistons': 'detroitpistons',
+      'pacers': 'indianapacers',
+      'indianapacers': 'indianapacers',
+      'bucks': 'milwaukeebucks',
+      'milwaukeebucks': 'milwaukeebucks',
+      'timberwolves': 'minnesotatimberwolves',
+      'minnesotatimberwolves': 'minnesotatimberwolves',
+      'nuggets': 'denvernuggets',
+      'denvernuggets': 'denvernuggets',
+      'thunder': 'oklahomacitythunder',
+      'oklahomacitythunder': 'oklahomacitythunder',
+      'trailblazers': 'portlandtrailblazers',
+      'portlandtrailblazers': 'portlandtrailblazers',
+      'jazz': 'utahjazz',
+      'utahjazz': 'utahjazz',
+      'suns': 'phoenixsuns',
+      'phoenixsuns': 'phoenixsuns',
+      'kings': 'sacramentokings',
+      'sacramentokings': 'sacramentokings',
+      'clippers': 'laclippers',
+      'laclippers': 'laclippers',
+      'spurs': 'sanantoniospurs',
+      'sanantoniospurs': 'sanantoniospurs',
+      'rockets': 'houstonrockets',
+      'houstonrockets': 'houstonrockets',
+      'mavericks': 'dallasmavericks',
+      'dallasmavericks': 'dallasmavericks',
+      'pelicans': 'neworleanspelicans',
+      'neworleanspelicans': 'neworleanspelicans',
+      'grizzlies': 'memphisgrizzlies',
+      'memphisgrizzlies': 'memphisgrizzlies',
+      
+      // MLB 팀들
+      'yankees': 'newyorkyankees',
+      'newyorkyankees': 'newyorkyankees',
+      'redsox': 'bostonredsox',
+      'bostonredsox': 'bostonredsox',
+      'rays': 'tampabayrays',
+      'tampabayrays': 'tampabayrays',
+      'bluejays': 'torontobluejays',
+      'torontobluejays': 'torontobluejays',
+      'orioles': 'baltimoreorioles',
+      'baltimoreorioles': 'baltimoreorioles',
+      'whitesox': 'chicagowhitesox',
+      'chicagowhitesox': 'chicagowhitesox',
+      'indians': 'clevelandindians',
+      'clevelandindians': 'clevelandindians',
+      'tigers': 'detroittigers',
+      'detroittigers': 'detroittigers',
+      'royals': 'kansascityroyals',
+      'kansascityroyals': 'kansascityroyals',
+      'twins': 'minnesotatwins',
+      'minnesotatwins': 'minnesotatwins',
+      'astros': 'houstonastros',
+      'houstonastros': 'houstonastros',
+      'athletics': 'oaklandathletics',
+      'oaklandathletics': 'oaklandathletics',
+      'angels': 'losangelesangels',
+      'losangelesangels': 'losangelesangels',
+      'mariners': 'seattlemariners',
+      'seattlemariners': 'seattlemariners',
+      'rangers': 'texasrangers',
+      'texasrangers': 'texasrangers',
+      'braves': 'atlantabraves',
+      'atlantabraves': 'atlantabraves',
+      'marlins': 'miamimarlins',
+      'miamimarlins': 'miamimarlins',
+      'mets': 'newyorkmets',
+      'newyorkmets': 'newyorkmets',
+      'phillies': 'philadelphiaphillies',
+      'philadelphiaphillies': 'philadelphiaphillies',
+      'nationals': 'washingtonnationals',
+      'washingtonnationals': 'washingtonnationals',
+      'cubs': 'chicagocubs',
+      'chicagocubs': 'chicagocubs',
+      'reds': 'cincinnatireds',
+      'cincinnatireds': 'cincinnatireds',
+      'brewers': 'milwaukeebrewers',
+      'milwaukeebrewers': 'milwaukeebrewers',
+      'pirates': 'pittsburghpirates',
+      'pittsburghpirates': 'pittsburghpirates',
+      'cardinals': 'stlouiscardinals',
+      'stlouiscardinals': 'stlouiscardinals',
+      'diamondbacks': 'arizonadiamondbacks',
+      'arizonadiamondbacks': 'arizonadiamondbacks',
+      'rockies': 'coloradorockies',
+      'coloradorockies': 'coloradorockies',
+      'dodgers': 'losangelesdodgers',
+      'losangelesdodgers': 'losangelesdodgers',
+      'padres': 'sandiegopadres',
+      'sandiegopadres': 'sandiegopadres',
+      'giants': 'sanfranciscogiants',
+      'sanfranciscogiants': 'sanfranciscogiants',
+      
+      // KBO 팀들
+      'kiwoomheroes': 'kiwoomheroes',
+      'hanwhaeagles': 'hanwhaeagles',
+      'ktwiz': 'ktwiz',
+      'ncdinos': 'ncdinos',
+      'kiatigers': 'kiatigers',
+      'ssglanders': 'ssglanders',
+      'lottegiants': 'lottegiants',
+      'doosanbears': 'doosanbears',
+      'lgtwins': 'lgtwins',
+      'samsunglions': 'samsunglions',
+      
+      // EPL 팀들
+      'arsenal': 'arsenal',
+      'astonvilla': 'astonvilla',
+      'bournemouth': 'bournemouth',
+      'brentford': 'brentford',
+      'brighton': 'brighton',
+      'burnley': 'burnley',
+      'chelsea': 'chelsea',
+      'crystalpalace': 'crystalpalace',
+      'everton': 'everton',
+      'fulham': 'fulham',
+      'liverpool': 'liverpool',
+      'manchestercity': 'manchestercity',
+      'manchesterunited': 'manchesterunited',
+      'newcastleunited': 'newcastleunited',
+      'nottinghamforest': 'nottinghamforest',
+      'sheffieldunited': 'sheffieldunited',
+      'tottenhamhotspur': 'tottenhamhotspur',
+      'westhamunited': 'westhamunited',
+      'wolverhamptonwanderers': 'wolverhamptonwanderers',
+      'lutontown': 'lutontown',
+      'ipswichtown': 'ipswichtown',
+      'leicestercity': 'leicestercity',
+      'southampton': 'southampton',
+      'leedsunited': 'leedsunited',
+      'norwichcity': 'norwichcity',
+      'watford': 'watford',
+      'cardiffcity': 'cardiffcity',
+      'huddersfieldtown': 'huddersfieldtown',
+      'swanseacity': 'swanseacity',
+      'stokecity': 'stokecity',
+      'westbromwichalbion': 'westbromwichalbion',
+      'middlesbrough': 'middlesbrough',
+      'birminghamcity': 'birminghamcity',
+      'blackburnrovers': 'blackburnrovers',
+      'bristolcity': 'bristolcity',
+      'coventrycity': 'coventrycity',
+      'derbycounty': 'derbycounty',
+      'hullcity': 'hullcity',
+      'millwall': 'millwall',
+      'prestonnorthend': 'prestonnorthend',
+      'queensparkrangers': 'queensparkrangers',
+      'reading': 'reading',
+      'rotherhamunited': 'rotherhamunited',
+      'sheffieldwednesday': 'sheffieldwednesday',
+      'sunderland': 'sunderland',
+      'swindontown': 'swindontown',
+      'wiganathletic': 'wiganathletic',
+      'wycombewanderers': 'wycombewanderers',
+      'blackpool': 'blackpool',
+      'barnsley': 'barnsley',
+      'birminghamcity': 'birminghamcity',
+      'blackburnrovers': 'blackburnrovers',
+      'bristolcity': 'bristolcity',
+      'coventrycity': 'coventrycity',
+      'derbycounty': 'derbycounty',
+      'hullcity': 'hullcity',
+      'millwall': 'millwall',
+      'prestonnorthend': 'prestonnorthend',
+      'queensparkrangers': 'queensparkrangers',
+      'reading': 'reading',
+      'rotherhamunited': 'rotherhamunited',
+      'sheffieldwednesday': 'sheffieldwednesday',
+      'sunderland': 'sunderland',
+      'swindontown': 'swindontown',
+      'wiganathletic': 'wiganathletic',
+      'wycombewanderers': 'wycombewanderers',
+      'blackpool': 'blackpool',
+      'barnsley': 'barnsley'
+    };
+    
+    return globalTeamMapping[normalized] || normalized;
   }
 
   /**
