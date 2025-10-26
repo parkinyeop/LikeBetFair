@@ -500,7 +500,27 @@ export default function BettingAdmin() {
 
         // 각 selection의 sport 정보 추출
         const sportKey = selection.sport_key || 'soccer_manual';
-        const sportTitle = selection.sport_title || 'Manual Input';
+
+        // sportKey로부터 올바른 sportTitle 매핑
+        const sportTitleMap: { [key: string]: string } = {
+          'soccer_italy_serie_a': 'Serie A',
+          'soccer_korea_kleague1': 'K-League',
+          'soccer_japan_j_league': 'J-League',
+          'soccer_brazil_campeonato': 'Brasileirao',
+          'soccer_usa_mls': 'MLS',
+          'soccer_argentina_primera_division': 'Argentina Primera',
+          'soccer_china_superleague': 'Chinese Super League',
+          'soccer_spain_primera_division': 'La Liga',
+          'soccer_germany_bundesliga': 'Bundesliga',
+          'soccer_england_premier_league': 'English Premier League',
+          'baseball_kbo': 'KBO',
+          'baseball_mlb': 'MLB',
+          'basketball_nba': 'NBA',
+          'basketball_kbl': 'KBL',
+          'americanfootball_nfl': 'NFL'
+        };
+
+        const sportTitle = selection.sport_title || sportTitleMap[sportKey] || 'Manual Input';
 
         return {
           gameId: gameId,
