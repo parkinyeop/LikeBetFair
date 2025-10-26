@@ -57,25 +57,28 @@ async function collectBrasileirao() {
         let result = 'pending';
         let status = 'scheduled';
         
-        if (event.intHomeScore !== null && event.intAwayScore !== null) {
-          const homeScore = parseInt(event.intHomeScore);
-          const awayScore = parseInt(event.intAwayScore);
-          score = JSON.stringify([
-            { name: homeTeam, score: homeScore.toString() },
-            { name: awayTeam, score: awayScore.toString() }
-          ]);
+        // ✅ FT 상태에서만 스코어 저장 - 중간 스코어 저장 방지
+        if (event.strStatus === 'Match Finished' || event.strStatus === 'FT') {
           status = 'finished';
           
-          // 결과 판정
-          if (homeScore > awayScore) {
-            result = 'home_win';
-          } else if (awayScore > homeScore) {
-            result = 'away_win';
-          } else {
-            result = 'draw';
+          // 스코어가 있는 경우만 저장
+          if (event.intHomeScore !== null && event.intAwayScore !== null) {
+            const homeScore = parseInt(event.intHomeScore);
+            const awayScore = parseInt(event.intAwayScore);
+            score = JSON.stringify([
+              { name: homeTeam, score: homeScore.toString() },
+              { name: awayTeam, score: awayScore.toString() }
+            ]);
+            
+            // 결과 판정
+            if (homeScore > awayScore) {
+              result = 'home_win';
+            } else if (awayScore > homeScore) {
+              result = 'away_win';
+            } else {
+              result = 'draw';
+            }
           }
-        } else if (event.strStatus === 'Match Finished' || event.strStatus === 'FT') {
-          status = 'finished';
         } else if (event.strStatus === 'Postponed') {
           status = 'cancelled';
           result = 'cancelled';

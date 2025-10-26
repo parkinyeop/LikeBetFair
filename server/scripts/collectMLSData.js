@@ -62,27 +62,29 @@ async function collectMLSData() {
           continue;
         }
       
-      // 스코어 파싱 (완료된 경기만)
+      // ✅ FT 상태에서만 스코어 저장 - 중간 스코어 저장 방지
       let homeScore = null;
       let awayScore = null;
       let status = 'scheduled';
       let result = 'pending';
       
-      if (event.intHomeScore !== null && event.intAwayScore !== null) {
-        homeScore = parseInt(event.intHomeScore);
-        awayScore = parseInt(event.intAwayScore);
+      if (event.strStatus === 'Match Finished' || event.strStatus === 'FT') {
         status = 'finished';
         
-        // 결과 계산
-        if (homeScore > awayScore) {
-          result = 'home_win';
-        } else if (awayScore > homeScore) {
-          result = 'away_win';
-        } else {
-          result = 'draw';
+        // 스코어가 있는 경우만 저장
+        if (event.intHomeScore !== null && event.intAwayScore !== null) {
+          homeScore = parseInt(event.intHomeScore);
+          awayScore = parseInt(event.intAwayScore);
+          
+          // 결과 계산
+          if (homeScore > awayScore) {
+            result = 'home_win';
+          } else if (awayScore > homeScore) {
+            result = 'away_win';
+          } else {
+            result = 'draw';
+          }
         }
-      } else if (event.strStatus === 'Match Finished' || event.strStatus === 'FT') {
-        status = 'finished';
       } else if (event.strStatus === 'Postponed') {
         status = 'cancelled';
       }
