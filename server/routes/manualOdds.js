@@ -19,17 +19,19 @@ router.get('/manual-odds/games/:sportKey', async (req, res) => {
     // GameResultService를 통해 SportsDB에서 경기 가져오기
     const result = await gameResultService.fetchResultsWithSportsDB(sportKey, parseInt(days), true);
 
-    if (!result || !result.events) {
+    if (!result || !result.data) {
       return res.status(404).json({
         success: false,
         message: '경기 목록을 가져올 수 없습니다'
       });
     }
 
+    const games = result.data;
+
     // 이미 배당율이 있는 경기 확인
-    const eventIds = result.events
-      .filter(e => e.eventId)
-      .map(e => e.eventId);
+    const eventIds = games
+      .filter(e => e.id)
+      .map(e => e.id);
 
     const existingOdds = await OddsCache.findAll({
       where: {
@@ -43,11 +45,16 @@ router.get('/manual-odds/games/:sportKey', async (req, res) => {
       existingOddsMap[odds.game_id] = odds.bookmakers;
     });
 
-    // 경기 목록에 기존 배당율 정보 추가
-    const gamesWithOdds = result.events.map(event => ({
-      ...event,
-      hasOdds: !!existingOddsMap[event.eventId],
-      existingOdds: existingOddsMap[event.eventId] || null
+    // 경기 목록에 기존 배당율 정보 추가 및 형식 변환
+    const gamesWithOdds = games.map(game => ({
+      eventId: game.id,
+      homeTeam: game.home_team,
+      awayTeam: game.away_team,
+      commenceTime: game.commence_time,
+      status: game.status,
+      score: game.scores,
+      hasOdds: !!existingOddsMap[game.id],
+      existingOdds: existingOddsMap[game.id] || null
     }));
 
     res.json({
