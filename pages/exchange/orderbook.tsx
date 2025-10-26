@@ -92,9 +92,9 @@ const OrderbookPage: React.FC = () => {
     const matchPercentage = totalMatchAmount > 0 ? Math.round((matchedAmount / totalMatchAmount) * 100) : 0;
 
     return {
-      totalAmount: totalMatchAmount, // 전체 매칭 금액
+      totalMatchAmount: totalMatchAmount, // 전체 매칭 금액
       matchedAmount: matchedAmount, // 체결된 매칭 금액
-      remainingAmount: remainingMatchAmount, // 남은 매칭 금액
+      remainingMatchAmount: remainingMatchAmount, // 남은 매칭 금액
       matchPercentage: matchPercentage // 체결 비율 (%)
     };
   };
@@ -713,16 +713,10 @@ const OrderbookPage: React.FC = () => {
                     >
                       {(() => {
                         const matchInfo = calculateMatchingInfo(order);
-                        // ✅ 남은 매칭 금액 = DB의 potentialProfit 사용 (재계산 금지)
-                        const remainingMatchAmt = order.type === 'back' && order.potentialProfit
-                          ? formatCurrency(order.potentialProfit)
-                          : formatCurrency(order.displayAmount || order.amount);
-                        // ✅ 전체 매칭 금액 = DB의 potentialProfit 또는 계산값
-                        const totalMatchAmt = order.type === 'back' && order.potentialProfit
-                          ? formatCurrency(order.potentialProfit)
-                          : order.type === 'back' 
-                          ? formatCurrency(Math.floor(order.amount * (order.odds - 1)))
-                          : formatCurrency(order.amount);
+                        // ✅ 남은 매칭 금액 = calculateMatchingInfo에서 계산된 값 사용
+                        const remainingMatchAmt = formatCurrency(matchInfo.remainingMatchAmount);
+                        // ✅ 전체 매칭 금액 = calculateMatchingInfo에서 계산된 값 사용
+                        const totalMatchAmt = formatCurrency(matchInfo.totalMatchAmount);
                         const matchPercentage = matchInfo.matchPercentage;
                         
                         return order.type === 'back'
