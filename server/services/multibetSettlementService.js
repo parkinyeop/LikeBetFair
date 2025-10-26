@@ -1090,32 +1090,65 @@ class MultibetSettlementService {
 
     // 핸디캡 Push 판정
     if (market === 'spreads' || market === '핸디캡' || market === 'Handicap') {
-      const line = parseFloat(selection.point);
-      
+      let selectedTeam, line;
+
+      // ✅ point 필드가 있으면 우선 사용
+      if (selection.point !== undefined) {
+        selectedTeam = selection.team;
+        line = parseFloat(selection.point);
+      } else {
+        // ✅ team 필드에서 핸디캡 파싱: "Lakers +3.5" → team: "Lakers", line: 3.5
+        const handicapMatch = selection.team.match(/^(.+?)\s+([+-])([\d.]+)$/);
+        if (handicapMatch) {
+          selectedTeam = handicapMatch[1].trim();
+          const sign = handicapMatch[2] === '-' ? -1 : 1;
+          line = sign * parseFloat(handicapMatch[3]);
+        } else {
+          console.log(`    [핸디캡] 파싱 실패: "${selection.team}" - Push 판정 불가`);
+          return false;
+        }
+      }
+
       // ✅ 팀명 정규화를 통한 정확한 매칭
-      const normalizedSelectionTeam = this.normalizeTeamName(selection.team);
+      const normalizedSelectionTeam = this.normalizeTeamName(selectedTeam);
       const normalizedHomeTeam = this.normalizeTeamName(gameResult.homeTeam);
       const normalizedAwayTeam = this.normalizeTeamName(gameResult.awayTeam);
-      
+
       const isHomeSelection = (normalizedSelectionTeam === normalizedHomeTeam);
       const scoreDiff = homeScore - awayScore;
       const adjustedDiff = isHomeSelection ? scoreDiff + line : scoreDiff - line;
 
       console.log(`    [핸디캡] 라인: ${line}, 홈선택: ${isHomeSelection}, 점수차: ${scoreDiff}, 조정차: ${adjustedDiff}`);
-      console.log(`    [팀명 매칭] 선택팀: "${selection.team}" → "${normalizedSelectionTeam}"`);
+      console.log(`    [팀명 매칭] 선택팀: "${selectedTeam}" → "${normalizedSelectionTeam}"`);
       console.log(`    [팀명 매칭] 홈팀: "${gameResult.homeTeam}" → "${normalizedHomeTeam}"`);
       console.log(`    [팀명 매칭] 어웨이팀: "${gameResult.awayTeam}" → "${normalizedAwayTeam}"`);
-      
+
       return adjustedDiff === 0; // 동점이면 Push
     }
 
     // 토탈 Push 판정
     if (market === 'totals' || market === '총점' || market === 'Over/Under') {
-      const line = parseFloat(selection.point);
+      let line;
+
+      // ✅ point 필드가 있으면 우선 사용
+      if (selection.point !== undefined) {
+        line = parseFloat(selection.point);
+      } else {
+        // ✅ team/selection에서 파싱: "Over 2.5" → 2.5
+        const teamValue = selection.team || selection.selection;
+        const totalMatch = teamValue.match(/(Over|Under)\s+([\d.]+)/i);
+        if (totalMatch) {
+          line = parseFloat(totalMatch[2]);
+        } else {
+          console.log(`    [토탈] 파싱 실패: "${teamValue}" - Push 판정 불가`);
+          return false;
+        }
+      }
+
       const totalScore = homeScore + awayScore;
 
       console.log(`    [토탈] 라인: ${line}, 총점: ${totalScore}`);
-      
+
       return totalScore === line; // 총점 = 기준점이면 Push
     }
 
