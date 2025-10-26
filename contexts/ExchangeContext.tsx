@@ -175,8 +175,29 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
     setMultiBetTotalOdds(roundedTotalOdds);
     
     if (multiBetStake > 0) {
-      // ✅ 정확한 Exchange 멀티배팅 수익 계산: 부동소수점 오차 방지 + 10원 단위 올림
-      const potentialWinnings = Math.ceil(Math.round(multiBetStake * roundedTotalOdds * 100) / 100 / 10) * 10;
+      // ✅ 멀티배팅 타입별 정확한 수익 계산
+      const isLayMultibet = multiBetSelections.every(selection => selection.side === 'lay');
+      
+      console.log('🔍 [멀티배팅 수익 계산] 디버깅:', {
+        multiBetStake,
+        roundedTotalOdds,
+        isLayMultibet,
+        selections: multiBetSelections.map(s => ({ side: s.side, odds: s.odds }))
+      });
+      
+      let potentialWinnings: number;
+      
+      if (isLayMultibet) {
+        // ✅ Lay 멀티배팅: 배팅 금액 ÷ (총 배당률 - 1)
+        const layProfit = multiBetStake / (roundedTotalOdds - 1);
+        potentialWinnings = Math.ceil(Math.round(layProfit * 100) / 100 / 10) * 10;
+        console.log('🔍 [Lay 계산]', { layProfit, potentialWinnings });
+      } else {
+        // ✅ Back 멀티배팅: 배팅 금액 × (총 배당률 - 1)
+        const backProfit = multiBetStake * (roundedTotalOdds - 1);
+        potentialWinnings = Math.ceil(Math.round(backProfit * 100) / 100 / 10) * 10;
+        console.log('🔍 [Back 계산]', { backProfit, potentialWinnings });
+      }
 
       setMultiBetPotentialWinnings(potentialWinnings);
     }
