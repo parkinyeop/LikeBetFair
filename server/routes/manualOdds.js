@@ -1,0 +1,233 @@
+import express from 'express';
+import gameResultService from '../services/gameResultService.js';
+import OddsCache from '../models/oddsCacheModel.js';
+import { Op } from 'sequelize';
+
+const router = express.Router();
+
+/**
+ * SportsDB에서 특정 리그의 경기 목록 가져오기
+ * GET /api/admin/manual-odds/games/:sportKey
+ */
+router.get('/games/:sportKey', async (req, res) => {
+  try {
+    const { sportKey } = req.params;
+    const { days = 7 } = req.query;
+
+    console.log(`📋 [Manual Odds] 경기 목록 조회: ${sportKey}, ${days}일`);
+
+    // GameResultService를 통해 SportsDB에서 경기 가져오기
+    const result = await gameResultService.fetchResultsWithSportsDB(sportKey, parseInt(days), true);
+
+    if (!result || !result.events) {
+      return res.status(404).json({
+        success: false,
+        message: '경기 목록을 가져올 수 없습니다'
+      });
+    }
+
+    // 이미 배당율이 있는 경기 확인
+    const eventIds = result.events
+      .filter(e => e.eventId)
+      .map(e => e.eventId);
+
+    const existingOdds = await OddsCache.findAll({
+      where: {
+        game_id: { [Op.in]: eventIds }
+      },
+      attributes: ['game_id', 'bookmakers']
+    });
+
+    const existingOddsMap = {};
+    existingOdds.forEach(odds => {
+      existingOddsMap[odds.game_id] = odds.bookmakers;
+    });
+
+    // 경기 목록에 기존 배당율 정보 추가
+    const gamesWithOdds = result.events.map(event => ({
+      ...event,
+      hasOdds: !!existingOddsMap[event.eventId],
+      existingOdds: existingOddsMap[event.eventId] || null
+    }));
+
+    res.json({
+      success: true,
+      sportKey: sportKey,
+      totalGames: gamesWithOdds.length,
+      games: gamesWithOdds
+    });
+
+  } catch (error) {
+    console.error('❌ [Manual Odds] 경기 목록 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '서버 오류가 발생했습니다',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 수동 배당율 저장
+ * POST /api/admin/manual-odds
+ */
+router.post('/', async (req, res) => {
+  try {
+    const {
+      sportKey,
+      sportTitle,
+      eventId,
+      homeTeam,
+      awayTeam,
+      commenceTime,
+      odds // { h2h: { home, away, draw? }, spreads?, totals? }
+    } = req.body;
+
+    console.log(`💾 [Manual Odds] 배당율 저장 시작: ${homeTeam} vs ${awayTeam}`);
+
+    // 필수 데이터 검증
+    if (!sportKey || !eventId || !homeTeam || !awayTeam || !commenceTime || !odds) {
+      return res.status(400).json({
+        success: false,
+        message: '필수 데이터가 누락되었습니다'
+      });
+    }
+
+    // 배당율 데이터 구조 생성 (OddsAPI 형식과 호환되도록)
+    const bookmakerData = {
+      key: 'manual_input',
+      title: 'Manual Input',
+      last_update: new Date().toISOString(),
+      markets: []
+    };
+
+    // H2H (승/패) 배당율
+    if (odds.h2h) {
+      const h2hOutcomes = [
+        { name: homeTeam, price: parseFloat(odds.h2h.home) }
+      ];
+
+      if (odds.h2h.draw) {
+        h2hOutcomes.push({ name: 'Draw', price: parseFloat(odds.h2h.draw) });
+      }
+
+      h2hOutcomes.push({ name: awayTeam, price: parseFloat(odds.h2h.away) });
+
+      bookmakerData.markets.push({
+        key: 'h2h',
+        last_update: new Date().toISOString(),
+        outcomes: h2hOutcomes
+      });
+    }
+
+    // Spreads (핸디캡) 배당율
+    if (odds.spreads && odds.spreads.length > 0) {
+      bookmakerData.markets.push({
+        key: 'spreads',
+        last_update: new Date().toISOString(),
+        outcomes: odds.spreads.map(spread => ({
+          name: spread.team,
+          price: parseFloat(spread.price),
+          point: parseFloat(spread.point)
+        }))
+      });
+    }
+
+    // Totals (오버/언더) 배당율
+    if (odds.totals && odds.totals.length > 0) {
+      bookmakerData.markets.push({
+        key: 'totals',
+        last_update: new Date().toISOString(),
+        outcomes: odds.totals.map(total => ({
+          name: total.name, // 'Over' or 'Under'
+          price: parseFloat(total.price),
+          point: parseFloat(total.point)
+        }))
+      });
+    }
+
+    // OddsCache에 저장 (findOrCreate 사용)
+    const [oddsCache, created] = await OddsCache.findOrCreate({
+      where: {
+        game_id: eventId
+      },
+      defaults: {
+        game_id: eventId,
+        sport_key: sportKey,
+        sport_title: sportTitle || 'Manual Input',
+        commence_time: new Date(commenceTime),
+        home_team: homeTeam,
+        away_team: awayTeam,
+        bookmakers: [bookmakerData]
+      }
+    });
+
+    // 기존 레코드인 경우 업데이트
+    if (!created) {
+      await oddsCache.update({
+        bookmakers: [bookmakerData],
+        updatedAt: new Date()
+      });
+      console.log(`🔄 [Manual Odds] 기존 배당율 업데이트: ${eventId}`);
+    } else {
+      console.log(`✅ [Manual Odds] 새 배당율 저장: ${eventId}`);
+    }
+
+    res.json({
+      success: true,
+      message: created ? '배당율이 성공적으로 저장되었습니다' : '배당율이 업데이트되었습니다',
+      data: {
+        eventId: eventId,
+        created: created
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ [Manual Odds] 배당율 저장 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '서버 오류가 발생했습니다',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 수동 배당율 삭제
+ * DELETE /api/admin/manual-odds/:eventId
+ */
+router.delete('/:eventId', async (req, res) => {
+  try {
+    const { eventId } = req.params;
+
+    const deleted = await OddsCache.destroy({
+      where: {
+        game_id: eventId
+      }
+    });
+
+    if (deleted === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '해당 배당율을 찾을 수 없습니다'
+      });
+    }
+
+    console.log(`🗑️ [Manual Odds] 배당율 삭제: ${eventId}`);
+
+    res.json({
+      success: true,
+      message: '배당율이 삭제되었습니다'
+    });
+
+  } catch (error) {
+    console.error('❌ [Manual Odds] 배당율 삭제 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '서버 오류가 발생했습니다',
+      error: error.message
+    });
+  }
+});
+
+export default router;

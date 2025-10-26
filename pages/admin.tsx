@@ -790,11 +790,36 @@ export default function AdminDashboard() {
                     <div>• 시스템 모니터링</div>
                     <div>• 백업 및 복구</div>
                   </div>
-                  <button 
+                  <button
                     onClick={() => router.push('/admin/settings')}
                     className="mt-3 w-full bg-gray-600 text-white py-2 px-3 rounded text-sm hover:bg-gray-700 transition-colors"
                   >
                     시스템 설정
+                  </button>
+                </div>
+
+                {/* 수동 배당율 입력 */}
+                <div className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow">
+                  <div className="flex items-center mb-3">
+                    <div className="bg-teal-100 p-2 rounded-full">
+                      <svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                      </svg>
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-900 ml-2">수동 배당율 입력</h3>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-3">OddsAPI 미지원 리그 배당율 수동 설정</p>
+                  <div className="space-y-1 text-xs text-gray-500">
+                    <div>• KBL, KBO 등 경기 선택</div>
+                    <div>• 승/패 배당율 입력</div>
+                    <div>• 핸디캡/오버언더 설정</div>
+                    <div>• 배당율 실시간 적용</div>
+                  </div>
+                  <button
+                    onClick={() => router.push('/admin/manual-odds')}
+                    className="mt-3 w-full bg-teal-600 text-white py-2 px-3 rounded text-sm hover:bg-teal-700 transition-colors"
+                  >
+                    배당율 입력하기
                   </button>
                 </div>
 
