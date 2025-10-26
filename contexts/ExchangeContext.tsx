@@ -424,16 +424,25 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
 
     // ✅ displayAmount가 있으면 사용, 없으면 DB의 potentialProfit 사용
     if (matchTargetOrder.displayAmount !== undefined && matchTargetOrder.displayAmount !== null) {
-      return matchTargetOrder.displayAmount;
+      const result = matchTargetOrder.displayAmount;
+      console.log('🔍 [getMaxMatchAmount] displayAmount 사용:', result);
+      return result;
     }
 
     // displayAmount가 없으면 DB의 potentialProfit 사용 (재계산 금지)
     if (matchTargetOrder.type === 'back') {
       // ✅ Back 주문: Lay가 내야 할 담보금 = DB의 potentialProfit (재계산 금지)
-      return matchTargetOrder.potentialProfit || 0;
+      const result = matchTargetOrder.potentialProfit || 0;
+      console.log('🔍 [getMaxMatchAmount] Back 주문 - potentialProfit 사용:', {
+        potentialProfit: matchTargetOrder.potentialProfit,
+        result
+      });
+      return result;
     } else {
       // Lay 주문: Back이 내야 할 배팅금 = remainingAmount
-      return matchTargetOrder.remainingAmount;
+      const result = matchTargetOrder.remainingAmount;
+      console.log('🔍 [getMaxMatchAmount] Lay 주문 - remainingAmount 사용:', result);
+      return result;
     }
   };
 

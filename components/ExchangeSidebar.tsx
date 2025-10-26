@@ -189,16 +189,19 @@ function OrderPanel() {
       // Back: 매칭된 Lay 베팅금액만큼 획득 (Exchange 원리)
       return amount;
     } else {
-      // ✅ Lay 주문: 매칭 모드에서는 직접 계산
-      if (selectedBet.potentialProfit) {
-        // DB에 저장된 값이 있으면 사용
-        return selectedBet.potentialProfit;
-      } else {
-        // 매칭 모드에서는 배당률과 금액으로 계산
-        // Lay 예상 수익 = 배팅 금액 ÷ (배당률 - 1)
-        const layProfit = amount / (selectedBet.price - 1);
-        return Math.round(layProfit);
-      }
+      // ✅ Lay 주문: 매칭 모드에서는 배당률과 금액으로 직접 계산
+      // Lay 예상 수익 = 배팅 금액 ÷ (배당률 - 1)
+      const layProfit = amount / (selectedBet.price - 1);
+      const profit = Math.round(layProfit);
+      
+      console.log('🔍 [예상 수익 계산]', {
+        amount,
+        price: selectedBet.price,
+        calculation: `${amount} / (${selectedBet.price} - 1) = ${layProfit}`,
+        profit
+      });
+      
+      return profit;
     }
   };
 
