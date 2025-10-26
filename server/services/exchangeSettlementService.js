@@ -739,8 +739,18 @@ class ExchangeSettlementService {
     }
     
     // 승부 판정
-    const isBackWin = this.determineWinner(backOrder, gameResult);
+    const backResult = this.determineWinner(backOrder, gameResult);
     
+    // ✅ Push 상황 처리
+    if (backResult === 'push') {
+      console.log(`  🔄 Push 상황: 양쪽 모두 환불 처리`);
+      
+      // 각자 원래 베팅금만 환불
+      const result = await this.processPushRefund(backOrder, layOrder, match, transaction);
+      return result;
+    }
+    
+    const isBackWin = backResult === true;
     console.log(`  🎲 승부 판정: Back ${isBackWin ? '승리' : '패배'}`);
     
     // 🔧 레이 주문 정산 시 백 주문의 결과 반전
@@ -1129,6 +1139,12 @@ class ExchangeSettlementService {
     console.log(`      핸디캡: ${line}, 선택팀: ${isHomeSelection ? 'home' : 'away'}`);
     console.log(`      조정된 점수차: ${adjustedDiff}`);
     
+    // ✅ 핸디캡 동점 처리 추가
+    if (adjustedDiff === 0) {
+      console.log(`      Push 조건: 조정된 점수차가 0 → 무효 (환불 처리)`);
+      return 'push'; // 특별한 값으로 Push 표시
+    }
+    
     return adjustedDiff > 0;
   }
 
@@ -1159,7 +1175,7 @@ class ExchangeSettlementService {
     // ✅ Push 조건 추가 (총점 = 기준점이면 무효)
     if (totalScore === line) {
       console.log(`      Push 조건: 총점 ${totalScore} = 기준 ${line} → 무효 (환불 처리)`);
-      return false; // Push는 승패 없음 (환불)
+      return 'push'; // false 대신 'push' 반환
     }
     
     if (isOverSelection) {
@@ -3740,6 +3756,98 @@ class ExchangeSettlementService {
       .replace(/[^a-z0-9가-힣\s]/g, '') // 특수문자 제거
       .replace(/\s+/g, '') // 공백 제거
       .trim();
+  }
+
+  /**
+   * Push 상황에서 환불 처리
+   * @param {Object} backOrder - Back 주문
+   * @param {Object} layOrder - Lay 주문
+   * @param {Object} match - 매치 정보
+   * @param {Object} transaction - DB 트랜잭션
+   * @returns {Object} 환불 결과
+   */
+  async processPushRefund(backOrder, layOrder, match, transaction) {
+    console.log(`🔄 Push 환불 처리 시작: Back #${backOrder.id}, Lay #${layOrder.id}`);
+    
+    // Back 주문 환불 (backStake만)
+    const backRefundAmount = match ? match.matchedAmount : backOrder.stakeAmount;
+    await this.refundUserBalance(backOrder, backRefundAmount, 'Push (무승부)로 인한 환불', transaction);
+    
+    // Lay 주문 환불 (layStake만 - liability 계산)
+    const layRefundAmount = match 
+      ? (match.matchedAmount * (match.matchedPrice - 1))
+      : (layOrder.stakeAmount * (layOrder.price - 1)); // liability 계산
+    
+    await this.refundUserBalance(layOrder, layRefundAmount, 'Push (무승부)로 인한 환불', transaction);
+    
+    // 주문 상태 업데이트
+    await this.updateOrderStatus(backOrder, transaction);
+    await this.updateOrderStatus(layOrder, transaction);
+    
+    // Match 테이블 업데이트
+    if (match) {
+      await match.update({
+        status: 'cancelled', // 'push' 대신 'cancelled' 사용
+        settledAt: new Date()
+      }, { transaction });
+    }
+    
+    console.log(`✅ Push 환불 완료: Back ${backRefundAmount}원, Lay ${layRefundAmount}원`);
+    
+    return {
+      winnerSide: 'push',
+      totalWinnings: 0,
+      backRefund: backRefundAmount,
+      layRefund: layRefundAmount
+    };
+  }
+
+  /**
+   * 사용자 잔고 환불 처리
+   * @param {Object} order - 주문 정보
+   * @param {number} refundAmount - 환불 금액
+   * @param {string} memo - 환불 메모
+   * @param {Object} transaction - DB 트랜잭션
+   */
+  async refundUserBalance(order, refundAmount, memo, transaction) {
+    const user = await User.findByPk(order.userId, { transaction });
+    if (!user) {
+      throw new Error(`사용자를 찾을 수 없습니다: ${order.userId}`);
+    }
+    
+    const currentBalance = parseFloat(user.balance);
+    const newBalance = currentBalance + refundAmount;
+    
+    await user.update({ balance: newBalance }, { transaction });
+    
+    await PaymentHistory.create({
+      userId: user.id,
+      betId: `EXCHANGE_${order.id}`,
+      amount: refundAmount,
+      memo: memo,
+      balanceAfter: newBalance,
+      transactionType: 'exchange_push_refund',
+      status: 'completed',
+      relatedOrderId: order.id,
+      paidAt: new Date()
+    }, { transaction });
+    
+    console.log(`💰 환불 처리: 사용자 ${user.id}, ${refundAmount}원 → 잔고 ${newBalance}원`);
+  }
+
+  /**
+   * 주문 상태 업데이트 (Push 처리)
+   * @param {Object} order - 주문 정보
+   * @param {Object} transaction - DB 트랜잭션
+   */
+  async updateOrderStatus(order, transaction) {
+    await order.update({
+      status: 'cancelled', // 'push' 대신 'cancelled' 사용
+      settledAt: new Date(),
+      settlementNote: `Push (무승부)로 인한 환불 처리`
+    }, { transaction });
+    
+    console.log(`📝 주문 상태 업데이트: #${order.id} → cancelled (Push)`);
   }
 }
 
