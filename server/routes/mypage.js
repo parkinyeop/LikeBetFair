@@ -96,6 +96,7 @@ router.get('/payment-history', verifyToken, async (req, res) => {
 
     const payments = await PaymentHistory.findAll({
       where: whereCondition,
+      attributes: { include: ['id', 'userId', 'amount', 'balanceAfter', 'memo', 'paidAt', 'relatedOrderId', 'relatedBetId'] },
       order: [['paidAt', 'DESC']],
       limit: 100
     });
@@ -103,7 +104,7 @@ router.get('/payment-history', verifyToken, async (req, res) => {
     console.log('✅ [입출금 내역] 조회 결과:', {
       userId: req.user.userId,
       count: payments.length,
-      firstPayment: payments.length > 0 ? { id: payments[0].id, userId: payments[0].userId, amount: payments[0].amount } : null
+      firstPayment: payments.length > 0 ? { id: payments[0].id, userId: payments[0].userId, amount: payments[0].amount, relatedOrderId: payments[0].relatedOrderId } : null
     });
 
     res.json({ payments });
