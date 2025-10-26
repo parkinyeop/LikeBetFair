@@ -9,7 +9,7 @@ const router = express.Router();
  * SportsDB에서 특정 리그의 경기 목록 가져오기
  * GET /api/admin/manual-odds/games/:sportKey
  */
-router.get('/games/:sportKey', async (req, res) => {
+router.get('/manual-odds/games/:sportKey', async (req, res) => {
   try {
     const { sportKey } = req.params;
     const { days = 7 } = req.query;
@@ -71,7 +71,7 @@ router.get('/games/:sportKey', async (req, res) => {
  * 수동 배당율 저장
  * POST /api/admin/manual-odds
  */
-router.post('/', async (req, res) => {
+router.post('/manual-odds', async (req, res) => {
   try {
     const {
       sportKey,
@@ -196,7 +196,7 @@ router.post('/', async (req, res) => {
  * 수동 배당율 삭제
  * DELETE /api/admin/manual-odds/:eventId
  */
-router.delete('/:eventId', async (req, res) => {
+router.delete('/manual-odds/:eventId', async (req, res) => {
   try {
     const { eventId } = req.params;
 
