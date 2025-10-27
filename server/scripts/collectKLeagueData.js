@@ -57,9 +57,9 @@ async function collectKLeagueData() {
     // 각 경기 처리
     for (const event of data.events) {
       try {
-        // 기본 정보 추출 (원본 팀명 사용)
-        const homeTeam = KLEAGUE_TEAM_MAPPING[event.strHomeTeam] || event.strHomeTeam;
-        const awayTeam = KLEAGUE_TEAM_MAPPING[event.strAwayTeam] || event.strAwayTeam;
+        // 기본 정보 추출
+        const homeTeam = normalizeTeamName(event.strHomeTeam, 'KLEAGUE1');
+        const awayTeam = normalizeTeamName(event.strAwayTeam, 'KLEAGUE1');
         // strTimestamp가 UTC 시간이므로 이를 사용
         let commenceTime;
         if (event.strTimestamp) {
@@ -81,12 +81,44 @@ async function collectKLeagueData() {
           status = event.strStatus.toLowerCase();
           result = event.strStatus.toLowerCase();
         }
-        // 2. FT 상태에서만 스코어 저장 - 중간 스코어 저장 방지
+        // 2. 스코어가 있는 경우 - 명시적으로 finished
+        else if (event.intHomeScore !== null && event.intAwayScore !== null) {
+          status = 'finished';
+          const homeScore = parseInt(event.intHomeScore);
+          const awayScore = parseInt(event.intAwayScore);
+          
+          score = JSON.stringify([
+            { name: homeTeam, score: homeScore.toString() },
+            { name: awayTeam, score: awayScore.toString() }
+          ]);
+          
+          if (homeScore > awayScore) {
+            result = 'home_win';
+          } else if (awayScore > homeScore) {
+            result = 'away_win';
+          } else {
+            result = 'draw';
+          }
+        }
+        // 3. Match Finished 상태이지만 스코어가 없는 경우
         else if (event.strStatus === 'Match Finished' || event.strStatus === 'FT') {
           status = 'finished';
+          // 스코어가 없는 완료 경기는 무승부로 처리
+          result = 'draw';
+          score = JSON.stringify([
+            { name: homeTeam, score: '0' },
+            { name: awayTeam, score: '0' }
+          ]);
+        }
+        // 4. 스코어가 있지만 status가 finished가 아닌 경우 - 보수적 시간 기반 처리
+        else if (event.intHomeScore !== null && event.intAwayScore !== null) {
+          const gameTime = new Date(commenceTime);
+          const now = new Date();
+          const hoursSinceGame = (now - gameTime) / (1000 * 60 * 60);
           
-          // 스코어가 있는 경우만 저장
-          if (event.intHomeScore !== null && event.intAwayScore !== null) {
+          // 48시간 이상 지났고 스코어가 있으면 완료로 처리
+          if (hoursSinceGame > 48) {
+            status = 'finished';
             const homeScore = parseInt(event.intHomeScore);
             const awayScore = parseInt(event.intAwayScore);
             
@@ -102,16 +134,8 @@ async function collectKLeagueData() {
             } else {
               result = 'draw';
             }
-          } else {
-            // 스코어가 없는 완료 경기는 무승부로 처리
-            result = 'draw';
-            score = JSON.stringify([
-              { name: homeTeam, score: '0' },
-              { name: awayTeam, score: '0' }
-            ]);
           }
         }
-
         // 5. 연기/취소 키워드 감지
         else if (event.strStatus) {
           const statusText = event.strStatus.toLowerCase();

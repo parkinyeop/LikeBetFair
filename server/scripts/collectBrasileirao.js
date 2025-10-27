@@ -57,71 +57,53 @@ async function collectBrasileirao() {
         let result = 'pending';
         let status = 'scheduled';
         
-        // ✅ FT 상태에서만 스코어 저장 - 중간 스코어 저장 방지
-        if (event.strStatus === 'Match Finished' || event.strStatus === 'FT') {
+        if (event.intHomeScore !== null && event.intAwayScore !== null) {
+          const homeScore = parseInt(event.intHomeScore);
+          const awayScore = parseInt(event.intAwayScore);
+          score = JSON.stringify([
+            { name: homeTeam, score: homeScore.toString() },
+            { name: awayTeam, score: awayScore.toString() }
+          ]);
           status = 'finished';
           
-          // 스코어가 있는 경우만 저장
-          if (event.intHomeScore !== null && event.intAwayScore !== null) {
-            const homeScore = parseInt(event.intHomeScore);
-            const awayScore = parseInt(event.intAwayScore);
-            score = JSON.stringify([
-              { name: homeTeam, score: homeScore.toString() },
-              { name: awayTeam, score: awayScore.toString() }
-            ]);
-            
-            // 결과 판정
-            if (homeScore > awayScore) {
-              result = 'home_win';
-            } else if (awayScore > homeScore) {
-              result = 'away_win';
-            } else {
-              result = 'draw';
-            }
+          // 결과 판정
+          if (homeScore > awayScore) {
+            result = 'home_win';
+          } else if (awayScore > homeScore) {
+            result = 'away_win';
+          } else {
+            result = 'draw';
           }
+        } else if (event.strStatus === 'Match Finished' || event.strStatus === 'FT') {
+          status = 'finished';
         } else if (event.strStatus === 'Postponed') {
           status = 'cancelled';
           result = 'cancelled';
         }
         
         // DB 저장/업데이트
-        // eventId로 기존 경기 찾기
-        const existingGame = await GameResult.findOne({
-          where: {
-            eventId: event.idEvent,
-            sportKey: 'soccer_brazil_campeonato'
-          }
+        const [gameResult, created] = await GameResult.upsert({
+          mainCategory: MAIN_CATEGORY,
+          subCategory: SUB_CATEGORY,
+          sportKey: 'soccer_brazil_campeonato', // 필수 필드 추가
+          homeTeam,
+          awayTeam,
+          commenceTime,
+          score,
+          result,
+          status,
+          eventId: event.idEvent,
+          lastUpdated: new Date()
+        }, {
+          conflictFields: ['eventId'] // eventId 기준으로 중복 체크
         });
         
-        if (existingGame) {
-          // 업데이트
-          await existingGame.update({
-            homeTeam,
-            awayTeam,
-            commenceTime,
-            score,
-            result,
-            status,
-            lastUpdated: new Date()
-          });
-          updateCount++;
-        } else {
-          // 새로 생성
-          await GameResult.create({
-            mainCategory: MAIN_CATEGORY,
-            subCategory: SUB_CATEGORY,
-            sportKey: 'soccer_brazil_campeonato',
-            sportTitle: 'Brasileirão',
-            homeTeam,
-            awayTeam,
-            commenceTime,
-            score,
-            result,
-            status,
-            eventId: event.idEvent,
-            lastUpdated: new Date()
-          });
+        if (created) {
           insertCount++;
+          console.log(`✅ 새 경기 추가: ${homeTeam} vs ${awayTeam} (${commenceTime.toISOString().split('T')[0]})`);
+        } else {
+          updateCount++;
+          console.log(`🔄 경기 업데이트: ${homeTeam} vs ${awayTeam} (${commenceTime.toISOString().split('T')[0]})`);
         }
         
       } catch (error) {

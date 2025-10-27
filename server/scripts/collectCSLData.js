@@ -120,8 +120,7 @@ async function collectCSLData() {
             needsUpdate = true;
           }
 
-          // ✅ FT 상태일 때만 스코어 업데이트 (중간 결과 저장 방지)
-          if (status === 'finished' && score && gameResult.score !== score) {
+          if (score && gameResult.score !== score) {
             updates.score = score;
             updates.result = result;
             needsUpdate = true;
