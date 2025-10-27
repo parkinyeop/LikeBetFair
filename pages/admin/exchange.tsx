@@ -708,19 +708,49 @@ export default function ExchangeAdmin() {
         const gameId = index + 1;
         const manualData = manualGameResults[gameId] || {};
         
+        // desc에서 팀명 추출 (예: "LG Twins vs Doosan Bears")
+        const teams = selection.desc?.split(' vs ') || [];
+        const homeTeam = teams[0] || selection.homeTeam || '';
+        const awayTeam = teams[1] || selection.awayTeam || '';
+
+        // 각 selection의 sport 정보 추출
+        const sportKey = selection.sport_key || selection.sportKey || 'basketball_kbl';
+        
+        // sportKey로부터 올바른 sportTitle 매핑
+        const sportTitleMap: { [key: string]: string } = {
+          'soccer_italy_serie_a': 'Serie A',
+          'soccer_korea_kleague1': 'K-League',
+          'soccer_japan_j_league': 'J-League',
+          'soccer_brazil_campeonato': 'Brasileirao',
+          'soccer_usa_mls': 'MLS',
+          'soccer_argentina_primera_division': 'Argentina Primera',
+          'soccer_china_superleague': 'Chinese Super League',
+          'soccer_spain_primera_division': 'La Liga',
+          'soccer_germany_bundesliga': 'Bundesliga',
+          'soccer_england_premier_league': 'English Premier League',
+          'baseball_kbo': 'KBO',
+          'baseball_mlb': 'MLB',
+          'basketball_nba': 'NBA',
+          'basketball_kbl': 'KBL',
+          'americanfootball_nfl': 'NFL'
+        };
+        
+        const sportTitle = selection.sport_title || selection.sportTitle || sportTitleMap[sportKey] || 'Manual Input';
+        const commenceTime = selection.commence_time || selection.commenceTime;
+        
         return {
           gameId: gameId,
-          homeTeam: selection.homeTeam,
-          awayTeam: selection.awayTeam,
+          homeTeam: homeTeam,
+          awayTeam: awayTeam,
           homeScore: parseInt(manualData.homeScore) || 0,
           awayScore: parseInt(manualData.awayScore) || 0,
           status: manualData.status || 'finished',
           result: manualData.result || null,
-          commenceTime: selection.commenceTime,
-          sportKey: selection.sportKey || selectedOrder.sportKey,
-          sportTitle: selection.sportTitle || selectedOrder.sportTitle,
-          mainCategory: 'soccer',
-          subCategory: selection.sportKey?.replace('soccer_', '').toUpperCase() || 'MANUAL_INPUT'
+          commenceTime: commenceTime,
+          sportKey: sportKey,
+          sportTitle: sportTitle,
+          mainCategory: sportKey.startsWith('basketball') ? 'basketball' : (sportKey.startsWith('baseball') ? 'baseball' : 'soccer'),
+          subCategory: sportKey.replace(/^(soccer_|basketball_|baseball_)/, '').toUpperCase() || 'MANUAL_INPUT'
         };
       }) || [];
 
