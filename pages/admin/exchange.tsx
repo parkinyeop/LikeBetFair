@@ -742,15 +742,22 @@ export default function ExchangeAdmin() {
         setShowManualInputModal(false);
         setManualGameResults({});
         
-        // 주문 상세 정보 새로고침 - handleOrderClick 대신 직접 API 호출
+        // 주문 상세 정보 새로고침 - matches 엔드포인트 사용
         try {
-          const orderResponse = await fetch(buildApiUrl('/api/admin') + `/exchange/orders/${selectedOrder.id}`, {
+          const orderResponse = await fetch(buildApiUrl('/api/admin') + `/exchange/orders/${selectedOrder.id}/matches`, {
             headers: getAuthHeaders()
           });
           
           if (orderResponse.ok) {
             const orderData = await orderResponse.json();
-            setSelectedOrder(orderData);
+            const orderWithMatches = {
+              ...selectedOrder,
+              matchedOrders: orderData.matchedOrders || [],
+              gameResults: orderData.gameResults || {},
+              gameResult: orderData.originalOrder?.gameResult || null,
+              refundInfo: orderData.refundInfo || []
+            };
+            setSelectedOrder(orderWithMatches);
           }
         } catch (refreshError) {
           console.error('주문 정보 새로고침 오류:', refreshError);
