@@ -153,6 +153,45 @@ router.post('/manual-odds', async (req, res) => {
       });
     }
 
+    // officialOdds 생성 (oddsController와 호환되는 형식)
+    const officialOdds = {};
+
+    // h2h (승/패)
+    if (odds.h2h) {
+      officialOdds.h2h = {
+        home: parseFloat(odds.h2h.home),
+        away: parseFloat(odds.h2h.away)
+      };
+      if (odds.h2h.draw) {
+        officialOdds.h2h.draw = parseFloat(odds.h2h.draw);
+      }
+    }
+
+    // spreads (핸디캡)
+    if (odds.spreads && odds.spreads.length > 0) {
+      officialOdds.spreads = {};
+      odds.spreads.forEach((spread, index) => {
+        const key = `spread_${index}`;
+        officialOdds.spreads[key] = {
+          point: parseFloat(spread.point),
+          odds: parseFloat(spread.price),
+          team: spread.team
+        };
+      });
+    }
+
+    // totals (오버/언더)
+    if (odds.totals && odds.totals.length > 0) {
+      officialOdds.totals = {};
+      odds.totals.forEach((total, index) => {
+        const key = total.name.toLowerCase(); // 'over' or 'under'
+        officialOdds.totals[key] = {
+          point: parseFloat(total.point),
+          odds: parseFloat(total.price)
+        };
+      });
+    }
+
     // mainCategory와 subCategory 자동 설정
     const categoryMap = {
       'basketball_kbl': { main: 'basketball', sub: 'kbl' },
@@ -178,6 +217,7 @@ router.post('/manual-odds', async (req, res) => {
         homeTeam: homeTeam,
         awayTeam: awayTeam,
         bookmakers: [bookmakerData],
+        officialOdds: officialOdds,  // 추가
         mainCategory: categories.main,
         subCategory: categories.sub,
         lastUpdated: new Date(),
@@ -189,6 +229,7 @@ router.post('/manual-odds', async (req, res) => {
     if (!created) {
       await oddsCache.update({
         bookmakers: [bookmakerData],
+        officialOdds: officialOdds,  // 추가
         lastUpdated: new Date()
       });
       console.log(`🔄 [Manual Odds] 기존 배당율 업데이트: ${eventId}`);
