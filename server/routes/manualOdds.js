@@ -153,7 +153,7 @@ router.post('/manual-odds', async (req, res) => {
       });
     }
 
-    // officialOdds 생성 (oddsController와 호환되는 형식)
+    // officialOdds 생성 (기존 OddsAPI 형식과 호환)
     const officialOdds = {};
 
     // h2h (승/패)
@@ -167,30 +167,37 @@ router.post('/manual-odds', async (req, res) => {
       }
     }
 
-    // spreads (핸디캡)
+    // spreads (핸디캡) - 기존 형식: "팀명 핸디캡"
     if (odds.spreads && odds.spreads.length > 0) {
       officialOdds.spreads = {};
-      odds.spreads.forEach((spread, index) => {
-        const key = `spread_${index}`;
+      odds.spreads.forEach((spread) => {
+        const point = parseFloat(spread.point);
+        const price = parseFloat(spread.price);
+        const key = `${spread.team} ${point > 0 ? '+' : ''}${point}`;
         officialOdds.spreads[key] = {
-          point: parseFloat(spread.point),
-          odds: parseFloat(spread.price),
-          team: spread.team
+          averagePrice: price,
+          point: point
         };
       });
     }
 
-    // totals (오버/언더)
+    // totals (오버/언더) - 기존 형식: "Over 144.5", "Under 144.5"
     if (odds.totals && odds.totals.length > 0) {
       officialOdds.totals = {};
-      odds.totals.forEach((total, index) => {
-        const key = total.name.toLowerCase(); // 'over' or 'under'
+      odds.totals.forEach((total) => {
+        const point = parseFloat(total.point);
+        const price = parseFloat(total.price);
+        const key = `${total.name} ${point}`;
         officialOdds.totals[key] = {
-          point: parseFloat(total.point),
-          odds: parseFloat(total.price)
+          averagePrice: price,
+          point: point
         };
       });
     }
+
+    // officialOdds 디버깅 로그
+    console.log(`📊 [Manual Odds] officialOdds 생성됨:`, JSON.stringify(officialOdds, null, 2));
+    console.log(`📊 [Manual Odds] bookmakerData:`, JSON.stringify(bookmakerData, null, 2));
 
     // mainCategory와 subCategory 자동 설정
     const categoryMap = {
