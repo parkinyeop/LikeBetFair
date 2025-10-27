@@ -171,13 +171,19 @@ export default function ManualOdds() {
         ];
       }
 
+      // KST 시간을 UTC로 변환
+      // datetime-local input은 'YYYY-MM-DDTHH:mm' 형식 (로컬 시간)
+      // KST는 UTC+9이므로 명시적으로 타임존 지정
+      const kstDateTime = gameInput.commenceTime + ':00+09:00'; // KST 타임존 명시
+      const utcTime = new Date(kstDateTime).toISOString();
+
       const payload = {
         sportKey: gameInput.sportKey,
         sportTitle: gameInput.sportTitle,
         eventId: eventId,
         homeTeam: gameInput.homeTeam,
         awayTeam: gameInput.awayTeam,
-        commenceTime: new Date(gameInput.commenceTime).toISOString(),
+        commenceTime: utcTime,
         odds: odds
       };
 
