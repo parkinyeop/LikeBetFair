@@ -332,172 +332,184 @@ export default function ManualOdds() {
         {/* 승/패 배당율 입력 */}
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4 border-b pb-2">승/패 배당율 (필수)</h2>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  홈팀 승리 배당율 *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="1.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  value={gameInput.h2hHomeOdds}
-                  onChange={(e) => setGameInput({ ...gameInput, h2hHomeOdds: e.target.value })}
-                  placeholder="예: 1.95"
-                />
+          {!gameInput.homeTeam || !gameInput.awayTeam ? (
+            <p className="text-gray-500 text-sm">먼저 홈팀과 어웨이팀을 선택해주세요.</p>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {gameInput.homeTeam} 승리 *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1.01"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    value={gameInput.h2hHomeOdds}
+                    onChange={(e) => setGameInput({ ...gameInput, h2hHomeOdds: e.target.value })}
+                    placeholder="예: 1.95"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {gameInput.awayTeam} 승리 *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1.01"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    value={gameInput.h2hAwayOdds}
+                    onChange={(e) => setGameInput({ ...gameInput, h2hAwayOdds: e.target.value })}
+                    placeholder="예: 2.10"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  어웨이팀 승리 배당율 *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="1.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  value={gameInput.h2hAwayOdds}
-                  onChange={(e) => setGameInput({ ...gameInput, h2hAwayOdds: e.target.value })}
-                  placeholder="예: 2.10"
-                />
-              </div>
-            </div>
 
-            {selectedLeague.hasDrawOdds && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  무승부 배당율 *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="1.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  value={gameInput.h2hDrawOdds}
-                  onChange={(e) => setGameInput({ ...gameInput, h2hDrawOdds: e.target.value })}
-                  placeholder="예: 3.50"
-                />
-              </div>
-            )}
-          </div>
+              {selectedLeague.hasDrawOdds && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    무승부 배당율 *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1.01"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    value={gameInput.h2hDrawOdds}
+                    onChange={(e) => setGameInput({ ...gameInput, h2hDrawOdds: e.target.value })}
+                    placeholder="예: 3.50"
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 핸디캡 배당율 입력 */}
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4 border-b pb-2">핸디캡 배당율 (선택)</h2>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  홈팀 핸디캡
-                </label>
-                <input
-                  type="number"
-                  step="0.5"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  value={gameInput.spreadHomePoint}
-                  onChange={(e) => setGameInput({ ...gameInput, spreadHomePoint: e.target.value })}
-                  placeholder="예: -5.5"
-                />
+          {!gameInput.homeTeam || !gameInput.awayTeam ? (
+            <p className="text-gray-500 text-sm">먼저 홈팀과 어웨이팀을 선택해주세요.</p>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    {gameInput.homeTeam} 핸디캡
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    value={gameInput.spreadHomePoint}
+                    onChange={(e) => setGameInput({ ...gameInput, spreadHomePoint: e.target.value })}
+                    placeholder="예: -5.5"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    핸디캡 배당율
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1.01"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    value={gameInput.spreadHomeOdds}
+                    onChange={(e) => setGameInput({ ...gameInput, spreadHomeOdds: e.target.value })}
+                    placeholder="예: 1.90"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  홈팀 핸디캡 배당율
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="1.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  value={gameInput.spreadHomeOdds}
-                  onChange={(e) => setGameInput({ ...gameInput, spreadHomeOdds: e.target.value })}
-                  placeholder="예: 1.90"
-                />
-              </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  어웨이팀 핸디캡
-                </label>
-                <input
-                  type="number"
-                  step="0.5"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  value={gameInput.spreadAwayPoint}
-                  onChange={(e) => setGameInput({ ...gameInput, spreadAwayPoint: e.target.value })}
-                  placeholder="예: +5.5"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  어웨이팀 핸디캡 배당율
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="1.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  value={gameInput.spreadAwayOdds}
-                  onChange={(e) => setGameInput({ ...gameInput, spreadAwayOdds: e.target.value })}
-                  placeholder="예: 1.90"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    {gameInput.awayTeam} 핸디캡
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    value={gameInput.spreadAwayPoint}
+                    onChange={(e) => setGameInput({ ...gameInput, spreadAwayPoint: e.target.value })}
+                    placeholder="예: +5.5"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    핸디캡 배당율
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1.01"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    value={gameInput.spreadAwayOdds}
+                    onChange={(e) => setGameInput({ ...gameInput, spreadAwayOdds: e.target.value })}
+                    placeholder="예: 1.90"
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* 오버/언더 배당율 입력 */}
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4 border-b pb-2">오버/언더 배당율 (선택)</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                기준점
-              </label>
-              <input
-                type="number"
-                step="0.5"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                value={gameInput.totalPoint}
-                onChange={(e) => setGameInput({ ...gameInput, totalPoint: e.target.value })}
-                placeholder="예: 165.5"
-              />
-            </div>
+          {!gameInput.homeTeam || !gameInput.awayTeam ? (
+            <p className="text-gray-500 text-sm">먼저 홈팀과 어웨이팀을 선택해주세요.</p>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  기준점 (총점)
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  value={gameInput.totalPoint}
+                  onChange={(e) => setGameInput({ ...gameInput, totalPoint: e.target.value })}
+                  placeholder="예: 165.5"
+                />
+              </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  오버 배당율
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="1.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  value={gameInput.totalOverOdds}
-                  onChange={(e) => setGameInput({ ...gameInput, totalOverOdds: e.target.value })}
-                  placeholder="예: 1.95"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  언더 배당율
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="1.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  value={gameInput.totalUnderOdds}
-                  onChange={(e) => setGameInput({ ...gameInput, totalUnderOdds: e.target.value })}
-                  placeholder="예: 1.95"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    오버 배당율
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1.01"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    value={gameInput.totalOverOdds}
+                    onChange={(e) => setGameInput({ ...gameInput, totalOverOdds: e.target.value })}
+                    placeholder="예: 1.95"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    언더 배당율
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1.01"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    value={gameInput.totalUnderOdds}
+                    onChange={(e) => setGameInput({ ...gameInput, totalUnderOdds: e.target.value })}
+                    placeholder="예: 1.95"
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* 저장 버튼 */}
