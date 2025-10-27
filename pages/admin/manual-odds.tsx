@@ -5,33 +5,24 @@ import { toast } from 'react-hot-toast';
 import { buildApiUrl } from '../../config/apiConfig';
 import Header from '../../components/Header';
 
-interface Game {
-  eventId: string;
+interface ManualGameInput {
+  sportKey: string;
+  sportTitle: string;
   homeTeam: string;
   awayTeam: string;
   commenceTime: string;
-  status: string;
-  score?: any;
-  hasOdds?: boolean;
-  existingOdds?: any;
-}
-
-interface OddsInput {
-  h2h: {
-    home: string;
-    away: string;
-    draw?: string;
-  };
-  spreads?: {
-    team: string;
-    point: string;
-    price: string;
-  }[];
-  totals?: {
-    name: string;
-    point: string;
-    price: string;
-  }[];
+  h2hHomeOdds: string;
+  h2hAwayOdds: string;
+  h2hDrawOdds: string;
+  // 핸디캡
+  spreadHomePoint: string;
+  spreadHomeOdds: string;
+  spreadAwayPoint: string;
+  spreadAwayOdds: string;
+  // 오버/언더
+  totalPoint: string;
+  totalOverOdds: string;
+  totalUnderOdds: string;
 }
 
 const LEAGUES = [
@@ -42,15 +33,25 @@ export default function ManualOdds() {
   const { isLoggedIn, isAdmin, adminLevel } = useAuth();
   const router = useRouter();
   const [selectedLeague, setSelectedLeague] = useState(LEAGUES[0]);
-  const [games, setGames] = useState<Game[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedGame, setSelectedGame] = useState<Game | null>(null);
-  const [oddsInput, setOddsInput] = useState<OddsInput>({
-    h2h: { home: '', away: '', draw: '' },
-    spreads: [],
-    totals: []
-  });
   const [saving, setSaving] = useState(false);
+
+  const [gameInput, setGameInput] = useState<ManualGameInput>({
+    sportKey: 'basketball_kbl',
+    sportTitle: 'KBL',
+    homeTeam: '',
+    awayTeam: '',
+    commenceTime: '',
+    h2hHomeOdds: '',
+    h2hAwayOdds: '',
+    h2hDrawOdds: '',
+    spreadHomePoint: '',
+    spreadHomeOdds: '',
+    spreadAwayPoint: '',
+    spreadAwayOdds: '',
+    totalPoint: '',
+    totalOverOdds: '',
+    totalUnderOdds: '',
+  });
 
   // 권한 체크
   useEffect(() => {
@@ -66,97 +67,35 @@ export default function ManualOdds() {
     }
   }, [isLoggedIn, isAdmin, adminLevel, router]);
 
-  // 경기 목록 불러오기
-  const fetchGames = async () => {
-    setLoading(true);
-    try {
-      const tabId = sessionStorage.getItem('tabId');
-      const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
-
-      if (!token) {
-        toast.error('로그인 토큰이 없습니다.');
-        return;
-      }
-
-      const response = await fetch(
-        buildApiUrl(`/api/admin/manual-odds/games/${selectedLeague.key}?days=7`),
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setGames(data.games || []);
-        toast.success(`${data.totalGames}개 경기를 불러왔습니다.`);
-      } else {
-        const error = await response.json();
-        toast.error(error.message || '경기 목록을 불러올 수 없습니다.');
-      }
-    } catch (error) {
-      console.error('경기 목록 불러오기 오류:', error);
-      toast.error('서버 오류가 발생했습니다.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 리그 변경 시 경기 목록 다시 불러오기
+  // 리그 변경 시 sportKey, sportTitle 업데이트
   useEffect(() => {
-    if (isLoggedIn && isAdmin && adminLevel >= 2) {
-      fetchGames();
-    }
+    setGameInput(prev => ({
+      ...prev,
+      sportKey: selectedLeague.key,
+      sportTitle: selectedLeague.title
+    }));
   }, [selectedLeague]);
-
-  // 경기 선택
-  const handleSelectGame = (game: Game) => {
-    setSelectedGame(game);
-
-    // 기존 배당율이 있으면 불러오기
-    if (game.existingOdds && game.existingOdds.length > 0) {
-      const bookmaker = game.existingOdds[0];
-      const h2hMarket = bookmaker.markets?.find((m: any) => m.key === 'h2h');
-
-      if (h2hMarket) {
-        const homeOutcome = h2hMarket.outcomes.find((o: any) => o.name === game.homeTeam);
-        const awayOutcome = h2hMarket.outcomes.find((o: any) => o.name === game.awayTeam);
-        const drawOutcome = h2hMarket.outcomes.find((o: any) => o.name === 'Draw');
-
-        setOddsInput({
-          h2h: {
-            home: homeOutcome?.price?.toString() || '',
-            away: awayOutcome?.price?.toString() || '',
-            draw: drawOutcome?.price?.toString() || ''
-          },
-          spreads: [],
-          totals: []
-        });
-      }
-    } else {
-      // 기본값으로 초기화
-      setOddsInput({
-        h2h: { home: '', away: '', draw: '' },
-        spreads: [],
-        totals: []
-      });
-    }
-  };
 
   // 배당율 저장
   const handleSaveOdds = async () => {
-    if (!selectedGame) return;
-
-    // 유효성 검증
-    if (!oddsInput.h2h.home || !oddsInput.h2h.away) {
-      toast.error('홈/어웨이 배당율은 필수입니다.');
+    // 유효성 검사
+    if (!gameInput.homeTeam || !gameInput.awayTeam) {
+      toast.error('홈팀과 어웨이팀을 입력해주세요.');
       return;
     }
 
-    if (selectedLeague.hasDrawOdds && !oddsInput.h2h.draw) {
-      toast.error('무승부 배당율은 필수입니다.');
+    if (!gameInput.commenceTime) {
+      toast.error('경기 시간을 선택해주세요.');
+      return;
+    }
+
+    if (!gameInput.h2hHomeOdds || !gameInput.h2hAwayOdds) {
+      toast.error('승/패 배당율을 입력해주세요.');
+      return;
+    }
+
+    if (selectedLeague.hasDrawOdds && !gameInput.h2hDrawOdds) {
+      toast.error('무승부 배당율을 입력해주세요.');
       return;
     }
 
@@ -170,20 +109,62 @@ export default function ManualOdds() {
         return;
       }
 
-      const requestBody = {
-        sportKey: selectedLeague.key,
-        sportTitle: selectedLeague.title,
-        eventId: selectedGame.eventId,
-        homeTeam: selectedGame.homeTeam,
-        awayTeam: selectedGame.awayTeam,
-        commenceTime: selectedGame.commenceTime,
-        odds: {
-          h2h: {
-            home: oddsInput.h2h.home,
-            away: oddsInput.h2h.away,
-            ...(selectedLeague.hasDrawOdds && { draw: oddsInput.h2h.draw })
-          }
+      // eventId 생성 (고유 ID)
+      const eventId = `manual_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // 배당율 데이터 구조 생성
+      const odds: any = {
+        h2h: {
+          home: parseFloat(gameInput.h2hHomeOdds),
+          away: parseFloat(gameInput.h2hAwayOdds),
         }
+      };
+
+      if (selectedLeague.hasDrawOdds && gameInput.h2hDrawOdds) {
+        odds.h2h.draw = parseFloat(gameInput.h2hDrawOdds);
+      }
+
+      // 핸디캡 데이터 추가
+      if (gameInput.spreadHomePoint && gameInput.spreadHomeOdds &&
+          gameInput.spreadAwayPoint && gameInput.spreadAwayOdds) {
+        odds.spreads = [
+          {
+            team: gameInput.homeTeam,
+            point: parseFloat(gameInput.spreadHomePoint),
+            price: parseFloat(gameInput.spreadHomeOdds)
+          },
+          {
+            team: gameInput.awayTeam,
+            point: parseFloat(gameInput.spreadAwayPoint),
+            price: parseFloat(gameInput.spreadAwayOdds)
+          }
+        ];
+      }
+
+      // 오버/언더 데이터 추가
+      if (gameInput.totalPoint && gameInput.totalOverOdds && gameInput.totalUnderOdds) {
+        odds.totals = [
+          {
+            name: 'Over',
+            point: parseFloat(gameInput.totalPoint),
+            price: parseFloat(gameInput.totalOverOdds)
+          },
+          {
+            name: 'Under',
+            point: parseFloat(gameInput.totalPoint),
+            price: parseFloat(gameInput.totalUnderOdds)
+          }
+        ];
+      }
+
+      const payload = {
+        sportKey: gameInput.sportKey,
+        sportTitle: gameInput.sportTitle,
+        eventId: eventId,
+        homeTeam: gameInput.homeTeam,
+        awayTeam: gameInput.awayTeam,
+        commenceTime: new Date(gameInput.commenceTime).toISOString(),
+        odds: odds
       };
 
       const response = await fetch(
@@ -194,15 +175,31 @@ export default function ManualOdds() {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(requestBody)
+          body: JSON.stringify(payload)
         }
       );
 
       if (response.ok) {
         const data = await response.json();
         toast.success(data.message);
-        setSelectedGame(null);
-        fetchGames(); // 목록 새로고침
+        // 입력 폼 초기화
+        setGameInput({
+          sportKey: selectedLeague.key,
+          sportTitle: selectedLeague.title,
+          homeTeam: '',
+          awayTeam: '',
+          commenceTime: '',
+          h2hHomeOdds: '',
+          h2hAwayOdds: '',
+          h2hDrawOdds: '',
+          spreadHomePoint: '',
+          spreadHomeOdds: '',
+          spreadAwayPoint: '',
+          spreadAwayOdds: '',
+          totalPoint: '',
+          totalOverOdds: '',
+          totalUnderOdds: '',
+        });
       } else {
         const error = await response.json();
         toast.error(error.message || '저장 중 오류가 발생했습니다.');
@@ -215,54 +212,17 @@ export default function ManualOdds() {
     }
   };
 
-  // 배당율 삭제
-  const handleDeleteOdds = async (eventId: string) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return;
-
-    try {
-      const tabId = sessionStorage.getItem('tabId');
-      const token = tabId ? sessionStorage.getItem(`token_${tabId}`) : null;
-
-      if (!token) {
-        toast.error('로그인 토큰이 없습니다.');
-        return;
-      }
-
-      const response = await fetch(
-        buildApiUrl(`/api/admin/manual-odds/${eventId}`),
-        {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (response.ok) {
-        toast.success('배당율이 삭제되었습니다.');
-        fetchGames(); // 목록 새로고침
-      } else {
-        const error = await response.json();
-        toast.error(error.message || '삭제 중 오류가 발생했습니다.');
-      }
-    } catch (error) {
-      console.error('배당율 삭제 오류:', error);
-      toast.error('서버 오류가 발생했습니다.');
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto px-4 py-8">
         {/* 헤더 */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">수동 배당율 입력</h1>
-              <p className="text-gray-600 mt-2">OddsAPI가 제공하지 않는 리그의 배당율을 수동으로 설정합니다</p>
+              <p className="text-gray-600 mt-2">미래 경기의 배당율을 수동으로 설정합니다</p>
             </div>
             <button
               onClick={() => router.push('/admin')}
@@ -294,170 +254,232 @@ export default function ManualOdds() {
           </div>
         </div>
 
-        {/* 경기 목록 */}
+        {/* 경기 정보 입력 */}
         <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">
-              {selectedLeague.title} 경기 목록 ({games.length}개)
-            </h2>
-            <button
-              onClick={fetchGames}
-              disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50"
-            >
-              {loading ? '불러오는 중...' : '새로고침'}
-            </button>
-          </div>
-
-          {loading ? (
-            <div className="text-center py-8 text-gray-500">경기 목록을 불러오는 중...</div>
-          ) : games.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">경기가 없습니다.</div>
-          ) : (
-            <div className="space-y-3">
-              {games.map((game) => (
-                <div
-                  key={game.eventId}
-                  className={`border rounded-lg p-4 hover:shadow-md transition-shadow ${
-                    game.hasOdds ? 'border-green-300 bg-green-50' : 'border-gray-200'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="font-semibold text-lg">
-                        {game.homeTeam} vs {game.awayTeam}
-                      </div>
-                      <div className="text-sm text-gray-600 mt-1">
-                        {new Date(game.commenceTime).toLocaleString('ko-KR')}
-                      </div>
-                      {game.hasOdds && (
-                        <div className="text-xs text-green-600 mt-1">
-                          ✓ 배당율 입력됨
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleSelectGame(game)}
-                        className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 transition-colors"
-                      >
-                        {game.hasOdds ? '수정' : '입력'}
-                      </button>
-                      {game.hasOdds && (
-                        <button
-                          onClick={() => handleDeleteOdds(game.eventId)}
-                          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-                        >
-                          삭제
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
+          <h2 className="text-xl font-semibold mb-4 border-b pb-2">경기 정보</h2>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  홈팀 *
+                </label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  value={gameInput.homeTeam}
+                  onChange={(e) => setGameInput({ ...gameInput, homeTeam: e.target.value })}
+                  placeholder="예: 서울 SK"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  어웨이팀 *
+                </label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  value={gameInput.awayTeam}
+                  onChange={(e) => setGameInput({ ...gameInput, awayTeam: e.target.value })}
+                  placeholder="예: 부산 KT"
+                />
+              </div>
             </div>
-          )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                경기 시간 *
+              </label>
+              <input
+                type="datetime-local"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                value={gameInput.commenceTime}
+                onChange={(e) => setGameInput({ ...gameInput, commenceTime: e.target.value })}
+              />
+            </div>
+          </div>
         </div>
 
-        {/* 배당율 입력 모달 */}
-        {selectedGame && (
-          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-            <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
-              <div className="mt-3">
-                {/* 모달 헤더 */}
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-medium text-gray-900">
-                    배당율 입력: {selectedGame.homeTeam} vs {selectedGame.awayTeam}
-                  </h3>
-                  <button
-                    onClick={() => setSelectedGame(null)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                  </button>
-                </div>
+        {/* 승/패 배당율 입력 */}
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4 border-b pb-2">승/패 배당율 (필수)</h2>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  홈팀 승리 배당율 *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="1.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  value={gameInput.h2hHomeOdds}
+                  onChange={(e) => setGameInput({ ...gameInput, h2hHomeOdds: e.target.value })}
+                  placeholder="예: 1.95"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  어웨이팀 승리 배당율 *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="1.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  value={gameInput.h2hAwayOdds}
+                  onChange={(e) => setGameInput({ ...gameInput, h2hAwayOdds: e.target.value })}
+                  placeholder="예: 2.10"
+                />
+              </div>
+            </div>
 
-                {/* 승/패 배당율 입력 */}
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {selectedGame.homeTeam} 승리 배당율
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="1.01"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                      value={oddsInput.h2h.home}
-                      onChange={(e) => setOddsInput({
-                        ...oddsInput,
-                        h2h: { ...oddsInput.h2h, home: e.target.value }
-                      })}
-                      placeholder="예: 1.95"
-                    />
-                  </div>
+            {selectedLeague.hasDrawOdds && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  무승부 배당율 *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="1.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  value={gameInput.h2hDrawOdds}
+                  onChange={(e) => setGameInput({ ...gameInput, h2hDrawOdds: e.target.value })}
+                  placeholder="예: 3.50"
+                />
+              </div>
+            )}
+          </div>
+        </div>
 
-                  {selectedLeague.hasDrawOdds && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        무승부 배당율
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="1.01"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                        value={oddsInput.h2h.draw}
-                        onChange={(e) => setOddsInput({
-                          ...oddsInput,
-                          h2h: { ...oddsInput.h2h, draw: e.target.value }
-                        })}
-                        placeholder="예: 3.50"
-                      />
-                    </div>
-                  )}
+        {/* 핸디캡 배당율 입력 */}
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4 border-b pb-2">핸디캡 배당율 (선택)</h2>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  홈팀 핸디캡
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  value={gameInput.spreadHomePoint}
+                  onChange={(e) => setGameInput({ ...gameInput, spreadHomePoint: e.target.value })}
+                  placeholder="예: -5.5"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  홈팀 핸디캡 배당율
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="1.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  value={gameInput.spreadHomeOdds}
+                  onChange={(e) => setGameInput({ ...gameInput, spreadHomeOdds: e.target.value })}
+                  placeholder="예: 1.90"
+                />
+              </div>
+            </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {selectedGame.awayTeam} 승리 배당율
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="1.01"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                      value={oddsInput.h2h.away}
-                      onChange={(e) => setOddsInput({
-                        ...oddsInput,
-                        h2h: { ...oddsInput.h2h, away: e.target.value }
-                      })}
-                      placeholder="예: 2.10"
-                    />
-                  </div>
-                </div>
-
-                {/* 액션 버튼 */}
-                <div className="flex justify-end space-x-3 mt-6">
-                  <button
-                    onClick={() => setSelectedGame(null)}
-                    className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
-                  >
-                    취소
-                  </button>
-                  <button
-                    onClick={handleSaveOdds}
-                    disabled={saving}
-                    className="px-4 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 transition-colors disabled:opacity-50"
-                  >
-                    {saving ? '저장 중...' : '저장'}
-                  </button>
-                </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  어웨이팀 핸디캡
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  value={gameInput.spreadAwayPoint}
+                  onChange={(e) => setGameInput({ ...gameInput, spreadAwayPoint: e.target.value })}
+                  placeholder="예: +5.5"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  어웨이팀 핸디캡 배당율
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="1.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  value={gameInput.spreadAwayOdds}
+                  onChange={(e) => setGameInput({ ...gameInput, spreadAwayOdds: e.target.value })}
+                  placeholder="예: 1.90"
+                />
               </div>
             </div>
           </div>
-        )}
+        </div>
+
+        {/* 오버/언더 배당율 입력 */}
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4 border-b pb-2">오버/언더 배당율 (선택)</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                기준점
+              </label>
+              <input
+                type="number"
+                step="0.5"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                value={gameInput.totalPoint}
+                onChange={(e) => setGameInput({ ...gameInput, totalPoint: e.target.value })}
+                placeholder="예: 165.5"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  오버 배당율
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="1.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  value={gameInput.totalOverOdds}
+                  onChange={(e) => setGameInput({ ...gameInput, totalOverOdds: e.target.value })}
+                  placeholder="예: 1.95"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  언더 배당율
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="1.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  value={gameInput.totalUnderOdds}
+                  onChange={(e) => setGameInput({ ...gameInput, totalUnderOdds: e.target.value })}
+                  placeholder="예: 1.95"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 저장 버튼 */}
+        <div className="flex justify-end">
+          <button
+            onClick={handleSaveOdds}
+            disabled={saving}
+            className="px-6 py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg font-semibold"
+          >
+            {saving ? '저장 중...' : '배당율 저장'}
+          </button>
+        </div>
       </div>
     </div>
   );
