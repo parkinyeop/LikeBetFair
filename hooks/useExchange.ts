@@ -61,9 +61,6 @@ export interface SelectedBet {
   homeTeam?: string; // 추가
   awayTeam?: string; // 추가
   commenceTime?: string; // 추가
-  potentialProfit?: number; // 예상 수익
-  isMultibet?: boolean; // 멀티배팅 여부
-  totalOdds?: number; // 총 배당률
 }
 
 export const useExchange = () => {

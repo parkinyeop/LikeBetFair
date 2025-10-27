@@ -1410,32 +1410,17 @@ function OrderHistoryPanel() {
                         {(order as any).isMultibet && (order as any).multibetGameResults && (order as any).multibetGameResults.length > 0 ? (
                           <div className="mb-3">
                             <div className="space-y-2">
-                              {(() => {
-                                // ✅ 중복 제거: 같은 팀 조합의 경기는 한 번만 표시
-                                const uniqueGames = new Map();
-                                (order as any).multibetGameResults.forEach((gameResult: any, idx: number) => {
-                                  if (!gameResult || !gameResult.homeTeam || !gameResult.awayTeam) return;
-                                  
-                                  const key = `${gameResult.homeTeam}_${gameResult.awayTeam}`;
-                                  if (!uniqueGames.has(key)) {
-                                    uniqueGames.set(key, { ...gameResult, originalIdx: idx });
-                                  }
-                                });
+                              {(order as any).multibetGameResults.map((gameResult: any, idx: number) => {
+                                const isPending = gameResult.status === 'scheduled' || !gameResult.score;
                                 
-                                return Array.from(uniqueGames.values()).map((gameResult: any) => {
-                                  const isPending = gameResult.status === 'scheduled' || !gameResult.score;
-                                  
-                                  // 🆕 경기별 승패 판정
-                                  const gameWon = gameResult.result === 'won';
-                                  const gameLost = gameResult.result === 'lost';
-                                  
-                                  if (isPending) return null;
-                                  
-                                  // 고유 키 생성
-                                  const uniqueKey = `${gameResult.homeTeam}_${gameResult.awayTeam}_${gameResult.originalIdx}`;
-                                  
-                                  return (
-                                  <div key={uniqueKey} className="border-l-2 border-gray-200 pl-3 py-1">
+                                // 🆕 경기별 승패 판정
+                                const gameWon = gameResult.result === 'won';
+                                const gameLost = gameResult.result === 'lost';
+                                
+                                if (isPending) return null;
+                                
+                                return (
+                                  <div key={idx} className="border-l-2 border-gray-200 pl-3 py-1">
                                     {(gameWon || gameLost) && (
                                       <div className="flex items-center text-sm mb-1">
                                         {/* 승패 아이콘 */}
@@ -1465,9 +1450,8 @@ function OrderHistoryPanel() {
                                       );
                                     })()}
                                   </div>
-                                  );
-                                });
-                              })()}
+                                );
+                              })}
                             </div>
                           </div>
                         ) :
