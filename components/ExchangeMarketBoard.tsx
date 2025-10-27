@@ -27,6 +27,19 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
   
   // 🆕 Exchange 환수율 설정
   const [oddsReturnRateSettings, setOddsReturnRateSettings] = useState({ returnRate: 0.99, enabled: true });
+  
+  // 🆕 실시간 베팅 금지 상태를 위한 현재 시간 state (페이지 새로고침 없이 주기적 업데이트)
+  const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // 🆕 현재 시간을 주기적으로 업데이트 - React Hook 패턴 (AJAX 방식 적용)
+  useEffect(() => {
+    // 10초마다 현재 시간을 업데이트
+    const timeInterval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 10000);
+    
+    return () => clearInterval(timeInterval);
+  }, []);
 
   // 🆕 Exchange 환수율 설정 로드
   useEffect(() => {
@@ -110,13 +123,14 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
   });
   
   // 베팅 마감 시간 체크 함수 (스포츠북 규칙) - 먼저 선언
+  // 🆕 React State를 사용하여 실시간 시간 업데이트 적용 (페이지 새로고침 불필요)
   const isBettingOpen = (commenceTime: string): boolean => {
-    const now = new Date();
+    const now = currentTime; // 🆕 업데이트된 시간 state 사용
     // 🚨 수정: 하드코딩된 KST 변환 제거
     // 브라우저의 로컬 시간대 설정을 사용하여 자동 변환
     const utcDate = new Date(commenceTime);
     const gameTime = utcDate;
-    const cutoffTime = new Date(gameTime.getTime() - 5 * 60 * 1000); // 5분 전 마감
+    const cutoffTime = new Date(gameTime.getTime() - 10 * 60 * 1000); // 10분 전 마감
     return now < cutoffTime;
   };
 
@@ -677,13 +691,13 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
 
                           const pointValue = parseFloat(absPoint);
                           // ✅ 수정: groupHandicapsByPoint()에서 계산된 실제 핸디캡 값 사용
-                          const homeHandicap = homeData.handicap;  // 실제 핸디캡 값 (부호 포함)
-                          const awayHandicap = awayData.handicap;  // 실제 핸디캡 값 (부호 포함)
+                          const homeHandicap = homeData?.handicap ?? -pointValue;  // 실제 핸디캡 값 (부호 포함)
+                          const awayHandicap = awayData?.handicap ?? pointValue;  // 실제 핸디캡 값 (부호 포함)
                           
 
                           return (
                             <div key={absPoint} className="flex items-center gap-2">
-                              {homeOdds != null && (
+                              {homeOdds != null && adjustedHomeOdds != null && adjustedHomeOdds !== undefined && (
                                 <button
                                   onClick={() => handleBetClick(game, `${game.homeTeam} ${formatHandicap(homeHandicap)}`, adjustedHomeOdds, 'back', '핸디캡')}
                                   disabled={!isOpen}
@@ -700,7 +714,7 @@ export default function ExchangeMarketBoard({ selectedCategory = "NBA", onSideba
                               <div className="w-12 text-sm font-medium text-blue-400 text-center">
                                 {homeHandicap != null ? formatHandicap(homeHandicap) : `-${pointValue}`}
                               </div>
-                              {awayOdds != null && (
+                              {awayOdds != null && adjustedAwayOdds != null && adjustedAwayOdds !== undefined && (
                                 <button
                                   onClick={() => handleBetClick(game, `${game.awayTeam} ${formatHandicap(awayHandicap)}`, adjustedAwayOdds, 'back', '핸디캡')}
                                   disabled={!isOpen}

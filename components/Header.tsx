@@ -19,6 +19,23 @@ export default function Header() {
   const [siteDescription, setSiteDescription] = useState("스포츠 베팅 플랫폼"); // 기본값
   const { isLoggedIn, username, logout, isAdmin, adminLevel, balance, forceRefreshBalance } = useAuth();
 
+  // 🆕 잔액 자동 갱신 (10초마다)
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    
+    console.log('[Header] 잔액 자동 갱신 시작');
+    
+    const balanceInterval = setInterval(() => {
+      console.log('[Header] 잔액 자동 갱신 실행');
+      forceRefreshBalance();
+    }, 10000); // 10초마다 갱신
+    
+    return () => {
+      console.log('[Header] 잔액 자동 갱신 해제');
+      clearInterval(balanceInterval);
+    };
+  }, [isLoggedIn, forceRefreshBalance]);
+
   // 현재 경로에 따라 카테고리 설정
   useEffect(() => {
     const path = router.asPath;

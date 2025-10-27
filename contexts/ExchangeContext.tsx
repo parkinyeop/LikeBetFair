@@ -12,6 +12,11 @@ export interface SelectedBet {
   homeTeam?: string;
   awayTeam?: string;
   commenceTime?: string;
+  // 🆕 MatchTargetOrder와 호환성 위한 필드들 추가
+  isMultibet?: boolean;
+  selectionDetails?: any[] | { selections: any[]; description?: string; multibetType?: string };
+  potentialProfit?: number;
+  totalOdds?: number;
 }
 
 export interface MatchTargetOrder {
