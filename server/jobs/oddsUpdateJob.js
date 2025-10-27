@@ -151,7 +151,9 @@ function cleanupLogFiles() {
 // 로그 저장 함수 (최적화됨 + 타입별 분리)
 function saveUpdateLog(type, status, data = {}) {
   const now = new Date();
-  const dateStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
+  // ✅ 로컬 시간대(한국 시간) 기준으로 날짜 생성 (UTC → KST 변환)
+  const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
+  const dateStr = kstDate.toISOString().slice(0, 10); // YYYY-MM-DD
   
   // 타입별 로그 파일 분리
   let logFileName;

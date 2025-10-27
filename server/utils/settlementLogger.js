@@ -14,7 +14,9 @@ class SettlementLogger {
   // ✅ 데일리 로그 파일명 생성
   getLogFilePath() {
     const now = new Date();
-    const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    // ✅ 로컬 시간대(한국 시간) 기준으로 날짜 생성 (UTC → KST 변환)
+    const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
+    const dateStr = kstDate.toISOString().split('T')[0]; // YYYY-MM-DD
     return path.join(this.logDir, `settlement-${dateStr}.log`);
   }
 
