@@ -137,25 +137,11 @@ class MultibetSettlementService {
         return { message: 'Unmatched order cancelled', orderId: order.id };
       }
 
-      // 🔧 settled 상태여도 미정산 매칭이 있으면 정산 진행
-      if (order.status === 'settled') {
-        // 미정산 매칭이 있는지 확인
-        const activeMatches = await ExchangeOrderMatch.findAll({
-          where: {
-            [Op.or]: [
-              { originalOrderId: order.id },
-              { matchingOrderId: order.id }
-            ],
-            status: 'active',
-            settledAt: null
-          },
-          transaction
-        });
-
-        if (activeMatches.length === 0) {
-          await transaction.commit();
-          return { message: 'Already settled', orderId: order.id };
-        }
+      // 🔧 settled 상태이고 settledAt이 설정된 주문은 재정산하지 않음
+      if (order.status === 'settled' && order.settledAt) {
+        console.log(`⏭️  주문 ${order.id}: 이미 정산 완료 (settled + settledAt 설정) - 정산 건너뜀`);
+        await transaction.commit();
+        return { message: 'Already settled', orderId: order.id };
       }
 
       // 2단계: selectionDetails 결정
@@ -852,9 +838,12 @@ class MultibetSettlementService {
     
     // 정산 결과에 따른 결제 처리
     await this.processPayment(order, finalResult, settlementResult, transaction);
-    
-    // ✅ 제로썸 정산: 레이 주문 정산 시 매칭된 백 주문들을 함께 정산
-    await this.settleMatchedBackOrders(order, finalResult, transaction);
+
+    // ✅ 제로썸 정산: 레이 주문 정산 시에만 매칭된 백 주문들을 함께 정산 (중복 방지)
+    // Back 주문은 자체 정산에서 이미 Pot을 받았으므로 settleMatchedBackOrders 불필요
+    if (order.side === 'lay') {
+      await this.settleMatchedBackOrders(order, finalResult, transaction);
+    }
     
     // ✅ 부분 매칭 환불 처리
     if (order.partiallyFilled && order.remainingAmount > 0) {
@@ -1480,34 +1469,10 @@ class MultibetSettlementService {
         limit: 50
       });
 
-      // 2단계: settled 상태지만 미정산 매칭이 있는 레이 주문 추가
-      const settledLaysWithActiveMatches = await sequelize.query(`
-        SELECT DISTINCT eo.id
-        FROM "ExchangeOrders" eo
-        INNER JOIN "ExchangeOrderMatches" eom ON (eom."originalOrderId" = eo.id OR eom."matchingOrderId" = eo.id)
-        WHERE eo."isMultibet" = true
-          AND eo.side = 'lay'
-          AND eo.status = 'settled'
-          AND eo."settledAt" IS NOT NULL
-          AND eom.status = 'active'
-          AND eom."settledAt" IS NULL
-        LIMIT 50
-      `, {
-        type: sequelize.QueryTypes.SELECT
-      });
-
-      const additionalLayOrderIds = settledLaysWithActiveMatches.map(row => row.id);
+      // 🚫 settled 상태의 주문은 재정산하지 않음 (중복 정산 방지)
+      // settled 상태의 주문은 이미 정산이 완료되었으므로 재정산 대상에서 제외
       
-      let additionalLayOrders = [];
-      if (additionalLayOrderIds.length > 0) {
-        additionalLayOrders = await ExchangeOrder.findAll({
-          where: { id: additionalLayOrderIds }
-        });
-        console.log(`🔧 settled 상태지만 미정산 매칭이 있는 레이 주문: ${additionalLayOrders.length}개 추가`);
-      }
-
-      // 합치기
-      const unsettledOrders = [...unsettledLayOrders, ...additionalLayOrders];
+      const unsettledOrders = unsettledLayOrders;
 
       console.log(`📋 정산 대상 멀티배팅 주문: ${unsettledOrders.length}개`);
 
