@@ -210,13 +210,17 @@ function MyBetsPanel() {
 
   // 상태 한글 변환 및 색상
   const statusLabel = (status: string, bet?: any) => {
-    // ✅ Push 체크: 멀티배팅에서 모든 선택이 cancelled이고 gameResult가 정상 종료된 경우
+    // ✅ Push 체크: 멀티배팅에서 모든 선택이 cancelled인 경우
     if (bet && Array.isArray(bet.selections)) {
-      const allSelectionsPush = bet.selections.every((sel: any) => 
-        sel.result === 'cancelled' && sel.isPush === true
+      // 스코어 정보 확인: 같은 경기의 스코어가 있다면 Push 판단
+      const hasScore = bet.selections.every((sel: any) => 
+        sel.gameResult && sel.gameResult.score && Array.isArray(sel.gameResult.score) && sel.gameResult.score.length > 0
       );
       
-      if (allSelectionsPush) {
+      // 모든 선택이 cancelled이고 스코어가 있는 경우 → Push
+      const allCancelled = bet.selections.every((sel: any) => sel.result === 'cancelled');
+      
+      if (allCancelled && hasScore) {
         return 'Push (Refund)';
       }
     }
@@ -228,13 +232,17 @@ function MyBetsPanel() {
     return status;
   };
   const statusColor = (status: string, bet?: any) => {
-    // ✅ Push 체크: 멀티배팅에서 모든 선택이 cancelled이고 gameResult가 정상 종료된 경우
+    // ✅ Push 체크: 멀티배팅에서 모든 선택이 cancelled인 경우
     if (bet && Array.isArray(bet.selections)) {
-      const allSelectionsPush = bet.selections.every((sel: any) => 
-        sel.result === 'cancelled' && sel.isPush === true
+      // 스코어 정보 확인: 같은 경기의 스코어가 있다면 Push 판단
+      const hasScore = bet.selections.every((sel: any) => 
+        sel.gameResult && sel.gameResult.score && Array.isArray(sel.gameResult.score) && sel.gameResult.score.length > 0
       );
       
-      if (allSelectionsPush) {
+      // 모든 선택이 cancelled이고 스코어가 있는 경우 → Push
+      const allCancelled = bet.selections.every((sel: any) => sel.result === 'cancelled');
+      
+      if (allCancelled && hasScore) {
         return 'text-yellow-600';
       }
     }
@@ -336,23 +344,16 @@ function MyBetsPanel() {
                           <div key={idx} className="text-sm">
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  {/* ✅ Push/Won/Lost 아이콘 표시 */}
-                                  {sel.result === 'won' && <span className="text-green-600">✔️</span>}
-                                  {sel.result === 'lost' && <span className="text-red-500">❌</span>}
-                                  {sel.isPush === true && sel.result === 'cancelled' && <span className="text-yellow-600">🤝</span>}
-                                  
-                                  <div className="font-medium text-gray-800">
-                                    {isOverUnder ? (
-                                      normalizeOverUnderOption(sel.option || sel.team, sel.desc, sel.point)
-                                    ) : isHandicap ? (
-                                      sel.team
-                                    ) : sel.result === 'draw' ? (
-                                      `Draw (Win)`
-                                    ) : (
-                                      `${sel.team} (Win)`
-                                    )}
-                                  </div>
+                                <div className="font-medium text-gray-800">
+                                  {isOverUnder ? (
+                                    normalizeOverUnderOption(sel.option || sel.team, sel.desc, sel.point)
+                                  ) : isHandicap ? (
+                                    sel.team
+                                  ) : sel.result === 'draw' ? (
+                                    `Draw (Win)`
+                                  ) : (
+                                    `${sel.team} (Win)`
+                                  )}
                                 </div>
                               </div>
                               <div className="text-right">
