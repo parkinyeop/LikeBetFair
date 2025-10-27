@@ -9,8 +9,6 @@ interface Payment {
   balanceAfter: number;
   memo: string;
   betId?: string;
-  relatedOrderId?: number;
-  relatedBetId?: string;
 }
 
 export default function PaymentsTab({ viewUserId }: { viewUserId?: string }) {
@@ -78,25 +76,6 @@ export default function PaymentsTab({ viewUserId }: { viewUserId?: string }) {
       key: 'betId',
       label: '주문/배팅번호',
       render: (value: string | undefined, row: Payment) => {
-        // ✅ relatedOrderId가 있으면 우선 표시 (Exchange 매칭 주문)
-        if (row.relatedOrderId) {
-          return (
-            <span className="text-blue-600 font-mono text-xs">
-              익스체인지 #{row.relatedOrderId}
-            </span>
-          );
-        }
-        
-        // ✅ relatedBetId가 있으면 스포츠북 배팅
-        if (row.relatedBetId) {
-          return (
-            <span className="text-green-600 font-mono text-xs" title={row.relatedBetId}>
-              배팅 #{row.relatedBetId.substring(0, 8)}...
-            </span>
-          );
-        }
-        
-        // fallback: betId 사용
         if (!value) return '-';
         
         // EXCHANGE_123 형식인 경우

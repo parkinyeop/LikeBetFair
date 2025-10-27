@@ -119,19 +119,8 @@ async function processPartialMatching(orderData) {
     // 🎯 Pot 계산: backStake + layStake
     // ✅ 10원 단위 정책: matchAmount를 10원 단위로 올림
     const roundedMatchAmount = Math.ceil(matchAmount / 10) * 10;
-    
-    // ✅ 존재하는 주문의 stake 계산
-    const existingStake = existingOrder.side === 'back' 
-      ? roundedMatchAmount  // Back은 stake 금액
-      : Math.ceil(roundedMatchAmount * (matchPrice - 1) / 10) * 10; // Lay는 담보금
-    
-    // ✅ 새로 매칭된 주문의 stake 계산 (반대 측)
-    const matchingStake = existingOrder.side === 'back'
-      ? Math.ceil(roundedMatchAmount * (matchPrice - 1) / 10) * 10  // Back 주문에 Lay 매칭: 담보금
-      : roundedMatchAmount; // Lay 주문에 Back 매칭: stake 금액
-    
-    const backStake = existingOrder.side === 'back' ? existingStake : matchingStake;
-    const layStake = existingOrder.side === 'lay' ? existingStake : matchingStake;
+    const backStake = existingOrder.side === 'back' ? roundedMatchAmount : Math.ceil(roundedMatchAmount * (matchPrice - 1) / 10) * 10;
+    const layStake = existingOrder.side === 'lay' ? roundedMatchAmount : Math.ceil(roundedMatchAmount * (matchPrice - 1) / 10) * 10;
     const potAmount = backStake + layStake;
 
     const matchRecord = await ExchangeOrderMatch.create({
@@ -252,8 +241,11 @@ router.post('/match-order', verifyToken, async (req, res) => {
         });
       }
       actualMatchAmount = Math.min(matchAmount, targetOrder.remainingAmount || targetOrder.amount);
-      // ✅ 10원 단위 올림: Lay 담보금 올림 (일관성)
-      stakeAmount = Math.ceil((parseFloat(adjustedPrice) - 1) * actualMatchAmount / 10) * 10;
+      // ✅ 10원 단위 올림: Lay 담보금 올림 (부동소수점 오차 방지)
+      // 정수 연산 사용: (price - 1) * 1000 → 정수로 변환 후 계산
+      const priceMultiplier = Math.round((parseFloat(adjustedPrice) - 1) * 1000);
+      const liabilityInWon = Math.floor(priceMultiplier * actualMatchAmount / 1000);
+      stakeAmount = Math.ceil(liabilityInWon / 10) * 10; // 10원 단위 올림
     }
     
     if (actualMatchAmount <= 0) {
@@ -424,19 +416,8 @@ router.post('/match-order', verifyToken, async (req, res) => {
     // 🎯 Pot 계산: backStake + layStake
     // ✅ 10원 단위 정책: actualMatchAmount를 10원 단위로 올림
     const roundedMatchAmount = Math.ceil(actualMatchAmount / 10) * 10;
-    
-    // ✅ 타겟 주문의 stake 계산
-    const targetStake = targetOrder.side === 'back' 
-      ? roundedMatchAmount  // Back은 stake 금액
-      : Math.ceil(roundedMatchAmount * (targetOrder.price - 1) / 10) * 10; // Lay는 담보금
-    
-    // ✅ 새로 생성된 매칭 주문의 stake 계산 (반대 측)
-    const matchStake = targetOrder.side === 'back'
-      ? Math.ceil(roundedMatchAmount * (targetOrder.price - 1) / 10) * 10  // Back 주문에 Lay 매칭: 담보금
-      : roundedMatchAmount; // Lay 주문에 Back 매칭: stake 금액
-    
-    const backStake = targetOrder.side === 'back' ? targetStake : matchStake;
-    const layStake = targetOrder.side === 'lay' ? targetStake : matchStake;
+    const backStake = targetOrder.side === 'back' ? roundedMatchAmount : Math.ceil(roundedMatchAmount * (targetOrder.price - 1) / 10) * 10;
+    const layStake = targetOrder.side === 'lay' ? roundedMatchAmount : Math.ceil(roundedMatchAmount * (targetOrder.price - 1) / 10) * 10;
     const potAmount = backStake + layStake;
 
     console.log('🆕 ExchangeOrderMatch 생성 시작:', {
@@ -656,13 +637,15 @@ router.post('/order', verifyToken, async (req, res) => {
     
     try {
       // 필요 금액 계산
-      // ✅ 10원 단위 올림 일관성: 모든 곳에서 Math.ceil 사용
+      // ✅ 10원 단위 올림: Lay 담보금 올림 (부동소수점 오차 방지)
       let required;
       if (side === 'back') {
         required = amount;
       } else {
-        // ✅ 10원 단위 올림: Lay 담보금 올림 (일관성)
-        required = Math.ceil((finalPrice - 1) * amount / 10) * 10;
+        // 정수 연산 사용: (price - 1) * 1000 → 정수로 변환 후 계산
+        const priceMultiplier = Math.round((finalPrice - 1) * 1000);
+        const liabilityInWon = Math.floor(priceMultiplier * amount / 1000);
+        required = Math.ceil(liabilityInWon / 10) * 10; // 10원 단위 올림
       }
       
       console.log('🔍 잔고 검증 상세:', { 
@@ -964,7 +947,7 @@ router.get('/orderbook', verifyToken, async (req, res) => {
       // - LAY 주문 → Back 매처가 낼 배팅금
       const remainingAmt = order.remainingAmount || order.amount;
       const displayAmount = order.side === 'back'
-        ? Math.ceil(remainingAmt * (parseFloat(order.price) - 1) / 10) * 10 // LAY 담보금 (10원 단위 올림)
+        ? Math.floor(remainingAmt * (parseFloat(order.price) - 1)) // LAY 담보금
         : remainingAmt; // Back 배팅금
       
       console.log(`🔍 [ALL-ORDERS] 주문 ${order.id} displayAmount 계산:`, {
@@ -1659,7 +1642,7 @@ router.get('/orders', verifyToken, async (req, res) => {
       // - LAY 주문 → Back 매처가 낼 배팅금
       const remainingAmt = order.remainingAmount || order.amount;
       const displayAmount = order.side === 'back'
-        ? Math.ceil(remainingAmt * (parseFloat(order.price) - 1) / 10) * 10 // LAY 담보금 (10원 단위 올림)
+        ? Math.floor(remainingAmt * (parseFloat(order.price) - 1)) // LAY 담보금
         : remainingAmt; // Back 배팅금
 
       return {
@@ -1787,7 +1770,7 @@ router.get('/all-orders', async (req, res) => {
       // - LAY 주문 → Back 매처가 낼 배팅금
       const remainingAmt = order.remainingAmount || order.amount;
       const displayAmount = order.side === 'back'
-        ? Math.ceil(remainingAmt * (parseFloat(order.price) - 1) / 10) * 10 // LAY 담보금 (10원 단위 올림)
+        ? Math.floor(remainingAmt * (parseFloat(order.price) - 1)) // LAY 담보금
         : remainingAmt; // Back 배팅금
       
       console.log(`🔍 [ALL-ORDERS-v2] 주문 ${order.id} displayAmount 계산:`, {

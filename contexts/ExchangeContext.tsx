@@ -12,9 +12,6 @@ export interface SelectedBet {
   homeTeam?: string;
   awayTeam?: string;
   commenceTime?: string;
-  // 🆕 멀티배팅 관련 필드들
-  isMultibet?: boolean;
-  totalOdds?: number;
 }
 
 export interface MatchTargetOrder {
@@ -178,29 +175,8 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
     setMultiBetTotalOdds(roundedTotalOdds);
     
     if (multiBetStake > 0) {
-      // ✅ 멀티배팅 타입별 정확한 수익 계산
-      const isLayMultibet = multiBetSelections.every(selection => selection.side === 'lay');
-      
-      console.log('🔍 [멀티배팅 수익 계산] 디버깅:', {
-        multiBetStake,
-        roundedTotalOdds,
-        isLayMultibet,
-        selections: multiBetSelections.map(s => ({ side: s.side, odds: s.odds }))
-      });
-      
-      let potentialWinnings: number;
-      
-      if (isLayMultibet) {
-        // ✅ Lay 멀티배팅: 배팅 금액 ÷ (총 배당률 - 1)
-        const layProfit = multiBetStake / (roundedTotalOdds - 1);
-        potentialWinnings = Math.ceil(Math.round(layProfit * 100) / 100 / 10) * 10;
-        console.log('🔍 [Lay 계산]', { layProfit, potentialWinnings });
-      } else {
-        // ✅ Back 멀티배팅: 배팅 금액 × (총 배당률 - 1)
-        const backProfit = multiBetStake * (roundedTotalOdds - 1);
-        potentialWinnings = Math.ceil(Math.round(backProfit * 100) / 100 / 10) * 10;
-        console.log('🔍 [Back 계산]', { backProfit, potentialWinnings });
-      }
+      // ✅ 정확한 Exchange 멀티배팅 수익 계산: 부동소수점 오차 방지 + 10원 단위 올림
+      const potentialWinnings = Math.ceil(Math.round(multiBetStake * roundedTotalOdds * 100) / 100 / 10) * 10;
 
       setMultiBetPotentialWinnings(potentialWinnings);
     }
@@ -409,10 +385,10 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
     
     if (matchTargetOrder.type === 'back') {
       // ✅ DB에 저장된 정확한 potentialProfit 값 사용 (재계산으로 인한 오차 제거)
-      return matchTargetOrder.potentialProfit || 0;
+      return matchTargetOrder.potentialProfit;
     } else {
       // Lay 주문에 Back으로 매칭: amount 그대로
-      return availableAmount || 0;
+      return availableAmount;
     }
   };
 
@@ -427,25 +403,16 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
 
     // ✅ displayAmount가 있으면 사용, 없으면 DB의 potentialProfit 사용
     if (matchTargetOrder.displayAmount !== undefined && matchTargetOrder.displayAmount !== null) {
-      const result = matchTargetOrder.displayAmount;
-      console.log('🔍 [getMaxMatchAmount] displayAmount 사용:', result);
-      return result;
+      return matchTargetOrder.displayAmount;
     }
 
     // displayAmount가 없으면 DB의 potentialProfit 사용 (재계산 금지)
     if (matchTargetOrder.type === 'back') {
       // ✅ Back 주문: Lay가 내야 할 담보금 = DB의 potentialProfit (재계산 금지)
-      const result = matchTargetOrder.potentialProfit || 0;
-      console.log('🔍 [getMaxMatchAmount] Back 주문 - potentialProfit 사용:', {
-        potentialProfit: matchTargetOrder.potentialProfit,
-        result
-      });
-      return result;
+      return matchTargetOrder.potentialProfit || 0;
     } else {
       // Lay 주문: Back이 내야 할 배팅금 = remainingAmount
-      const result = matchTargetOrder.remainingAmount;
-      console.log('🔍 [getMaxMatchAmount] Lay 주문 - remainingAmount 사용:', result);
-      return result;
+      return matchTargetOrder.remainingAmount;
     }
   };
 
