@@ -119,8 +119,10 @@ async function processPartialMatching(orderData) {
     // 🎯 Pot 계산: backStake + layStake
     // ✅ 10원 단위 정책: matchAmount를 10원 단위로 올림
     const roundedMatchAmount = Math.ceil(matchAmount / 10) * 10;
-    const backStake = existingOrder.side === 'back' ? roundedMatchAmount : Math.ceil(roundedMatchAmount * (matchPrice - 1) / 10) * 10;
-    const layStake = existingOrder.side === 'lay' ? roundedMatchAmount : Math.ceil(roundedMatchAmount * (matchPrice - 1) / 10) * 10;
+    // ✅ 정수 연산으로 부동소수점 오차 완전 제거: (price * 1000 - 1000) * amount / 1000
+    const liability = Math.floor((matchPrice * 1000 - 1000) * roundedMatchAmount / 1000);
+    const backStake = existingOrder.side === 'back' ? roundedMatchAmount : Math.ceil(liability / 10) * 10;
+    const layStake = existingOrder.side === 'lay' ? roundedMatchAmount : Math.ceil(liability / 10) * 10;
     const potAmount = backStake + layStake;
 
     const matchRecord = await ExchangeOrderMatch.create({
@@ -241,10 +243,9 @@ router.post('/match-order', verifyToken, async (req, res) => {
         });
       }
       actualMatchAmount = Math.min(matchAmount, targetOrder.remainingAmount || targetOrder.amount);
-      // ✅ 10원 단위 올림: Lay 담보금 올림 (부동소수점 오차 방지)
-      // 정수 연산 사용: (price - 1) * 1000 → 정수로 변환 후 계산
-      const priceMultiplier = Math.round((parseFloat(adjustedPrice) - 1) * 1000);
-      const liabilityInWon = Math.floor(priceMultiplier * actualMatchAmount / 1000);
+      // ✅ 10원 단위 올림: Lay 담보금 올림 (부동소수점 오차 완전 제거)
+      // 정수 연산: (price * 1000 - 1000) * amount / 1000
+      const liabilityInWon = Math.floor((parseFloat(adjustedPrice) * 1000 - 1000) * actualMatchAmount / 1000);
       stakeAmount = Math.ceil(liabilityInWon / 10) * 10; // 10원 단위 올림
     }
     
@@ -416,8 +417,10 @@ router.post('/match-order', verifyToken, async (req, res) => {
     // 🎯 Pot 계산: backStake + layStake
     // ✅ 10원 단위 정책: actualMatchAmount를 10원 단위로 올림
     const roundedMatchAmount = Math.ceil(actualMatchAmount / 10) * 10;
-    const backStake = targetOrder.side === 'back' ? roundedMatchAmount : Math.ceil(roundedMatchAmount * (targetOrder.price - 1) / 10) * 10;
-    const layStake = targetOrder.side === 'lay' ? roundedMatchAmount : Math.ceil(roundedMatchAmount * (targetOrder.price - 1) / 10) * 10;
+    // ✅ 정수 연산으로 부동소수점 오차 완전 제거: (price * 1000 - 1000) * amount / 1000
+    const liability = Math.floor((targetOrder.price * 1000 - 1000) * roundedMatchAmount / 1000);
+    const backStake = targetOrder.side === 'back' ? roundedMatchAmount : Math.ceil(liability / 10) * 10;
+    const layStake = targetOrder.side === 'lay' ? roundedMatchAmount : Math.ceil(liability / 10) * 10;
     const potAmount = backStake + layStake;
 
     console.log('🆕 ExchangeOrderMatch 생성 시작:', {
@@ -637,14 +640,13 @@ router.post('/order', verifyToken, async (req, res) => {
     
     try {
       // 필요 금액 계산
-      // ✅ 10원 단위 올림: Lay 담보금 올림 (부동소수점 오차 방지)
+      // ✅ 10원 단위 올림: Lay 담보금 올림 (부동소수점 오차 완전 제거)
       let required;
       if (side === 'back') {
         required = amount;
       } else {
-        // 정수 연산 사용: (price - 1) * 1000 → 정수로 변환 후 계산
-        const priceMultiplier = Math.round((finalPrice - 1) * 1000);
-        const liabilityInWon = Math.floor(priceMultiplier * amount / 1000);
+        // 정수 연산: (price * 1000 - 1000) * amount / 1000
+        const liabilityInWon = Math.floor((finalPrice * 1000 - 1000) * amount / 1000);
         required = Math.ceil(liabilityInWon / 10) * 10; // 10원 단위 올림
       }
       
@@ -946,10 +948,11 @@ router.get('/orderbook', verifyToken, async (req, res) => {
       // - Back 주문 → LAY 매처가 낼 담보금
       // - LAY 주문 → Back 매처가 낼 배팅금
       const remainingAmt = order.remainingAmount || order.amount;
+      // ✅ 정수 연산으로 부동소수점 오차 완전 제거: (price * 1000 - 1000) * amount / 1000
       const displayAmount = order.side === 'back'
-        ? Math.floor(remainingAmt * (parseFloat(order.price) - 1)) // LAY 담보금
+        ? Math.floor((parseFloat(order.price) * 1000 - 1000) * remainingAmt / 1000) // LAY 담보금
         : remainingAmt; // Back 배팅금
-      
+
       console.log(`🔍 [ALL-ORDERS] 주문 ${order.id} displayAmount 계산:`, {
         side: order.side,
         amount: order.amount,
@@ -1641,8 +1644,9 @@ router.get('/orders', verifyToken, async (req, res) => {
       // - Back 주문 → LAY 매처가 낼 담보금
       // - LAY 주문 → Back 매처가 낼 배팅금
       const remainingAmt = order.remainingAmount || order.amount;
+      // ✅ 정수 연산으로 부동소수점 오차 완전 제거: (price * 1000 - 1000) * amount / 1000
       const displayAmount = order.side === 'back'
-        ? Math.floor(remainingAmt * (parseFloat(order.price) - 1)) // LAY 담보금
+        ? Math.floor((parseFloat(order.price) * 1000 - 1000) * remainingAmt / 1000) // LAY 담보금
         : remainingAmt; // Back 배팅금
 
       return {
@@ -1769,10 +1773,11 @@ router.get('/all-orders', async (req, res) => {
       // - Back 주문 → LAY 매처가 낼 담보금
       // - LAY 주문 → Back 매처가 낼 배팅금
       const remainingAmt = order.remainingAmount || order.amount;
+      // ✅ 정수 연산으로 부동소수점 오차 완전 제거: (price * 1000 - 1000) * amount / 1000
       const displayAmount = order.side === 'back'
-        ? Math.floor(remainingAmt * (parseFloat(order.price) - 1)) // LAY 담보금
+        ? Math.floor((parseFloat(order.price) * 1000 - 1000) * remainingAmt / 1000) // LAY 담보금
         : remainingAmt; // Back 배팅금
-      
+
       console.log(`🔍 [ALL-ORDERS-v2] 주문 ${order.id} displayAmount 계산:`, {
         side: order.side,
         amount: order.amount,

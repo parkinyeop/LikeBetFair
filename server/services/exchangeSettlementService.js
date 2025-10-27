@@ -2550,13 +2550,23 @@ class ExchangeSettlementService {
       const homeScore = parseInt(score.find(s => s.name === gameResult.homeTeam)?.score || 0);
       const awayScore = parseInt(score.find(s => s.name === gameResult.awayTeam)?.score || 0);
       
-      // 핸디캡 적용
-      const adjustedHomeScore = homeScore + line;
-      const adjustedAwayScore = awayScore;
+      // ✅ 선택한 팀에 따라 핸디캡 적용
+      let adjustedHomeScore, adjustedAwayScore;
+      const isHomeTeamSelection = selectedTeam === homeTeam;
+      
+      if (isHomeTeamSelection) {
+        // 홈팀 선택 → 홈팀에 핸디캡 적용
+        adjustedHomeScore = homeScore + line;
+        adjustedAwayScore = awayScore;
+      } else {
+        // 어웨이팀 선택 → 어웨이팀에 핸디캡 적용
+        adjustedHomeScore = homeScore;
+        adjustedAwayScore = awayScore + line;
+      }
       
       // Push 조건: 핸디캡 적용 후 동점
       if (adjustedHomeScore === adjustedAwayScore) {
-        console.log(`   🤝 핸디캡 Push: ${homeScore}+${line} = ${awayScore} → 1.0배`);
+        console.log(`   🤝 핸디캡 Push: 조정 스코어 ${adjustedHomeScore} = ${adjustedAwayScore} → 1.0배`);
         return { won: false, isPush: true, result: 'push' };
       }
       

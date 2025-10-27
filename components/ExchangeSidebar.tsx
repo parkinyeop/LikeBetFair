@@ -189,19 +189,9 @@ function OrderPanel() {
       // Back: 매칭된 Lay 베팅금액만큼 획득 (Exchange 원리)
       return amount;
     } else {
-      // ✅ Lay 주문: 매칭 모드에서는 배당률과 금액으로 직접 계산
-      // Lay 예상 수익 = 배팅 금액 ÷ (배당률 - 1)
-      const layProfit = amount / (selectedBet.price - 1);
-      const profit = Math.round(layProfit);
-      
-      console.log('🔍 [예상 수익 계산]', {
-        amount,
-        price: selectedBet.price,
-        calculation: `${amount} / (${selectedBet.price} - 1) = ${layProfit}`,
-        profit
-      });
-      
-      return profit;
+      // ✅ Lay 주문: DB의 정확한 potentialProfit 값 사용 (재계산 금지)
+      // DB에는 이미 정확하게 계산된 값이 저장되어 있음
+      return selectedBet.potentialProfit || 0;
     }
   };
 
@@ -1306,16 +1296,11 @@ function OrderHistoryPanel() {
                         const hasProfit = actualProfit !== null && actualProfit !== undefined;
                         const profit = hasProfit ? parseFloat(String(actualProfit)) : 0;
                         const stakeAmount = (order as any).stakeAmount || order.amount;
-                        const settlementNote = (order as any).settlementNote || '';
-                        
-                        // ✅ 취소/환불 여부 확인 (settlementNote에 "환불", "취소" 키워드 포함)
-                        const isCancelled = settlementNote.includes('환불') || settlementNote.includes('취소') || 
-                                           settlementNote.includes('Cancel') || settlementNote.includes('Push');
                         
                         // ✅ 익스체인지 정산 판정 (담보금 미리 차감 방식)
-                        const isWin = profit > 0 && !isCancelled;  // 취소가 아니고 수익이 있을 때만 승리
-                        const isFullRefund = Math.abs(profit - stakeAmount) < 1 || isCancelled;
-                        const isLoss = profit <= 0 && !isFullRefund && !isCancelled; // 0원 이하 = 패배
+                        const isWin = profit > 0;
+                        const isFullRefund = Math.abs(profit - stakeAmount) < 1;
+                        const isLoss = profit <= 0 && !isFullRefund; // 0원 이하 = 패배
                         
                         // 부분 환불 판정 (실제 수익이 음수이지만 전체 배팅금액보다 적게 손실)
                         const isPartialRefund = profit < 0 && Math.abs(profit) < stakeAmount;
@@ -1425,17 +1410,32 @@ function OrderHistoryPanel() {
                         {(order as any).isMultibet && (order as any).multibetGameResults && (order as any).multibetGameResults.length > 0 ? (
                           <div className="mb-3">
                             <div className="space-y-2">
-                              {(order as any).multibetGameResults.map((gameResult: any, idx: number) => {
-                                const isPending = gameResult.status === 'scheduled' || !gameResult.score;
+                              {(() => {
+                                // ✅ 중복 제거: 같은 팀 조합의 경기는 한 번만 표시
+                                const uniqueGames = new Map();
+                                (order as any).multibetGameResults.forEach((gameResult: any, idx: number) => {
+                                  if (!gameResult || !gameResult.homeTeam || !gameResult.awayTeam) return;
+                                  
+                                  const key = `${gameResult.homeTeam}_${gameResult.awayTeam}`;
+                                  if (!uniqueGames.has(key)) {
+                                    uniqueGames.set(key, { ...gameResult, originalIdx: idx });
+                                  }
+                                });
                                 
-                                // 🆕 경기별 승패 판정
-                                const gameWon = gameResult.result === 'won';
-                                const gameLost = gameResult.result === 'lost';
-                                
-                                if (isPending) return null;
-                                
-                                return (
-                                  <div key={idx} className="border-l-2 border-gray-200 pl-3 py-1">
+                                return Array.from(uniqueGames.values()).map((gameResult: any) => {
+                                  const isPending = gameResult.status === 'scheduled' || !gameResult.score;
+                                  
+                                  // 🆕 경기별 승패 판정
+                                  const gameWon = gameResult.result === 'won';
+                                  const gameLost = gameResult.result === 'lost';
+                                  
+                                  if (isPending) return null;
+                                  
+                                  // 고유 키 생성
+                                  const uniqueKey = `${gameResult.homeTeam}_${gameResult.awayTeam}_${gameResult.originalIdx}`;
+                                  
+                                  return (
+                                  <div key={uniqueKey} className="border-l-2 border-gray-200 pl-3 py-1">
                                     {(gameWon || gameLost) && (
                                       <div className="flex items-center text-sm mb-1">
                                         {/* 승패 아이콘 */}
@@ -1465,8 +1465,9 @@ function OrderHistoryPanel() {
                                       );
                                     })()}
                                   </div>
-                                );
-                              })}
+                                  );
+                                });
+                              })()}
                             </div>
                           </div>
                         ) :
@@ -1649,16 +1650,7 @@ function OrderHistoryPanel() {
                                   <span className={`text-xs font-bold ${
                                     isWin ? 'text-green-600' : isLoss ? 'text-red-600' : 'text-gray-600'
                                   }`}>
-                                    {(() => {
-                                      if (isFullRefund || isPartialRefund) {
-                                        // 환불은 원금 반환이므로 표시
-                                        return `환불 ${actualProfit.toLocaleString()}원`;
-                                      } else if (isWin) {
-                                        return `+${actualProfit.toLocaleString()}원`;
-                                      } else {
-                                        return `${actualProfit.toLocaleString()}원`;
-                                      }
-                                    })()}
+                                    {isWin ? '+' : ''}{actualProfit.toLocaleString()}원
                                   </span>
                                 </div>
                               </div>

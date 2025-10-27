@@ -12,6 +12,9 @@ export interface SelectedBet {
   homeTeam?: string;
   awayTeam?: string;
   commenceTime?: string;
+  potentialProfit?: number; // 예상 수익
+  isMultibet?: boolean; // 멀티배팅 여부
+  totalOdds?: number; // 총 배당률
 }
 
 export interface MatchTargetOrder {
@@ -375,7 +378,7 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
   };
 
   // 🆕 매칭에 필요한 정확한 금액 계산 (부분 매칭 지원)
-  const getRequiredMatchAmount = () => {
+  const getRequiredMatchAmount = (): number => {
     if (!matchTargetOrder) return 0;
     
     // displayAmount 또는 remainingAmount를 우선 사용
@@ -385,10 +388,10 @@ export const ExchangeProvider: React.FC<ExchangeProviderProps> = ({ children }) 
     
     if (matchTargetOrder.type === 'back') {
       // ✅ DB에 저장된 정확한 potentialProfit 값 사용 (재계산으로 인한 오차 제거)
-      return matchTargetOrder.potentialProfit;
+      return matchTargetOrder.potentialProfit || 0;
     } else {
       // Lay 주문에 Back으로 매칭: amount 그대로
-      return availableAmount;
+      return availableAmount || 0;
     }
   };
 
