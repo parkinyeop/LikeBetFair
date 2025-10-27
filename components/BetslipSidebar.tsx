@@ -209,14 +209,36 @@ function MyBetsPanel() {
   filteredBets = filteredBets.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   // 상태 한글 변환 및 색상
-  const statusLabel = (status: string) => {
+  const statusLabel = (status: string, bet?: any) => {
+    // ✅ Push 체크: 멀티배팅에서 모든 선택이 cancelled이고 gameResult가 정상 종료된 경우
+    if (bet && Array.isArray(bet.selections)) {
+      const allSelectionsPush = bet.selections.every((sel: any) => 
+        sel.result === 'cancelled' && sel.isPush === true
+      );
+      
+      if (allSelectionsPush) {
+        return 'Push (Refund)';
+      }
+    }
+    
     if (status === 'pending') return 'In Progress';
-      if (status === 'won') return 'Won';
-  if (status === 'lost') return 'Lost';
+    if (status === 'won') return 'Won';
+    if (status === 'lost') return 'Lost';
     if (status === 'cancelled') return 'Bet Cancelled';
     return status;
   };
-  const statusColor = (status: string) => {
+  const statusColor = (status: string, bet?: any) => {
+    // ✅ Push 체크: 멀티배팅에서 모든 선택이 cancelled이고 gameResult가 정상 종료된 경우
+    if (bet && Array.isArray(bet.selections)) {
+      const allSelectionsPush = bet.selections.every((sel: any) => 
+        sel.result === 'cancelled' && sel.isPush === true
+      );
+      
+      if (allSelectionsPush) {
+        return 'text-yellow-600';
+      }
+    }
+    
     if (status === 'pending') return 'text-blue-600';
     if (status === 'won') return 'text-green-600';
     if (status === 'lost') return 'text-red-500';
@@ -291,7 +313,7 @@ function MyBetsPanel() {
                   {/* 1줄: 날짜 | 상태 */}
                   <div className="flex justify-between items-center text-xs text-gray-400 mb-2">
                     <span>{dateStr}</span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor(bet.status)}`}>{statusLabel(bet.status)}</span>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor(bet.status, bet)}`}>{statusLabel(bet.status, bet)}</span>
                   </div>
                   
                   {/* 배팅 유형 표시 */}
@@ -314,16 +336,23 @@ function MyBetsPanel() {
                           <div key={idx} className="text-sm">
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
-                                <div className="font-medium text-gray-800">
-                                  {isOverUnder ? (
-                                    normalizeOverUnderOption(sel.option || sel.team, sel.desc, sel.point)
-                                  ) : isHandicap ? (
-                                    sel.team
-                                  ) : sel.result === 'draw' ? (
-                                    `Draw (Win)`
-                                  ) : (
-                                    `${sel.team} (Win)`
-                                  )}
+                                <div className="flex items-center gap-2">
+                                  {/* ✅ Push/Won/Lost 아이콘 표시 */}
+                                  {sel.result === 'won' && <span className="text-green-600">✔️</span>}
+                                  {sel.result === 'lost' && <span className="text-red-500">❌</span>}
+                                  {sel.isPush === true && sel.result === 'cancelled' && <span className="text-yellow-600">🤝</span>}
+                                  
+                                  <div className="font-medium text-gray-800">
+                                    {isOverUnder ? (
+                                      normalizeOverUnderOption(sel.option || sel.team, sel.desc, sel.point)
+                                    ) : isHandicap ? (
+                                      sel.team
+                                    ) : sel.result === 'draw' ? (
+                                      `Draw (Win)`
+                                    ) : (
+                                      `${sel.team} (Win)`
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                               <div className="text-right">
