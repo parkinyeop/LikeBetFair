@@ -35,14 +35,14 @@ router.get('/manual-odds/games/:sportKey', async (req, res) => {
 
     const existingOdds = await OddsCache.findAll({
       where: {
-        game_id: { [Op.in]: eventIds }
+        oddsApiId: { [Op.in]: eventIds }
       },
-      attributes: ['game_id', 'bookmakers']
+      attributes: ['oddsApiId', 'bookmakers']
     });
 
     const existingOddsMap = {};
     existingOdds.forEach(odds => {
-      existingOddsMap[odds.game_id] = odds.bookmakers;
+      existingOddsMap[odds.oddsApiId] = odds.bookmakers;
     });
 
     // 경기 목록에 기존 배당율 정보 추가 및 형식 변환
@@ -153,19 +153,35 @@ router.post('/manual-odds', async (req, res) => {
       });
     }
 
+    // mainCategory와 subCategory 자동 설정
+    const categoryMap = {
+      'basketball_kbl': { main: 'basketball', sub: 'kbl' },
+      'baseball_kbo': { main: 'baseball', sub: 'kbo' },
+      'basketball_nba': { main: 'basketball', sub: 'nba' },
+      'baseball_mlb': { main: 'baseball', sub: 'mlb' },
+    };
+    const categories = categoryMap[sportKey] || { main: 'other', sub: 'manual' };
+
     // OddsCache에 저장 (findOrCreate 사용)
     const [oddsCache, created] = await OddsCache.findOrCreate({
       where: {
-        game_id: eventId
+        sportKey: sportKey,
+        homeTeam: homeTeam,
+        awayTeam: awayTeam,
+        commenceTime: new Date(commenceTime)
       },
       defaults: {
-        game_id: eventId,
-        sport_key: sportKey,
-        sport_title: sportTitle || 'Manual Input',
-        commence_time: new Date(commenceTime),
-        home_team: homeTeam,
-        away_team: awayTeam,
-        bookmakers: [bookmakerData]
+        oddsApiId: eventId,
+        sportKey: sportKey,
+        sportTitle: sportTitle || 'Manual Input',
+        commenceTime: new Date(commenceTime),
+        homeTeam: homeTeam,
+        awayTeam: awayTeam,
+        bookmakers: [bookmakerData],
+        mainCategory: categories.main,
+        subCategory: categories.sub,
+        lastUpdated: new Date(),
+        market: 'h2h'
       }
     });
 
@@ -173,7 +189,7 @@ router.post('/manual-odds', async (req, res) => {
     if (!created) {
       await oddsCache.update({
         bookmakers: [bookmakerData],
-        updatedAt: new Date()
+        lastUpdated: new Date()
       });
       console.log(`🔄 [Manual Odds] 기존 배당율 업데이트: ${eventId}`);
     } else {
@@ -209,7 +225,7 @@ router.delete('/manual-odds/:eventId', async (req, res) => {
 
     const deleted = await OddsCache.destroy({
       where: {
-        game_id: eventId
+        oddsApiId: eventId
       }
     });
 

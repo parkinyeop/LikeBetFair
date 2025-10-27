@@ -36,12 +36,6 @@ interface OddsInput {
 
 const LEAGUES = [
   { key: 'basketball_kbl', title: 'KBL', hasDrawOdds: false },
-  { key: 'baseball_kbo', title: 'KBO', hasDrawOdds: false },
-  { key: 'basketball_nba', title: 'NBA', hasDrawOdds: false },
-  { key: 'baseball_mlb', title: 'MLB', hasDrawOdds: false },
-  { key: 'soccer_korea_kleague1', title: 'K리그', hasDrawOdds: true },
-  { key: 'soccer_japan_j_league', title: 'J리그', hasDrawOdds: true },
-  { key: 'soccer_italy_serie_a', title: '세리에 A', hasDrawOdds: true },
 ];
 
 export default function ManualOdds() {
