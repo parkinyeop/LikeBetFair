@@ -1416,20 +1416,24 @@ function OrderHistoryPanel() {
                                 // 🆕 경기별 승패 판정
                                 const gameWon = gameResult.result === 'won';
                                 const gameLost = gameResult.result === 'lost';
+                                const isPush = gameResult.isPush === true;
                                 
                                 if (isPending) return null;
                                 
                                 return (
                                   <div key={idx} className="border-l-2 border-gray-200 pl-3 py-1">
-                                    {(gameWon || gameLost) && (
+                                    {/* 승패/푸시 표시 */}
+                                    {(gameWon || gameLost || isPush) && (
                                       <div className="flex items-center text-sm mb-1">
-                                        {/* 승패 아이콘 */}
                                         {gameWon && <span className="mr-2 text-green-600">✔️</span>}
                                         {gameLost && <span className="mr-2 text-red-500">❌</span>}
+                                        {isPush && <span className="mr-2 text-yellow-600">🤝</span>}
                                         <span className={`text-xs font-medium ${
-                                          gameWon ? 'text-green-600' : 'text-red-500'
+                                          gameWon ? 'text-green-600' : 
+                                          gameLost ? 'text-red-500' : 
+                                          'text-yellow-600'
                                         }`}>
-                                          {gameWon ? 'Won' : 'Lost'}
+                                          {gameWon ? 'Won' : gameLost ? 'Lost' : 'Push (환불)'}
                                         </span>
                                       </div>
                                     )}
