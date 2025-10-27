@@ -156,14 +156,14 @@ router.post('/manual-odds', async (req, res) => {
     // officialOdds 생성 (기존 OddsAPI 형식과 호환)
     const officialOdds = {};
 
-    // h2h (승/패)
+    // h2h (승/패) - 팀명을 키로 사용
     if (odds.h2h) {
       officialOdds.h2h = {
-        home: parseFloat(odds.h2h.home),
-        away: parseFloat(odds.h2h.away)
+        [homeTeam]: { averagePrice: parseFloat(odds.h2h.home) },
+        [awayTeam]: { averagePrice: parseFloat(odds.h2h.away) }
       };
       if (odds.h2h.draw) {
-        officialOdds.h2h.draw = parseFloat(odds.h2h.draw);
+        officialOdds.h2h['Draw'] = { averagePrice: parseFloat(odds.h2h.draw) };
       }
     }
 
