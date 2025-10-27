@@ -29,6 +29,20 @@ const LEAGUES = [
   { key: 'basketball_kbl', title: 'KBL', hasDrawOdds: false },
 ];
 
+// KBL 팀 목록 (SportsDB API와 동일한 표기)
+const KBL_TEAMS = [
+  'Seoul Samsung Thunders',
+  'Seoul SK Knights',
+  'Goyang Sono Skygunners',
+  'Suwon KT Sonicboom',
+  'Changwon LG Sakers',
+  'Ulsan Hyundai Mobis Phoebus',
+  'Anyang KGC',
+  'Jeonju KCC Egis',
+  'Daegu KOGAS',
+  'Busan KCC Egis'
+];
+
 export default function ManualOdds() {
   const { isLoggedIn, isAdmin, adminLevel } = useAuth();
   const router = useRouter();
@@ -263,25 +277,35 @@ export default function ManualOdds() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   홈팀 *
                 </label>
-                <input
-                  type="text"
+                <select
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
                   value={gameInput.homeTeam}
                   onChange={(e) => setGameInput({ ...gameInput, homeTeam: e.target.value })}
-                  placeholder="예: 서울 SK"
-                />
+                >
+                  <option value="">팀 선택</option>
+                  {KBL_TEAMS.map((team) => (
+                    <option key={team} value={team}>
+                      {team}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   어웨이팀 *
                 </label>
-                <input
-                  type="text"
+                <select
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
                   value={gameInput.awayTeam}
                   onChange={(e) => setGameInput({ ...gameInput, awayTeam: e.target.value })}
-                  placeholder="예: 부산 KT"
-                />
+                >
+                  <option value="">팀 선택</option>
+                  {KBL_TEAMS.map((team) => (
+                    <option key={team} value={team}>
+                      {team}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
