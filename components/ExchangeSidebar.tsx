@@ -1306,11 +1306,16 @@ function OrderHistoryPanel() {
                         const hasProfit = actualProfit !== null && actualProfit !== undefined;
                         const profit = hasProfit ? parseFloat(String(actualProfit)) : 0;
                         const stakeAmount = (order as any).stakeAmount || order.amount;
+                        const settlementNote = (order as any).settlementNote || '';
+                        
+                        // ✅ 취소/환불 여부 확인 (settlementNote에 "환불", "취소" 키워드 포함)
+                        const isCancelled = settlementNote.includes('환불') || settlementNote.includes('취소') || 
+                                           settlementNote.includes('Cancel') || settlementNote.includes('Push');
                         
                         // ✅ 익스체인지 정산 판정 (담보금 미리 차감 방식)
-                        const isWin = profit > 0;
-                        const isFullRefund = Math.abs(profit - stakeAmount) < 1;
-                        const isLoss = profit <= 0 && !isFullRefund; // 0원 이하 = 패배
+                        const isWin = profit > 0 && !isCancelled;  // 취소가 아니고 수익이 있을 때만 승리
+                        const isFullRefund = Math.abs(profit - stakeAmount) < 1 || isCancelled;
+                        const isLoss = profit <= 0 && !isFullRefund && !isCancelled; // 0원 이하 = 패배
                         
                         // 부분 환불 판정 (실제 수익이 음수이지만 전체 배팅금액보다 적게 손실)
                         const isPartialRefund = profit < 0 && Math.abs(profit) < stakeAmount;
@@ -1644,7 +1649,16 @@ function OrderHistoryPanel() {
                                   <span className={`text-xs font-bold ${
                                     isWin ? 'text-green-600' : isLoss ? 'text-red-600' : 'text-gray-600'
                                   }`}>
-                                    {isWin ? '+' : ''}{actualProfit.toLocaleString()}원
+                                    {(() => {
+                                      if (isFullRefund || isPartialRefund) {
+                                        // 환불은 원금 반환이므로 표시
+                                        return `환불 ${actualProfit.toLocaleString()}원`;
+                                      } else if (isWin) {
+                                        return `+${actualProfit.toLocaleString()}원`;
+                                      } else {
+                                        return `${actualProfit.toLocaleString()}원`;
+                                      }
+                                    })()}
                                   </span>
                                 </div>
                               </div>

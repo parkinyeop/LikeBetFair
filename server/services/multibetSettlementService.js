@@ -2275,10 +2275,11 @@ class MultibetSettlementService {
           backActualProfit = 0;
           console.log(`       💸 백 패배: Pot 손실`);
         } else {
-          // 취소: 담보금 환불
-          const backStake = backOrder.stakeAmount || 0;
-          backActualProfit = backStake;
-          console.log(`       🔄 취소 환불: ${backActualProfit.toLocaleString()}원`);
+          // ✅ 취소 환불: 각 매치의 backStake만 환불 (매치별 차감된 금액)
+          const matchBackStake = match.backStake || 0;
+          backActualProfit = matchBackStake;
+          
+          console.log(`       🔄 취소 환불 (매치 backStake: ${matchBackStake.toLocaleString()}원)`);
         }
 
         // ✅ FIX: 백 주문 업데이트 (actualProfit 누적)
