@@ -38,15 +38,33 @@ const originalWarn = console.warn;
 
 console.log = (...args) => {
   const timestamp = new Date().toISOString();
-  const message = args.map(arg => 
+  const message = args.map(arg =>
     typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
   ).join(' ');
-  
-  originalLog(...args); // 터미널 출력
-  try {
-    fs.appendFileSync(getLogFilePath(), `[${timestamp}] [LOG] ${message}\n`);
-  } catch (err) {
-    originalError('로그 파일 쓰기 실패:', err);
+
+  originalLog(...args); // 터미널 출력 (항상)
+
+  // 🔇 파일 기록 필터링: 반복적인 디버그 로그는 파일에 쓰지 않음
+  const skipFilePatterns = [
+    '[VerifyToken]',           // 토큰 검증 로그
+    'JWT_SECRET 상태',         // JWT 시크릿 로그
+    'GET /orders',             // 주문 조회 (10초마다)
+    'GET /balance',            // 잔액 조회 (10초마다)
+    'GET /api/exchange/orders', // 익스체인지 주문
+    'GET /api/exchange/balance',// 익스체인지 잔액
+    'GET /api/auth/balance',   // 인증 잔액
+    'GET /all-orders',         // 전체 주문
+    'GET /api/exchange/all-orders'
+  ];
+
+  const shouldSkipFile = skipFilePatterns.some(pattern => message.includes(pattern));
+
+  if (!shouldSkipFile) {
+    try {
+      fs.appendFileSync(getLogFilePath(), `[${timestamp}] [LOG] ${message}\n`);
+    } catch (err) {
+      originalError('로그 파일 쓰기 실패:', err);
+    }
   }
 };
 
