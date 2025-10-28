@@ -1493,7 +1493,7 @@ class MultibetSettlementService {
           settledAt: null
         },
         order: [['createdAt', 'ASC']],
-        limit: 50
+        limit: 200
       });
 
       // 2단계: settled 상태지만 미정산 매칭이 있는 레이 주문 추가
@@ -1507,7 +1507,7 @@ class MultibetSettlementService {
           AND eo."settledAt" IS NOT NULL
           AND eom.status = 'active'
           AND eom."settledAt" IS NULL
-        LIMIT 50
+        LIMIT 200
       `, {
         type: sequelize.QueryTypes.SELECT
       });
@@ -1846,7 +1846,7 @@ class MultibetSettlementService {
           
           await PaymentHistory.create({
             userId: backOrder.userId,
-            betId: `EXCHANGE_${backOrder.id}_MATCH_${match.id}`,
+            betId: `EXCHANGE_${backOrder.id}_MATCH_${layOrder.id}`,
             amount: backActualProfit,  // ✅ Pot 획득 금액
             balanceAfter: newBackBalance,
             memo: `Exchange 멀티베팅 제로썸 정산 (레이 주문 ${layOrder.id} 매치 ${match.id}: ${backResult})`,
