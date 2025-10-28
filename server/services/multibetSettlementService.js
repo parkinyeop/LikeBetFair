@@ -137,11 +137,25 @@ class MultibetSettlementService {
         return { message: 'Unmatched order cancelled', orderId: order.id };
       }
 
-      // 🔧 settled 상태이고 settledAt이 설정된 주문은 재정산하지 않음
-      if (order.status === 'settled' && order.settledAt) {
-        console.log(`⏭️  주문 ${order.id}: 이미 정산 완료 (settled + settledAt 설정) - 정산 건너뜀`);
-        await transaction.commit();
-        return { message: 'Already settled', orderId: order.id };
+      // 🔧 settled 상태여도 미정산 매칭이 있으면 정산 진행
+      if (order.status === 'settled') {
+        // 미정산 매칭이 있는지 확인
+        const activeMatches = await ExchangeOrderMatch.findAll({
+          where: {
+            [Op.or]: [
+              { originalOrderId: order.id },
+              { matchingOrderId: order.id }
+            ],
+            status: 'active',
+            settledAt: null
+          },
+          transaction
+        });
+
+        if (activeMatches.length === 0) {
+          await transaction.commit();
+          return { message: 'Already settled', orderId: order.id };
+        }
       }
 
       // 2단계: selectionDetails 결정
@@ -956,8 +970,8 @@ class MultibetSettlementService {
       console.log(`   📦 Pot #${match.id}: ${finalPot.toLocaleString()}원 (원본)`);
 
       // ✅ Push 처리: 멀티배팅에서 cancelled가 있으면 배당률 재계산
-      const hasPush = gameResults.some(gr => gr.result === 'cancelled');
-      
+      const hasPush = gameResults.some(gr => gr.gameResult?.result === 'cancelled');
+
       if (hasPush && order.isMultibet) {
         // 원래 배당률과 조정된 배당률 계산
         const originalOdds = Number(order.totalOdds || order.price || 1.0);
@@ -1008,22 +1022,22 @@ class MultibetSettlementService {
   /**
    * 조정된 배당률 계산 (Push 반영)
    * @param {Object} order - 주문
-   * @param {Array} gameResults - 경기 결과 배열
+   * @param {Array} gameResults - 경기 결과 배열 (구조: [{ selection, gameResult, index }, ...])
    * @returns {number} 조정된 배당률
    */
   calculateAdjustedOddsFromResults(order, gameResults) {
     const selections = order.selectionDetails?.selections || [];
-    
+
     if (selections.length === 0 || gameResults.length === 0) {
       return Number(order.totalOdds || order.price || 1.0);
     }
-    
+
     let adjustedOdds = 1.0;
-    
+
     for (let i = 0; i < Math.min(selections.length, gameResults.length); i++) {
       const selection = selections[i];
-      const gameResult = gameResults[i];
-      
+      const { gameResult } = gameResults[i];  // ✅ 구조분해: gameResult 추출
+
       if (gameResult?.result === 'won') {
         // 승리한 경기: 원래 배당률
         adjustedOdds *= (selection.odds || 1.0);
@@ -1033,7 +1047,7 @@ class MultibetSettlementService {
       }
       // lost는 이미 승패 판정에서 처리됨
     }
-    
+
     return adjustedOdds;
   }
 
@@ -1469,10 +1483,34 @@ class MultibetSettlementService {
         limit: 50
       });
 
-      // 🚫 settled 상태의 주문은 재정산하지 않음 (중복 정산 방지)
-      // settled 상태의 주문은 이미 정산이 완료되었으므로 재정산 대상에서 제외
+      // 2단계: settled 상태지만 미정산 매칭이 있는 레이 주문 추가
+      const settledLaysWithActiveMatches = await sequelize.query(`
+        SELECT DISTINCT eo.id
+        FROM "ExchangeOrders" eo
+        INNER JOIN "ExchangeOrderMatches" eom ON (eom."originalOrderId" = eo.id OR eom."matchingOrderId" = eo.id)
+        WHERE eo."isMultibet" = true
+          AND eo.side = 'lay'
+          AND eo.status = 'settled'
+          AND eo."settledAt" IS NOT NULL
+          AND eom.status = 'active'
+          AND eom."settledAt" IS NULL
+        LIMIT 50
+      `, {
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      const additionalLayOrderIds = settledLaysWithActiveMatches.map(row => row.id);
       
-      const unsettledOrders = unsettledLayOrders;
+      let additionalLayOrders = [];
+      if (additionalLayOrderIds.length > 0) {
+        additionalLayOrders = await ExchangeOrder.findAll({
+          where: { id: additionalLayOrderIds }
+        });
+        console.log(`🔧 settled 상태지만 미정산 매칭이 있는 레이 주문: ${additionalLayOrders.length}개 추가`);
+      }
+
+      // 합치기
+      const unsettledOrders = [...unsettledLayOrders, ...additionalLayOrders];
 
       console.log(`📋 정산 대상 멀티배팅 주문: ${unsettledOrders.length}개`);
 
@@ -1633,10 +1671,9 @@ class MultibetSettlementService {
           backActualProfit = 0;
           console.log(`       💸 백 패배: Pot 손실`);
         } else {
-          // 취소: 담보금 환불
-          const backStake = backOrder.stakeAmount || 0;
-          backActualProfit = backStake;
-          console.log(`       🔄 취소 환불: ${backActualProfit.toLocaleString()}원`);
+          // 취소: Pot 전체 환불 (백담보 + 레이담보)
+          backActualProfit = potAmount;
+          console.log(`       🔄 취소 환불: Pot 전체 ${backActualProfit.toLocaleString()}원`);
         }
 
         // ✅ FIX: 백 주문 업데이트 (actualProfit 누적)
