@@ -61,8 +61,7 @@ console.log(`[SCHEDULER_SYSTEM_FLAG] ✅ Flags reset - isUpdatingOdds: ${isUpdat
 
 // 스케줄러 상태 모니터링 및 효율성 리포팅 (30분마다)
 setInterval(() => {
-  console.log('[SCHEDULER_STATUS] 💓 isUpdatingOdds:', isUpdatingOdds);
-  console.log('[SCHEDULER_STATUS] 💓 isUpdatingResults:', isUpdatingResults);
+  // 스케줄러 상태는 scheduler_*.log에만 기록 (서버 로그 중복 방지)
 
   // ✅ 효율성 리포팅
   const currentTime = Date.now();
@@ -71,11 +70,7 @@ setInterval(() => {
   if (timeSinceLastLog >= 30) { // 30분마다 효율성 리포트
     const efficiencyRate = totalSchedulerRuns > 0 ? ((skippedRuns / totalSchedulerRuns) * 100).toFixed(1) : 0;
 
-    console.log('📊 [SCHEDULER_EFFICIENCY] 최적화 성과 리포트:');
-    console.log(`   총 실행 횟수: ${totalSchedulerRuns}`);
-    console.log(`   건너뛴 횟수: ${skippedRuns}`);
-    console.log(`   효율성 개선율: ${efficiencyRate}%`);
-    console.log(`   리소스 절약: CPU/DB 연결 ${efficiencyRate}% 절약`);
+    // 효율성 리포트는 scheduler_*.log에만 기록
 
     // 로그 저장
     saveUpdateLog('scheduler_efficiency', 'report', {
@@ -112,7 +107,7 @@ let activeCategories = new Set([
 // 활성 카테고리 관리 함수
 const updateActiveCategories = (categories) => {
   activeCategories = new Set(categories);
-  console.log(`[${new Date().toISOString()}] Active categories updated:`, Array.from(activeCategories));
+  // 카테고리 변경은 scheduler_*.log에만 기록됨 (서버 로그 중복 방지)
 };
 
 // 로그 디렉토리 생성
@@ -195,12 +190,9 @@ function saveUpdateLog(type, status, data = {}) {
   
   const logLine = JSON.stringify(logEntry) + '\n';
   fs.appendFileSync(logFile, logLine);
-  
-  // 콘솔 출력 최적화 - 스케줄러 검색 키워드 추가
-  const emoji = status === 'success' ? '✅' : status === 'error' ? '❌' : '🚀';
-  const message = cleanData.message || '';
-  const searchKeyword = `[SCHEDULER_${type.toUpperCase()}]`; // 검색용 키워드
-  console.log(`${searchKeyword} ${emoji} [${now.toISOString()}] ${type.toUpperCase()} ${status.toUpperCase()}: ${message}`);
+
+  // 전용 로그 파일에만 기록 (서버 로그 중복 방지)
+  // game_results_*.log, odds_data_*.log, bet_results_*.log, scheduler_*.log
 }
 
 // 타임아웃 래퍼 함수

@@ -29,11 +29,8 @@ class SettlementLogger {
     }
     
     logEntry += '\n' + '─'.repeat(80) + '\n';
-    
-    // 콘솔 출력
-    console.log(logEntry);
-    
-    // 파일 기록 (데일리 로그)
+
+    // settlement-*.log 파일에만 기록 (서버 로그 중복 방지)
     try {
       const logFile = this.getLogFilePath();
       fs.appendFileSync(logFile, logEntry);

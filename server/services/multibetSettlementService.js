@@ -1164,47 +1164,34 @@ class MultibetSettlementService {
       // ✅ Push로 인한 Lay 환불 처리
       if (this.pendingLayRefund && this.pendingLayRefund > 0) {
         console.log(`🔄 Push로 인한 Lay 환불 처리: ${this.pendingLayRefund.toLocaleString()}원`);
+        console.log(`   현재 주문: ${order.id} (side: ${order.side})`);
         
-        // Lay 주문 찾기 (매칭된 주문)
-        for (const match of matches) {
-          const isOriginalOrder = (match.originalOrderId === order.id);
-          const layOrderId = isOriginalOrder ? match.matchingOrderId : match.originalOrderId;
-          const layOrderSide = isOriginalOrder ? match.matchingSide : match.originalSide;
-          
-          // Lay 주문인 경우만 환불
-          if (layOrderSide === 'lay') {
-            const layOrder = await ExchangeOrder.findByPk(layOrderId, { transaction });
-            const layUser = await User.findByPk(layOrder.userId, { transaction });
-            
-            if (layUser) {
-              const refundAmount = this.pendingLayRefund;
-              const currentLayBalance = parseFloat(layUser.balance) || 0;
-              const newLayBalance = Math.round(currentLayBalance + refundAmount);
-              
-              await layUser.update({ balance: newLayBalance }, { transaction });
-              
-              // PaymentHistory 기록
-              await PaymentHistory.create({
-                userId: layUser.id,
-                betId: `EXCHANGE_${layOrderId}`,
-                amount: refundAmount,
-                balanceAfter: newLayBalance,
-                memo: `멀티배팅 Push 환불 (배당률 조정으로 인한 Lay 담보금 환불) - 주문 #${order.id}`,
-                transactionType: 'exchange_push_refund',
-                status: 'completed',
-                relatedOrderId: layOrderId,
-                metadata: {
-                  reason: 'multibet_push',
-                  originalOrderId: order.id,
-                  matchId: match.id
-                },
-                paidAt: new Date()
-              }, { transaction });
-              
-              console.log(`✅ Lay 환불 완료: 사용자 ${layUser.id}, ${refundAmount.toLocaleString()}원`);
-            }
-          }
-        }
+        const refundAmount = this.pendingLayRefund;
+        
+        // 환불 금액을 잔액에 추가하고 PaymentHistory 기록
+        const currentBalance = parseFloat(user.balance) || 0;
+        const newBalance = Math.round(currentBalance + refundAmount);
+        
+        await user.update({ balance: newBalance }, { transaction });
+        
+        await PaymentHistory.create({
+          userId: user.id,
+          betId: `EXCHANGE_${order.id}_PUSH_REFUND`,
+          amount: refundAmount,
+          balanceAfter: newBalance,
+          memo: `멀티배팅 Push 환불 (배당률 조정으로 인한 Lay 담보금 환불) - 주문 #${order.id}`,
+          transactionType: 'exchange_push_refund',
+          status: 'completed',
+          relatedOrderId: order.id,
+          metadata: {
+            reason: 'multibet_push',
+            originalOrderId: order.id
+          },
+          paidAt: new Date()
+        }, { transaction });
+        
+        console.log(`✅ Lay 환불 완료: 사용자 ${user.id}, ${refundAmount.toLocaleString()}원`);
+        console.log(`   잔액 변화: ${currentBalance.toLocaleString()}원 → ${newBalance.toLocaleString()}원`);
         
         // 환불 완료 후 초기화
         this.pendingLayRefund = 0;
