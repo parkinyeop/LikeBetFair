@@ -811,7 +811,14 @@ class MultibetSettlementService {
     // ✅ gameResults 전달하여 Push 처리
     const profit = await this.calculateProfit(order, finalResult, settlementResult.gameResults);
 
+    // ✅ 제로썸 정산: 레이 주문 정산 시에만 매칭된 백 주문들을 먼저 정산 (중복 방지)
+    // Back 주문은 자체 정산에서 이미 Pot을 받았으므로 settleMatchedBackOrders 불필요
+    if (order.side === 'lay') {
+      await this.settleMatchedBackOrders(order, finalResult, transaction);
+    }
+
     // 🔧 모든 매칭이 정산되었는지 확인하여 status와 settledAt 결정
+    // ✅ settleMatchedBackOrders 실행 후에 확인하여 정확한 상태 반영
     const matches = await ExchangeOrderMatch.findAll({
       where: {
         [Op.or]: [
@@ -824,10 +831,10 @@ class MultibetSettlementService {
 
     // 미정산 매칭 확인
     const unsettledMatches = matches.filter(m => m.status === 'active' || !m.settledAt);
-    
+
     let orderStatus;
     let shouldSetSettledAt;
-    
+
     if (finalResult === 'cancelled') {
       orderStatus = 'cancelled';
       shouldSetSettledAt = true;
@@ -849,15 +856,9 @@ class MultibetSettlementService {
       actualProfit: profit,
       profitLoss: profit
     }, { transaction });
-    
+
     // 정산 결과에 따른 결제 처리
     await this.processPayment(order, finalResult, settlementResult, transaction);
-
-    // ✅ 제로썸 정산: 레이 주문 정산 시에만 매칭된 백 주문들을 함께 정산 (중복 방지)
-    // Back 주문은 자체 정산에서 이미 Pot을 받았으므로 settleMatchedBackOrders 불필요
-    if (order.side === 'lay') {
-      await this.settleMatchedBackOrders(order, finalResult, transaction);
-    }
     
     // ✅ 부분 매칭 환불 처리
     if (order.partiallyFilled && order.remainingAmount > 0) {
@@ -1446,13 +1447,25 @@ class MultibetSettlementService {
     const { summary } = settlementResult;
     const gameCount = summary.total;
     const wonCount = summary.won;
-    
+    const cancelledCount = summary.cancelled;
+    const activeGameCount = gameCount - cancelledCount; // Push 제외한 실제 경기 수
+
     if (result === 'cancelled') {
-      return `Exchange 멀티배팅 취소 환불 (${gameCount}개 경기 중 ${summary.cancelled}개 취소) - 환불: ${profit}원`;
+      return `Exchange 멀티배팅 취소 환불 (${gameCount}개 경기 중 ${cancelledCount}개 취소) - 환불: ${profit}원`;
     } else if (result === 'won') {
-      return `Exchange 멀티배팅 승리 수익 (${gameCount}개 경기 모두 승리) - 수익: ${profit}원`;
+      // Push가 있는 경우와 없는 경우 구분
+      if (cancelledCount > 0) {
+        return `Exchange 멀티배팅 승리 수익 (${activeGameCount}개 경기 승리, ${cancelledCount}개 Push) - 수익: ${profit}원`;
+      } else {
+        return `Exchange 멀티배팅 승리 수익 (${gameCount}개 경기 모두 승리) - 수익: ${profit}원`;
+      }
     } else {
-      return `Exchange 멀티배팅 패배 손실 (${gameCount}개 경기 중 ${wonCount}개 승리) - 손실: ${Math.abs(profit)}원`;
+      // Lost: Push 제외한 경기 수로 표시
+      if (cancelledCount > 0) {
+        return `Exchange 멀티배팅 패배 손실 (${activeGameCount}개 경기 중 ${wonCount}개 승리, ${cancelledCount}개 Push) - 손실: ${Math.abs(profit)}원`;
+      } else {
+        return `Exchange 멀티배팅 패배 손실 (${gameCount}개 경기 중 ${wonCount}개 승리) - 손실: ${Math.abs(profit)}원`;
+      }
     }
   }
 
@@ -1658,12 +1671,101 @@ class MultibetSettlementService {
 
         console.log(`       레이 결과: ${layResult} → 백 결과: ${backResult}`);
 
-        // 🎯 Pot 기반 정산
-        const potAmount = Number(match.potAmount || 0);
+        // 🎯 Pot 기반 정산 (Push 처리 포함)
+        let potAmount = Number(match.potAmount || 0);
         let backActualProfit = 0;
+        let layRefundAmount = 0; // Lay 환불액
+
+        // ✅ Push 처리: 레이 주문에 Push가 있으면 Pot 재계산
+        if (layOrder.isMultibet && layOrder.selectionDetails) {
+          // 레이 주문의 배당률 정보 확인
+          const selections = layOrder.selectionDetails.selections || [];
+
+          // 원래 배당률
+          let originalOdds = 1.0;
+          selections.forEach(s => originalOdds *= (s.odds || 1.0));
+
+          // 조정된 배당률 계산 (gameResults 필요 - selectionDetails의 각 경기 확인)
+          // 간단히 layResult === 'won'이고 isMultibet이면 Push가 포함되었을 가능성 체크
+          // 더 정확한 방법: GameResults 조회하여 cancelled 확인
+
+          // 임시: layOrder에 저장된 조정 정보가 있는지 확인
+          // 실제로는 gameResults를 다시 조회해야 함
+
+          // GameResults 조회하여 Push 확인
+          const gameIds = selections.map(s => s.gameId).filter(Boolean);
+
+          if (gameIds.length > 0) {
+            const GameResult = (await import('../models/gameResultModel.js')).default;
+            const gameResults = await GameResult.findAll({
+              where: {
+                id: gameIds
+              },
+              transaction
+            });
+
+            // 각 경기의 결과 확인
+            const hasCancelled = gameResults.some(gr => gr.result === 'cancelled');
+
+            if (hasCancelled || gameResults.some(gr => {
+              // 총점 Push 확인
+              const selection = selections.find(s => s.gameId === gr.id && s.market === '총점');
+              if (selection && gr.score) {
+                const homeScore = parseInt(gr.score[0]?.score || 0);
+                const awayScore = parseInt(gr.score[1]?.score || 0);
+                const totalScore = homeScore + awayScore;
+                const match = selection.team?.match(/^(Under|Over)\s+([\d.]+)$/);
+                if (match) {
+                  const point = parseFloat(match[2]);
+                  return totalScore === point; // Push 조건
+                }
+              }
+              // 핸디캡 Push 확인도 필요하면 추가
+              return false;
+            })) {
+              console.log(`       🔄 Push 감지: Pot 재계산 필요`);
+
+              // 조정된 배당률 계산
+              let adjustedOdds = 1.0;
+              for (const selection of selections) {
+                const gr = gameResults.find(g => g.id === selection.gameId);
+                if (!gr) continue;
+
+                // 총점 판정
+                if (selection.market === '총점' && gr.score) {
+                  const homeScore = parseInt(gr.score[0]?.score || 0);
+                  const awayScore = parseInt(gr.score[1]?.score || 0);
+                  const totalScore = homeScore + awayScore;
+                  const match = selection.team?.match(/^(Under|Over)\s+([\d.]+)$/);
+                  if (match) {
+                    const point = parseFloat(match[2]);
+                    if (totalScore === point) {
+                      adjustedOdds *= 1.0; // Push
+                      continue;
+                    }
+                  }
+                }
+
+                adjustedOdds *= (selection.odds || 1.0);
+              }
+
+              console.log(`       배당률: ${originalOdds.toFixed(3)} → ${adjustedOdds.toFixed(3)}`);
+
+              // Pot 재계산
+              const backStake = Number(match.backStake || 0);
+              const originalLayStake = Number(match.layStake || 0);
+              const adjustedLayStake = backStake * (adjustedOdds - 1);
+              layRefundAmount = originalLayStake - adjustedLayStake;
+
+              potAmount = backStake + adjustedLayStake;
+              console.log(`       조정된 Pot: ${match.potAmount} → ${potAmount.toLocaleString()}원`);
+              console.log(`       Lay 환불: ${layRefundAmount.toLocaleString()}원`);
+            }
+          }
+        }
 
         if (backResult === 'won') {
-          // 백 승리: Pot 전체 획득
+          // 백 승리: 조정된 Pot 획득
           backActualProfit = potAmount;
           console.log(`       🏆 백 승리: Pot ${potAmount.toLocaleString()}원 획득`);
         } else if (backResult === 'lost') {
@@ -1671,9 +1773,15 @@ class MultibetSettlementService {
           backActualProfit = 0;
           console.log(`       💸 백 패배: Pot 손실`);
         } else {
-          // 취소: Pot 전체 환불 (백담보 + 레이담보)
-          backActualProfit = potAmount;
-          console.log(`       🔄 취소 환불: Pot 전체 ${backActualProfit.toLocaleString()}원`);
+          // 취소: 백 담보금만 환불 (레이도 자기 담보금 환불받아야 함)
+          const backStake = Number(match.backStake || 0);
+          backActualProfit = backStake;
+          console.log(`       🔄 취소 환불: 백 담보금 ${backActualProfit.toLocaleString()}원 (Pot ${potAmount.toLocaleString()}원 중)`);
+
+          // 레이 환불 (레이도 자기 담보금만)
+          const layStake = Number(match.layStake || 0);
+          layRefundAmount = layStake;
+          console.log(`       🔄 레이도 취소: 레이 담보금 ${layRefundAmount.toLocaleString()}원 환불 필요`);
         }
 
         // ✅ FIX: 백 주문 업데이트 (actualProfit 누적)
@@ -1758,8 +1866,46 @@ class MultibetSettlementService {
           console.log(`       📝 PaymentHistory 기록: ${backActualProfit.toLocaleString()}원 (주문: ${backOrder.id}, 매치: ${match.id})`);
         }
 
+        // ✅ Push로 인한 Lay 환불 처리
+        if (layRefundAmount > 0) {
+          console.log(`       🔄 Push 환불: 레이 주문 ${layOrder.id}에게 ${layRefundAmount.toLocaleString()}원 환불`);
+
+          const layUser = await User.findByPk(layOrder.userId, { transaction });
+          const currentLayBalance = parseFloat(layUser.balance);
+          const newLayBalance = currentLayBalance + layRefundAmount;
+
+          await layUser.update({ balance: newLayBalance }, { transaction });
+
+          console.log(`       💰 레이 잔액: ${currentLayBalance.toLocaleString()} + ${layRefundAmount.toLocaleString()} = ${newLayBalance.toLocaleString()}원`);
+
+          // PaymentHistory 기록
+          const { TransactionType } = await import('../types/paymentHistory.js');
+
+          await PaymentHistory.create({
+            userId: layOrder.userId,
+            betId: `EXCHANGE_${layOrder.id}_PUSH_REFUND_${match.id}`,
+            amount: layRefundAmount,
+            balanceAfter: newLayBalance,
+            memo: `Exchange 멀티베팅 Push 환불 (매치 ${match.id}: 배당률 조정으로 담보금 일부 환불)`,
+            transactionType: TransactionType.EXCHANGE_MULTIBET_SETTLEMENT,
+            status: 'completed',
+            relatedOrderId: layOrder.id,
+            relatedMatchId: match.id,
+            metadata: {
+              matchId: match.id,
+              refundType: 'push_refund',
+              originalLayStake: Number(match.layStake || 0),
+              adjustedLayStake: Number(match.layStake || 0) - layRefundAmount,
+              refundAmount: layRefundAmount
+            },
+            paidAt: new Date()
+          }, { transaction });
+
+          console.log(`       📝 Push 환불 PaymentHistory 기록: ${layRefundAmount.toLocaleString()}원`);
+        }
+
       }
-      
+
       console.log(`\n   ✅ 제로썸 정산 완료: ${matches.length}개 백 주문 정산됨\n`);
       
     } catch (error) {

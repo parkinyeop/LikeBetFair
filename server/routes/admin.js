@@ -732,8 +732,8 @@ router.get('/exchange/orders/:orderId/matches', verifyToken, requireAdmin(1), as
             where: {
               commenceTime: {
                 [Op.between]: [
-                  new Date(new Date(selection.commenceTime).getTime() - 12 * 60 * 60 * 1000), // ±12시간
-                  new Date(new Date(selection.commenceTime).getTime() + 12 * 60 * 60 * 1000)
+                  new Date(new Date(selection.commenceTime).getTime() - 2 * 60 * 60 * 1000), // ±2시간
+                  new Date(new Date(selection.commenceTime).getTime() + 2 * 60 * 60 * 1000)
                 ]
               }
             },
@@ -786,8 +786,8 @@ router.get('/exchange/orders/:orderId/matches', verifyToken, requireAdmin(1), as
           where: {
             commenceTime: {
               [Op.between]: [
-                new Date(new Date(originalOrder.commenceTime).getTime() - 12 * 60 * 60 * 1000), // ±12시간
-                new Date(new Date(originalOrder.commenceTime).getTime() + 12 * 60 * 60 * 1000)
+                new Date(new Date(originalOrder.commenceTime).getTime() - 2 * 60 * 60 * 1000), // ±2시간
+                new Date(new Date(originalOrder.commenceTime).getTime() + 2 * 60 * 60 * 1000)
               ]
             }
           },
