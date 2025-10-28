@@ -81,6 +81,19 @@ export default function PaymentsTab({ viewUserId }: { viewUserId?: string }) {
         // EXCHANGE_123 형식인 경우
         if (value.startsWith('EXCHANGE_')) {
           const orderId = value.replace('EXCHANGE_', '');
+          
+          // EXCHANGE_779_MATCH_784 형식인 경우 (백 주문과 레이 주문 표시)
+          if (orderId.includes('_MATCH_')) {
+            const parts = orderId.split('_MATCH_');
+            const backOrder = parts[0];
+            const layOrder = parts[1];
+            return (
+              <span className="text-blue-600 font-mono text-xs">
+                백 #{backOrder} ↔ 레이 #{layOrder}
+              </span>
+            );
+          }
+          
           return (
             <span className="text-blue-600 font-mono text-xs">
               익스체인지 #{orderId}
