@@ -971,33 +971,40 @@ class MultibetSettlementService {
       console.log(`   📦 Pot #${match.id}: ${finalPot.toLocaleString()}원 (원본)`);
 
       // ✅ Push 처리: 멀티배팅에서 cancelled가 있으면 배당률 재계산
+      // ⚠️ 중요: 진짜 멀티배팅(selectionCount > 1)만 처리
+      // 단일 경기 주문이 isMultibet=true로 잘못 표시된 경우 제외
       const hasPush = gameResults.some(gr => gr.gameResult?.result === 'cancelled');
+      const selectionCount = order.selectionCount || (order.selectionDetails?.selections?.length) || 1;
+      const isRealMultibet = order.isMultibet && selectionCount > 1;
 
-      if (hasPush && order.isMultibet) {
+      if (hasPush && isRealMultibet) {
         // 원래 배당률과 조정된 배당률 계산
         const originalOdds = Number(order.totalOdds || order.price || 1.0);
         const adjustedOdds = this.calculateAdjustedOddsFromResults(order, gameResults);
-        
+
         console.log(`   🔄 Push 감지: 배당률 ${originalOdds.toFixed(3)} → ${adjustedOdds.toFixed(3)}`);
-        
+
         // Back 담보금과 Lay 담보금
         const backStake = Number(match.backStake || 0);
         const originalLayStake = Number(match.layStake || 0);
-        
+
         // 새로운 Lay 담보금 계산 (조정된 배당률 기준)
         const newLayStake = backStake * (adjustedOdds - 1);
-        
+
         // Lay 환불 금액
         const layRefund = originalLayStake - newLayStake;
-        
+
         if (layRefund > 0) {
           totalLayRefund += layRefund;
           console.log(`   💸 Lay 환불: ${layRefund.toLocaleString()}원 (${originalLayStake.toLocaleString()} → ${newLayStake.toLocaleString()})`);
         }
-        
+
         // 새로운 Pot = Back 담보 + 새 Lay 담보
         finalPot = backStake + newLayStake;
         console.log(`   📦 조정된 Pot: ${finalPot.toLocaleString()}원`);
+      } else if (hasPush && order.isMultibet && !isRealMultibet) {
+        // 단일 경기인데 isMultibet=true로 잘못 표시된 경우 경고 로그
+        console.log(`   ⚠️  주문 ${order.id}: 단일 경기(selectionCount=${selectionCount})인데 isMultibet=true로 표시됨 - Push 환불 건너뜀`);
       }
 
       // 🎯 핵심: 승리 시 Pot 전체, 패배 시 0원
@@ -1665,7 +1672,11 @@ class MultibetSettlementService {
         let adjustedOdds = null; // Push 조정 배당률
 
         // ✅ Push 처리: 레이 주문에 Push가 있으면 Pot 재계산
-        if (layOrder.isMultibet && layOrder.selectionDetails) {
+        // ⚠️ 중요: 진짜 멀티배팅(selectionCount > 1)만 처리
+        const laySelectionCount = layOrder.selectionCount || (layOrder.selectionDetails?.selections?.length) || 1;
+        const isRealLayMultibet = layOrder.isMultibet && laySelectionCount > 1;
+
+        if (isRealLayMultibet && layOrder.selectionDetails) {
           // 레이 주문의 배당률 정보 확인
           const selections = layOrder.selectionDetails.selections || [];
 
@@ -1756,7 +1767,7 @@ class MultibetSettlementService {
           // 백 승리: 백 stake 지분 × 배당률 지급
           const backStake = Number(match.backStake || 0);
           // 조정된 배당률이 있으면 사용 (Push 발생 시), 없으면 원래 배당률
-          const odds = adjustedOdds || backOrder.totalOdds || backOrder.price || 1.0;
+          const odds = Number(adjustedOdds || backOrder.totalOdds || backOrder.price || 1.0);
           backActualProfit = backStake * odds;
           console.log(`       🏆 백 승리: 백 stake ${backStake.toLocaleString()}원 × ${odds.toFixed(3)} = ${backActualProfit.toLocaleString()}원`);
         } else if (backResult === 'lost') {
