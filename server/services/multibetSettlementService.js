@@ -1675,6 +1675,7 @@ class MultibetSettlementService {
         let potAmount = Number(match.potAmount || 0);
         let backActualProfit = 0;
         let layRefundAmount = 0; // Lay 환불액
+        let adjustedOdds = null; // Push 조정 배당률
 
         // ✅ Push 처리: 레이 주문에 Push가 있으면 Pot 재계산
         if (layOrder.isMultibet && layOrder.selectionDetails) {
@@ -1726,7 +1727,7 @@ class MultibetSettlementService {
               console.log(`       🔄 Push 감지: Pot 재계산 필요`);
 
               // 조정된 배당률 계산
-              let adjustedOdds = 1.0;
+              adjustedOdds = 1.0;
               for (const selection of selections) {
                 const gr = gameResults.find(g => g.id === selection.gameId);
                 if (!gr) continue;
@@ -1765,9 +1766,12 @@ class MultibetSettlementService {
         }
 
         if (backResult === 'won') {
-          // 백 승리: 조정된 Pot 획득
-          backActualProfit = potAmount;
-          console.log(`       🏆 백 승리: Pot ${potAmount.toLocaleString()}원 획득`);
+          // 백 승리: 백 stake 지분 × 배당률 지급
+          const backStake = Number(match.backStake || 0);
+          // 조정된 배당률이 있으면 사용 (Push 발생 시), 없으면 원래 배당률
+          const odds = adjustedOdds || backOrder.totalOdds || backOrder.price || 1.0;
+          backActualProfit = backStake * odds;
+          console.log(`       🏆 백 승리: 백 stake ${backStake.toLocaleString()}원 × ${odds.toFixed(3)} = ${backActualProfit.toLocaleString()}원`);
         } else if (backResult === 'lost') {
           // 백 패배: 0원
           backActualProfit = 0;
@@ -1866,43 +1870,7 @@ class MultibetSettlementService {
           console.log(`       📝 PaymentHistory 기록: ${backActualProfit.toLocaleString()}원 (주문: ${backOrder.id}, 매치: ${match.id})`);
         }
 
-        // ✅ Push로 인한 Lay 환불 처리
-        if (layRefundAmount > 0) {
-          console.log(`       🔄 Push 환불: 레이 주문 ${layOrder.id}에게 ${layRefundAmount.toLocaleString()}원 환불`);
-
-          const layUser = await User.findByPk(layOrder.userId, { transaction });
-          const currentLayBalance = parseFloat(layUser.balance);
-          const newLayBalance = currentLayBalance + layRefundAmount;
-
-          await layUser.update({ balance: newLayBalance }, { transaction });
-
-          console.log(`       💰 레이 잔액: ${currentLayBalance.toLocaleString()} + ${layRefundAmount.toLocaleString()} = ${newLayBalance.toLocaleString()}원`);
-
-          // PaymentHistory 기록
-          const { TransactionType } = await import('../types/paymentHistory.js');
-
-          await PaymentHistory.create({
-            userId: layOrder.userId,
-            betId: `EXCHANGE_${layOrder.id}_PUSH_REFUND_${match.id}`,
-            amount: layRefundAmount,
-            balanceAfter: newLayBalance,
-            memo: `Exchange 멀티베팅 Push 환불 (매치 ${match.id}: 배당률 조정으로 담보금 일부 환불)`,
-            transactionType: TransactionType.EXCHANGE_MULTIBET_SETTLEMENT,
-            status: 'completed',
-            relatedOrderId: layOrder.id,
-            relatedMatchId: match.id,
-            metadata: {
-              matchId: match.id,
-              refundType: 'push_refund',
-              originalLayStake: Number(match.layStake || 0),
-              adjustedLayStake: Number(match.layStake || 0) - layRefundAmount,
-              refundAmount: layRefundAmount
-            },
-            paidAt: new Date()
-          }, { transaction });
-
-          console.log(`       📝 Push 환불 PaymentHistory 기록: ${layRefundAmount.toLocaleString()}원`);
-        }
+        // 🔴 제거: 레이 환불은 processPayment에서 처리 (중복 방지)
 
       }
 
