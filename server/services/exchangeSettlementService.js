@@ -2902,7 +2902,8 @@ class ExchangeSettlementService {
       const allMatchedOrders = await ExchangeOrder.findAll({
         where: {
           status: { [Op.in]: ['open', 'active', 'matched', 'partially_matched'] },
-          side: 'lay'  // 🔧 레이 주문만 정산
+          side: 'lay',              // 🔧 레이 주문만 정산
+          isMultibet: false         // 🔴 멀티베팅 주문 제외 (멀티베팅 서비스에서 전담 처리)
           // settledAt 조건 제거 - 정산된 주문도 포함해서 쌍을 찾기 위해
         }
       });

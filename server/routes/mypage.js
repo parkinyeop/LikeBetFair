@@ -97,7 +97,15 @@ router.get('/payment-history', verifyToken, async (req, res) => {
     const payments = await PaymentHistory.findAll({
       where: whereCondition,
       order: [['paidAt', 'DESC']],
-      limit: 100
+      limit: 100,
+      include: [
+        {
+          model: ExchangeOrder,
+          as: 'relatedOrder',
+          attributes: ['id', 'side'],
+          required: false
+        }
+      ]
     });
 
     console.log('✅ [입출금 내역] 조회 결과:', {

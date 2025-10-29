@@ -85,4 +85,9 @@ import('./userModel.js').then(({ default: User }) => {
   PaymentHistory.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 });
 
+// ExchangeOrder 모델과의 연관관계 설정
+import('./exchangeOrderModel.js').then(({ default: ExchangeOrder }) => {
+  PaymentHistory.belongsTo(ExchangeOrder, { foreignKey: 'relatedOrderId', as: 'relatedOrder' });
+});
+
 export default PaymentHistory; 

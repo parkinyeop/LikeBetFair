@@ -1273,7 +1273,15 @@ router.get('/users/:userId/payment-history', verifyToken, requireAdmin(2), async
     const payments = await PaymentHistory.findAll({
       where,
       order: [['paidAt', 'DESC']],
-      limit: 1000
+      limit: 1000,
+      include: [
+        {
+          model: ExchangeOrder,
+          as: 'relatedOrder',
+          attributes: ['id', 'side'],
+          required: false
+        }
+      ]
     });
     
     res.json({ payments });

@@ -9,6 +9,11 @@ interface Payment {
   balanceAfter: number;
   memo: string;
   betId?: string;
+  relatedOrderId?: number;
+  relatedOrder?: {
+    id: number;
+    side: 'back' | 'lay';
+  };
 }
 
 export default function PaymentsTab({ viewUserId }: { viewUserId?: string }) {
@@ -76,12 +81,33 @@ export default function PaymentsTab({ viewUserId }: { viewUserId?: string }) {
       key: 'betId',
       label: '주문/배팅번호',
       render: (value: string | undefined, row: Payment) => {
+        // relatedOrder가 있는 경우 (익스체인지 주문 - side 포함)
+        if (row.relatedOrder) {
+          const orderTypeText = row.relatedOrder.side === 'back' ? '백' : '레이';
+          const colorClass = row.relatedOrder.side === 'back' ? 'text-blue-600' : 'text-pink-600';
+          return (
+            <span className={`${colorClass} font-mono text-xs font-semibold`}>
+              {orderTypeText} #{row.relatedOrder.id}
+            </span>
+          );
+        }
+
+        // relatedOrderId만 있는 경우 (orderType 정보 없음)
+        if (row.relatedOrderId) {
+          return (
+            <span className="text-blue-600 font-mono text-xs">
+              익스체인지 #{row.relatedOrderId}
+            </span>
+          );
+        }
+
+        // betId가 없는 경우
         if (!value) return '-';
-        
+
         // EXCHANGE_123 형식인 경우
         if (value.startsWith('EXCHANGE_')) {
           const orderId = value.replace('EXCHANGE_', '');
-          
+
           // EXCHANGE_779_MATCH_784 형식인 경우 (백 주문과 레이 주문 표시)
           if (orderId.includes('_MATCH_')) {
             const parts = orderId.split('_MATCH_');
@@ -93,14 +119,14 @@ export default function PaymentsTab({ viewUserId }: { viewUserId?: string }) {
               </span>
             );
           }
-          
+
           return (
             <span className="text-blue-600 font-mono text-xs">
               익스체인지 #{orderId}
             </span>
           );
         }
-        
+
         // UUID 형식인 경우 (스포츠북 배팅)
         if (value.includes('-')) {
           return (
@@ -109,7 +135,7 @@ export default function PaymentsTab({ viewUserId }: { viewUserId?: string }) {
             </span>
           );
         }
-        
+
         // 숫자만 있는 경우
         return (
           <span className="font-mono text-xs">
