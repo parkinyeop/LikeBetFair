@@ -280,13 +280,12 @@ cron.schedule('*/10 * * * *', async () => {
       existingGamesUpdated: updateResults?.updatedExistingCount || 0,
       skippedGames: updateResults?.skippedCount || 0,
       categoriesProcessed: updateResults?.categories?.length || 0,
-      updatedGamesDetails: updateResults?.updatedGamesDetails || [],
+      // updatedGamesDetails 제거 - 로그 파일 크기 최적화
       // ✨ 새로운 상세 정보
       sportsDBAPIProvided: updateResults?.sportsDBAPIProvided || 0,
       saved: updateResults?.saved || 0,
       updated: updateResults?.updated || 0,
-      savedGames: updateResults?.savedGames || [],
-      skippedGames: updateResults?.skippedGames || []
+      savedGames: updateResults?.savedGames || []
     };
     
     console.log('[SCHEDULER_RESULTS] ✅ Game results and bet results update completed:');
