@@ -1046,9 +1046,11 @@ class MultibetSettlementService {
         console.log(`   🔍 Lost 체크: 경기 ${gr.index || 'N/A'}, result=${result}`);
         return result === 'lost';
       });
+      const isMultibetOrder = Boolean(order?.isMultibet ?? (order?.selectionDetails?.selections?.length > 1));
+      console.log(`[SETTLE][PUSH][DECISION] orderId=${order.id} matchId=${match.id} values=${JSON.stringify({ hasPush, hasLost, isMultibet: isMultibetOrder, finalResult: result })}`);
       
       // Push 환불: 다른 경기에서 패배가 있더라도 Push가 발생하면 무조건 처리 (핸디캡 Push 우선 적용)
-      if (hasPush && order.isMultibet) {
+      if (hasPush && isMultibetOrder) {
         // 원래 배당률과 조정된 배당률 계산
         const originalOdds = Number(order.totalOdds || order.price || 1.0);
         const adjustedOdds = this.calculateAdjustedOddsFromResults(order, gameResults);
@@ -1073,16 +1075,23 @@ class MultibetSettlementService {
         
         // Lay 환불 금액
         const layRefund = originalLayStake - newLayStake;
+        console.log(`[SETTLE][LAY][CALC] orderId=${order.id} matchId=${match.id} values=${JSON.stringify({ backStake, originalLayStake, newLayStake, layRefund })}`);
         
         if (layRefund > 0) {
           totalLayRefund += layRefund;
           console.log(`   💸 Lay 환불: ${layRefund.toLocaleString()}원 (${originalLayStake.toLocaleString()} → ${newLayStake.toLocaleString()})`);
           console.log(`[SETTLE][LAY][ADJ] orderId=${order.id} matchId=${match.id} values=${JSON.stringify({ originalLayStake, newLayStake, layRefund })}`);
+        } else {
+          console.log(`[SETTLE][LAY][SKIP] orderId=${order.id} matchId=${match.id} values=${JSON.stringify({ reason: 'no_refund_needed', layRefund })}`);
         }
         
         // 새로운 Pot = Back 담보 + 새 Lay 담보
         finalPot = backStake + newLayStake;
         console.log(`   📦 조정된 Pot: ${finalPot.toLocaleString()}원`);
+      } else if (!hasPush) {
+        console.log(`[SETTLE][PUSH][SKIP] orderId=${order.id} matchId=${match.id} values=${JSON.stringify({ reason: 'no_push_detected', hasLost })}`);
+      } else if (!isMultibetOrder) {
+        console.log(`[SETTLE][PUSH][SKIP] orderId=${order.id} matchId=${match.id} values=${JSON.stringify({ reason: 'not_multibet_order' })}`);
       }
 
       // 🎯 핵심: 승리 시 Pot 전체, 패배 시 0원
@@ -1296,13 +1305,7 @@ class MultibetSettlementService {
             
             console.log(`   🔍 레이 주문 #${layOrderId} 결과 판단: ${layOrderResult} (현재 주문: ${order.side} ${result})`);
             
-            if (layOrderResult === 'lost') {
-              console.log(`   ⚠️  레이 주문 #${layOrderId} 패배: Push 환불 스킵 (제로썸 보장)`);
-              console.log(`   💡 Push 환불 금액 ${finalPushRefund.toLocaleString()}원은 백 주문 정산에 반영됨`);
-              continue; // 이 매치의 Push 환불 스킵
-            }
-            
-            console.log(`🔄 Push로 인한 Lay 환불 처리: 주문 #${layOrderId}, ${finalPushRefund.toLocaleString()}원`);
+            console.log(`🔄 Push로 인한 Lay 환불 처리: 주문 #${layOrderId}, ${finalPushRefund.toLocaleString()}원 (레이 결과: ${layOrderResult})`);
             const layOrder = await ExchangeOrder.findByPk(layOrderId, { transaction });
             const layUser = await User.findByPk(layOrder.userId, { transaction });
             
