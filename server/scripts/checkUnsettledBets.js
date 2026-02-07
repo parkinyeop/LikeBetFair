@@ -1,19 +1,10 @@
-import { Sequelize } from 'sequelize';
 import dotenv from 'dotenv';
+import createScriptSequelize from '../config/scriptDatabase.js';
 
 dotenv.config();
 
-// Render 데이터베이스 연결을 위한 Sequelize 인스턴스 생성
-const sequelize = new Sequelize({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  username: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  dialect: 'postgres',
-  logging: false,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
+// 스크립트 전용 Sequelize 인스턴스 생성
+const sequelize = createScriptSequelize();
 
 async function checkUnsettledBets() {
   try {

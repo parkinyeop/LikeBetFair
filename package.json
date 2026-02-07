@@ -7,6 +7,15 @@
     "build:fast": "NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS='--max-old-space-size=4096' next build --no-lint",
     "start": "npm run build:fast && cd server && node app.js",
     "start:server": "cd server && node app.js",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "cd server && node app.js",
+    "dev:client": "npx next dev",
+    "dev:fresh": "rm -rf .next && npm run dev",
+    "dev:watch": "concurrently \"npm run dev:server:watch\" \"npm run dev:client\"",
+    "dev:server:watch": "cd server && nodemon app.js --watch . --ext js,json",
+    "dev:restart": "npm run dev:stop && sleep 3 && npm run dev",
+    "dev:stop": "pkill -f 'next-server' 2>/dev/null || true; pkill -f 'next dev' 2>/dev/null || true; pkill -f 'concurrently' 2>/dev/null || true; lsof -t -i:5050 | xargs kill -9 2>/dev/null || true",
+    "dev:stop:wait": "npm run dev:stop && sleep 3 && echo 'Ready to restart'",
     "migrate": "cd server && node runMigrations.js",
     "lint": "next lint",
     "postinstall": "cd server && npm install --only=production",
@@ -28,8 +37,8 @@
     "autoprefixer": "^10.4.17",
     "axios": "^1.9.0",
     "bcryptjs": "^2.4.3",
+    "chart.js": "^4.5.0",
     "cheerio": "^1.1.0",
-    "concurrently": "^9.1.2",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^4.18.2",
@@ -42,7 +51,9 @@
     "pg-hstore": "^2.3.4",
     "postcss": "^8.4.35",
     "react": "^18.2.0",
+    "react-chartjs-2": "^5.3.0",
     "react-dom": "^18.2.0",
+    "react-hot-toast": "^2.6.0",
     "react-resizable-panels": "^3.0.3",
     "sequelize": "^6.37.7",
     "sqlite3": "^5.1.7",
@@ -52,8 +63,10 @@
     "zustand": "^5.0.5"
   },
   "devDependencies": {
+    "concurrently": "^9.2.0",
     "eslint": "^8.56.0",
-    "eslint-config-next": "14.1.0"
+    "eslint-config-next": "14.1.0",
+    "nodemon": "^3.1.10"
   },
   "type": "module"
 }

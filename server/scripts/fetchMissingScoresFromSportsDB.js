@@ -1,8 +1,12 @@
 import GameResult from '../models/gameResultModel.js';
 import axios from 'axios';
 import { normalizeTeamName } from '../normalizeUtils.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
 
-const API_KEY = '116108'; // 반드시 프리미엄 키 사용
+// 스크립트 전용 Sequelize 인스턴스 생성
+const sequelize = createScriptSequelize();
+
+const API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // 반드시 프리미엄 키 사용
 const BASE_URL = 'https://www.thesportsdb.com/api/v1/json';
 
 // 리그명 → SportsDB 리그ID 매핑 (필요시 확장)
@@ -84,6 +88,13 @@ async function main() {
   missingScores.forEach(g => {
     console.log(`${g.date} | ${g.homeTeam} vs ${g.awayTeam} | API: ${g.home} ${g.homeScore} - ${g.awayScore} ${g.away} | status: ${g.status}`);
   });
+  
+  // 데이터베이스 연결 종료
+  await sequelize.close();
 }
 
-main().catch(e => { console.error(e); process.exit(1); }); 
+main().catch(async (e) => { 
+  console.error(e); 
+  await sequelize.close();
+  process.exit(1); 
+}); 

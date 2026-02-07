@@ -1,7 +1,9 @@
 import GameResult from '../models/gameResultModel.js';
 import axios from 'axios';
+import createScriptSequelize from '../config/scriptDatabase.js';
+const sequelize = createScriptSequelize();
 
-const API_KEY = '116108'; // SportsDB API 키
+const API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // SportsDB API 키
 const BASE_URL = 'https://www.thesportsdb.com/api/v1/json';
 
 // 누락된 리그들의 SportsDB 리그 ID 매핑
@@ -76,9 +78,9 @@ async function collectMissingLeagueResults() {
             const status = mapStatus(event.strStatus);
             const result = getResult(homeScore, awayScore);
             
-            // 경기 시간 파싱 (기본값: 00:00:00)
+            // 경기 시간 파싱 (기본값: 00:00:00, UTC 기준)
             const timeStr = event.strTime || '00:00:00';
-            const commenceTime = new Date(`${event.dateEvent}T${timeStr}`);
+            const commenceTime = new Date(`${event.dateEvent}T${timeStr}Z`);
             
             // GameResult에 upsert
             await GameResult.upsert({
@@ -133,11 +135,23 @@ async function collectMissingLeagueResults() {
 
 // 스크립트 실행
 collectMissingLeagueResults()
-  .then(() => {
+  .then(async () => {
+
     console.log('스크립트 실행 완료');
     process.exit(0);
-  })
-  .catch(error => {
+  
+      // 데이터베이스 연결 종료
+      console.log('🔌 데이터베이스 연결 종료 중...');
+      await sequelize.close();
+      console.log('✅ 데이터베이스 연결 종료 완료');
+    })
+  .catch(async (error) => {
+
     console.error('스크립트 실행 중 에러:', error);
     process.exit(1);
-  }); 
+  
+      // 데이터베이스 연결 종료
+      console.log('🔌 데이터베이스 연결 종료 중...');
+      await sequelize.close();
+      console.log('✅ 데이터베이스 연결 종료 완료');
+    }); 

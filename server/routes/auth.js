@@ -29,12 +29,19 @@ router.get('/balance', verifyToken, async (req, res) => {
       return res.status(404).json({ error: '사용자를 찾을 수 없습니다' });
     }
     
-    console.log('[Balance] 잔액 조회 성공:', { userId: user.id, balance: user.balance });
+    console.log('[Balance] 잔액 조회 성공:', { 
+      userId: user.id, 
+      balance: user.balance,
+      isAdmin: user.isAdmin,
+      adminLevel: user.adminLevel
+    });
     
     res.json({ 
       balance: Number(user.balance),
       userId: user.id,
-      username: user.username
+      username: user.username,
+      isAdmin: user.isAdmin,
+      adminLevel: user.adminLevel
     });
   } catch (error) {
     console.error('[Balance] 잔액 조회 오류:', error);

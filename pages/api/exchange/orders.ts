@@ -1,9 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { buildServerApiUrl } from '../../../config/serverApiConfig';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || '3aad092c060aa49ac87be19a33431c81c6fa287c9bcdda983c1b5d5a83380a7fa816ea915bbc9aff816c78db2a39ff673ae60b5ce4bbcce50c060569d99ec1c1';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  console.log('🚨🚨🚨 [Next.js API] /api/exchange/orders 호출됨!');
+  console.log('🚨🚨🚨 [Next.js API] req.method:', req.method);
+  console.log('🚨🚨🚨 [Next.js API] req.body:', JSON.stringify(req.body));
+  
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
@@ -23,8 +28,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       orderData: req.body
     });
 
-    // 백엔드 서버로 프록시
-    const backendResponse = await fetch('http://localhost:5050/api/exchange/order', {
+    const backendUrl = buildServerApiUrl('/api/exchange/order');
+    console.log('🚨🚨🚨 [Next.js API] 백엔드 URL:', backendUrl);
+
+    // 백엔드 서버로 프록시 (환경변수 기반)
+    const backendResponse = await fetch(backendUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

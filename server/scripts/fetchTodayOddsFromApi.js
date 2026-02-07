@@ -1,7 +1,13 @@
 import axios from 'axios';
 import oddsApiService from '../services/oddsApiService.js';
 
+// 환경 변수 검증
 const apiKey = process.env.ODDS_API_KEY;
+if (!apiKey) {
+  console.error('❌ ODDS_API_KEY 환경 변수가 설정되지 않았습니다.');
+  process.exit(1);
+}
+
 const baseUrl = 'https://api.the-odds-api.com/v4/sports';
 
 const clientSportKeyMap = {
@@ -46,25 +52,67 @@ async function fetchTodayOddsFromApi() {
   // 2. 오늘 경기 odds 조회
   for (const [cat, sportKey] of Object.entries(clientSportKeyMap)) {
     try {
-      const oddsList = await oddsApiService.fetchRecentOdds(cat);
-      // 오늘 날짜만 필터링
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(today.getDate()+1);
-      const todayOdds = oddsList.filter(o => {
+      const oddsList = await oddsApiService.getCachedOdds(sportKey);
+      
+      // UTC 기준 현재 시간부터 미래 경기들 필터링
+      const nowUTC = new Date();
+      
+      const futureOdds = oddsList.filter(o => {
+        // Date 생성자는 Date 객체와 문자열 모두 자동 처리
         const dt = new Date(o.commence_time);
-        return dt >= today && dt < tomorrow;
+        return dt >= nowUTC; // 현재 시간 이후의 모든 경기
       });
-      console.log(`[${cat}] (${sportKey}) 오늘 경기수: ${todayOdds.length}`);
-      todayOdds.forEach(o => {
-        console.log(`  - ${o.home_team} vs ${o.away_team} @ ${o.commence_time}`);
+      
+      console.log(`✅ [${cat}] (${sportKey}) 미래 경기수: ${futureOdds.length}`);
+      futureOdds.forEach((o, index) => {
+        const gameTime = new Date(o.commence_time);
+        const timeStr = gameTime.toISOString().split('T')[0]; // YYYY-MM-DD 형식
+        console.log(`  ${index + 1}. ${o.home_team} vs ${o.away_team}`);
+        console.log(`     시간: ${timeStr} ${gameTime.toISOString().split('T')[1].split('.')[0]}Z`);
       });
     } catch (e) {
-      console.error(`[${cat}] (${sportKey}) 에러:`, e.message);
+      console.error(`❌ [${cat}] (${sportKey}) 에러:`, e.message);
+      console.error(`   상세 오류:`, e.stack);
+      if (e.response) {
+        console.error(`   HTTP 상태: ${e.response.status}`);
+        console.error(`   응답 데이터:`, e.response.data);
+      }
+      // API 키 문제인 경우 스크립트 종료
+      if (e.response && e.response.status === 401) {
+        console.error('🚨 API 키가 유효하지 않습니다. 스크립트를 종료합니다.');
+        process.exit(1);
+      }
     }
   }
 }
 
-fetchAllSportsFromOddsApi();
-fetchTodayOddsFromApi(); 
+// 메인 실행 함수
+async function main() {
+  try {
+    console.log('🚀 배당율 수집 스크립트 시작');
+    console.log(`📅 실행 시간: ${new Date().toISOString()} (UTC)`);
+    
+    // 순차 실행으로 로그 순서 보장
+    await fetchAllSportsFromOddsApi();
+    await fetchTodayOddsFromApi();
+    
+    console.log('✅ 배당율 수집 스크립트 완료');
+    
+    // 데이터베이스 연결 종료
+    try {
+      const { sequelize } = await import('../models/index.js');
+      await sequelize.close();
+      console.log('📊 데이터베이스 연결 종료');
+    } catch (dbError) {
+      console.warn('⚠️ 데이터베이스 연결 종료 중 오류:', dbError.message);
+    }
+    
+    process.exit(0); // 명시적 종료
+  } catch (error) {
+    console.error('💥 스크립트 실행 중 치명적 오류:', error);
+    process.exit(1);
+  }
+}
+
+// 스크립트 실행
+main(); 

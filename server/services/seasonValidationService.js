@@ -29,7 +29,7 @@ class SeasonValidationService {
       'basketball_nba': '4387',
       'basketball_kbl': '5124',
       'baseball_mlb': '4424',
-      'baseball_kbo': '4578',
+      'baseball_kbo': '4830', // KBO 리그 ID (정확한 ID)
       'americanfootball_nfl': '4391'
     };
     
@@ -47,9 +47,27 @@ class SeasonValidationService {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
+      // ✅ EPL 등 여러 키로 저장될 수 있는 리그를 위한 대체 키
+      const alternativeKeys = {
+        'soccer_england_premier_league': ['soccer_epl', 'soccer_england_premier_league'],
+        'soccer_spain_primera_division': ['soccer_spain_la_liga', 'soccer_spain_primera_division'],
+        'soccer_usa_mls': ['soccer_usa_mls'],
+        'soccer_korea_kleague1': ['soccer_korea_kleague1'],
+        'soccer_japan_j_league': ['soccer_japan_j_league'],
+        'soccer_italy_serie_a': ['soccer_italy_serie_a'],
+        'soccer_brazil_campeonato': ['soccer_brazil_campeonato'],
+        'soccer_argentina_primera_division': ['soccer_argentina_primera_division'],
+        'soccer_china_superleague': ['soccer_china_superleague'],
+        'soccer_germany_bundesliga': ['soccer_germany_bundesliga']
+      };
+      
+      const keysToCheck = alternativeKeys[sportKey] || [sportKey];
+      
       const oddsCount = await OddsCache.count({
         where: {
-          sportKey: sportKey,
+          sportKey: {
+            [Op.in]: keysToCheck
+          },
           commenceTime: {
             [Op.gte]: thirtyDaysAgo
           }
@@ -124,10 +142,12 @@ class SeasonValidationService {
       
       const upcomingScheduled = events.filter(event => {
         const gameDate = new Date(event.dateEvent);
-        return gameDate >= now && 
+        const isNotFinished = event.strStatus !== 'FT' && 
+                             event.strStatus !== 'Match Finished' &&
+                             event.intHomeScore === null;
+        return gameDate > now && 
                gameDate <= thirtyDaysLater &&
-               event.strStatus !== 'FT' && 
-               event.strStatus !== 'Match Finished';
+               isNotFinished;
       });
 
       console.log(`📊 [SportsDB] ${sportKey} 분석 결과:`, {
@@ -216,7 +236,27 @@ class SeasonValidationService {
 
       console.log(`🔍 [SeasonValidation] ${sportKey} 시즌 상태 체크 시작...`);
       
-      // 1단계: TheSportsDB API 시도
+      // 🎯 1단계 (최우선): OddsAPI 배당율 확인 - 배당율이 있으면 무조건 시즌 활성!
+      console.log(`🎯 [SeasonValidation] ${sportKey} OddsAPI 배당율 확인 (최우선)...`);
+      const oddsData = await this.checkRecentOddsData(sportKey);
+      
+      if (oddsData.oddsCount > 0) {
+        console.log(`✅ [SeasonValidation] ${sportKey} OddsAPI 배당율 존재 (${oddsData.oddsCount}개) → 시즌 활성!`);
+        return {
+          isActive: true,
+          status: 'active',
+          reason: `배당율 제공 중 (${oddsData.oddsCount}개 경기)`,
+          recentGamesCount: 0,
+          upcomingGamesCount: oddsData.oddsCount,
+          oddsCount: oddsData.oddsCount,
+          seasonInfo: seasonInfo,
+          dataSource: 'OddsAPI'
+        };
+      }
+      
+      console.log(`ℹ️ [SeasonValidation] ${sportKey} OddsAPI 배당율 없음, TheSportsDB 확인...`);
+      
+      // 2단계: TheSportsDB API 시도 (OddsAPI에 배당율이 없을 때만)
       const sportsDbStatus = await this.checkSeasonStatusWithSportsDB(sportKey);
       
       if (sportsDbStatus.status !== 'unknown' && sportsDbStatus.status !== 'error') {
@@ -228,13 +268,13 @@ class SeasonValidationService {
           reason: sportsDbStatus.reason,
           recentGamesCount: sportsDbStatus.recentGamesCount || 0,
           upcomingGamesCount: sportsDbStatus.upcomingGamesCount || 0,
-          oddsCount: sportsDbStatus.oddsCount || 0,
+          oddsCount: 0,
           seasonInfo: seasonInfo,
           dataSource: 'TheSportsDB'
         };
       }
 
-      // 2단계: 로컬 GameResult 데이터로 폴백
+      // 3단계: 로컬 GameResult 데이터로 폴백 (최후의 수단)
       console.log(`🔄 [SeasonValidation] ${sportKey} TheSportsDB 실패, 로컬 데이터로 폴백...`);
       
       const recentResults = await this.getRecentGameResults(sportKey, 7);
@@ -263,16 +303,13 @@ class SeasonValidationService {
       // 실제 데이터 기반 시즌 상태 판단
       const realStatus = this.determineRealSeasonStatus(seasonInfo, recentResults, upcomingGames);
       
-      // odds 데이터 확인
-      const oddsData = await this.checkRecentOddsData(sportKey);
-      
       return {
         isActive: realStatus.status === 'active',
         status: realStatus.status,
         reason: realStatus.reason,
         recentGamesCount: recentResults.length,
         upcomingGamesCount: upcomingGames.length,
-        oddsCount: oddsData.oddsCount || 0,
+        oddsCount: 0,
         seasonInfo: seasonInfo,
         dataSource: 'Local'
       };
@@ -297,11 +334,12 @@ class SeasonValidationService {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
     
-    // sportKey를 기반으로 subCategory 매핑
+    // sportKey를 기반으로 subCategory 매핑 (oddsApiService.js의 clientSportKeyMap과 일치하도록)
     const subCategoryMap = {
-      'soccer_japan_j_league': 'J_LEAGUE',
-      'soccer_korea_kleague1': 'KLEAGUE1',
-      'soccer_italy_serie_a': 'SERIE_A',
+      'soccer_japan_j_league': 'JLEAGUE',
+      'soccer_korea_kleague1': 'KLEAGUE',
+      'soccer_italy_serie_a': 'SERIEA',
+      'soccer_epl': 'EPL',
       'basketball_nba': 'NBA',
       'basketball_kbl': 'KBL',
       'baseball_kbo': 'KBO',
@@ -311,7 +349,7 @@ class SeasonValidationService {
       'soccer_brazil_campeonato': 'BRASILEIRAO',
       'soccer_argentina_primera_division': 'ARGENTINA_PRIMERA',
       'soccer_china_superleague': 'CSL',
-      'soccer_spain_primera_division': 'LALIGA',
+      'soccer_spain_la_liga': 'LALIGA',
       'soccer_germany_bundesliga': 'BUNDESLIGA'
     };
     

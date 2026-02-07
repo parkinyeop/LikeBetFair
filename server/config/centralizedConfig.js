@@ -1,7 +1,11 @@
 // DB 기준 중앙화된 설정 파일
 // 모든 API 설정, 카테고리 매핑, 시간 설정 등을 한 곳에서 관리
 
+import dotenv from 'dotenv';
 import db from '../models/db.js';
+
+// 환경 변수 로드
+dotenv.config();
 
 // ===== API 설정 =====
 export const API_CONFIG = {
@@ -9,8 +13,21 @@ export const API_CONFIG = {
   BACKEND_PORT: process.env.PORT || 5050,
   FRONTEND_PORT: 3000,
   BASE_URL: process.env.NODE_ENV === 'production' 
-    ? process.env.PRODUCTION_URL 
-    : 'http://localhost:5050',
+    ? process.env.API_BASE_URL_PROD || 'https://likebetfair.onrender.com'
+    : process.env.API_BASE_URL_DEV || 'http://localhost:5050',
+  
+  // API 키 설정
+  API_KEYS: {
+    ODDS_API_KEY: process.env.ODDS_API_KEY,
+    THE_ODDS_API_KEY: process.env.THE_ODDS_API_KEY,
+    THESPORTSDB_API_KEY: process.env.THESPORTSDB_API_KEY
+  },
+  
+  // API 엔드포인트 URL
+  API_URLS: {
+    THE_ODDS_API: 'https://api.the-odds-api.com/v4/sports',
+    THE_SPORTS_DB: 'https://www.thesportsdb.com/api/v1/json'
+  },
   
   // API 엔드포인트
   ENDPOINTS: {
@@ -36,9 +53,9 @@ export const API_CONFIG = {
 
 // ===== 시간 설정 =====
 export const TIME_CONFIG = {
-  // 시간대 설정
-  DEFAULT_TIMEZONE: 'Asia/Seoul',
-  UTC_OFFSET: 9, // KST = UTC+9
+  // 시간대 설정 (UTC 기준으로 통일)
+  DEFAULT_TIMEZONE: 'UTC',
+  UTC_OFFSET: 0, // UTC 기준
   
   // 베팅 관련 시간 설정
   BETTING_CUTOFF_MINUTES: 10,  // 경기 시작 10분 전 베팅 마감
@@ -212,28 +229,31 @@ export function getActiveSports() {
     .map(sport => sport.displayName);
 }
 
-// ===== 베팅 설정 =====
+// ===== 관리자 설정 =====
+export const ADMIN_CONFIG = {
+  SYSTEM_ADMIN_ID: process.env.SYSTEM_ADMIN_ID,
+  DEFAULT_ADMIN_USERNAME: process.env.DEFAULT_ADMIN_USERNAME || 'admin',
+  DEFAULT_ADMIN_PASSWORD: process.env.DEFAULT_ADMIN_PASSWORD || 'admin123',
+  DEFAULT_TEST_USERNAME: process.env.DEFAULT_TEST_USERNAME || 'testuser',
+  DEFAULT_TEST_PASSWORD: process.env.DEFAULT_TEST_PASSWORD || 'test123'
+};
+
+// 🎯 베팅 규칙 설정 (스포츠북과 동일)
 export const BETTING_CONFIG = {
   // 베팅 금액 제한
-  MIN_BET_AMOUNT: 1000,      // 최소 1,000원
-  MAX_BET_AMOUNT: 1000000,   // 최대 100만원
-  MAX_DAILY_BET: 5000000,    // 일일 최대 500만원
+  MIN_BET_AMOUNT: parseInt(process.env.MIN_BET_AMOUNT) || 1000,        // 최소 베팅 금액: 1,000원
+  MAX_BET_AMOUNT: parseInt(process.env.MAX_BET_AMOUNT) || null,        // 최대 베팅 금액: 제한 없음 (사용자 잔액 한도)
   
-  // 배당률 제한
-  MIN_ODDS: 1.01,
-  MAX_ODDS: 100.0,
+  // 선택 개수 제한
+  MIN_SELECTIONS: 1,           // 최소 선택 개수: 1개 (단일 베팅 허용)
+  MAX_SELECTIONS: 10,          // 최대 선택 개수: 10개
   
-  // 베팅 슬립 제한
-  MAX_SELECTIONS: 10,        // 최대 10개 선택
-  MAX_SAME_GAME_BETS: 3,     // 같은 경기 최대 3개 베팅
-  
-  // 결과 처리
-  RESULT_PROCESSING_DELAY: 30 * 60 * 1000, // 경기 종료 30분 후 결과 확정
-  AUTO_CANCEL_HOURS: 24,     // 24시간 후 자동 취소
-  
-  // 수수료
-  COMMISSION_RATE: 0.05,     // 5% 수수료
-  MINIMUM_COMMISSION: 50     // 최소 수수료 50원
+  // 기타 제한
+  MAX_SAME_GAME_BETS: 3,       // 같은 경기 최대 베팅 수: 3개
+  MAX_TOTAL_ODDS: 1000,        // 최대 총 배당율: 1000배
+  MAX_FUTURE_DAYS: 7,          // 최대 미래 경기 일수: 7일
+  MIN_BEFORE_GAME_MINUTES: parseInt(process.env.BETTING_CUTOFF_MINUTES) || 10, // 경기 시작 전 최소 베팅 시간: 10분
+  API_TIMEOUT: parseInt(process.env.API_TIMEOUT) || 30000 // API 타임아웃: 30초
 };
 
 // ===== 로깅 설정 =====
@@ -272,7 +292,7 @@ export function getEnvironmentConfig() {
   
   const envConfigs = {
     development: {
-      LOG_LEVEL: 'debug',
+      LOG_LEVEL: 'info',
       ODDS_UPDATE_INTERVAL: 10 * 60 * 1000, // 개발환경에서는 10분마다
       RATE_LIMIT: { WINDOW_MS: 15 * 60 * 1000, MAX_REQUESTS: 1000 }
     },
@@ -289,6 +309,12 @@ export function getEnvironmentConfig() {
   };
   
   return envConfigs[env] || envConfigs.development;
+}
+
+// 로그 레벨 가져오기 함수
+export function getLogLevel() {
+  const envConfig = getEnvironmentConfig();
+  return envConfig.LOG_LEVEL || 'info';
 }
 
 // ===== 초기화 함수 =====

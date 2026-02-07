@@ -1,8 +1,10 @@
 import axios from 'axios';
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName } from '../normalizeUtils.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+const sequelize = createScriptSequelize();
 
-const API_KEY = '116108'; // TheSportsDB 프리미엄 키
+const API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // TheSportsDB 프리미엄 키
 const KBL_LEAGUE_ID = '5124'; // KBL 리그 ID
 
 // KBL 팀명 세트 (정규화된 공식 팀명으로 검증)
@@ -100,13 +102,13 @@ async function collectKBLSeasonData() {
         if (event.strTimestamp) {
           commenceTime = new Date(event.strTimestamp);
         } else if (event.dateEvent && event.strTime) {
-          commenceTime = new Date(`${event.dateEvent}T${event.strTime}`);
+          commenceTime = new Date(`${event.dateEvent}T${event.strTime}Z`);
         } else {
           console.log(`⚠️ 시간 정보 없음: ${event.strHomeTeam} vs ${event.strAwayTeam}`);
           continue;
         }
             } else {
-              commenceTime = new Date(`${event.dateEvent}T10:00:00`); // KBL 기본 시간 (KST 19:00)
+              commenceTime = new Date(`${event.dateEvent}T10:00:00Z`); // KBL 기본 시간 (UTC 10:00)
             }
             
             // 상태 결정
@@ -133,7 +135,7 @@ async function collectKBLSeasonData() {
               commenceTime: commenceTime,
               status: status,
               score: score,
-              result: result,
+              // result 필드 제거 - status로 대체
               eventId: event.idEvent,
               lastUpdated: new Date()
             });
@@ -177,13 +179,25 @@ async function collectKBLSeasonData() {
 
 // 스크립트 실행
 if (import.meta.url === `file://${process.argv[1]}`) {
-  collectKBLSeasonData().then(() => {
+  collectKBLSeasonData().then(async () => {
+
     console.log('스크립트 실행 완료');
     process.exit(0);
-  }).catch(error => {
+  
+      // 데이터베이스 연결 종료
+      console.log('🔌 데이터베이스 연결 종료 중...');
+      await sequelize.close();
+      console.log('✅ 데이터베이스 연결 종료 완료');
+    }).catch(async (error) => {
+
     console.error('스크립트 실행 중 오류:', error);
     process.exit(1);
-  });
+  
+      // 데이터베이스 연결 종료
+      console.log('🔌 데이터베이스 연결 종료 중...');
+      await sequelize.close();
+      console.log('✅ 데이터베이스 연결 종료 완료');
+    });
 }
 
 export default collectKBLSeasonData; 

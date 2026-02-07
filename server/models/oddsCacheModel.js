@@ -52,6 +52,11 @@ const OddsCache = sequelize.define('OddsCache', {
     type: DataTypes.STRING,
     allowNull: false,
     defaultValue: 'h2h'
+  },
+  oddsApiId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    comment: 'OddsAPI에서 제공하는 경기 고유 ID'
   }
 }, {
   timestamps: true,
@@ -60,6 +65,10 @@ const OddsCache = sequelize.define('OddsCache', {
       unique: true,
       fields: ['sportKey', 'homeTeam', 'awayTeam', 'commenceTime'],
       name: 'unique_game_odds'
+    },
+    {
+      fields: ['oddsApiId'],
+      name: 'idx_odds_api_id'
     },
     {
       fields: ['sportKey', 'commenceTime'],

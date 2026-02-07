@@ -15,12 +15,15 @@ Thumbs.db
 .env.development.local
 .env.production.local
 .env.test.local
+server/.env
 
 # 5. 로그
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+server/logs/
+*.log
 
 # 6. Vercel/Netlify 설정 파일 (선택)
 .vercel/
@@ -30,3 +33,34 @@ pnpm-debug.log*
 .vscode/
 .idea/
 *.swp
+
+# 8. 테스트 및 디버깅 파일
+server/archive/
+server/test-*.js
+server/debug-*.js
+server/check-*.js
+server/analyze-*.js
+backup_*.sql
+
+# 9. 스크립트 테스트 파일들
+server/scripts/archive/
+server/scripts/test*.js
+server/scripts/check*.js
+server/scripts/explore*.js
+server/scripts/get*.js
+server/scripts/manual*.js
+server/scripts/run*.js
+server/scripts/analyze*.js
+
+# 10. 테스트 데이터 파일들
+server/data/test_archive/
+server/data/*_test_*.json
+server/data/*_sample*.json
+server/data/alternative_*.json
+server/data/mapping_*.md
+
+# 9. 개발 도구 및 SDK
+gemini/
+google-cloud-sdk/
+package-lock.json
+server/package-lock.json

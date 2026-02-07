@@ -1,12 +1,18 @@
 import OddsCache from '../models/oddsCacheModel.js';
 import OddsApiService from '../services/oddsApiService.js';
+import SportsbookOddsReturnRateService from '../services/sportsbookOddsReturnRateService.js';
+import ExchangeOddsReturnRateService from '../services/exchangeOddsReturnRateService.js';
+import { adjustOddsPayout } from '../utils/oddsUtils.js';
 import { Op } from 'sequelize';
 
 const oddsController = {
   getOdds: async (req, res) => {
     try {
       const { sport } = req.params;
-      const { limit } = req.query; // limit 파라미터 추가
+      const { limit, applySportsbookRate = 'true' } = req.query; // limit 파라미터 추가
+      
+      // applySportsbookRate 파라미터: 'true'(기본값) 또는 'false'
+      const shouldApplyRate = applySportsbookRate !== 'false';
       
       // sportKey 매핑 (여러 형태의 키를 처리) - 확장된 버전
       const sportKeyMapping = {
@@ -45,13 +51,15 @@ const oddsController = {
         'ARGENTINA_PRIMERA': ['soccer_argentina_primera_division'], // ARGENTINA_PRIMERA로 요청이 오면 soccer_argentina_primera_division 데이터만 반환
         'soccer_china_superleague': ['soccer_china_superleague', '중국 슈퍼리그'],
         '중국 슈퍼리그': ['soccer_china_superleague'], // 중국 슈퍼리그로 요청이 오면 soccer_china_superleague 데이터만 반환
-        'soccer_spain_primera_division': ['soccer_spain_primera_division', '라리가'],
-        '라리가': ['soccer_spain_primera_division'], // 라리가로 요청이 오면 soccer_spain_primera_division 데이터만 반환
+        'soccer_spain_primera_division': ['soccer_spain_primera_division', 'soccer_spain_la_liga', '라리가'],
+        'soccer_spain_la_liga': ['soccer_spain_la_liga', 'soccer_spain_primera_division', '라리가'], // 실제 DB 키
+        '라리가': ['soccer_spain_primera_division', 'soccer_spain_la_liga'], // 라리가로 요청이 오면 둘 다 반환
         'soccer_germany_bundesliga': ['soccer_germany_bundesliga', '분데스리가'],
         '분데스리가': ['soccer_germany_bundesliga'], // 분데스리가로 요청이 오면 soccer_germany_bundesliga 데이터만 반환
-        'soccer_england_premier_league': ['soccer_england_premier_league', '프리미어리그', 'PREMIER_LEAGUE'],
-        '프리미어리그': ['soccer_england_premier_league'], // 프리미어리그로 요청이 오면 soccer_england_premier_league 데이터만 반환
-        'PREMIER_LEAGUE': ['soccer_england_premier_league'], // PREMIER_LEAGUE로 요청이 오면 soccer_england_premier_league 데이터만 반환
+        'soccer_england_premier_league': ['soccer_england_premier_league', 'soccer_epl', '프리미어리그', 'PREMIER_LEAGUE'],
+        'soccer_epl': ['soccer_epl', 'soccer_england_premier_league', '프리미어리그', 'PREMIER_LEAGUE'], // 실제 DB 키
+        '프리미어리그': ['soccer_england_premier_league', 'soccer_epl'], // 프리미어리그로 요청이 오면 둘 다 반환
+        'PREMIER_LEAGUE': ['soccer_england_premier_league', 'soccer_epl'], // PREMIER_LEAGUE로 요청이 오면 둘 다 반환
         'soccer': [
           'soccer_usa_mls', 'MLS',
           'soccer_korea_kleague1', 'K리그',
@@ -60,9 +68,9 @@ const oddsController = {
           'soccer_brazil_campeonato', '브라질 세리에 A', 'BRASILEIRAO',
           'soccer_argentina_primera_division', '아르헨티나 프리메라', 'ARGENTINA_PRIMERA',
           'soccer_china_superleague', '중국 슈퍼리그',
-          'soccer_spain_primera_division', '라리가',
+          'soccer_spain_primera_division', 'soccer_spain_la_liga', '라리가',
           'soccer_germany_bundesliga', '분데스리가',
-          'soccer_england_premier_league', '프리미어리그', 'PREMIER_LEAGUE'
+          'soccer_england_premier_league', 'soccer_epl', '프리미어리그', 'PREMIER_LEAGUE'
         ]
       };
       
@@ -83,13 +91,14 @@ const oddsController = {
         sevenDaysLater: sevenDaysLater.toISOString()
       });
       
-      const koreaTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+      // UTC 시간을 그대로 사용 (API에서 받은 시간이 이미 UTC)
+      const koreaTime = now;
       // 최근 7일 + 향후 7일 필터링 (과거 경기도 포함)
       const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       
       console.log(`[oddsController] 최근 7일 + 향후 7일 필터링:`, {
           currentTimeUTC: now.toISOString(),
-          currentTimeKorea: koreaTime.toISOString().replace('Z', ' KST'),
+          currentTimeKorea: koreaTime.toISOString(),
           sevenDaysAgo: sevenDaysAgo.toISOString(),
           sevenDaysLater: sevenDaysLater.toISOString(),
           sport: sport
@@ -247,7 +256,12 @@ const oddsController = {
           bookmakers: game.bookmakers ? 
             (typeof game.bookmakers === 'string' ? JSON.parse(game.bookmakers) : game.bookmakers) : 
             null,
-          officialOdds: parsedOfficialOdds
+          officialOdds: parsedOfficialOdds,
+          // 🆕 원본 배당율 복사본 (환수율 적용 전 원본 보관)
+          originalOdds: JSON.parse(JSON.stringify(parsedOfficialOdds)),
+          originalBookmakers: game.bookmakers ? 
+            JSON.parse(JSON.stringify(typeof game.bookmakers === 'string' ? JSON.parse(game.bookmakers) : game.bookmakers)) : 
+            null
         };
       });
 
@@ -261,6 +275,175 @@ const oddsController = {
           hasOdds: !!formattedData[0].odds,
           hasBookmakers: !!formattedData[0].bookmakers
         });
+      }
+
+      // 🎯 스포츠북 환수율 적용 (정교한 확률 기반 계산)
+      try {
+        // ✅ 스포츠북 환수율: 기본적으로 항상 적용 (클라이언트에서 선택 가능)
+        const sportsbookRateSettings = await SportsbookOddsReturnRateService.getOddsReturnRateSettings();
+        const exchangeRateSettings = await ExchangeOddsReturnRateService.getOddsReturnRateSettings();
+
+        // 🆕 각 게임에 두 가지 버전의 배당율 생성
+        formattedData.forEach(game => {
+          // 스포츠북 환수율 적용 버전 (비활성화 시에도 originalOdds 복사본 생성)
+          if (game.originalOdds) {
+            game.sportsbookOdds = JSON.parse(JSON.stringify(game.originalOdds)); // 복사본 생성
+
+            // 환수율이 활성화되어 있으면 조정 적용
+            if (sportsbookRateSettings.enabled && sportsbookRateSettings.returnRate) {
+              const sportsbookRate = sportsbookRateSettings.returnRate;
+            
+              // h2h 적용
+              if (game.sportsbookOdds?.h2h) {
+                const h2hKeys = Object.keys(game.sportsbookOdds.h2h);
+                const h2hOdds = h2hKeys.map(key => {
+                  const oddsValue = game.sportsbookOdds.h2h[key];
+                  if (typeof oddsValue === 'number') return oddsValue;
+                  if (oddsValue?.averagePrice) return oddsValue.averagePrice;
+                  return null;
+                }).filter(o => o !== null && !isNaN(o));
+
+                if (h2hOdds.length > 0) {
+                  const adjusted = adjustOddsPayout(h2hOdds, sportsbookRate);
+                  let idx = 0;
+                  h2hKeys.forEach(key => {
+                    if (typeof game.sportsbookOdds.h2h[key] === 'number') {
+                      game.sportsbookOdds.h2h[key] = adjusted[idx++];
+                    } else if (game.sportsbookOdds.h2h[key]?.averagePrice) {
+                      game.sportsbookOdds.h2h[key] = adjusted[idx++];
+                    }
+                  });
+                }
+              }
+
+              // spreads 적용
+              if (game.sportsbookOdds?.spreads) {
+                const spreadKeys = Object.keys(game.sportsbookOdds.spreads);
+                const spreadOdds = spreadKeys.map(key => {
+                  const oddsValue = game.sportsbookOdds.spreads[key].odds;
+                  if (typeof oddsValue === 'number') return oddsValue;
+                  if (oddsValue?.averagePrice) return oddsValue.averagePrice;
+                  return null;
+                }).filter(o => o !== null && !isNaN(o));
+
+                if (spreadOdds.length > 0) {
+                  const adjusted = adjustOddsPayout(spreadOdds, sportsbookRate);
+                  let idx = 0;
+                  spreadKeys.forEach(key => {
+                    if (typeof game.sportsbookOdds.spreads[key].odds === 'number') {
+                      game.sportsbookOdds.spreads[key].odds = adjusted[idx++];
+                    } else if (game.sportsbookOdds.spreads[key].odds?.averagePrice) {
+                      game.sportsbookOdds.spreads[key].odds = adjusted[idx++];
+                    }
+                  });
+                }
+              }
+
+              // totals 적용
+              if (game.sportsbookOdds?.totals) {
+                const totalKeys = Object.keys(game.sportsbookOdds.totals);
+                const totalOdds = totalKeys.map(key => {
+                  const oddsValue = game.sportsbookOdds.totals[key].odds;
+                  if (typeof oddsValue === 'number') return oddsValue;
+                  if (oddsValue?.averagePrice) return oddsValue.averagePrice;
+                  return null;
+                }).filter(o => o !== null && !isNaN(o));
+
+                if (totalOdds.length > 0) {
+                  const adjusted = adjustOddsPayout(totalOdds, sportsbookRate);
+                  let idx = 0;
+                  totalKeys.forEach(key => {
+                    if (typeof game.sportsbookOdds.totals[key].odds === 'number') {
+                      game.sportsbookOdds.totals[key].odds = adjusted[idx++];
+                    } else if (game.sportsbookOdds.totals[key].odds?.averagePrice) {
+                      game.sportsbookOdds.totals[key].odds = adjusted[idx++];
+                    }
+                  });
+                }
+              }
+            }
+          }
+          
+          // 익스체인지 환수율 적용 버전
+          if (exchangeRateSettings.enabled && exchangeRateSettings.returnRate && game.originalOdds) {
+            const exchangeRate = exchangeRateSettings.returnRate;
+            game.exchangeOdds = JSON.parse(JSON.stringify(game.originalOdds)); // 복사본 생성
+            
+            // h2h 적용 (동일한 로직)
+            if (game.exchangeOdds?.h2h) {
+              const h2hKeys = Object.keys(game.exchangeOdds.h2h);
+              const h2hOdds = h2hKeys.map(key => {
+                const oddsValue = game.exchangeOdds.h2h[key];
+                if (typeof oddsValue === 'number') return oddsValue;
+                if (oddsValue?.averagePrice) return oddsValue.averagePrice;
+                return null;
+              }).filter(o => o !== null && !isNaN(o));
+              
+              if (h2hOdds.length > 0) {
+                const adjusted = adjustOddsPayout(h2hOdds, exchangeRate);
+                let idx = 0;
+                h2hKeys.forEach(key => {
+                  if (typeof game.exchangeOdds.h2h[key] === 'number') {
+                    game.exchangeOdds.h2h[key] = adjusted[idx++];
+                  } else if (game.exchangeOdds.h2h[key]?.averagePrice) {
+                    game.exchangeOdds.h2h[key] = adjusted[idx++];
+                  }
+                });
+              }
+            }
+            
+            // spreads 적용
+            if (game.exchangeOdds?.spreads) {
+              const spreadKeys = Object.keys(game.exchangeOdds.spreads);
+              const spreadOdds = spreadKeys.map(key => {
+                const oddsValue = game.exchangeOdds.spreads[key].odds;
+                if (typeof oddsValue === 'number') return oddsValue;
+                if (oddsValue?.averagePrice) return oddsValue.averagePrice;
+                return null;
+              }).filter(o => o !== null && !isNaN(o));
+              
+              if (spreadOdds.length > 0) {
+                const adjusted = adjustOddsPayout(spreadOdds, exchangeRate);
+                let idx = 0;
+                spreadKeys.forEach(key => {
+                  if (typeof game.exchangeOdds.spreads[key].odds === 'number') {
+                    game.exchangeOdds.spreads[key].odds = adjusted[idx++];
+                  } else if (game.exchangeOdds.spreads[key].odds?.averagePrice) {
+                    game.exchangeOdds.spreads[key].odds = adjusted[idx++];
+                  }
+                });
+              }
+            }
+            
+            // totals 적용
+            if (game.exchangeOdds?.totals) {
+              const totalKeys = Object.keys(game.exchangeOdds.totals);
+              const totalOdds = totalKeys.map(key => {
+                const oddsValue = game.exchangeOdds.totals[key].odds;
+                if (typeof oddsValue === 'number') return oddsValue;
+                if (oddsValue?.averagePrice) return oddsValue.averagePrice;
+                return null;
+              }).filter(o => o !== null && !isNaN(o));
+              
+              if (totalOdds.length > 0) {
+                const adjusted = adjustOddsPayout(totalOdds, exchangeRate);
+                let idx = 0;
+                totalKeys.forEach(key => {
+                  if (typeof game.exchangeOdds.totals[key].odds === 'number') {
+                    game.exchangeOdds.totals[key].odds = adjusted[idx++];
+                  } else if (game.exchangeOdds.totals[key].odds?.averagePrice) {
+                    game.exchangeOdds.totals[key].odds = adjusted[idx++];
+                  }
+                });
+              }
+            }
+          }
+        });
+        
+        console.log(`[oddsController] ✅ 환수율 적용 완료 - 스포츠북 및 익스체인지 버전 모두 생성됨`);
+      } catch (payoutRateError) {
+        console.error('[oddsController] ⚠️ 환수율 적용 중 오류 (무시하고 계속):', payoutRateError.message);
+        // 환수율 적용 실패해도 원본 배당률로 반환
       }
 
       res.json(formattedData);

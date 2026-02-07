@@ -4,7 +4,10 @@ import User from '../models/userModel.js';
 import axios from 'axios';
 import Bet from '../models/betModel.js';
 import { Op } from 'sequelize';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+
+// 스크립트 전용 Sequelize 인스턴스 생성
+const sequelize = createScriptSequelize();
 
 // TheSportsDB API를 활용한 경기 결과 판정 함수 (The Odds API 사용 금지)
 async function getGameResult(sel) {
@@ -72,7 +75,11 @@ const authController = {
     try {
       console.log('[Register] 요청 시작');
       console.log('[Register] 요청 헤더:', req.headers);
-      console.log('[Register] 요청 바디:', req.body);
+      console.log('[Register] 요청 바디 구조:', {
+        hasBody: !!req.body,
+        bodyKeys: req.body ? Object.keys(req.body) : [],
+        timestamp: new Date().toISOString()
+      });
       
       const { username, email, password } = req.body;
 
@@ -190,44 +197,72 @@ const authController = {
 
       console.log('[Register] 사용자 생성 중...');
 
-      // Create new user
-      const user = await User.create({
-        username,
-        email,
-        password: hashedPassword,
-        balance: 0.00, // 기본 잔액
-        isAdmin: false,
-        adminLevel: 0,
-        isActive: true
-      });
+      // ✅ 트랜잭션 시작 - User 모델의 sequelize 인스턴스 사용
+      const balanceServiceModule = await import('../services/balanceService.js');
+      const balanceService = balanceServiceModule.default;
+      const registerTransaction = await User.sequelize.transaction();
+      
+      try {
+        // Create new user (초기 잔액 0으로 시작)
+        const user = await User.create({
+          username,
+          email,
+          password: hashedPassword,
+          balance: 0.00, // ✅ 0으로 시작
+          isAdmin: false,
+          adminLevel: 0,
+          isActive: true
+        }, { transaction: registerTransaction });
 
-      console.log('[Register] 사용자 생성 완료:', user.id);
+        console.log('[Register] 사용자 생성 완료:', user.id);
+        
+        // ✅ 초기 잔액 설정 (PaymentHistory 자동 기록)
+        const initialBalance = 100000; // 초기 지급 금액
+        await balanceService.setInitialBalance(
+          user.id,
+          initialBalance,
+          registerTransaction
+        );
+        
+        console.log(`[Register] 초기 잔액 설정 완료: ${initialBalance.toLocaleString()}원 (PaymentHistory 기록됨)`);
 
-      // Create token
-      const token = jwt.sign(
-        { userId: user.id },
-        process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
-      );
+        // Create token
+        const token = jwt.sign(
+          { userId: user.id },
+          process.env.JWT_SECRET,
+          { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
+        );
 
-      console.log('[Register] 토큰 생성 완료');
-      console.log('[Register] 회원가입 성공:', { 
-        userId: user.id, 
-        username: user.username, 
-        email: user.email 
-      });
-
-      res.status(201).json({ 
-        success: true,
-        token,
-        message: '회원가입이 완료되었습니다',
-        user: { 
-          id: user.id, 
+        console.log('[Register] 토큰 생성 완료');
+        
+        // 트랜잭션 커밋
+        await registerTransaction.commit();
+        
+        console.log('[Register] 회원가입 성공:', { 
+          userId: user.id, 
           username: user.username, 
           email: user.email,
-          balance: Number(user.balance)
-        }
-      });
+          initialBalance: initialBalance
+        });
+
+        res.status(201).json({ 
+          success: true,
+          token,
+          message: '회원가입이 완료되었습니다',
+          user: { 
+            id: user.id, 
+            username: user.username, 
+            email: user.email,
+            balance: initialBalance // ✅ 초기 잔액 반환
+          }
+        });
+        
+      } catch (innerError) {
+        // 트랜잭션 롤백
+        await registerTransaction.rollback();
+        console.error('[Register] 회원가입 트랜잭션 실패:', innerError);
+        throw innerError;
+      }
       
     } catch (err) {
       console.error('[Register] 서버 오류:', err);
@@ -288,52 +323,83 @@ const authController = {
 
   login: async (req, res) => {
     try {
-      const { email, password } = req.body;
+      const { email, username, password } = req.body;
+      
+      console.log('[Login] 요청 데이터:', { 
+        hasEmail: !!email, 
+        hasUsername: !!username, 
+        hasPassword: !!password 
+      });
 
+      // Use email if provided, otherwise use username
+      const loginField = email || username;
+      
+      if (!loginField) {
+        return res.status(400).json({ message: '이메일 또는 사용자명을 입력해주세요' });
+      }
+
+      console.log('[Login] 사용자 조회 시작:', loginField);
+      
       // Check if user exists by email first, then by username
       let user = await User.findOne({
-        where: { email: email }
+        where: { email: loginField }
       });
+
+      console.log('[Login] 이메일로 조회 결과:', user ? '찾음' : '없음');
 
       // If not found by email, try username
       if (!user) {
         user = await User.findOne({
-          where: { username: email }
+          where: { username: loginField }
         });
+        console.log('[Login] 사용자명으로 조회 결과:', user ? '찾음' : '없음');
       }
       
       if (!user) {
+        console.log('[Login] 사용자를 찾을 수 없음');
         return res.status(400).json({ message: 'Invalid credentials' });
       }
 
+      console.log('[Login] 사용자 찾음:', user.id);
+      
       // Check password
       const isMatch = await bcrypt.compare(password, user.password);
+      console.log('[Login] 비밀번호 검증:', isMatch ? '성공' : '실패');
+      
       if (!isMatch) {
         return res.status(400).json({ message: 'Invalid credentials' });
       }
 
-      // 로그인 시 pending 베팅 결과 판정
-      await checkAndUpdatePendingBets(user.id);
-
-      // Update last login time
-      await user.update({ lastLogin: new Date() });
-
+      console.log('[Login] 로그인 성공 처리 시작');
+      
       // Create token
       const token = jwt.sign(
         { userId: user.id },
         process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN }
+        { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
       );
 
-      // username, email, balance, 관리자 정보도 함께 반환
+      // Send response immediately
       res.json({ 
         token, 
-        userId: user.id, // userId 직접 포함
+        userId: user.id,
         username: user.username, 
         email: user.email, 
         balance: Number(user.balance),
         isAdmin: user.isAdmin,
         adminLevel: user.adminLevel
+      });
+      
+      console.log('[Login] 응답 전송 완료');
+      
+      // Update last login time after response (non-blocking)
+      setImmediate(async () => {
+        try {
+          await user.update({ lastLogin: new Date() });
+          console.log('[Login] 마지막 로그인 시간 업데이트 완료');
+        } catch (err) {
+          console.error('[Login] 마지막 로그인 시간 업데이트 실패:', err);
+        }
       });
     } catch (err) {
       console.error('Login error:', err);

@@ -1,58 +1,77 @@
 import fs from 'fs/promises';
 import path from 'path';
 import schedule from 'node-schedule';
+import { reloadSeasonSchedules } from '../config/sportsMapping.js';
 
 /**
- * 시즌 상태를 config 파일에 업데이트
+ * ✅ 시즌 상태를 JSON 파일에 안전하게 업데이트
+ * - JavaScript 파일 대신 JSON 파일 수정 (구문 오류 위험 제거)
+ * - 원자적 쓰기 (temp → rename)
+ * - 자동 백업 생성
+ * - 수동 오버라이드 존중
  */
 async function updateSeasonStatus(sportKey, statusInfo) {
   try {
-    const configPath = path.join(process.cwd(), 'config/sportsMapping.js');
+    const configPath = path.join(process.cwd(), 'config/seasonSchedules.json');
     
-    // 현재 설정 파일 읽기
-    let configContent = await fs.readFile(configPath, 'utf8');
+    // 1. 현재 설정 파일 읽기
+    const configContent = await fs.readFile(configPath, 'utf8');
+    const config = JSON.parse(configContent);
     
-    // 해당 스포츠의 시즌 정보 찾기 및 업데이트
-    const seasonKey = `'${sportKey}': {`;
-    const seasonStartIndex = configContent.indexOf(seasonKey);
-    
-    if (seasonStartIndex === -1) {
-      throw new Error(`설정에서 ${sportKey}를 찾을 수 없습니다`);
+    // 2. 수동 오버라이드 확인
+    if (config[sportKey]?.manualOverride === true) {
+      console.log(`⚠️ ${sportKey}: 수동 오버라이드 설정됨, 자동 업데이트 건너뜀`);
+      return { skipped: true, reason: 'manual override' };
     }
     
-    // 해당 섹션의 끝 찾기 (다음 '},' 또는 마지막 '}')
-    let braceCount = 0;
-    let sectionEndIndex = seasonStartIndex;
-    let foundStart = false;
+    // 3. 백업 생성 (타임스탬프 포함)
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const backupPath = `${configPath}.backup.${timestamp}`;
+    await fs.copyFile(configPath, backupPath);
+    console.log(`📦 백업 생성: ${backupPath}`);
     
-    for (let i = seasonStartIndex; i < configContent.length; i++) {
-      if (configContent[i] === '{') {
-        if (!foundStart) foundStart = true;
-        braceCount++;
-      } else if (configContent[i] === '}') {
-        braceCount--;
-        if (foundStart && braceCount === 0) {
-          sectionEndIndex = i + 1;
-          break;
-        }
-      }
-    }
+    // 4. 데이터 업데이트
+    const oldStatus = config[sportKey]?.status || 'unknown';
     
-    // 새로운 시즌 정보 생성
-    const newSeasonInfo = createSeasonInfoString(sportKey, statusInfo);
+    config[sportKey] = {
+      ...config[sportKey],
+      name: getLeagueName(sportKey),
+      status: statusInfo.status,
+      currentSeason: new Date().getFullYear().toString(),
+      lastAutoUpdate: new Date().toISOString(),
+      updateReason: statusInfo.reason,
+      description: createDescription(statusInfo),
+      manualOverride: false
+    };
     
-    // 설정 파일 업데이트
-    const beforeSection = configContent.substring(0, seasonStartIndex);
-    const afterSection = configContent.substring(sectionEndIndex);
+    // 메타데이터 업데이트
+    config._metadata = {
+      ...config._metadata,
+      lastModified: new Date().toISOString(),
+      modifiedBy: 'auto-updater',
+      lastChange: `${sportKey}: ${oldStatus} → ${statusInfo.status}`
+    };
     
-    const updatedContent = beforeSection + newSeasonInfo + afterSection;
+    // 5. 원자적 쓰기 (temp → rename)
+    const tmpPath = `${configPath}.tmp`;
+    await fs.writeFile(tmpPath, JSON.stringify(config, null, 2), 'utf8');
+    await fs.rename(tmpPath, configPath);
     
-    // 파일 저장
-    await fs.writeFile(configPath, updatedContent, 'utf8');
+    // 6. 변경 로그 기록
+    await logSeasonChange(sportKey, oldStatus, statusInfo);
     
-    console.log(`✅ ${sportKey} 시즌 상태 업데이트 완료: ${statusInfo.status}`);
+    // 7. 메모리 캐시 리로드
+    reloadSeasonSchedules();
     
-    return true;
+    console.log(`✅ ${sportKey} 시즌 상태 업데이트 완료: ${oldStatus} → ${statusInfo.status}`);
+    
+    return { 
+      success: true, 
+      sportKey, 
+      oldStatus, 
+      newStatus: statusInfo.status,
+      reason: statusInfo.reason
+    };
   } catch (error) {
     console.error(`❌ ${sportKey} 시즌 상태 업데이트 실패:`, error);
     throw error;
@@ -60,41 +79,62 @@ async function updateSeasonStatus(sportKey, statusInfo) {
 }
 
 /**
- * 새로운 시즌 정보 문자열 생성
+ * 시즌 변경 이력 로그 기록
  */
-function createSeasonInfoString(sportKey, statusInfo) {
+async function logSeasonChange(sportKey, oldStatus, statusInfo) {
+  try {
+    const logDir = path.join(process.cwd(), 'server/logs');
+    const logPath = path.join(logDir, 'season-changes.log');
+    
+    // logs 디렉토리 없으면 생성
+    try {
+      await fs.mkdir(logDir, { recursive: true });
+    } catch (e) {
+      // 이미 존재하면 무시
+    }
+    
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      sportKey,
+      oldStatus,
+      newStatus: statusInfo.status,
+      reason: statusInfo.reason,
+      confidence: statusInfo.confidence || 'N/A',
+      dataSource: statusInfo.dataSource || 'Unknown'
+    };
+    
+    const logLine = JSON.stringify(logEntry) + '\n';
+    await fs.appendFile(logPath, logLine, 'utf8');
+    
+    console.log(`📝 변경 이력 기록: ${logPath}`);
+  } catch (error) {
+    console.error('❌ 변경 이력 기록 실패:', error);
+    // 로그 실패는 치명적이지 않으므로 계속 진행
+  }
+}
+
+/**
+ * 상태 설명 생성
+ */
+function createDescription(statusInfo) {
   const statusDescriptions = {
     'active': '진행 중',
-    'break': '휴식기', 
+    'break': '휴식기',
     'offseason': '시즌오프'
   };
   
   const statusKorean = statusDescriptions[statusInfo.status] || statusInfo.status;
-  const currentDate = new Date().toISOString().split('T')[0];
+  const year = new Date().getFullYear();
   
-  // 기본 시즌 정보 템플릿
-  let seasonInfo = `  '${sportKey}': {\n`;
-  seasonInfo += `    name: '${getLeagueName(sportKey)}',\n`;
-  seasonInfo += `    status: '${statusInfo.status}',\n`;
-  seasonInfo += `    currentSeason: '${new Date().getFullYear()}',\n`;
-  
-  // 상태에 따른 추가 정보
   if (statusInfo.status === 'active') {
-    seasonInfo += `    nextSeasonStart: '${new Date().getFullYear()}-03-01',\n`;
-    seasonInfo += `    description: '${new Date().getFullYear()}시즌 ${statusKorean} (자동 감지: ${statusInfo.reason})'\n`;
+    return `${year}시즌 ${statusKorean} (자동 감지: ${statusInfo.reason})`;
   } else if (statusInfo.status === 'break') {
-    seasonInfo += `    breakPeriod: { start: '${currentDate}', end: 'TBD' },\n`;
-    seasonInfo += `    description: '시즌 중 ${statusKorean} (자동 감지: ${statusInfo.reason})'\n`;
-  } else { // offseason
-    seasonInfo += `    seasonEnd: '${currentDate}',\n`;
-    seasonInfo += `    nextSeasonStart: 'TBD',\n`;
-    seasonInfo += `    description: '${statusKorean} (자동 감지: ${statusInfo.reason})'\n`;
+    return `시즌 중 ${statusKorean} (자동 감지: ${statusInfo.reason})`;
+  } else {
+    return `${statusKorean} (자동 감지: ${statusInfo.reason})`;
   }
-  
-  seasonInfo += `  },`;
-  
-  return seasonInfo;
 }
+
 
 /**
  * 스포츠 키에서 리그 이름 가져오기

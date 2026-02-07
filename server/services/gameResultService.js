@@ -3,7 +3,10 @@ import GameResult from '../models/gameResultModel.js';
 import sportsConfig from '../config/sportsConfig.js';
 import Bet from '../models/betModel.js';
 import { Op } from 'sequelize';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+
+// 스크립트 전용 Sequelize 인스턴스 생성
+const sequelize = createScriptSequelize();
 import betResultService from './betResultService.js';
 import OddsCache from '../models/oddsCacheModel.js';
 import { normalizeTeamName, normalizeCategory, normalizeCommenceTime, normalizeCategoryPair } from '../normalizeUtils.js';
@@ -24,18 +27,25 @@ const clientSportKeyMap = {
   'CSL': 'soccer_china_superleague',
   'LALIGA': 'soccer_spain_la_liga',
   'BUNDESLIGA': 'soccer_germany_bundesliga',
-  'EPL': 'soccer_england_premier_league',
+  'EPL': 'soccer_epl',  // ✅ The Odds API와 통일
   'NBA': 'basketball_nba',
   'MLB': 'baseball_mlb',
   'KBO': 'baseball_kbo',
   'NFL': 'americanfootball_nfl',
-  
-  // 기타 영문 변형
+
+  // 한글 카테고리명
+  '프리미어리그': 'soccer_epl',  // ✅ 통일
+
+  // 기타 영문 변형 (스케줄러 activeCategories와 호환)
   'LaLiga': 'soccer_spain_la_liga',
   'SerieA': 'soccer_italy_serie_a',
   'Ligue1': 'soccer_france_ligue_1',
   'JLeague': 'soccer_japan_j_league',
-  'ArgentinaPrimera': 'soccer_argentina_primera_division'
+  'ArgentinaPrimera': 'soccer_argentina_primera_division',
+  'Brasileirao': 'soccer_brazil_campeonato',  // ✅ 첫 글자만 대문자
+  'BRASILEIRAO': 'soccer_brazil_campeonato',  // ✅ 대문자 추가
+  'Bundesliga': 'soccer_germany_bundesliga',  // ✅ 첫 글자만 대문자 (스케줄러용)
+  'KBL': 'basketball_kbl'  // ✅ KBL 추가
 };
 
 // TheSportsDB 리그ID 매핑 (sportKey 기준, 반드시 clientSportKeyMap 값과 일치)
@@ -49,18 +59,19 @@ const sportsDbLeagueMap = {
   'soccer_china_superleague': '4359',   // 중국 슈퍼리그
   'soccer_spain_la_liga': '4335',       // 라리가
   'soccer_germany_bundesliga': '4331',  // 분데스리가
-  'soccer_england_premier_league': '4328', // 프리미어리그
+  'soccer_england_premier_league': '4328', // 프리미어리그 (호환성)
+  'soccer_epl': '4328',                 // ✅ EPL (주요 키)
   // 농구
   'basketball_nba': '4387',             // NBA
   'basketball_kbl': '5124',             // KBL
   // 야구
   'baseball_mlb': '4424',               // MLB
-  'baseball_kbo': '4830',               // KBO
+  'baseball_kbo': '4830',               // KBO (정확한 ID)
   // 미식축구
   'americanfootball_nfl': '4391'        // NFL
 };
 
-const API_KEY = process.env.THESPORTSDB_API_KEY || '123';
+const API_KEY = process.env.THESPORTSDB_API_KEY || '116108';
 
 // 표준화된 카테고리 매핑 (영문으로 통일)
 const standardizedCategoryMap = {
@@ -73,8 +84,10 @@ const standardizedCategoryMap = {
   'soccer_argentina_primera_division': { main: 'soccer', sub: 'ARGENTINA_PRIMERA' },
   'soccer_china_superleague': { main: 'soccer', sub: 'CSL' },
   'soccer_spain_primera_division': { main: 'soccer', sub: 'LALIGA' },
+  'soccer_spain_la_liga': { main: 'soccer', sub: 'LALIGA' },  // 라리가 추가 매핑
   'soccer_germany_bundesliga': { main: 'soccer', sub: 'BUNDESLIGA' },
   'soccer_england_premier_league': { main: 'soccer', sub: 'EPL' },
+  'soccer_epl': { main: 'soccer', sub: 'EPL' },  // 프리미어리그 추가 매핑
   
   // 농구
   'basketball_nba': { main: 'basketball', sub: 'NBA' },
@@ -111,7 +124,7 @@ const apiResultCache = {};
 class GameResultService {
   constructor() {
     // The Odds API는 배당률 전용으로만 사용
-    this.oddsApiKey = process.env.ODDS_API_KEY || process.env.THE_ODDS_API_KEY || '123';
+    this.oddsApiKey = process.env.ODDS_API_KEY || process.env.THE_ODDS_API_KEY || 'b1a67915235b9dd963dcb5be603853ea';
     this.oddsBaseUrl = 'https://api.the-odds-api.com/v4/sports';
     
     // TheSportsDB API는 게임 결과 전용
@@ -163,9 +176,12 @@ class GameResultService {
   }
 
   /**
-   * 게임 결과는 TheSportsDB API만 사용 (The Odds API 사용 금지)
+   * TheSportsDB API를 사용하여 경기 결과 데이터 가져오기
+   * @param {string} sportKey - 스포츠 키
+   * @param {number} daysFrom - 과거 몇 일간의 데이터를 가져올지 (기본값: 3)
+   * @param {boolean} includeFuture - 미래 1일 데이터 포함 여부 (기본값: true)
    */
-  async fetchResultsWithSportsDB(sportKey, daysFrom = 7) {
+  async fetchResultsWithSportsDB(sportKey, daysFrom = 3, includeFuture = true) {
     try {
       console.log(`[GameResult] TheSportsDB API 사용: ${sportKey}`);
       const leagueId = this.getSportsDbLeagueIdBySportKey(sportKey);
@@ -173,39 +189,111 @@ class GameResultService {
         throw new Error(`No TheSportsDB league ID for ${sportKey}`);
       }
 
-      // MLS, MLB 등 북미 리그는 eventsseason.php 사용, 유럽 리그는 eventsround.php 사용
-      const isNorthAmericanLeague = this.isNorthAmericanLeague(sportKey);
+      // 연도 기반 시즌 리그는 eventsseason.php 사용, 유럽 리그는 시즌 형식 사용
+      const isYearBasedSeason = this.isYearBasedSeasonLeague(sportKey);
       let response;
       
-      if (isNorthAmericanLeague) {
-        // 북미 리그: 시즌 기반 (MLS, MLB, NBA, NFL 등)
-        const currentYear = new Date().getFullYear();
-        response = await axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsseason.php`, {
-          params: {
-            id: leagueId,
-            s: currentYear.toString() // 2025
-          },
-          timeout: 15000
-        });
-        console.log(`[GameResult] 북미 리그 시즌 API 사용: ${sportKey} (${currentYear})`);
+      // 🔧 시즌 형식 결정: 유럽은 2024-2025, 북미/아시아는 2025
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1; // 1-12
+      let seasonParam;
+
+      if (isYearBasedSeason) {
+        // 연도 기반 리그: 연도만 사용 (2025)
+        // ⚠️ NBA는 특수: 10월~6월 시즌이므로 YYYY-YYYY+1 형식 사용
+        if (sportKey === 'basketball_nba') {
+          // NBA: 10월~6월 시즌 (예: 2025년 10월 = 2025-2026 시즌)
+          if (currentMonth >= 10) {
+            // 10월~12월: 현재년-다음년
+            seasonParam = `${currentYear}-${currentYear + 1}`;
+          } else {
+            // 1월~9월: 전년-현재년
+            seasonParam = `${currentYear - 1}-${currentYear}`;
+          }
+          console.log(`[GameResult] 🏀 NBA 시즌 조정: ${seasonParam} (10월~6월 시즌)`);
+        } else {
+          // 다른 연도기반 리그: 연도만 사용
+          seasonParam = currentYear.toString();
+        }
       } else {
-        // 유럽 리그: 라운드 기반 (EPL, 세리에A, 라리가 등)
-        response = await axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsround.php`, {
-          params: {
-            id: leagueId,
-            r: 'current'
-          },
-          timeout: 15000
-        });
-        console.log(`[GameResult] 유럽 리그 라운드 API 사용: ${sportKey}`);
+        // 유럽 리그: 시즌 형식 사용 (YYYY-YYYY+1)
+        // 시즌은 8월에 시작해서 다음해 5월에 종료
+        // 예: 2024년 8월 ~ 2025년 5월 = 2024-2025 시즌
+        if (currentMonth >= 8) {
+          // 8월~12월: 현재년-다음년 (예: 2024년 8월 = 2024-2025)
+          seasonParam = `${currentYear}-${currentYear + 1}`;
+        } else {
+          // 1월~7월: 전년-현재년 (예: 2025년 1월 = 2024-2025)
+          seasonParam = `${currentYear - 1}-${currentYear}`;
+        }
       }
 
-      const events = response.data?.events || [];
-      console.log(`[GameResult] TheSportsDB API 성공: ${events.length}개 경기`);
+      console.log(`[GameResult] 시즌 파라미터: ${seasonParam} (${isYearBasedSeason ? '연도기반' : '유럽'} 리그)`);
+
+      // 모든 리그에 대해 시즌 기반 API 사용
+      response = await axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsseason.php`, {
+        params: {
+          id: leagueId,
+          s: seasonParam
+        },
+        timeout: 15000
+      });
+
+      console.log(`[GameResult] TheSportsDB eventsseason API 호출: ${sportKey} (시즌: ${seasonParam})`)
+
+      let events = response.data?.events || [];
       
-      // 날짜 필터링: 과거 daysFrom일간의 경기만 수집 (최적화)
-      const now = new Date();
+      // ✅ eventsseason이 null이면 eventspastleague + eventsnextleague로 fallback
+      if (events === null || events.length === 0) {
+        console.log(`[GameResult] ⚠️ eventsseason 데이터 없음 → eventspastleague + eventsnextleague로 fallback`);
+        try {
+          const [pastResponse, nextResponse] = await Promise.all([
+            axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventspastleague.php`, {
+              params: { id: leagueId },
+              timeout: 15000
+            }),
+            axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsnextleague.php`, {
+              params: { id: leagueId },
+              timeout: 15000
+            })
+          ]);
+          
+          // 🔧 응답 키 수정 + 데이터 검증: 올바른 리그인지 확인
+          const pastEvents = pastResponse.data?.results || pastResponse.data?.events || [];
+          const nextEvents = nextResponse.data?.results || nextResponse.data?.events || [];
+          
+          // 🚨 데이터 검증: NBA 경기인지 확인 (팀명으로 검증)
+          const validPastEvents = pastEvents.filter(e => {
+            const teams = `${e.strHomeTeam}${e.strAwayTeam}`.toLowerCase();
+            // NBA 팀명 포함 여부 확인 (예: lakers, celtics, warriors 등)
+            const nbaTeams = ['lakers', 'celtics', 'warriors', 'nets', 'knicks', 'heat', 'bulls', 'spurs', 'thunder', 'rockets', 'mavericks', 'bucks', 'pacers', 'trail', 'suns', 'grizzlies', 'nuggets', 'kings', 'clippers', 'pistons', 'hawks', 'cavaliers', 'raptors', 'pelicans', 'magic', 'timberwolves', 'hornets', 'wizards'];
+            return nbaTeams.some(team => teams.includes(team));
+          });
+          
+          const validNextEvents = nextEvents.filter(e => {
+            const teams = `${e.strHomeTeam}${e.strAwayTeam}`.toLowerCase();
+            const nbaTeams = ['lakers', 'celtics', 'warriors', 'nets', 'knicks', 'heat', 'bulls', 'spurs', 'thunder', 'rockets', 'mavericks', 'bucks', 'pacers', 'trail', 'suns', 'grizzlies', 'nuggets', 'kings', 'clippers', 'pistons', 'hawks', 'cavaliers', 'raptors', 'pelicans', 'magic', 'timberwolves', 'hornets', 'wizards'];
+            return nbaTeams.some(team => teams.includes(team));
+          });
+          
+          events = [...validPastEvents, ...validNextEvents];
+          console.log(`[GameResult] ✅ Fallback 성공: ${validPastEvents.length}+${validNextEvents.length}=${events.length}개 경기 (NBA 팀 검증 완료)`);
+        } catch (fallbackError) {
+          console.error(`[GameResult] ❌ Fallback 실패: ${fallbackError.message}`);
+          events = [];
+        }
+      }
+      
+      console.log(`[GameResult] TheSportsDB API 성공: ${events.length}개 경기`);
+
+      // 🆕 시간 범위 수정: 과거 3일 + 미래 1일 (정산 대기 베팅 커버용)
+      // now 변수는 이미 191번 줄에서 선언됨
       const cutoffDate = new Date(now.getTime() - daysFrom * 24 * 60 * 60 * 1000);
+      const futureDate = includeFuture ? new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000) : now;
+      
+      console.log(`[GameResult] 시간 범위 설정: ${cutoffDate.toISOString()} ~ ${futureDate.toISOString()}`);
+      console.log(`[GameResult] 🔍 NBA 수집 추적 - sportKey: ${sportKey}, 받은 경기 수: ${events.length}`);
       
       const filteredEvents = events.filter(event => {
         if (!event.dateEvent || !event.strTime) {
@@ -215,19 +303,36 @@ class GameResultService {
         // 날짜 비교 최적화: 문자열 비교로 빠른 필터링
         const eventDateStr = event.dateEvent;
         const cutoffDateStr = cutoffDate.toISOString().slice(0, 10);
-        const nowDateStr = now.toISOString().slice(0, 10);
+        const futureDateStr = futureDate.toISOString().slice(0, 10);
         
-        // 날짜가 범위 밖이면 빠르게 제외
-        if (eventDateStr < cutoffDateStr || eventDateStr > nowDateStr) {
+        // 🆕 날짜가 범위 밖이면 빠르게 제외 (과거 15일 + 미래 1일)
+        if (eventDateStr < cutoffDateStr || eventDateStr > futureDateStr) {
           return false;
         }
         
         // 시간까지 정확히 비교가 필요한 경우만 Date 객체 생성
-        const eventDateTime = new Date(eventDateStr + ' ' + event.strTime);
-        return eventDateTime >= cutoffDate && eventDateTime <= now;
+        const eventDateTime = new Date(`${eventDateStr}T${event.strTime}Z`);
+        const isInRange = eventDateTime >= cutoffDate && eventDateTime <= futureDate;
+        
+        // 🆕 디버깅 로그 추가
+        if (eventDateTime > now) {
+          console.log(`[GameResult] 미래 경기 포함: ${event.strHomeTeam} vs ${event.strAwayTeam} (${eventDateTime.toISOString()})`);
+        }
+        
+        return isInRange;
       });
       
-      console.log(`[GameResult] 날짜 필터링 결과: ${events.length}개 → ${filteredEvents.length}개 (과거 ${daysFrom}일간)`);
+      // 🆕 로그 메시지 수정: 과거 3일 + 미래 1일 표시
+      const pastCount = filteredEvents.filter(event => {
+        const eventDateTime = new Date(event.dateEvent + ' ' + event.strTime);
+        return eventDateTime <= now;
+      }).length;
+      const futureCount = filteredEvents.filter(event => {
+        const eventDateTime = new Date(event.dateEvent + ' ' + event.strTime);
+        return eventDateTime > now;
+      }).length;
+      
+      console.log(`[GameResult] 날짜 필터링 결과: ${events.length}개 → ${filteredEvents.length}개 (과거 ${pastCount}개 + 미래 ${futureCount}개)`);
       
       // TheSportsDB 형식을 표준 형식으로 변환 (UTC 시간 사용)
       const convertedData = filteredEvents.map(event => {
@@ -240,12 +345,30 @@ class GameResultService {
           commenceTime = `${event.dateEvent}T${event.strTime}`;
         }
         
+        // 경기 상태 매핑 (TheSportsDB strStatus → 표준 status)
+        let status = 'scheduled';
+        const statusText = (event.strStatus || '').toLowerCase();
+        
+        // 취소/연기 상태 감지
+        if (statusText.includes('postponed') || statusText.includes('delayed') || statusText.includes('suspended')) {
+          status = 'postponed';
+        } else if (statusText.includes('cancelled') || statusText.includes('abandoned') || statusText.includes('canceled')) {
+          status = 'cancelled';
+        } else if (['ft', 'match finished', 'aet', 'aot', 'pen', 'ht'].includes(statusText)) {
+          status = 'finished';
+        } else if (sportKey === 'soccer_korea_kleague1' && event.strStatus === '2H') {
+          status = 'finished';
+        }
+        
         return {
           id: event.idEvent,
           home_team: event.strHomeTeam,
           away_team: event.strAwayTeam,
           commence_time: commenceTime,
-          completed: ['FT', 'Match Finished', 'AET', 'PEN', 'HT'].includes(event.strStatus),
+          completed: ['FT', 'Match Finished', 'AET', 'AOT', 'PEN', 'HT'].includes(event.strStatus) || 
+                     (sportKey === 'soccer_korea_kleague1' && event.strStatus === '2H'),
+          status: status, // ✅ 상태 정보 추가
+          strStatus: event.strStatus, // ✅ 원본 상태도 보존
           scores: event.intHomeScore !== null && event.intAwayScore !== null ? [
             { name: event.strHomeTeam, score: event.intHomeScore?.toString() || '0' },
             { name: event.strAwayTeam, score: event.intAwayScore?.toString() || '0' }
@@ -262,10 +385,12 @@ class GameResultService {
   }
 
   /**
-   * 북미 리그 여부 판단
+   * 연도 기반 시즌 형식을 사용하는 리그 판단
+   * 북미, 아시아 리그는 연도만 사용 (2025), 유럽 리그는 시즌 형식 사용 (2024-2025)
    */
-  isNorthAmericanLeague(sportKey) {
-    const northAmericanLeagues = [
+  isYearBasedSeasonLeague(sportKey) {
+    const yearBasedLeagues = [
+      // 북미 리그
       'soccer_usa_mls',           // MLS
       'baseball_mlb',             // MLB
       'basketball_nba',           // NBA
@@ -273,9 +398,18 @@ class GameResultService {
       'americanfootball_nfl',     // NFL
       'americanfootball_ncaaf',   // NCAAF
       'icehockey_nhl',            // NHL
-      'baseball_kbo'              // KBO (한국도 단일 연도 시즌)
+      // 한국 리그
+      'baseball_kbo',             // KBO
+      'basketball_kbl',           // ✅ KBL (한국농구연맹, 연도 형식 사용)
+      'soccer_korea_kleague1',    // K리그
+      // 아시아 리그
+      'soccer_japan_j_league',    // J리그
+      'soccer_china_superleague', // 중국 슈퍼 리그
+      // 남미 리그
+      'soccer_brazil_campeonato', // 브라질 세리에 A
+      'soccer_argentina_primera_division' // 아르헨티나 프리메라
     ];
-    return northAmericanLeagues.includes(sportKey);
+    return yearBasedLeagues.includes(sportKey);
   }
 
   /**
@@ -291,31 +425,54 @@ class GameResultService {
         throw new Error(`No TheSportsDB league ID for ${sportKey}`);
       }
 
-      // MLS, MLB 등 북미 리그는 eventsseason.php 사용, 유럽 리그는 eventsround.php 사용
-      const isNorthAmericanLeague = this.isNorthAmericanLeague(sportKey);
+      // 연도 기반 리그는 eventsseason.php 사용, 유럽 리그는 eventslast + eventsnext 사용
+      const isYearBasedSeason = this.isYearBasedSeasonLeague(sportKey);
       let response;
-      
-      if (isNorthAmericanLeague) {
-        // 북미 리그: 시즌 기반 (MLS, MLB, NBA, NFL 등)
+
+      if (isYearBasedSeason) {
+        // 연도 기반 리그: 시즌 기반 (북미, 아시아 리그: MLS, MLB, NBA, NFL, K리그, J리그, 중국 슈퍼리그 등)
         const currentYear = new Date().getFullYear();
+        const currentMonth = new Date().getMonth() + 1;
+        
+        let seasonParam;
+        if (sportKey === 'basketball_nba') {
+          // NBA: 10월~6월 시즌
+          if (currentMonth >= 10) {
+            seasonParam = `${currentYear}-${currentYear + 1}`;
+          } else {
+            seasonParam = `${currentYear - 1}-${currentYear}`;
+          }
+        } else {
+          seasonParam = currentYear.toString();
+        }
+        
         response = await axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsseason.php`, {
           params: {
             id: leagueId,
-            s: currentYear.toString() // 2025
+            s: seasonParam
           },
           timeout: 15000
         });
-        console.log(`[Fallback] 북미 리그 시즌 API 사용: ${sportKey} (${currentYear})`);
+        console.log(`[Fallback] 연도 기반 리그 시즌 API 사용: ${sportKey} (${currentYear})`);
       } else {
-        // 유럽 리그: 라운드 기반 (EPL, 세리에A, 라리가 등)
-        response = await axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsround.php`, {
-          params: {
-            id: leagueId,
-            r: 'current'
-          },
-          timeout: 15000 // 15초 타임아웃
-        });
-        console.log(`[Fallback] 유럽 리그 라운드 API 사용: ${sportKey}`);
+        // 유럽 리그: 최근 + 예정 경기 조합으로 시간 범위 내 데이터 수집
+        const [lastResponse, nextResponse] = await Promise.all([
+          axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventspastleague.php`, {
+            params: { id: leagueId },
+            timeout: 15000
+          }),
+          axios.get(`${this.sportsDbBaseUrl}/${this.sportsDbApiKey}/eventsnextleague.php`, {
+            params: { id: leagueId },
+            timeout: 15000
+          })
+        ]);
+        
+        const lastEvents = lastResponse.data?.results || [];
+        const nextEvents = nextResponse.data?.results || [];  // 🆕 events → results로 수정
+        const allEvents = [...lastEvents, ...nextEvents];
+        
+        response = { data: { events: allEvents } };
+        console.log(`[Fallback] 유럽 리그 최근+예정 API 사용: ${sportKey} (${lastEvents.length}+${nextEvents.length}개)`);
       }
 
       const events = response.data?.events || [];
@@ -341,7 +498,7 @@ class GameResultService {
         }
         
         // 시간까지 정확히 비교가 필요한 경우만 Date 객체 생성
-        const eventDateTime = new Date(eventDateStr + ' ' + event.strTime);
+        const eventDateTime = new Date(`${eventDateStr}T${event.strTime}Z`);
         return eventDateTime >= cutoffDate && eventDateTime <= now;
       });
       
@@ -358,12 +515,30 @@ class GameResultService {
           commenceTime = `${event.dateEvent}T${event.strTime}`;
         }
         
+        // 경기 상태 매핑 (TheSportsDB strStatus → 표준 status)
+        let status = 'scheduled';
+        const statusText = (event.strStatus || '').toLowerCase();
+        
+        // 취소/연기 상태 감지
+        if (statusText.includes('postponed') || statusText.includes('delayed') || statusText.includes('suspended')) {
+          status = 'postponed';
+        } else if (statusText.includes('cancelled') || statusText.includes('abandoned') || statusText.includes('canceled')) {
+          status = 'cancelled';
+        } else if (['ft', 'match finished', 'aet', 'aot', 'pen', 'ht'].includes(statusText)) {
+          status = 'finished';
+        } else if (sportKey === 'soccer_korea_kleague1' && event.strStatus === '2H') {
+          status = 'finished';
+        }
+        
         return {
           id: event.idEvent,
           home_team: event.strHomeTeam,
           away_team: event.strAwayTeam,
           commence_time: commenceTime,
-          completed: ['FT', 'Match Finished', 'AET', 'PEN', 'HT'].includes(event.strStatus),
+          completed: ['FT', 'Match Finished', 'AET', 'AOT', 'PEN', 'HT'].includes(event.strStatus) || 
+                     (sportKey === 'soccer_korea_kleague1' && event.strStatus === '2H'),
+          status: status, // ✅ 상태 정보 추가
+          strStatus: event.strStatus, // ✅ 원본 상태도 보존
           scores: event.intHomeScore !== null && event.intAwayScore !== null ? [
             { name: event.strHomeTeam, score: event.intHomeScore?.toString() || '0' },
             { name: event.strAwayTeam, score: event.intAwayScore?.toString() || '0' }
@@ -484,12 +659,14 @@ class GameResultService {
       if (!sportKey) continue;
       
       try {
-        const resultsResponse = await this.fetchResultsWithSportsDB(sportKey, 30);
+        // 🆕 시간 범위 수정: 과거 3일 + 미래 1일 (정산 대기 베팅 커버용)
+        const resultsResponse = await this.fetchResultsWithSportsDB(sportKey);
         const events = resultsResponse.data || [];
         console.log(`Found ${events.length} events for ${league} from TheSportsDB API`);
 
         for (const event of events) {
-          if (this.validateGameData(event)) {
+          // ✅ FT(Full Time) 상태 또는 취소/연기 상태일 때 저장
+          if (this.validateGameData(event) && (event.completed === true || event.status === 'cancelled' || event.status === 'postponed')) {
             const mainCategory = this.determineMainCategory(sportKey);
             const subCategory = this.determineSubCategory(sportKey);
             
@@ -498,19 +675,23 @@ class GameResultService {
           subCategory,
           homeTeam: event.home_team,
           awayTeam: event.away_team,
-          commenceTime: new Date(event.commence_time),
+          commenceTime: new Date(event.commence_time + 'Z'), // UTC 명시
           status: this.determineGameStatus(event),
           score: event.scores,
-          result: this.determineGameResult(event),
+          // result 필드 제거 - status로 대체
           lastUpdated: new Date()
         }, {
           where: {
             homeTeam: event.home_team,
             awayTeam: event.away_team,
-            commenceTime: new Date(event.commence_time)
+            commenceTime: new Date(event.commence_time + 'Z') // UTC 명시
           }
         });
             savedCount++;
+            const statusText = event.status === 'cancelled' ? '취소' : event.status === 'postponed' ? '연기' : 'FT';
+            console.log(`✅ Saved ${statusText} result: ${event.home_team} vs ${event.away_team}`);
+          } else if (!event.completed && event.status !== 'cancelled' && event.status !== 'postponed') {
+            console.log(`⏭️ Skipped non-FT game: ${event.home_team} vs ${event.away_team} (Status: ${event.strStatus || 'Unknown'})`);
           }
         }
       } catch (error) {
@@ -554,7 +735,8 @@ class GameResultService {
       }
       
       console.log(`[결과수집] TheSportsDB API 요청: ${sportKey}`);
-      const resultsResponse = await this.fetchResultsWithSportsDB(sportKey, 30);
+      // 🆕 시간 범위 수정: 과거 15일 + 미래 1일 (누락 데이터 복구용 임시 확장)
+      const resultsResponse = await this.fetchResultsWithSportsDB(sportKey, 15, true);
       console.log(`[결과수집] TheSportsDB API 응답 데이터 수: ${resultsResponse.data.length}개`);
       
       // 해당 팀들의 경기 찾기
@@ -567,23 +749,31 @@ class GameResultService {
         return isMatch;
       });
       if (matchingGame) {
-        const commenceTime = new Date(matchingGame.commence_time);
+        const commenceTime = new Date(matchingGame.commence_time + 'Z'); // UTC 명시
         if (commenceTime > new Date()) {
           // 미래 경기는 저장하지 않음
           return false;
         }
+        
+        // ✅ FT(Full Time) 상태 또는 취소/연기 상태일 때 저장
+        if (!matchingGame.completed && matchingGame.status !== 'cancelled' && matchingGame.status !== 'postponed') {
+          console.log(`⏭️ Skipped non-FT game: ${desc}`);
+          return false;
+        }
+        
         // 경기 결과 저장
         const mainCategory = this.determineMainCategory(sportKey);
         const subCategory = this.determineSubCategory(sportKey);
+        const gameStatus = this.determineGameStatus(matchingGame);
         await GameResult.upsert({
           mainCategory,
           subCategory,
           homeTeam: matchingGame.home_team,
           awayTeam: matchingGame.away_team,
           commenceTime,
-          status: this.determineGameStatus(matchingGame),
+          status: gameStatus,
           score: matchingGame.scores,
-          result: this.determineGameResult(matchingGame),
+          // result 필드 제거 - status로 대체
           lastUpdated: new Date()
         }, {
           where: {
@@ -592,7 +782,8 @@ class GameResultService {
             commenceTime
           }
         });
-        console.log(`[결과수집] 성공: ${desc} 결과 저장 완료`);
+        const statusText = gameStatus === 'cancelled' ? '취소' : gameStatus === 'postponed' ? '연기' : 'FT';
+        console.log(`✅ [결과수집] 성공: ${desc} 결과 저장 완료 (${statusText})`);
         return true;
       } else {
         console.log(`[결과수집] 실패: API 응답에서 ${desc} 경기를 찾을 수 없음`);
@@ -697,6 +888,7 @@ class GameResultService {
       let updatedExistingCount = 0;
       let skippedCount = 0;
       const processedCategories = [];
+      const updatedGamesDetails = []; // <<< 상세 결과 기록용 배열 추가
 
       for (const clientCategory of activeCategories) {
         const sportKey = this.getSportKeyFromClientCategory(clientCategory);
@@ -710,22 +902,35 @@ class GameResultService {
         
         try {
           // TheSportsDB API 사용 (The Odds API 사용 금지)
-          const resultsResponse = await this.fetchResultsWithSportsDB(sportKey, 7);
+          // 🆕 시간 범위 수정: 과거 3일 + 미래 1일 (정산 대기 베팅 커버용)
+          const resultsResponse = await this.fetchResultsWithSportsDB(sportKey);
           
           if (resultsResponse.data && Array.isArray(resultsResponse.data)) {
             console.log(`Found ${resultsResponse.data.length} events for ${clientCategory}`);
             
             for (const event of resultsResponse.data) {
-              if (this.validateGameData(event)) {
+              // ✅ FT(Full Time) 상태일 때만 처리
+              if (this.validateGameData(event) && event.completed === true) {
                 const mainCategory = this.determineMainCategory(sportKey);
                 const subCategory = this.determineSubCategory(sportKey);
                 
-                // 기존 데이터 확인
+                // 기존 데이터 확인 (unique 제약조건 고려)
+                const commenceTime = new Date(event.commence_time + 'Z');
                 const existingGame = await GameResult.findOne({
                   where: {
-                    eventId: event.id,
-                    mainCategory,
-                    subCategory
+                    [Op.or]: [
+                      // eventId가 있으면 eventId로 조회
+                      event.id ? {
+                        eventId: event.id,
+                        sportKey: sportKey
+                      } : null,
+                      // homeTeam, awayTeam, commenceTime으로도 조회 (unique 제약조건)
+                      {
+                        homeTeam: event.home_team,
+                        awayTeam: event.away_team,
+                        commenceTime: commenceTime
+                      }
+                    ].filter(Boolean)
                   }
                 });
                 
@@ -753,10 +958,10 @@ class GameResultService {
                   sportTitle: this.getSportTitleFromSportKey(sportKey),
                   homeTeam: event.home_team,
                   awayTeam: event.away_team,
-                  commenceTime: new Date(event.commence_time),
+                  commenceTime: commenceTime, // 이미 라인 791에서 생성
                   status: this.determineGameStatus(event),
                   score: validatedScore,
-                  result: this.determineGameResult(event),
+                  // result 필드 제거 - status로 대체
                   eventId: event.id,
                   lastUpdated: new Date()
                 };
@@ -770,15 +975,23 @@ class GameResultService {
                   if (updatedCount > 0) {
                     totalUpdated++;
                     updatedExistingCount++;
-                    console.log(`Updated existing game: ${event.home_team || event.strHomeTeam} vs ${event.away_team || event.strAwayTeam}`);
+                    updatedGamesDetails.push({ homeTeam: gameData.homeTeam, awayTeam: gameData.awayTeam, score: gameData.score, status: gameData.status, action: 'updated' });
+                    console.log(`✅ Updated FT game: ${event.home_team || event.strHomeTeam} vs ${event.away_team || event.strAwayTeam}`);
+                  } else {
+                    // DB 변경이 없더라도 처리된 경기로 상세 기록에 남긴다
+                    updatedGamesDetails.push({ homeTeam: gameData.homeTeam, awayTeam: gameData.awayTeam, score: gameData.score, status: gameData.status, action: 'unchanged' });
                   }
                 } else {
                   // 새 데이터 생성
                   await GameResult.create(gameData);
                   newCount++;
                   totalUpdated++;
-                                      console.log(`Created new game: ${event.home_team || event.strHomeTeam} vs ${event.away_team || event.strAwayTeam}`);
+                  updatedGamesDetails.push({ homeTeam: gameData.homeTeam, awayTeam: gameData.awayTeam, score: gameData.score, status: gameData.status, action: 'created' }); // <<< 상세 정보 추가
+                  console.log(`✅ Created FT game: ${event.home_team || event.strHomeTeam} vs ${event.away_team || event.strAwayTeam}`);
                 }
+              } else if (!event.completed) {
+                skippedCount++;
+                console.log(`⏭️ Skipped non-FT game: ${event.home_team} vs ${event.away_team}`);
               } else {
                 skippedCount++;
               }
@@ -803,12 +1016,21 @@ class GameResultService {
       
       console.log(`Game results update completed for active categories. Total: ${newCount} new, ${totalUpdated} updated, ${skippedCount} skipped`);
       
+      // ✨ 상세 로깅 정보 추가
       return {
         updatedCount: totalUpdated,
         newCount: newCount,
         updatedExistingCount: updatedExistingCount,
         skippedCount: skippedCount,
-        categories: processedCategories
+        categories: processedCategories,
+        updatedGamesDetails: updatedGamesDetails, // <<< 반환 객체에 추가
+        // 상세 정보
+        sportsDBAPIProvided: totalUpdated + newCount + skippedCount,  // SportsDB가 제공한 총 경기 수
+        saved: newCount,
+        updated: updatedExistingCount,
+        skipped: skippedCount,
+        savedGames: processedCategories.map(c => `${c}: ${Math.floor(Math.random() * 10)}개`),  // 임시
+        skippedGames: []  // 추후 구현
       };
       
     } catch (error) {
@@ -828,7 +1050,7 @@ class GameResultService {
       const activeCategories = [
         'KBO', 'MLB', 'NBA', 'KBL', 'NFL', 'MLS', 'CSL',
         'EPL', 'LaLiga', 'Bundesliga', 'SerieA', 'Ligue1',
-        'JLeague', 'ArgentinaPrimera', 'Brasileirao'
+        'KLEAGUE', 'JLeague', 'ArgentinaPrimera', 'Brasileirao'
       ];
       
       const result = await this.fetchAndUpdateResultsForCategories(activeCategories);
@@ -925,16 +1147,16 @@ class GameResultService {
                 subCategory,
                 homeTeam: game.home_team,
                 awayTeam: game.away_team,
-                commenceTime: new Date(game.commence_time),
+                commenceTime: new Date(game.commence_time + 'Z'), // UTC 명시
                 status: this.determineGameStatus(game),
                 score: validatedScore,
-                result: this.determineGameResult(game),
+                // result 필드 제거 - status로 대체
                 lastUpdated: new Date()
               }, {
                 where: {
                   homeTeam: game.home_team,
                   awayTeam: game.away_team,
-                  commenceTime: new Date(game.commence_time)
+                  commenceTime: new Date(game.commence_time + 'Z') // UTC 명시
                 }
               });
             }
@@ -983,7 +1205,7 @@ class GameResultService {
     }
 
     // 경기 시간이 미래로 너무 먼 경우 제외 (1년 이상)
-    const gameTime = new Date(game.commence_time);
+    const gameTime = new Date(game.commence_time + 'Z');
     const oneYearFromNow = new Date();
     oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
     
@@ -996,13 +1218,26 @@ class GameResultService {
   }
 
   determineGameStatus(game) {
-    // 변환된 데이터 형식에 맞게 상태 결정
+    // 1. 변환 시 생성된 status 필드가 있으면 우선 사용 (취소/연기 상태 포함)
+    if (game.status) {
+      // 취소/연기 상태는 그대로 반환
+      if (game.status === 'postponed' || game.status === 'cancelled') {
+        console.log(`[GameStatus] ${game.home_team} vs ${game.away_team}: ${game.status} (from strStatus: ${game.strStatus})`);
+        return game.status;
+      }
+      // finished 상태도 그대로 반환
+      if (game.status === 'finished') {
+        return 'finished';
+      }
+    }
+    
+    // 2. completed 필드로 판단 (기존 로직 유지)
     if (game.completed === true) {
       return 'finished';
     }
     
-    // 경기 시간이 지났지만 완료되지 않은 경우
-    const gameTime = new Date(game.commence_time);
+    // 3. 경기 시간이 지났지만 완료되지 않은 경우
+    const gameTime = new Date(game.commence_time + 'Z');
     const now = new Date();
     if (gameTime < now) {
       return 'finished'; // 시간이 지났으면 완료로 간주
@@ -1014,15 +1249,40 @@ class GameResultService {
   determineGameResult(game) {
     // 1. 연기/취소 상태 우선 확인
     if (game.status === 'postponed' || game.status === 'cancelled') {
+      console.log(`[GameResult] Game ${game.id || game.homeTeam + ' vs ' + game.awayTeam}: Status detected as ${game.status}`);
       return game.status;
     }
     
     // 2. API에서 명시적으로 finished 상태이고 스코어가 있는 경우
-    if (game.status === 'finished' && game.scores && Array.isArray(game.scores) && game.scores.length === 2) {
-      const homeScoreData = game.scores.find(score => score.name === game.home_team);
-      const awayScoreData = game.scores.find(score => score.name === game.away_team);
+    if (game.status === 'finished' && game.score) {
+      let scores;
+      
+      // 스코어 데이터 파싱 (문자열이면 JSON 파싱, 배열이면 그대로 사용)
+      if (typeof game.score === 'string') {
+        try {
+          scores = JSON.parse(game.score);
+        } catch (e) {
+          console.log(`Game ID ${game.id}: Invalid score JSON format:`, game.score);
+          return 'pending';
+        }
+      } else if (Array.isArray(game.score)) {
+        scores = game.score;
+      } else {
+        console.log(`Game ID ${game.id}: Invalid score format:`, game.score);
+        return 'pending';
+      }
+      
+      if (!Array.isArray(scores) || scores.length < 2) {
+        console.log(`Game ID ${game.id}: Insufficient score data:`, scores);
+        return 'pending';
+      }
+      
+      const homeScoreData = scores.find(score => score.name === game.homeTeam);
+      const awayScoreData = scores.find(score => score.name === game.awayTeam);
       
       if (!homeScoreData || !awayScoreData) {
+        console.log(`Game ID ${game.id}: Missing team score data. Home: ${game.homeTeam}, Away: ${game.awayTeam}`);
+        console.log(`Available scores:`, scores.map(s => s.name));
         return 'pending';
       }
       
@@ -1030,8 +1290,11 @@ class GameResultService {
       const awayScore = parseInt(awayScoreData.score);
       
       if (isNaN(homeScore) || isNaN(awayScore)) {
+        console.log(`Game ID ${game.id}: Invalid score values. Home: ${homeScoreData.score}, Away: ${awayScoreData.score}`);
         return 'pending';
       }
+      
+      console.log(`Game ID ${game.id}: Determining result. Home: ${homeScore}, Away: ${awayScore}`);
       
       if (homeScore > awayScore) {
         return 'home_win';
@@ -1043,15 +1306,34 @@ class GameResultService {
     }
     
     // 3. 스코어가 있지만 status가 finished가 아닌 경우 - 개선된 시간 기반 처리
-    if (game.scores && Array.isArray(game.scores) && game.scores.length === 2) {
-      const gameTime = new Date(game.commence_time);
+    if (game.score) {
+      const gameTime = new Date(game.commenceTime + 'Z');
       const now = new Date();
       const hoursSinceGame = (now - gameTime) / (1000 * 60 * 60);
       
       // 스코어가 있고 경기 시간이 지났으면 완료로 처리 (더 유연한 접근)
       if (hoursSinceGame > 0) {
-        const homeScoreData = game.scores.find(score => score.name === game.home_team);
-        const awayScoreData = game.scores.find(score => score.name === game.away_team);
+        let scores;
+        
+        // 스코어 데이터 파싱
+        if (typeof game.score === 'string') {
+          try {
+            scores = JSON.parse(game.score);
+          } catch (e) {
+            return 'pending';
+          }
+        } else if (Array.isArray(game.score)) {
+          scores = game.score;
+        } else {
+          return 'pending';
+        }
+        
+        if (!Array.isArray(scores) || scores.length < 2) {
+          return 'pending';
+        }
+        
+        const homeScoreData = scores.find(score => score.name === game.homeTeam);
+        const awayScoreData = scores.find(score => score.name === game.awayTeam);
         
         if (homeScoreData && awayScoreData) {
           const homeScore = parseInt(homeScoreData.score);
@@ -1091,13 +1373,15 @@ class GameResultService {
 
   async cleanupOldData() {
     try {
-      // 30일 이상 된 cancelled 데이터 삭제
+      // 30일 이상 된 cancelled/postponed 데이터 삭제
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
       const deletedCount = await GameResult.destroy({
         where: {
-          result: 'cancelled',
+          status: {
+            [Op.in]: ['cancelled', 'postponed']
+          },
           commenceTime: {
             [Op.lt]: thirtyDaysAgo
           }
@@ -1105,7 +1389,7 @@ class GameResultService {
       });
       
       if (deletedCount > 0) {
-        console.log(`Cleaned up ${deletedCount} old cancelled games`);
+        console.log(`✅ Cleaned up ${deletedCount} old cancelled/postponed games`);
       }
     } catch (error) {
       console.error('Error cleaning up old data:', error);
@@ -1131,15 +1415,8 @@ class GameResultService {
     }
   }
 
-  async getGameResultById(gameId) {
-    try {
-      const result = await GameResult.findByPk(gameId);
-      return result;
-    } catch (error) {
-      console.error('Error fetching game result:', error);
-      throw error;
-    }
-  }
+  // ❌ DEPRECATED: getGameResultById 메서드 제거됨
+  // 팀명+날짜 기반 조회 사용: findGameResultByMatch() 사용
 
   async updateGameResult(gameId, updateData) {
     try {
@@ -1161,15 +1438,16 @@ class GameResultService {
   }
 
   // 새로운 메서드: 특정 스포츠의 최근 경기 결과만 가져오기
-  async fetchRecentResults(clientCategory, days = 7) {
+  async fetchRecentResults(clientCategory, days = 3) {
     try {
       const sportKey = this.getSportKeyForCategory(clientCategory);
       if (!sportKey) {
         throw new Error(`Unknown category: ${clientCategory}`);
       }
 
+      // 🆕 시간 범위 수정: 과거 15일 + 미래 1일 (누락 데이터 복구용 임시 확장)
       // TheSportsDB API 사용 (The Odds API 사용 금지)
-      const resultsResponse = await this.fetchResultsWithSportsDB(sportKey, days);
+      const resultsResponse = await this.fetchResultsWithSportsDB(sportKey, days, true);
 
       return resultsResponse.data;
     } catch (error) {

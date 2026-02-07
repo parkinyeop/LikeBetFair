@@ -1,0 +1,57 @@
+[
+  {
+    "id": "5fcfc2c0cdea979dcb212e634c4bd416",
+    "sport_key": "baseball_kbo",
+    "sport_title": "KBO",
+    "commence_time": "2025-09-30T09:30:00Z",
+    "completed": false,
+    "home_team": "LG Twins",
+    "away_team": "Doosan Bears",
+    "scores": null,
+    "last_update": null
+  },
+  {
+    "id": "1e080683f55a1bb1566ab25dc1475a4d",
+    "sport_key": "baseball_kbo",
+    "sport_title": "KBO",
+    "commence_time": "2025-09-30T09:30:00Z",
+    "completed": false,
+    "home_team": "Hanwha Eagles",
+    "away_team": "Lotte Giants",
+    "scores": null,
+    "last_update": null
+  },
+  {
+    "id": "efd8c854f855ca362ec07d32b4c365aa",
+    "sport_key": "baseball_kbo",
+    "sport_title": "KBO",
+    "commence_time": "2025-09-30T09:30:00Z",
+    "completed": false,
+    "home_team": "NC Dinos",
+    "away_team": "KT Wiz",
+    "scores": null,
+    "last_update": null
+  },
+  {
+    "id": "6793277bfd27315b050cd48393009f89",
+    "sport_key": "baseball_kbo",
+    "sport_title": "KBO",
+    "commence_time": "2025-09-30T09:30:00Z",
+    "completed": false,
+    "home_team": "Samsung Lions",
+    "away_team": "Kia Tigers",
+    "scores": null,
+    "last_update": null
+  },
+  {
+    "id": "35e2f384eebc37bf6a43a265b721b0f2",
+    "sport_key": "baseball_kbo",
+    "sport_title": "KBO",
+    "commence_time": "2025-09-30T09:30:00Z",
+    "completed": false,
+    "home_team": "Kiwoom Heroes",
+    "away_team": "SSG Landers",
+    "scores": null,
+    "last_update": null
+  }
+]

@@ -32,7 +32,7 @@ const User = sequelize.define('User', {
     }
   },
   balance: {
-    type: DataTypes.DECIMAL(10, 2),
+    type: DataTypes.DECIMAL(12, 2),  // 최대 10억원 (999,999,999.99)
     allowNull: false,
     defaultValue: 0.00
   },
@@ -51,12 +51,12 @@ const User = sequelize.define('User', {
     }
   },
   referralCode: {
-    type: DataTypes.STRING(20),
+    type: DataTypes.STRING(4),
     allowNull: true,
     unique: true
   },
   referredBy: {
-    type: DataTypes.STRING(20),
+    type: DataTypes.STRING(4),
     allowNull: true
   },
   referrerAdminId: {
@@ -145,5 +145,21 @@ User.prototype.canViewUser = function(targetUserId) {
   // 자신이 추천한 사용자만 조회 가능
   return this.hasPermission('view_own_referrals');
 };
+
+// ExchangeOrder와의 관계 설정
+import('./exchangeOrderModel.js').then(({ default: ExchangeOrder }) => {
+  User.hasMany(ExchangeOrder, {
+    foreignKey: 'userId',
+    as: 'exchangeOrders'
+  });
+});
+
+// PaymentHistory와의 관계 설정
+import('./paymentHistoryModel.js').then(({ default: PaymentHistory }) => {
+  User.hasMany(PaymentHistory, {
+    foreignKey: 'userId',
+    as: 'paymentHistories'
+  });
+});
 
 export default User; 

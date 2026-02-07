@@ -1,18 +1,12 @@
-import { Sequelize, DataTypes } from 'sequelize';
+import { DataTypes } from 'sequelize';
 import dotenv from 'dotenv';
 dotenv.config();
 import fs from 'fs';
 
-// Sequelize 인스턴스 생성
-const sequelize = new Sequelize({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  username: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  dialect: 'postgres',
-  logging: false
-});
+import createScriptSequelize from '../config/scriptDatabase.js';
+
+// 스크립트 전용 Sequelize 인스턴스 생성
+const sequelize = createScriptSequelize();
 
 // Bet 모델 정의
 const Bet = sequelize.define('Bet', {
@@ -180,9 +174,9 @@ async function updateGameResultsFromBets() {
           continue;
         }
         
-        // commence_time이 있으면 사용하고, 없으면 오늘 날짜로 설정
+        // commence_time이 있으면 사용하고, 없으면 오늘 날짜로 설정 (UTC 변환)
         const commenceTime = selection.commence_time 
-          ? new Date(selection.commence_time)
+          ? new Date(selection.commence_time + 'Z')
           : new Date(); // 오늘 날짜로 설정
         
         // 고유한 경기 식별자 생성 (홈팀 + 원정팀 + 시작시간)
@@ -243,7 +237,7 @@ async function updateGameResultsFromBets() {
           commenceTime: gameInfo.commenceTime,
           status: 'scheduled',
           score: score,
-          result: result,
+          // result 필드 제거 - status로 대체
           lastUpdated: new Date()
         });
         

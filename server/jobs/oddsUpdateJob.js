@@ -1,13 +1,23 @@
 import cron from 'node-cron';
 import oddsApiService from '../services/oddsApiService.js';
+import oddsCleanupService from '../services/oddsCleanupService.js';
 import gameResultService from '../services/gameResultService.js';
 import betResultService from '../services/betResultService.js';
+import ExchangeSettlementService from '../services/exchangeSettlementService.js';
+import multibetSettlementService from '../services/multibetSettlementService.js';
+import { cleanupOldLogs, getLogStats } from '../utils/logCleanup.js';
 import fs from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { collectPremierLeagueData } from '../scripts/collectPremierLeagueData.js';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+import GameResult from '../models/gameResultModel.js';
+import ExchangeOrder from '../models/exchangeOrderModel.js';
+import { Op } from 'sequelize';
+
+// 스크립트 전용 Sequelize 인스턴스 생성
+const sequelize = createScriptSequelize();
 
 const execAsync = promisify(exec);
 
@@ -17,17 +27,62 @@ let lastUpdateTime = null;
 let isInitializing = false; // 초기화 중복 실행 방지
 let lastInitTime = null; // 마지막 초기화 시간
 
+// ✅ 스마트 스케줄링: 효율성 추적 변수
+let totalSchedulerRuns = 0;
+let skippedRuns = 0;
+let lastEfficiencyLog = Date.now();
+
+// 💰 API 예산 최적화 스케줄러
+// 월간 20,000 크레딧 한도 내 운영을 위한 최적화 적용
+// 
+// 📅 최적화된 스케줄러 일정:
+// - 고우선순위: 4시간마다 (일 6회)
+// - 중우선순위: 6시간마다 (일 4회)
+// - 저우선순위: 24시간마다 (일 1회)
+// - 경기 결과: 2시간마다 (일 12회)
+// - Regions: us만 사용
+// - 예상 비용: 17,370 크레딧/월 (86.9% 사용)
+
 // 서버 시작 로그
 console.log('🚀 [SCHEDULER_SYSTEM] Odds Update Scheduler Starting...');
 console.log('🚀 [SCHEDULER_SYSTEM] Process ID:', process.pid);
 console.log('🚀 [SCHEDULER_SYSTEM] Start Time:', new Date().toISOString());
 console.log('🚀 [SCHEDULER_SYSTEM] Node Version:', process.version);
 console.log('🚀 [SCHEDULER_SYSTEM] Environment:', process.env.NODE_ENV || 'development');
+console.log('💰 [SCHEDULER_SYSTEM] API BUDGET OPTIMIZED - 17,370 CREDITS/MONTH (86.9%)');
 
-// 스케줄러 상태 모니터링 추가 (30분마다로 변경)
+// 🔧 데드락 방지: 서버 시작 시 플래그 강제 리셋
+console.log(`[SCHEDULER_SYSTEM_FLAG] 🔧 Server startup - Force resetting flags to prevent deadlock`);
+console.log(`[SCHEDULER_SYSTEM_FLAG] 🔧 Previous isUpdatingOdds: ${isUpdatingOdds}`);
+console.log(`[SCHEDULER_SYSTEM_FLAG] 🔧 Previous isUpdatingResults: ${isUpdatingResults}`);
+isUpdatingOdds = false;
+isUpdatingResults = false;
+console.log(`[SCHEDULER_SYSTEM_FLAG] ✅ Flags reset - isUpdatingOdds: ${isUpdatingOdds}, isUpdatingResults: ${isUpdatingResults}`);
+
+// 스케줄러 상태 모니터링 및 효율성 리포팅 (30분마다)
 setInterval(() => {
-  console.log('[SCHEDULER_STATUS] 💓 isUpdatingOdds:', isUpdatingOdds);
-  console.log('[SCHEDULER_STATUS] 💓 isUpdatingResults:', isUpdatingResults);
+  // 스케줄러 상태는 scheduler_*.log에만 기록 (서버 로그 중복 방지)
+
+  // ✅ 효율성 리포팅
+  const currentTime = Date.now();
+  const timeSinceLastLog = (currentTime - lastEfficiencyLog) / (1000 * 60); // 분 단위
+
+  if (timeSinceLastLog >= 30) { // 30분마다 효율성 리포트
+    const efficiencyRate = totalSchedulerRuns > 0 ? ((skippedRuns / totalSchedulerRuns) * 100).toFixed(1) : 0;
+
+    // 효율성 리포트는 scheduler_*.log에만 기록
+
+    // 로그 저장
+    saveUpdateLog('scheduler_efficiency', 'report', {
+      message: 'Scheduler efficiency report',
+      totalRuns: totalSchedulerRuns,
+      skippedRuns: skippedRuns,
+      efficiencyRate: parseFloat(efficiencyRate),
+      reportPeriod: `${timeSinceLastLog.toFixed(1)} minutes`
+    });
+
+    lastEfficiencyLog = currentTime;
+  }
 }, 30 * 60 * 1000); // 30분마다
 
 // 리그별 우선순위 설정 (API 사용량 최적화)
@@ -52,7 +107,7 @@ let activeCategories = new Set([
 // 활성 카테고리 관리 함수
 const updateActiveCategories = (categories) => {
   activeCategories = new Set(categories);
-  console.log(`[${new Date().toISOString()}] Active categories updated:`, Array.from(activeCategories));
+  // 카테고리 변경은 scheduler_*.log에만 기록됨 (서버 로그 중복 방지)
 };
 
 // 로그 디렉토리 생성
@@ -64,12 +119,14 @@ if (!fs.existsSync(logsDir)) {
 // 로그 파일 크기 제한 (10MB)
 const MAX_LOG_SIZE = 10 * 1024 * 1024; // 10MB
 
-// 로그 파일 정리 함수
+// 로그 파일 정리 함수 (분리된 로그 파일들 포함)
 function cleanupLogFiles() {
   try {
     const files = fs.readdirSync(logsDir);
     files.forEach(file => {
-      if (file.startsWith('scheduler_') && file.endsWith('.log')) {
+      if ((file.startsWith('scheduler_') || file.startsWith('game_results_') || 
+           file.startsWith('odds_data_') || file.startsWith('bet_results_')) && 
+          file.endsWith('.log')) {
         const filePath = path.join(logsDir, file);
         const stats = fs.statSync(filePath);
         
@@ -86,11 +143,26 @@ function cleanupLogFiles() {
   }
 }
 
-// 로그 저장 함수 (최적화됨)
+// 로그 저장 함수 (최적화됨 + 타입별 분리)
 function saveUpdateLog(type, status, data = {}) {
   const now = new Date();
-  const dateStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
-  const logFile = path.join(logsDir, `scheduler_${dateStr}.log`);
+  // ✅ 로컬 시간대(한국 시간) 기준으로 날짜 생성 (UTC → KST 변환)
+  const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
+  const dateStr = kstDate.toISOString().slice(0, 10); // YYYY-MM-DD
+  
+  // 타입별 로그 파일 분리
+  let logFileName;
+  if (type === 'results') {
+    logFileName = `game_results_${dateStr}.log`;
+  } else if (type === 'odds') {
+    logFileName = `odds_data_${dateStr}.log`;
+  } else if (type === 'bets') {
+    logFileName = `bet_results_${dateStr}.log`;
+  } else {
+    logFileName = `scheduler_${dateStr}.log`; // 기타 로그들
+  }
+  
+  const logFile = path.join(logsDir, logFileName);
   
   // init 타입 로그 최적화 - 중복 방지
   if (type === 'init' && status === 'start') {
@@ -118,12 +190,9 @@ function saveUpdateLog(type, status, data = {}) {
   
   const logLine = JSON.stringify(logEntry) + '\n';
   fs.appendFileSync(logFile, logLine);
-  
-  // 콘솔 출력 최적화 - 스케줄러 검색 키워드 추가
-  const emoji = status === 'success' ? '✅' : status === 'error' ? '❌' : '🚀';
-  const message = cleanData.message || '';
-  const searchKeyword = `[SCHEDULER_${type.toUpperCase()}]`; // 검색용 키워드
-  console.log(`${searchKeyword} ${emoji} [${now.toISOString()}] ${type.toUpperCase()} ${status.toUpperCase()}: ${message}`);
+
+  // 전용 로그 파일에만 기록 (서버 로그 중복 방지)
+  // game_results_*.log, odds_data_*.log, bet_results_*.log, scheduler_*.log
 }
 
 // 타임아웃 래퍼 함수
@@ -136,7 +205,7 @@ function withTimeout(promise, timeoutMs, operationName) {
   ]);
 }
 
-// 경기 결과 업데이트 - 10분마다 실행 (5분에서 변경)
+// 경기 결과 업데이트 - 10분마다 실행 (✅ TheSportsDB 무료 API 사용)
 cron.schedule('*/10 * * * *', async () => {
   console.log('[SCHEDULER_RESULTS] 🚀 Starting game results update at:', new Date().toISOString());
   
@@ -149,43 +218,113 @@ cron.schedule('*/10 * * * *', async () => {
   isUpdatingResults = true;
 
   try {
-    // 8분 타임아웃 설정
-    const updateResult = await withTimeout(
-      gameResultService.fetchAndUpdateResultsForCategories(Array.from(activeCategories)),
-      8 * 60 * 1000, // 8분
+    // ✨ The Odds API scores로 경기 결과 업데이트 (3일치 - API 제한)
+    const updateResults = await withTimeout(
+      gameResultService.fetchAndSaveAllResults(),  // ✅ TheSportsDB 메서드
+      10 * 60 * 1000, // 10분
       'Game results update'
     );
     
-    // 경기 결과 업데이트 후 배팅 결과도 업데이트 (2분 타임아웃)
-    console.log('[SCHEDULER_BETS] 🚀 Starting bet results update after game results');
-    saveUpdateLog('bets', 'start', { message: 'Starting bet results update after game results' });
-    const betUpdateResult = await withTimeout(
-      betResultService.updateBetResults(),
-      2 * 60 * 1000, // 2분
-      'Bet results update'
-    );
+    // ✨ 결과 집계 (상세 정보 추가) - 단일 객체 처리
+    const updateResult = {
+      updatedCount: updateResults.updatedCount || 0,
+      newCount: updateResults.newCount || 0,
+      updatedExistingCount: updateResults.updatedExistingCount || 0,
+      skippedCount: updateResults.skippedCount || 0,
+      categories: updateResults.categories || [],
+      // 상세 정보
+      sportsDBAPIProvided: updateResults.sportsDBAPIProvided || 0,
+      saved: updateResults.saved || 0,
+      updated: updateResults.updated || 0,
+      savedGames: updateResults.savedGames || [],
+      skippedGames: updateResults.skippedGames || []
+    };
+    
+    // --- ✅ 베팅 정산: 실패해도 전체 트랜잭션을 중단하지 않도록 보호 ---
+    let betUpdateResult = { updatedCount: 0, errorCount: 0, skipped: true };
+    if (updateResults?.updatedCount > 0) {
+      console.log(`[SCHEDULER_BETS] 🎯 ${updateResults.updatedCount}개 경기 결과 업데이트됨 - 베팅 정산 진행`);
+      saveUpdateLog('bets', 'start', {
+        message: 'Starting bet results update after game results',
+        gameUpdates: updateResults.updatedCount
+      });
+      try {
+        betUpdateResult = await withTimeout(
+          betResultService.updateBetResults(),
+          2 * 60 * 1000, // 2분
+          'Bet results update'
+        );
+      } catch (betErr) {
+        console.log('[SCHEDULER_BETS] ❌ Bet results update failed:', betErr.message);
+        // 실패를 기록하고 계속 진행 (게임 결과 로그는 반드시 남긴다)
+        betUpdateResult = { updatedCount: 0, errorCount: 1, skipped: false, error: betErr.message };
+        saveUpdateLog('bets', 'error', {
+          message: 'Bet results update failed',
+          error: betErr.message
+        });
+      }
+    } else {
+      console.log('[SCHEDULER_BETS] ⚡ 경기 결과 업데이트 없음 - 베팅 정산 건너뛰기');
+      saveUpdateLog('bets', 'skipped', {
+        message: 'Bet results update skipped (효율성 최적화)',
+        reason: 'No game results updated'
+      });
+    }
     
     lastUpdateTime = new Date();
     
-    // 실제 업데이트 결과를 상세히 로그에 기록
+    // ✨ 실제 업데이트 결과를 상세히 로그에 기록 (개선됨)
     const gameResultsSummary = {
-      totalUpdated: updateResult?.updatedCount || 0,
-      newGames: updateResult?.newCount || 0,
-      existingGamesUpdated: updateResult?.updatedExistingCount || 0,
-      skippedGames: updateResult?.skippedCount || 0,
-      categoriesProcessed: updateResult?.categories?.length || 0
+      totalUpdated: updateResults?.updatedCount || 0,
+      newGames: updateResults?.newCount || 0,
+      existingGamesUpdated: updateResults?.updatedExistingCount || 0,
+      skippedGames: updateResults?.skippedCount || 0,
+      categoriesProcessed: updateResults?.categories?.length || 0,
+      // updatedGamesDetails 제거 - 로그 파일 크기 최적화
+      // ✨ 새로운 상세 정보
+      sportsDBAPIProvided: updateResults?.sportsDBAPIProvided || 0,
+      saved: updateResults?.saved || 0,
+      updated: updateResults?.updated || 0,
+      savedGames: updateResults?.savedGames || []
     };
     
-    console.log('[SCHEDULER_RESULTS] ✅ Game results and bet results update completed:', {
-      gameResultsUpdated: gameResultsSummary.totalUpdated,
-      betResultsUpdated: betUpdateResult?.updatedCount || 0
-    });
+    console.log('[SCHEDULER_RESULTS] ✅ Game results and bet results update completed:');
+    console.log('[SCHEDULER_RESULTS]   - SportsDB Provided:', gameResultsSummary.sportsDBAPIProvided);
+    console.log('[SCHEDULER_RESULTS]   - Saved:', gameResultsSummary.saved);
+    console.log('[SCHEDULER_RESULTS]   - Updated:', gameResultsSummary.updated);
+    console.log('[SCHEDULER_RESULTS]   - Skipped:', gameResultsSummary.skippedGames);
+    console.log('[SCHEDULER_RESULTS]   - Total Updated:', gameResultsSummary.totalUpdated);
+    console.log('[SCHEDULER_RESULTS]   - Bet Results Updated:', betUpdateResult?.updatedCount || 0);
     
+    if (gameResultsSummary.savedGames.length > 0) {
+      console.log('[SCHEDULER_RESULTS] 💾 Saved Games (first 5):');
+      gameResultsSummary.savedGames.slice(0, 5).forEach(g => console.log(`[SCHEDULER_RESULTS]     - ${g}`));
+    }
+    
+    // ✨ Bet Results 상세 정보 추가
+    const betResultsSummary = {
+      pendingBetsChecked: betUpdateResult?.pendingBetsChecked || 0,
+      settled: betUpdateResult?.settled || 0,
+      failed: betUpdateResult?.failed || 0,
+      stillPending: betUpdateResult?.stillPending || 0,
+      skipped: betUpdateResult?.skipped || false
+    };
+    
+    if (!betResultsSummary.skipped) {
+      console.log('[SCHEDULER_BETS] 📊 Bet Results Summary:');
+      console.log('[SCHEDULER_BETS]   - Pending Bets Checked:', betResultsSummary.pendingBetsChecked);
+      console.log('[SCHEDULER_BETS]   - Settled:', betResultsSummary.settled);
+      console.log('[SCHEDULER_BETS]   - Failed:', betResultsSummary.failed);
+      console.log('[SCHEDULER_BETS]   - Still Pending:', betResultsSummary.stillPending);
+    }
+    
+    // ✅ 게임 결과는 베팅 정산 성공/실패와 무관하게 항상 로그로 남긴다
     saveUpdateLog('results', 'success', { 
       message: 'Game results and bet results update completed',
       gameResultsUpdated: gameResultsSummary.totalUpdated,
       gameResultsDetail: gameResultsSummary,
       betResultsUpdated: betUpdateResult?.updatedCount || 0,
+      betResultsDetail: betResultsSummary,
       categories: Array.from(activeCategories)
     });
     
@@ -202,16 +341,32 @@ cron.schedule('*/10 * * * *', async () => {
     setTimeout(async () => {
       try {
         saveUpdateLog('results', 'start', { message: 'Retrying game results update', isRetry: true });
-        const retryResult = await withTimeout(
-          gameResultService.fetchAndUpdateResultsForCategories(Array.from(activeCategories)),
-          8 * 60 * 1000,
+        const retryResults = await withTimeout(
+          gameResultService.fetchAndSaveAllResults(),  // ✅ TheSportsDB 메서드
+          10 * 60 * 1000, // 10분
           'Game results retry'
         );
-        const betRetryResult = await withTimeout(
-          betResultService.updateBetResults(),
-          2 * 60 * 1000,
-          'Bet results retry'
-        );
+        
+        const retryResult = {
+          updatedCount: retryResults.updatedCount || 0,
+          newCount: retryResults.newCount || 0,
+          updatedExistingCount: retryResults.updatedExistingCount || 0,
+          skippedCount: retryResults.skippedCount || 0
+        };
+
+        // --- ✅ 효율성 최적화: 재시도에서도 경기 결과 업데이트가 있을 때만 베팅 정산 실행 ---
+        let betRetryResult;
+        if (retryResult?.updatedCount > 0) {
+          console.log(`[SCHEDULER_RETRY] 🎯 재시도에서 ${retryResult.updatedCount}개 경기 결과 업데이트됨 - 베팅 정산 진행`);
+          betRetryResult = await withTimeout(
+            betResultService.updateBetResults(),
+            2 * 60 * 1000,
+            'Bet results retry'
+          );
+        } else {
+          console.log('[SCHEDULER_RETRY] ⚡ 재시도에서 경기 결과 업데이트 없음 - 베팅 정산 건너뛰기');
+          betRetryResult = { updatedCount: 0, errorCount: 0, skipped: true };
+        }
         lastUpdateTime = new Date();
         
         const retrySummary = {
@@ -243,13 +398,18 @@ cron.schedule('*/10 * * * *', async () => {
   }
 });
 
-// 고우선순위 리그 - 30분마다 업데이트 (15분에서 변경)
-cron.schedule('*/30 * * * *', async () => {
+// 💰 API 예산 최적화 - 고우선순위 리그
+// 고우선순위 리그 - 6시간마다 업데이트 (예산 최적화 - 사용량 절감)
+cron.schedule('0 */6 * * *', async () => {
   console.log('[SCHEDULER_ODDS] 🔔 Cron job triggered at:', new Date().toISOString());
   
   if (isUpdatingOdds) {
     console.log('[SCHEDULER_ODDS] ⏭️ Previous odds update is still running, skipping this update');
     console.log('[SCHEDULER_ODDS] ⏭️ isUpdatingOdds flag is:', isUpdatingOdds);
+    saveUpdateLog('odds', 'skip', { 
+      message: 'Previous odds update still running, skipping',
+      reason: 'isUpdatingOdds flag is true'
+    });
     return;
   }
   
@@ -260,9 +420,12 @@ cron.schedule('*/30 * * * *', async () => {
   // 타임아웃 설정
   const timeoutId = setTimeout(() => {
     console.log('[SCHEDULER_ODDS] ⚠️ Odds update timeout detected, forcing reset');
+    console.log(`[SCHEDULER_ODDS_FLAG] ⚠️ Forcing isUpdatingOdds to false due to timeout. Previous value: ${isUpdatingOdds}`);
     isUpdatingOdds = false;
   }, maxUpdateTime);
   
+  // 플래그 설정 직전/직후 로그 추가
+  console.log(`[SCHEDULER_ODDS_FLAG] 🟢 Setting isUpdatingOdds to true. Previous value: ${isUpdatingOdds}`);
   isUpdatingOdds = true;
   console.log('[SCHEDULER_ODDS] 🚀 Starting high-priority leagues odds update (30min interval)');
   console.log('[SCHEDULER_ODDS] 📋 Target leagues:', Array.from(highPriorityCategories));
@@ -306,23 +469,46 @@ cron.schedule('*/30 * * * *', async () => {
       console.log('[SCHEDULER_ODDS] 🔧 fetchAndCacheOddsForCategories returned:', oddsUpdateResult);
     }
     
-    // 실제 업데이트 결과를 상세히 로그에 기록
+    // ✨ 실제 업데이트 결과를 상세히 로그에 기록 (개선됨)
     const oddsSummary = {
       totalUpdated: oddsUpdateResult?.updatedCount || 0,
       newOdds: oddsUpdateResult?.newCount || 0,
       existingOddsUpdated: oddsUpdateResult?.updatedExistingCount || 0,
       skippedOdds: oddsUpdateResult?.skippedCount || 0,
       apiCalls: oddsUpdateResult?.apiCalls || 0,
-      categoriesProcessed: oddsUpdateResult?.categories?.length || 0
+      categoriesProcessed: oddsUpdateResult?.categories?.length || 0,
+      // ✨ 새로운 상세 정보
+      oddsAPIProvided: oddsUpdateResult?.oddsAPIProvided || 0,  // OddsAPI가 제공한 총 경기 수
+      filteredOut: oddsUpdateResult?.filteredOut || 0,          // 시간 필터로 제외된 경기
+      duplicatesRemoved: oddsUpdateResult?.duplicatesRemoved || 0,  // 중복 제거된 경기
+      validationFailed: oddsUpdateResult?.validationFailed || 0,    // 검증 실패 경기
+      saved: oddsUpdateResult?.saved || 0,                      // 실제 저장된 경기
+      savedGames: oddsUpdateResult?.savedGames || [],           // 저장된 경기 목록 (간략)
+      skippedGames: oddsUpdateResult?.skippedGames || []        // 건너뛴 경기 목록 (간략)
     };
     
     console.log('[SCHEDULER_ODDS] 📊 Update Summary:');
+    console.log('[SCHEDULER_ODDS]   - OddsAPI Provided:', oddsSummary.oddsAPIProvided);
+    console.log('[SCHEDULER_ODDS]   - Filtered Out:', oddsSummary.filteredOut);
+    console.log('[SCHEDULER_ODDS]   - Duplicates Removed:', oddsSummary.duplicatesRemoved);
+    console.log('[SCHEDULER_ODDS]   - Validation Failed:', oddsSummary.validationFailed);
+    console.log('[SCHEDULER_ODDS]   - Saved:', oddsSummary.saved);
     console.log('[SCHEDULER_ODDS]   - Total Updated:', oddsSummary.totalUpdated);
     console.log('[SCHEDULER_ODDS]   - New Odds:', oddsSummary.newOdds);
     console.log('[SCHEDULER_ODDS]   - Existing Updated:', oddsSummary.existingOddsUpdated);
     console.log('[SCHEDULER_ODDS]   - Skipped:', oddsSummary.skippedOdds);
     console.log('[SCHEDULER_ODDS]   - API Calls:', oddsSummary.apiCalls);
     console.log('[SCHEDULER_ODDS]   - Categories Processed:', oddsSummary.categoriesProcessed);
+    
+    if (oddsSummary.savedGames.length > 0) {
+      console.log('[SCHEDULER_ODDS] 💾 Saved Games (first 5):');
+      oddsSummary.savedGames.slice(0, 5).forEach(g => console.log(`[SCHEDULER_ODDS]     - ${g}`));
+    }
+    
+    if (oddsSummary.skippedGames.length > 0) {
+      console.log('[SCHEDULER_ODDS] ⏭️ Skipped Games (first 5):');
+      oddsSummary.skippedGames.slice(0, 5).forEach(g => console.log(`[SCHEDULER_ODDS]     - ${g.game}: ${g.reason}`));
+    }
     
     saveUpdateLog('odds', 'success', { 
       message: 'High-priority odds update completed (30min interval)',
@@ -345,14 +531,28 @@ cron.schedule('*/30 * * * *', async () => {
     });
   } finally {
     clearTimeout(timeoutId); // 타임아웃 클리어
+    // 플래그 해제 직전/직후 로그 추가
+    console.log(`[SCHEDULER_ODDS_FLAG] 🔴 Setting isUpdatingOdds to false. Previous value: ${isUpdatingOdds}`);
     isUpdatingOdds = false;
     console.log('[SCHEDULER_ODDS] ✅ High-priority odds update process completed at:', new Date().toISOString());
-    console.log('[SCHEDULER_ODDS] ✅ isUpdatingOdds flag reset to:', isUpdatingOdds);
+    console.log(`[SCHEDULER_ODDS_FLAG] ✅ isUpdatingOdds flag is now: ${isUpdatingOdds}`);
   }
 });
 
-// 중우선순위 리그 - 2시간마다 업데이트 (1시간에서 변경)
-cron.schedule('0 */2 * * *', async () => {
+// 💰 API 예산 최적화 - 중우선순위 리그
+// 중우선순위 리그 - 12시간마다 업데이트 (예산 최적화 - 사용량 절감)
+cron.schedule('0 */12 * * *', async () => {
+  // 중복 실행 방지
+  if (isUpdatingOdds) {
+    console.log('[SCHEDULER_ODDS_MEDIUM] ⏭️ Previous odds update is still running, skipping medium-priority update');
+    saveUpdateLog('odds', 'skip', { 
+      message: 'Previous odds update still running, skipping medium-priority update',
+      priority: 'medium',
+      reason: 'isUpdatingOdds flag is true'
+    });
+    return;
+  }
+  
   saveUpdateLog('odds', 'start', { 
     message: 'Starting medium-priority leagues odds update (2hour interval)',
     priority: 'medium',
@@ -414,60 +614,66 @@ cron.schedule('0 */2 * * *', async () => {
   }
 });
 
-// 저우선순위 리그 - 24시간마다 업데이트 (시즌 오프 리그들)
+// 🚫 TEMPORARILY DISABLED - 500K API LIMIT RESPONSE
+// 저우선순위 리그 - 24시간마다 업데이트 (원래 코드)
+// cron.schedule('0 0 * * *', async () => {
+//   // ... 기존 코드 전체 주석 처리 ...
+// });
+
+// ✅ 저우선순위 리그 - 매일 자정에 업데이트 (활성화)
 cron.schedule('0 0 * * *', async () => {
-  saveUpdateLog('odds', 'start', { 
-    message: 'Starting low-priority leagues odds update (24hour interval)',
+  // 중복 실행 방지
+  if (isUpdatingOdds) {
+    console.log('[SCHEDULER_ODDS_LOW] ⏭️ Previous odds update is still running, skipping low-priority update');
+    saveUpdateLog('odds_low', 'skip', {
+      message: 'Previous odds update still running, skipping low-priority update',
+      priority: 'low',
+      reason: 'isUpdatingOdds flag is true'
+    });
+    return;
+  }
+  
+  saveUpdateLog('odds_low', 'start', {
+    message: 'Starting low-priority leagues odds update (daily)',
     priority: 'low',
     leagues: Array.from(lowPriorityCategories)
   });
-  
+
   try {
-    // API 사용량이 낮을 때만 실행
-    const dynamicPriority = oddsApiService.getDynamicPriorityLevel();
-    if (dynamicPriority === 'low') {
-      const oddsUpdateResult = await withTimeout(
-        oddsApiService.fetchAndCacheOddsForCategories(Array.from(lowPriorityCategories), 'low'),
-        15 * 60 * 1000, // 15분
-        'Low-priority odds update'
-      );
-      
-      const oddsSummary = {
-        totalUpdated: oddsUpdateResult?.updatedCount || 0,
-        newOdds: oddsUpdateResult?.newCount || 0,
-        existingOddsUpdated: oddsUpdateResult?.updatedExistingCount || 0,
-        skippedOdds: oddsUpdateResult?.skippedCount || 0,
-        apiCalls: oddsUpdateResult?.apiCalls || 0,
-        categoriesProcessed: oddsUpdateResult?.categories?.length || 0
-      };
-      
-      console.log('[SCHEDULER_ODDS] 📊 Low-priority Update Summary:');
-      console.log('[SCHEDULER_ODDS]   - Total Updated:', oddsSummary.totalUpdated);
-      console.log('[SCHEDULER_ODDS]   - New Odds:', oddsSummary.newOdds);
-      console.log('[SCHEDULER_ODDS]   - Existing Updated:', oddsSummary.existingOddsUpdated);
-      console.log('[SCHEDULER_ODDS]   - Skipped:', oddsSummary.skippedOdds);
-      console.log('[SCHEDULER_ODDS]   - API Calls:', oddsSummary.apiCalls);
-      console.log('[SCHEDULER_ODDS]   - Categories Processed:', oddsSummary.categoriesProcessed);
-      
-      saveUpdateLog('odds', 'success', { 
-        message: 'Low-priority odds update completed (24hour interval)',
-        priority: 'low',
-        leagues: Array.from(lowPriorityCategories),
-        dynamicPriority: dynamicPriority,
-        oddsUpdated: oddsSummary.totalUpdated,
-        oddsDetail: oddsSummary
-      });
-    } else {
-      console.log('[SCHEDULER_ODDS] ⚠️ Skipping low-priority update due to API usage constraints');
-      saveUpdateLog('odds', 'skip', { 
-        message: 'Skipping low-priority update due to API usage constraints',
-        priority: 'low',
-        leagues: Array.from(lowPriorityCategories),
-        dynamicPriority: dynamicPriority
-      });
-    }
+    const oddsUpdateResult = await withTimeout(
+      oddsApiService.fetchAndCacheOddsForCategories(Array.from(lowPriorityCategories), 'low'),
+      15 * 60 * 1000, // 15분 타임아웃
+      'Low-priority odds update'
+    );
+
+    const oddsSummary = {
+      totalUpdated: oddsUpdateResult?.updatedCount || 0,
+      newOdds: oddsUpdateResult?.newCount || 0,
+      existingOddsUpdated: oddsUpdateResult?.updatedExistingCount || 0,
+      skippedOdds: oddsUpdateResult?.skippedCount || 0,
+      apiCalls: oddsUpdateResult?.apiCalls || 0,
+      categoriesProcessed: oddsUpdateResult?.categories?.length || 0
+    };
+
+    console.log('[SCHEDULER_LOW] 📊 Low-priority Update Summary:');
+    console.log('[SCHEDULER_LOW]   - Total Updated:', oddsSummary.totalUpdated);
+    console.log('[SCHEDULER_LOW]   - New Odds:', oddsSummary.newOdds);
+    console.log('[SCHEDULER_LOW]   - Existing Updated:', oddsSummary.existingOddsUpdated);
+    console.log('[SCHEDULER_LOW]   - Skipped:', oddsSummary.skippedOdds);
+    console.log('[SCHEDULER_LOW]   - API Calls:', oddsSummary.apiCalls);
+    console.log('[SCHEDULER_LOW]   - Categories Processed:', oddsSummary.categoriesProcessed);
+
+    saveUpdateLog('odds_low', 'success', {
+      message: 'Low-priority odds update completed',
+      priority: 'low',
+      leagues: Array.from(lowPriorityCategories),
+      oddsUpdated: oddsSummary.totalUpdated,
+      oddsDetail: oddsSummary
+    });
+
   } catch (error) {
-    saveUpdateLog('odds', 'error', { 
+    console.error('[SCHEDULER_LOW] ❌ Error:', error.message);
+    saveUpdateLog('odds_low', 'error', {
       message: 'Low-priority odds update failed',
       priority: 'low',
       leagues: Array.from(lowPriorityCategories),
@@ -476,47 +682,57 @@ cron.schedule('0 0 * * *', async () => {
   }
 });
 
-// 전체 데이터 업데이트 - 하루에 한 번만 (비용 절약)
-cron.schedule('0 6 * * *', async () => {
-  saveUpdateLog('full', 'start', { 
-    message: 'Starting daily full data update',
-    includesOdds: true,
-    includesResults: true,
-    includesBets: true
-  });
-  
-  try {
-    // 모든 카테고리에 대해 한 번에 업데이트 (30분 타임아웃)
-    const [oddsResult, resultsResult] = await withTimeout(
-      Promise.all([
-        oddsApiService.fetchAndCacheOdds(),
-        gameResultService.fetchAndUpdateResults()
-      ]),
-      30 * 60 * 1000, // 30분
-      'Daily full update'
-    );
-    
-    // 배팅 결과 업데이트 (5분 타임아웃)
-    const betResult = await withTimeout(
-      betResultService.updateBetResults(),
-      5 * 60 * 1000, // 5분
-      'Daily bet results update'
-    );
-    
-    lastUpdateTime = new Date();
-    saveUpdateLog('full', 'success', { 
-      message: 'Daily full update completed',
-      oddsUpdated: 'All categories',
-      resultsUpdated: resultsResult?.updatedCount || 'N/A',
-      betsUpdated: betResult?.updatedCount || 0
-    });
-  } catch (error) {
-    saveUpdateLog('full', 'error', { 
-      message: 'Daily full update failed',
-      error: error.message
-    });
-  }
-});
+// 🚫 TEMPORARILY DISABLED - 500K API LIMIT RESPONSE
+// 전체 데이터 업데이트 - 하루에 한 번만 (비용 절약) (원래 코드)
+// cron.schedule('0 6 * * *', async () => {
+//   // ... 기존 코드 전체 주석 처리 ...
+// });
+
+// 🚫 TEMPORARILY DISABLED - ORIGINAL SCHEDULER RESTORED
+// 전체 데이터 업데이트 - 하루에 한 번만 (원래 코드)
+// cron.schedule('0 6 */3 * *', async () => {
+//   saveUpdateLog('full_temp', 'start', { 
+//     message: 'Starting TEMPORARY full data update (3day interval - 500K limit)',
+//     includesOdds: true,
+//     includesResults: true,
+//     includesBets: true,
+//       note: 'Temporary scheduler due to 500K API limit'
+//   });
+//   
+//   try {
+//     // 모든 카테고리에 대해 한 번에 업데이트 (20분 타임아웃 - 임시)
+//     const [oddsResult, resultsResult] = await withTimeout(
+//       Promise.all([
+//         oddsApiService.fetchAndCacheOdds(),
+//         gameResultCount: Array.from(activeCategories).length
+//       ]),
+//       20 * 60 * 1000, // 20분
+//       'Temporary daily full update'
+//     );
+//     
+//     // 배팅 결과 업데이트 (3분 타임아웃 - 임시)
+//     const betResult = await withTimeout(
+//       betResultService.updateBetResults(),
+//       3 * 60 * 1000, // 3분
+//       'Temporary daily bet results update'
+//     );
+//     
+//     lastUpdateTime = new Date();
+//     saveUpdateLog('full_temp', 'success', { 
+//       message: 'Temporary full data update completed (3day interval)',
+//       oddsUpdated: 'All categories',
+//       resultsUpdated: resultsResult?.updatedCount || 'N/A',
+//       betsUpdated: betResult?.updatedCount || 0,
+//       note: 'Temporary scheduler due to 500K API limit'
+//     });
+//   } catch (error) {
+//     saveUpdateLog('full_temp', 'error', { 
+//       message: 'Temporary full data update failed',
+//       error: error.message,
+//       note: 'Temporary scheduler due to 500K API limit'
+//     });
+//   }
+// });
 
 // 데이터베이스 통계 - 매일 자정에 실행
 cron.schedule('0 0 * * *', async () => {
@@ -555,13 +771,17 @@ const initializeData = async () => {
   
   try {
     // 활성 카테고리만 초기 로드 (20분 타임아웃)
-    const [oddsResult, resultsResult] = await withTimeout(
-      Promise.all([
-        oddsApiService.fetchAndCacheOddsForCategories(Array.from(activeCategories)),
-        gameResultService.fetchAndUpdateResultsForCategories(Array.from(activeCategories))
-      ]),
+    const oddsResult = await withTimeout(
+      oddsApiService.fetchAndCacheOddsForCategories(Array.from(activeCategories)),
       20 * 60 * 1000, // 20분
-      'Initial data caching'
+      'Initial odds caching'
+    );
+    
+    // ✨ The Odds API scores로 경기 결과 초기 로드 (3일치 - API 제한)
+    const resultsResult = await withTimeout(
+      gameResultService.fetchAndSaveAllResults(),  // ✅ TheSportsDB 메서드
+      10 * 60 * 1000, // 10분
+      'Initial game results loading'
     );
     
     // 초기 배팅 결과 업데이트 (3분 타임아웃)
@@ -572,12 +792,34 @@ const initializeData = async () => {
     );
     
     lastUpdateTime = new Date();
+    
+    // 결과 집계
+    const totalResults = resultsResult.reduce((sum, r) => sum + (r.saved || 0) + (r.updated || 0), 0);
+    
+    // ✨ 상세 로그 정보 추가
+    const oddsSummary = {
+      totalUpdated: oddsResult?.updatedCount || 0,
+      newOdds: oddsResult?.newCount || 0,
+      existingOddsUpdated: oddsResult?.updatedExistingCount || 0,
+      skippedOdds: oddsResult?.skippedCount || 0,
+      apiCalls: oddsResult?.apiCalls || 0,
+      categoriesProcessed: oddsResult?.categories?.length || 0,
+      oddsAPIProvided: oddsResult?.oddsAPIProvided || 0,
+      filteredOut: oddsResult?.filteredOut || 0,
+      duplicatesRemoved: oddsResult?.duplicatesRemoved || 0,
+      validationFailed: oddsResult?.validationFailed || 0,
+      saved: oddsResult?.saved || 0,
+      savedGames: oddsResult?.savedGames?.slice(0, 10) || [],
+      skippedGames: oddsResult?.skippedGames?.slice(0, 10) || []
+    };
+    
     saveUpdateLog('init', 'success', { 
       message: 'Initial data cached successfully for active categories',
       categories: Array.from(activeCategories),
       oddsUpdated: oddsResult?.updatedCount || 0,
-      resultsUpdated: resultsResult?.updatedCount || 'N/A',
-      betsUpdated: betResult?.updatedCount || 0
+      resultsUpdated: totalResults || 0,
+      betsUpdated: betResult?.updatedCount || 0,
+      oddsDetail: oddsSummary  // ✨ 상세 정보 추가
     });
   } catch (error) {
     saveUpdateLog('init', 'error', { 
@@ -595,12 +837,14 @@ const initializeData = async () => {
       try {
         saveUpdateLog('init', 'start', { message: 'Retrying initial data caching', isRetry: true });
         await withTimeout(
-          Promise.all([
-            oddsApiService.fetchAndCacheOddsForCategories(Array.from(activeCategories)),
-            gameResultService.fetchAndUpdateResultsForCategories(Array.from(activeCategories))
-          ]),
+          oddsApiService.fetchAndCacheOddsForCategories(Array.from(activeCategories)),
           20 * 60 * 1000, // 20분
-          'Initial data retry'
+          'Initial odds retry'
+        );
+        await withTimeout(
+          gameResultService.fetchAndSaveAllResults(),  // ✅ TheSportsDB 메서드
+          10 * 60 * 1000, // 10분
+          'Initial game results retry'
         );
         await withTimeout(
           betResultService.updateBetResults(),
@@ -665,7 +909,7 @@ const getHealthStatus = () => {
   };
 };
 
-// TheSportsDB 결과 업데이트 스케줄러 (2시간마다, 1시간에서 변경)
+// TheSportsDB 결과 업데이트 스케줄러 (10분마다 - TheSportsDB 무료 API 사용)
 setInterval(async () => {
   try {
     console.log('[Scheduler] TheSportsDB에서 경기 결과 업데이트 시작');
@@ -678,9 +922,9 @@ setInterval(async () => {
   } catch (error) {
     console.error('[Scheduler] TheSportsDB 결과 업데이트 에러:', error);
   }
-}, 2 * 60 * 60 * 1000); // 2시간마다
+}, 10 * 60 * 1000); // 10분마다
 
-// 배팅내역 기반 누락 경기 결과 자동 보충 (2시간마다, 1시간에서 변경)
+// 배팅내역 기반 누락 경기 결과 자동 보충 (30분마다 - 더 자주 보충)
 setInterval(async () => {
   try {
     console.log('[Scheduler] 배팅내역 기반 누락 경기 결과 자동 보충 시작');
@@ -693,9 +937,37 @@ setInterval(async () => {
   } catch (error) {
     console.error('[Scheduler] 배팅내역 기반 누락 경기 결과 자동 보충 에러:', error);
   }
-}, 2 * 60 * 60 * 1000); // 2시간마다
+}, 30 * 60 * 1000); // 30분마다
 
 const getActiveCategories = () => Array.from(activeCategories);
+
+// 🧹 로그 파일 자동 정리 - 매일 새벽 2시에 실행 (7일 이상 된 로그 삭제)
+cron.schedule('0 2 * * *', async () => {
+  try {
+    console.log('🧹 [LogCleanup] 오래된 로그 파일 정리 시작');
+    
+    // 로그 통계 확인
+    const statsBefore = getLogStats();
+    console.log(`[LogCleanup] 현재 로그: ${statsBefore.totalFiles}개 파일, ${statsBefore.totalSizeInMB} MB`);
+    
+    // 7일 이상 된 로그 삭제
+    cleanupOldLogs(7);
+    
+    // 정리 후 통계
+    const statsAfter = getLogStats();
+    console.log(`[LogCleanup] 정리 후: ${statsAfter.totalFiles}개 파일, ${statsAfter.totalSizeInMB} MB`);
+    
+    saveUpdateLog('log_cleanup', 'success', {
+      before: statsBefore,
+      after: statsAfter,
+      deletedFiles: statsBefore.totalFiles - statsAfter.totalFiles,
+      freedSpace: `${(statsBefore.totalSize - statsAfter.totalSize) / 1024 / 1024} MB`
+    });
+  } catch (error) {
+    console.error('🧹 [LogCleanup] 로그 정리 실패:', error);
+    saveUpdateLog('log_cleanup', 'error', { error: error.message });
+  }
+});
 
 // 🔒 보안 감사 작업 - 매일 새벽 3시에 실행
 cron.schedule('0 3 * * *', async () => {
@@ -792,8 +1064,113 @@ cron.schedule('*/5 18-23 * * *', async () => {
   }
 });
 
-// EPL 경기 결과/odds 별도 30분마다 강제 실행 (10분에서 변경)
-cron.schedule('*/30 * * * *', async () => {
+// 🔄 Exchange 주문 자동 만료 처리 - 매 10분마다 실행
+cron.schedule('*/10 * * * *', async () => {
+  try {
+    console.log('🔄 [Exchange] 만료된 주문 자동 취소 시작...');
+    
+    // Exchange 주문 만료 처리 실행 (직접 호출)
+    const service = new ExchangeSettlementService();
+    await service.cancelUnmatchedOrdersAtKickoff();
+    
+    console.log('✅ [Exchange] 만료된 주문 자동 취소 완료');
+    
+  } catch (error) {
+    console.error('❌ [Exchange] 만료된 주문 자동 취소 실패:', error.message);
+    
+    // 오류 로그 저장
+    saveUpdateLog('exchange_order_expiry', 'error', {
+      message: 'Exchange 주문 자동 만료 처리 실패',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// 🎯 Exchange 주문 자동 정산 처리 - 매 5분마다 실행 (효율성 최적화 적용)
+cron.schedule('*/5 * * * *', async () => {
+  totalSchedulerRuns++; // 효율성 추적
+
+  try {
+    console.log('🔍 [Exchange] 정산 필요성 검증 시작...');
+
+    // --- ✅ 효율성 최적화: 정산 필요성 사전 검증 ---
+
+    // 1. 최근 6분 내에 업데이트된 'finished' 상태의 경기 결과 확인
+    const sixMinutesAgo = new Date(Date.now() - 6 * 60 * 1000);
+    const recentFinishedGames = await GameResult.count({
+      where: {
+        status: 'finished',
+        updatedAt: { [Op.gte]: sixMinutesAgo }
+      }
+    });
+
+    // 2. 정산 대상 Exchange 주문 확인
+    const pendingExchangeOrders = await ExchangeOrder.count({
+      where: {
+        status: { [Op.in]: ['matched', 'partially_matched'] },
+        settledAt: null
+      }
+    });
+
+    // 3. 효율성 체크: 신규 경기 결과도 없고 정산 대상 주문도 없으면 건너뛰기
+    if (recentFinishedGames === 0 && pendingExchangeOrders === 0) {
+      skippedRuns++; // 효율성 추적
+      console.log('⚡ [Exchange] 정산 건너뛰기: 신규 경기 결과 없음, 정산 대상 주문 없음');
+      saveUpdateLog('exchange_settlement', 'skipped', {
+        message: 'Exchange 정산 건너뛰기 (효율성 최적화)',
+        timestamp: new Date().toISOString(),
+        reason: 'No recent game results and no pending orders',
+        efficiency: {
+          totalRuns: totalSchedulerRuns,
+          skippedRuns: skippedRuns,
+          efficiencyRate: ((skippedRuns / totalSchedulerRuns) * 100).toFixed(1)
+        }
+      });
+      return;
+    }
+
+    console.log(`🎯 [Exchange] 정산 진행: 신규 경기 ${recentFinishedGames}개, 정산 대상 주문 ${pendingExchangeOrders}개`);
+
+    // --- 기존 정산 로직 실행 ---
+
+    // Exchange 개별 주문 자동 정산 실행 (직접 호출)
+    const service = new ExchangeSettlementService();
+    const individualResult = await service.settleAllConnectedOrders();
+    console.log('✅ [Exchange] 개별 주문 자동 정산 완료:', individualResult);
+
+    // 멀티배팅 주문 자동 정산 실행 (직접 호출)
+    console.log('🎯 [Exchange] 멀티배팅 주문 자동 정산 시작...');
+    const multibetResult = await multibetSettlementService.settleAllMultibetOrders();
+    console.log('✅ [Exchange] 멀티배팅 주문 자동 정산 완료:', multibetResult);
+
+    // 정산 결과 로그 저장 (최적화 정보 포함)
+    saveUpdateLog('exchange_settlement', 'success', {
+      message: 'Exchange 주문 자동 정산 완료 (개별 + 멀티배팅)',
+      timestamp: new Date().toISOString(),
+      individualOrders: individualResult,
+      multibetOrders: multibetResult,
+      optimization: {
+        recentGames: recentFinishedGames,
+        pendingOrders: pendingExchangeOrders,
+        skipped: false
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ [Exchange] 매칭된 주문 자동 정산 실패:', error.message);
+
+    // 오류 로그 저장
+    saveUpdateLog('exchange_settlement', 'error', {
+      message: 'Exchange 주문 자동 정산 실패',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// EPL 경기 결과/odds 별도 6시간마다 강제 실행 (사용량 절감)
+cron.schedule('0 */6 * * *', async () => {
   saveUpdateLog('epl', 'start', { message: 'EPL 프리미어리그 데이터 강제 업데이트' });
   try {
     await withTimeout(
@@ -809,14 +1186,14 @@ cron.schedule('*/30 * * * *', async () => {
 
 // OddsHistory 정리 스케줄러 - 매일 새벽 4시에 실행
 cron.schedule('0 4 * * *', async () => {
-  saveUpdateLog('cleanup', 'start', { 
+  saveUpdateLog('cleanup', 'start', {
     message: 'Starting OddsHistory cleanup (3+ days old data)'
   });
-  
+
   try {
     const { default: OddsHistory } = await import('../models/oddsHistoryModel.js');
     const { Op } = await import('sequelize');
-    
+
     // 3일 이상 된 데이터 삭제 (5분 타임아웃)
     await withTimeout(
       (async () => {
@@ -828,26 +1205,62 @@ cron.schedule('0 4 * * *', async () => {
             }
           }
         });
-        
-        saveUpdateLog('cleanup', 'success', { 
+
+        saveUpdateLog('cleanup', 'success', {
           message: 'OddsHistory cleanup completed',
           deletedCount: deletedCount,
           cutoffDate: threeDaysAgo.toISOString()
         });
-        
+
         console.log(`🧹 [Cleanup] OddsHistory에서 ${deletedCount}개 레코드 삭제 완료 (3일 이상)`);
       })(),
       5 * 60 * 1000, // 5분
       'OddsHistory cleanup'
     );
-    
+
   } catch (error) {
-    saveUpdateLog('cleanup', 'error', { 
+    saveUpdateLog('cleanup', 'error', {
       message: 'OddsHistory cleanup failed',
       error: error.message
     });
-    
+
     console.error('❌ [Cleanup] OddsHistory 정리 실패:', error.message);
+  }
+});
+
+// 🧹 OddsCache 오래된 데이터 정리 스케줄러 - 매일 새벽 5시에 실행
+cron.schedule('0 5 * * *', async () => {
+  saveUpdateLog('odds_cleanup', 'start', {
+    message: 'Starting OddsCache old data cleanup'
+  });
+
+  try {
+    // 5분 타임아웃으로 클린업 실행
+    const cleanupResult = await withTimeout(
+      oddsCleanupService.cleanupOldOdds(),
+      5 * 60 * 1000, // 5분
+      'OddsCache cleanup'
+    );
+
+    saveUpdateLog('odds_cleanup', 'success', {
+      message: 'OddsCache cleanup completed',
+      totalDeleted: cleanupResult.totalDeleted,
+      breakdown: cleanupResult.breakdown,
+      executionTime: cleanupResult.executionTime
+    });
+
+    console.log(`🧹 [OddsCleanup] 총 ${cleanupResult.totalDeleted}개 오래된 배당률 데이터 삭제 완료`);
+    console.log(`   - 과거 경기 + 오래된 업데이트: ${cleanupResult.breakdown.abandonedPastGames}개`);
+    console.log(`   - 너무 먼 미래 경기 (14일 초과): ${cleanupResult.breakdown.farFutureGames}개`);
+    console.log(`   - 오래 업데이트 안 된 데이터 (7일 이상): ${cleanupResult.breakdown.staleData}개`);
+
+  } catch (error) {
+    saveUpdateLog('odds_cleanup', 'error', {
+      message: 'OddsCache cleanup failed',
+      error: error.message
+    });
+
+    console.error('❌ [OddsCleanup] 배당률 데이터 정리 실패:', error.message);
   }
 });
 

@@ -46,23 +46,20 @@ export function getClientTimezoneInfo() {
  * UTC 시간을 클라이언트 로컬 시간으로 변환
  */
 export function convertUtcToLocal(utcTime: string | Date): Date {
-  // UTC 시간을 Date 객체로 변환 (UTC로 해석)
   let utcDate: Date;
   if (typeof utcTime === 'string') {
-    // UTC 문자열을 명시적으로 UTC로 파싱
-    if (utcTime.endsWith('Z')) {
-      utcDate = new Date(utcTime);
-    } else {
-      // Z가 없으면 UTC로 간주하고 추가
-      utcDate = new Date(utcTime + 'Z');
-    }
+    // OddsAPI에서 받은 시간은 이미 UTC이므로 그대로 사용
+    // new Date()는 UTC 시간을 UTC로 정확하게 해석
+    utcDate = new Date(utcTime);
   } else {
     utcDate = new Date(utcTime.getTime());
   }
   
-
+  // 🚨 수정: 하드코딩된 KST 변환 제거
+  // 브라우저의 로컬 시간대 설정을 사용하여 자동 변환
+  // const kstDate = new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
   
-  // JavaScript Date는 자동으로 클라이언트 시간대로 표시됨
+  // UTC 시간을 브라우저 로컬 시간대로 자동 변환
   return utcDate;
 }
 
@@ -495,4 +492,109 @@ export function getTimezoneDebugInfo(time: string | Date) {
     clientOffset: clientInfo.displayName,
     isKST: clientInfo.isKST
   };
+} 
+
+/**
+ * UTC 시간을 브라우저 지역 시간으로 변환
+ * @param utcTime UTC 시간 (Date 객체 또는 ISO 문자열)
+ * @returns 지역 시간 문자열
+ */
+export function formatToLocalDateTime(utcTime: Date | string): string {
+  const date = new Date(utcTime);
+  // timeZone 옵션을 생략하여 브라우저의 기본 시간대 사용
+  return date.toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+}
+
+/**
+ * @deprecated formatToLocalDateTime을 사용하세요. 호환성을 위해 유지됨.
+ */
+export function convertUTCToKST(utcTime: Date | string): string {
+  return formatToLocalDateTime(utcTime);
+}
+
+/**
+ * UTC 시간을 브라우저 지역 시간으로 변환하여 상대적 시간 표시 (예: "3시간 후", "1일 전")
+ * @param utcTime UTC 시간 (Date 객체 또는 ISO 문자열)
+ * @returns 상대적 시간 문자열
+ */
+export function getRelativeTimeKST(utcTime: Date | string): string {
+  const utcDate = new Date(utcTime);
+  const now = new Date();
+  const diffMs = utcDate.getTime() - now.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffMs < 0) {
+    // 과거 시간
+    if (diffDays < -1) return `${Math.abs(diffDays)}일 전`;
+    if (diffHours < -1) return `${Math.abs(diffHours)}시간 전`;
+    return '방금 전';
+  } else {
+    // 미래 시간
+    if (diffDays > 1) return `${diffDays}일 후`;
+    if (diffHours > 1) return `${diffHours}시간 후`;
+    return '곧 시작';
+  }
+}
+
+/**
+ * UTC 시간을 브라우저 지역 시간으로 변환하여 경기 시작까지 남은 시간 계산
+ * @param utcTime UTC 시간 (Date 객체 또는 ISO 문자열)
+ * @returns 남은 시간 정보 객체
+ */
+export function getTimeUntilGameKST(utcTime: Date | string): {
+  isStarted: boolean;
+  isFinished: boolean;
+  remainingTime: string;
+  status: string;
+} {
+  const utcDate = new Date(utcTime);
+  const now = new Date();
+  const diffMs = utcDate.getTime() - now.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+  if (diffMs < -7200000) { // 2시간 전
+    return {
+      isStarted: true,
+      isFinished: true,
+      remainingTime: '경기 종료',
+      status: 'finished'
+    };
+  } else if (diffMs < 0) { // 경기 시작 후
+    return {
+      isStarted: true,
+      isFinished: false,
+      remainingTime: '경기 진행중',
+      status: 'in-progress'
+    };
+  } else if (diffMs < 300000) { // 5분 전
+    return {
+      isStarted: false,
+      isFinished: false,
+      remainingTime: '곧 시작',
+      status: 'starting-soon'
+    };
+  } else if (diffHours > 0) {
+    return {
+      isStarted: false,
+      isFinished: false,
+      remainingTime: `${diffHours}시간 ${diffMinutes}분 후`,
+      status: 'upcoming'
+    };
+  } else {
+    return {
+      isStarted: false,
+      isFinished: false,
+      remainingTime: `${diffMinutes}분 후`,
+      status: 'upcoming'
+    };
+  }
 } 

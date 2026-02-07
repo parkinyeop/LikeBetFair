@@ -17,7 +17,7 @@ const ReferralCode = sequelize.define('ReferralCode', {
     }
   },
   code: {
-    type: DataTypes.STRING(20),
+    type: DataTypes.STRING(4),
     allowNull: false,
     unique: true
   },

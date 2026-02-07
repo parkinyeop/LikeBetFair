@@ -1,4 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { buildServerApiUrl } from '../../../config/serverApiConfig';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || '3aad092c060aa49ac87be19a33431c81c6fa287c9bcdda983c1b5d5a83380a7fa816ea915bbc9aff816c78db2a39ff673ae60b5ce4bbcce50c060569d99ec1c1';
@@ -35,8 +36,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     console.log(`🎯 매치 주문 요청 (Next.js API): ${side} ${price} (${amount}원) - User: ${user.id}`);
 
-    // 백엔드 서버로 프록시
-    const backendResponse = await fetch('http://localhost:5050/api/exchange/match-order', {
+    // 백엔드 서버로 프록시 (환경변수 기반)
+    const backendResponse = await fetch(buildServerApiUrl('/api/exchange/match-order'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

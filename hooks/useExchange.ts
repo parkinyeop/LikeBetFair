@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { API_CONFIG, buildApiUrl } from '../config/apiConfig';
 import { useAuth } from '../contexts/AuthContext';
 import { useExchangeContext } from '../contexts/ExchangeContext';
 
@@ -12,7 +13,7 @@ export type ExchangeOrder = {
   price: number;
   amount: number;
   selection?: string; // 선택한 팀/선수명
-  status: 'open' | 'matched' | 'settled' | 'cancelled';
+  status: 'open' | 'partially_matched' | 'matched' | 'settled' | 'cancelled' | 'active';
   matchedOrderId?: number;
   createdAt: string;
   updatedAt: string;
@@ -22,6 +23,22 @@ export type ExchangeOrder = {
   sportKey?: string; // 스포츠 키 추가
   backOdds?: number;
   layOdds?: number;
+  stakeAmount?: number; // 베팅 금액
+  potentialProfit?: number; // 예상 수익
+  oddsSource?: string; // 배당율 출처
+  oddsUpdatedAt?: string; // 배당율 업데이트 시간
+  // 🆕 부분 매칭 필드들 추가
+  originalAmount?: number; // 최초 주문 금액
+  remainingAmount?: number; // 남은 금액
+  filledAmount?: number; // 체결된 금액
+  partiallyFilled?: boolean; // 부분 체결 여부
+  displayAmount?: number; // 화면에 표시할 금액
+  // 🆕 멀티배팅 필드들 추가
+  isMultibet?: boolean;
+  totalOdds?: number;
+  selectionCount?: number;
+  selectionDetails?: any;
+  potentialWinnings?: number;
 };
 
 export interface ExchangeBalance {
@@ -47,7 +64,7 @@ export interface SelectedBet {
 }
 
 export const useExchange = () => {
-  const { token, balance, setBalance } = useAuth();
+  const { token, balance, setBalance, logout } = useAuth();
   const { selectedBet, setSelectedBet } = useExchangeContext();
   const [orders, setOrders] = useState<ExchangeOrder[]>([]);
   const [loading, setLoading] = useState(false);
@@ -71,13 +88,19 @@ export const useExchange = () => {
     if (!token) return;
     
     try {
-      // API URL 결정
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
-                    (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                     ? 'http://localhost:5050' 
-                     : 'https://likebetfair.onrender.com');
+      const url = buildApiUrl('/api/exchange/balance');
+      const response = await fetch(url, { headers });
       
-      const response = await fetch(`${apiUrl}/api/exchange/balance`, { headers });
+      // 401 에러 시 자동 로그아웃
+      if (response.status === 401) {
+        console.warn('⚠️ 토큰 만료 또는 인증 실패, 자동 로그아웃 처리');
+        logout();
+        if (typeof window !== 'undefined') {
+          window.location.href = '/';
+        }
+        return;
+      }
+      
       if (!response.ok) throw new Error('잔고 조회 실패');
       
       const data: ExchangeBalance = await response.json();
@@ -85,7 +108,7 @@ export const useExchange = () => {
     } catch (err) {
       console.error('잔고 조회 중 오류:', err);
     }
-  }, [token, setBalance]);
+  }, [token, setBalance, logout]);
 
   // 주문 내역 조회
   const fetchOrders = useCallback(async () => {
@@ -93,13 +116,19 @@ export const useExchange = () => {
     
     try {
       setLoading(true);
-      // API URL 결정
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
-                    (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                     ? 'http://localhost:5050' 
-                     : 'https://likebetfair.onrender.com');
+      const url = buildApiUrl('/api/exchange/orders');
+      const response = await fetch(url, { headers });
       
-      const response = await fetch(`${apiUrl}/api/exchange/orders`, { headers });
+      // 401 에러 시 자동 로그아웃
+      if (response.status === 401) {
+        console.warn('⚠️ 토큰 만료 또는 인증 실패, 자동 로그아웃 처리');
+        logout();
+        if (typeof window !== 'undefined') {
+          window.location.href = '/';
+        }
+        return;
+      }
+      
       if (!response.ok) throw new Error('주문 내역 조회 실패');
       
       const data: ExchangeOrder[] = await response.json();
@@ -111,17 +140,20 @@ export const useExchange = () => {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, logout]);
 
-  // 주문 등록
+  // 주문 등록 (Phase 2: price 파라미터 제거)
   const placeOrder = useCallback(async (orderData: {
     gameId: string;
     market: string;
     line: number;
     side: 'back' | 'lay';
-    price: number;
+    // price: number;  // ✅ 제거: 서버에서 결정
     amount: number;
     selection?: string; // 선택한 팀/선수명
+    homeTeam?: string;
+    awayTeam?: string;
+    commenceTime?: string;
   }) => {
     if (!token) {
       throw new Error('로그인이 필요합니다.');
@@ -131,7 +163,7 @@ export const useExchange = () => {
     setError(null);
 
     try {
-      console.log('📝 주문 생성:', orderData);
+      console.log('📝 주문 생성 (price 제거됨):', orderData);
       const response = await fetch('/api/exchange/orders', {
         method: 'POST',
         headers: {
@@ -204,13 +236,8 @@ export const useExchange = () => {
     
     try {
       setLoading(true);
-      // API URL 결정
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
-                    (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                     ? 'http://localhost:5050' 
-                     : 'https://likebetfair.onrender.com');
-      
-      const response = await fetch(`${apiUrl}/api/exchange/cancel/${orderId}`, {
+      const url = buildApiUrl(`/api/exchange/cancel/${orderId}`);
+      const response = await fetch(url, {
         method: 'POST',
         headers,
       });
@@ -257,8 +284,8 @@ export const useExchange = () => {
       });
       
       const url = line !== undefined 
-        ? `http://localhost:5050/api/exchange/orderbook-test?gameId=${encodedGameId}&market=${encodedMarket}&line=${encodedLine}`
-        : `http://localhost:5050/api/exchange/orderbook-test?gameId=${encodedGameId}&market=${encodedMarket}`;
+        ? `/api/exchange/orderbook-test?gameId=${encodedGameId}&market=${encodedMarket}&line=${encodedLine}`
+        : `/api/exchange/orderbook-test?gameId=${encodedGameId}&market=${encodedMarket}`;
       console.log('fetchOrderbook URL:', url);
       
       const response = await fetch(url, {
@@ -288,16 +315,14 @@ export const useExchange = () => {
   // 전체 오픈 주문 조회 (공개 API - 토큰 불필요)
   const fetchAllOpenOrders = useCallback(async () => {
     try {
-      // API URL 결정
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
-                    (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                     ? 'http://localhost:5050' 
-                     : 'https://likebetfair.onrender.com');
-      
-      const response = await fetch(`${apiUrl}/api/exchange/all-orders`, {
+      console.log('🔄 [useExchange] fetchAllOpenOrders 호출됨');
+      const url = buildApiUrl('/api/exchange/all-orders');
+      const response = await fetch(url, {
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        // ✅ 캐시 방지: 매칭 후 즉시 최신 데이터 가져오기
+        cache: 'no-store'
       });
       
       if (!response.ok) {
@@ -306,10 +331,10 @@ export const useExchange = () => {
       }
       
       const data: ExchangeOrder[] = await response.json();
-      console.log('fetchAllOpenOrders 성공:', data.length, '개 주문');
+      console.log('✅ [useExchange] fetchAllOpenOrders 성공:', data.length, '개 주문');
       return data;
     } catch (err) {
-      console.error('fetchAllOpenOrders 에러:', err);
+      console.error('❌ [useExchange] fetchAllOpenOrders 에러:', err);
       setError(err instanceof Error ? err.message : '전체 주문 조회 중 오류 발생');
       return [];
     }
@@ -326,15 +351,21 @@ export const useExchange = () => {
   // Exchange 주문 완료 이벤트 리스너
   useEffect(() => {
     const handleExchangeOrderPlaced = () => {
+      console.log('🔄 [useExchange] exchangeOrderPlaced 이벤트 감지 - 내 주문 갱신');
       if (token) {
+        console.log('✅ [useExchange] fetchOrders() 및 fetchBalance() 호출 시작');
         fetchOrders();
         fetchBalance();
+      } else {
+        console.warn('⚠️ [useExchange] 토큰 없음, 주문 갱신 건너뜀');
       }
     };
 
+    console.log('🎯 [useExchange] exchangeOrderPlaced 이벤트 리스너 등록');
     window.addEventListener('exchangeOrderPlaced', handleExchangeOrderPlaced);
     
     return () => {
+      console.log('🗑️ [useExchange] exchangeOrderPlaced 이벤트 리스너 제거');
       window.removeEventListener('exchangeOrderPlaced', handleExchangeOrderPlaced);
     };
   }, [token, fetchOrders, fetchBalance]);

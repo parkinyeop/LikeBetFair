@@ -1,5 +1,7 @@
 import axios from 'axios';
 import GameResult from '../models/gameResultModel.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+const sequelize = createScriptSequelize();
 import { normalizeTeamName } from '../normalizeUtils.js';
 
 /**
@@ -17,21 +19,86 @@ async function collectArgentinaPrimera() {
   
   let insertCount = 0;
   let updateCount = 0;
+  let allEvents = [];
   
   try {
-    // 2025 시즌 경기 결과 가져오기
-    const url = `https://www.thesportsdb.com/api/v1/json/3/eventsseason.php?id=${LEAGUE_ID}&s=${SEASON}`;
-    console.log(`API 호출: ${url}`);
+    // 1. 2025 시즌 경기 결과 가져오기
+    console.log('\n📅 1단계: 2025 시즌 경기 데이터 수집...');
+    const seasonUrl = `https://www.thesportsdb.com/api/v1/json/3/eventsseason.php?id=${LEAGUE_ID}&s=${SEASON}`;
+    console.log(`API 호출: ${seasonUrl}`);
     
-    const response = await axios.get(url);
+    const seasonResponse = await axios.get(seasonUrl);
     
-    if (!response.data || !response.data.events) {
-      console.log('❌ API 응답에 경기 데이터가 없습니다');
-      return;
+    if (seasonResponse.data && seasonResponse.data.events) {
+      allEvents = [...allEvents, ...seasonResponse.data.events];
+      console.log(`✅ 시즌 데이터: ${seasonResponse.data.events.length}개 경기`);
+    } else {
+      console.log('⚠️ 시즌 API 응답에 경기 데이터가 없습니다');
     }
+
+    // 2. 최근 경기 결과 가져오기
+    console.log('\n📅 2단계: 최근 경기 데이터 수집...');
+    const recentUrl = `https://www.thesportsdb.com/api/v1/json/3/eventspastleague.php?id=${LEAGUE_ID}`;
+    console.log(`API 호출: ${recentUrl}`);
     
-    const events = response.data.events;
-    console.log(`📊 총 ${events.length}개 경기 발견`);
+    const recentResponse = await axios.get(recentUrl);
+    
+    if (recentResponse.data && recentResponse.data.events) {
+      allEvents = [...allEvents, ...recentResponse.data.events];
+      console.log(`✅ 최근 경기: ${recentResponse.data.events.length}개 경기`);
+    } else {
+      console.log('⚠️ 최근 경기 API 응답에 경기 데이터가 없습니다');
+    }
+
+    // 3. 9월 11일 특정 날짜 경기 가져오기
+    console.log('\n📅 3단계: 9월 11일 특정 날짜 경기 데이터 수집...');
+    const dayUrl = `https://www.thesportsdb.com/api/v1/json/3/eventsday.php?d=2025-09-11&s=Soccer`;
+    console.log(`API 호출: ${dayUrl}`);
+    
+    const dayResponse = await axios.get(dayUrl);
+    
+    if (dayResponse.data && dayResponse.data.events) {
+      // 아르헨티나 프리메라 디비시온 경기만 필터링
+      const argentinaEvents = dayResponse.data.events.filter(event => 
+        event.strLeague && event.strLeague.toLowerCase().includes('argentina')
+      );
+      allEvents = [...allEvents, ...argentinaEvents];
+      console.log(`✅ 9월 11일 아르헨티나 경기: ${argentinaEvents.length}개 경기`);
+    } else {
+      console.log('⚠️ 9월 11일 API 응답에 경기 데이터가 없습니다');
+    }
+
+    // 4. 8월-9월 기간 경기 가져오기
+    console.log('\n📅 4단계: 8월-9월 기간 경기 데이터 수집...');
+    const months = ['08', '09'];
+    for (const month of months) {
+      const monthUrl = `https://www.thesportsdb.com/api/v1/json/3/eventsday.php?d=2025-${month}-11&s=Soccer`;
+      console.log(`API 호출: ${monthUrl}`);
+      
+      try {
+        const monthResponse = await axios.get(monthUrl);
+        
+        if (monthResponse.data && monthResponse.data.events) {
+          const argentinaEvents = monthResponse.data.events.filter(event => 
+            event.strLeague && event.strLeague.toLowerCase().includes('argentina')
+          );
+          allEvents = [...allEvents, ...argentinaEvents];
+          console.log(`✅ 2025-${month}-11 아르헨티나 경기: ${argentinaEvents.length}개 경기`);
+        }
+      } catch (error) {
+        console.log(`⚠️ 2025-${month}-11 API 호출 실패: ${error.message}`);
+      }
+    }
+
+    // 중복 제거 (event.idEvent 기준)
+    const uniqueEvents = allEvents.filter((event, index, self) => 
+      index === self.findIndex(e => e.idEvent === event.idEvent)
+    );
+    
+    console.log(`\n📊 총 수집된 경기: ${allEvents.length}개`);
+    console.log(`📊 중복 제거 후: ${uniqueEvents.length}개`);
+    
+    const events = uniqueEvents;
     
     for (const event of events) {
       try {
@@ -80,24 +147,39 @@ async function collectArgentinaPrimera() {
           { name: awayTeam, score: awayScore.toString() }
         ]) : null;
         
-        // DB 저장/업데이트
-        const [gameResult, created] = await GameResult.upsert({
-          mainCategory: MAIN_CATEGORY,
-          subCategory: SUB_CATEGORY,
-          homeTeam,
-          awayTeam,
-          commenceTime,
-          score,
-          status,
-          result,
-          eventId: event.idEvent
-        }, {
+        // DB 저장/업데이트 (upsert 대신 findOrCreate 사용)
+        const [gameResult, created] = await GameResult.findOrCreate({
           where: {
             homeTeam,
             awayTeam,
             commenceTime
+          },
+          defaults: {
+            mainCategory: MAIN_CATEGORY,
+            subCategory: SUB_CATEGORY,
+            homeTeam,
+            awayTeam,
+            commenceTime,
+            score,
+            status,
+            result,
+            eventId: event.idEvent,
+            sportKey: 'soccer_argentina_primera_division',
+            sportTitle: '아르헨티나 프리메라 디비시온'
           }
         });
+
+        // 기존 경기인 경우 업데이트
+        if (!created) {
+          await gameResult.update({
+            score,
+            status,
+            result,
+            eventId: event.idEvent,
+            sportKey: 'soccer_argentina_primera_division',
+            sportTitle: '아르헨티나 프리메라 디비시온'
+          });
+        }
         
         if (created) {
           insertCount++;
@@ -146,12 +228,20 @@ async function collectArgentinaPrimera() {
 // 직접 실행
 if (import.meta.url === `file://${process.argv[1]}`) {
   collectArgentinaPrimera()
-    .then(() => {
+    .then(async () => {
       console.log('✅ 스크립트 완료');
+      // 데이터베이스 연결 종료
+      console.log('🔌 데이터베이스 연결 종료 중...');
+      await sequelize.close();
+      console.log('✅ 데이터베이스 연결 종료 완료');
       process.exit(0);
     })
-    .catch(error => {
+    .catch(async (error) => {
       console.error('❌ 스크립트 실패:', error);
+      // 데이터베이스 연결 종료
+      console.log('🔌 데이터베이스 연결 종료 중...');
+      await sequelize.close();
+      console.log('✅ 데이터베이스 연결 종료 완료');
       process.exit(1);
     });
 }

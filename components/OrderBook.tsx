@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_CONFIG, buildApiUrl } from '../config/apiConfig';
 import { useExchange, ExchangeOrder } from '../hooks/useExchange';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -24,13 +25,8 @@ export default function OrderBook({ gameId, market, line, onOrderClick }: OrderB
       const sportKey = gameId.split('_').slice(0, -1).join('_');
       if (!sportKey) return;
 
-      // API URL 결정
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
-                    (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                     ? 'http://localhost:5050' 
-                     : 'https://likebetfair.onrender.com');
-      
-      const response = await fetch(`${apiUrl}/api/odds/${sportKey}`);
+      const url = buildApiUrl(`${API_CONFIG.ENDPOINTS.ODDS}/${sportKey}`);
+      const response = await fetch(url);
       if (!response.ok) return;
       
       const data = await response.json();
@@ -100,6 +96,11 @@ export default function OrderBook({ gameId, market, line, onOrderClick }: OrderB
       setShowCancelConfirm(null);
       // 호가창 새로고침
       loadOrderbook();
+      
+      // 🆕 주문 취소 후 이벤트 발생
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('exchangeOrderPlaced'));
+      }
     } catch (error) {
       console.error('주문 취소 실패:', error);
     }
@@ -146,7 +147,7 @@ export default function OrderBook({ gameId, market, line, onOrderClick }: OrderB
         <div className="flex justify-between items-start mb-2">
           <div className="flex items-center space-x-2">
             <div>
-              <span className="text-lg font-bold text-gray-900">{order.price.toFixed(2)}</span>
+              <span className="text-lg font-bold text-gray-900">{order.price.toFixed(3)}</span>
               {/* 배당율 정보 표시 */}
               {(() => {
                 console.log('🔍 주문 배당율 데이터:', {
@@ -164,12 +165,12 @@ export default function OrderBook({ gameId, market, line, onOrderClick }: OrderB
                 return (
                   <div className="text-xs text-gray-600 mt-1">
                     <div className="flex justify-between">
-                      <span>주문 Back: {typeof order.backOdds === 'number' ? order.backOdds.toFixed(2) : 'N/A'}</span>
-                      <span>주문 Lay: {typeof order.layOdds === 'number' ? order.layOdds.toFixed(2) : 'N/A'}</span>
+                      <span>주문 Back: {typeof order.backOdds === 'number' ? order.backOdds.toFixed(3) : 'N/A'}</span>
+                      <span>주문 Lay: {typeof order.layOdds === 'number' ? order.layOdds.toFixed(3) : 'N/A'}</span>
                     </div>
                     {sportsbookBackOdds && (
                       <div className="flex justify-between mt-1 text-blue-600">
-                        <span>스포츠북: {sportsbookBackOdds.toFixed(2)}</span>
+                        <span>스포츠북: {sportsbookBackOdds.toFixed(3)}</span>
                         <span>참고 배당</span>
                       </div>
                     )}

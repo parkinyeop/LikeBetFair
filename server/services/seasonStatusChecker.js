@@ -78,15 +78,17 @@ class SeasonStatusChecker {
     const checks = await Promise.all([
       this.checkOddsAvailability(oddsApiKey),
       this.checkRecentGames(sportKey),
-      this.checkUpcomingGames(sportKey)
+      this.checkUpcomingGames(sportKey),
+      this.checkDatabaseGames(sportKey)  // ✅ 실제 DB 데이터 체크 추가
     ]);
 
-    const [hasOdds, recentGames, upcomingGames] = checks;
+    const [hasOdds, recentGames, upcomingGames, dbGames] = checks;
 
     return this.determineSeasonStatus({
       hasOdds,
       recentGames,
       upcomingGames,
+      dbGames,
       sportKey,
       currentStatus: seasonInfo.status
     });
@@ -117,7 +119,7 @@ class SeasonStatusChecker {
       'basketball_nba': '4387',
       'basketball_kbl': '5124',
       'baseball_mlb': '4424',
-      'baseball_kbo': '4578', // KBO 리그 ID - Korean Professional Baseball 시도
+      'baseball_kbo': '4830', // KBO 리그 ID (정확한 ID)
       'americanfootball_nfl': '4391'
     };
     
@@ -146,14 +148,14 @@ class SeasonStatusChecker {
       const now = new Date();
       
       const upcomingGames = games.filter(game => 
-        new Date(game.commence_time) > now
+        new Date(game.commence_time + 'Z') > now
       );
 
       // 가장 가까운 경기 날짜 찾기
       let nextGameDate = null;
       if (upcomingGames.length > 0) {
         const sortedGames = upcomingGames.sort((a, b) => 
-          new Date(a.commence_time) - new Date(b.commence_time)
+          new Date(a.commence_time + 'Z') - new Date(b.commence_time + 'Z')
         );
         nextGameDate = sortedGames[0].commence_time;
       }
@@ -172,6 +174,45 @@ class SeasonStatusChecker {
   }
 
   /**
+   * 연도 기반 시즌 형식을 사용하는 리그 판단
+   */
+  isYearBasedSeasonLeague(sportKey) {
+    const yearBasedLeagues = [
+      // 북미 리그
+      'soccer_usa_mls', 'baseball_mlb', 'basketball_nba', 'basketball_wnba',
+      'americanfootball_nfl', 'americanfootball_ncaaf', 'icehockey_nhl',
+      // 한국 리그
+      'baseball_kbo', 'basketball_kbl', 'soccer_korea_kleague1',
+      // 아시아 리그
+      'soccer_japan_j_league', 'soccer_china_superleague',
+      // 남미 리그
+      'soccer_brazil_campeonato', 'soccer_argentina_primera_division'
+    ];
+    return yearBasedLeagues.includes(sportKey);
+  }
+
+  /**
+   * sportKey에 맞는 시즌 파라미터 생성
+   */
+  getSeasonParam(sportKey) {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+
+    if (this.isYearBasedSeasonLeague(sportKey)) {
+      // 연도 기반 리그: 2025
+      return currentYear.toString();
+    } else {
+      // 유럽 리그: 2024-2025 형식
+      if (currentMonth >= 8) {
+        return `${currentYear}-${currentYear + 1}`;
+      } else {
+        return `${currentYear - 1}-${currentYear}`;
+      }
+    }
+  }
+
+  /**
    * TheSportsDB에서 최근 경기 확인 (지난 30일)
    */
   async checkRecentGames(sportKey) {
@@ -182,13 +223,13 @@ class SeasonStatusChecker {
         return { count: 0, lastGameDate: null };
       }
 
-      const currentSeason = new Date().getFullYear();
+      const seasonParam = this.getSeasonParam(sportKey);
       const response = await axios.get(
         `https://www.thesportsdb.com/api/v1/json/${this.theSportsDbApiKey}/eventsseason.php`,
         {
           params: {
             id: leagueId,
-            s: currentSeason
+            s: seasonParam
           },
           timeout: 10000
         }
@@ -231,13 +272,13 @@ class SeasonStatusChecker {
         return { count: 0, nextGameDate: null };
       }
 
-      const currentSeason = new Date().getFullYear();
+      const seasonParam = this.getSeasonParam(sportKey);
       const response = await axios.get(
         `https://www.thesportsdb.com/api/v1/json/${this.theSportsDbApiKey}/eventsseason.php`,
         {
           params: {
             id: leagueId,
-            s: currentSeason
+            s: seasonParam
           },
           timeout: 10000
         }
@@ -272,10 +313,74 @@ class SeasonStatusChecker {
   }
 
   /**
+   * 실제 데이터베이스에서 경기 데이터 확인
+   */
+  async checkDatabaseGames(sportKey) {
+    try {
+      // OddsCache 모델 import (동적 import 사용)
+      const { default: OddsCache } = await import('../models/oddsCacheModel.js');
+      
+      const now = new Date();
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const sevenDaysLater = new Date();
+      sevenDaysLater.setDate(sevenDaysLater.getDate() + 7);
+      
+      // 최근 30일 + 향후 7일 범위에서 경기 데이터 확인
+      const games = await OddsCache.findAll({
+        where: {
+          sportKey: sportKey,
+          commenceTime: {
+            [require('sequelize').Op.between]: [thirtyDaysAgo, sevenDaysLater]
+          }
+        },
+        order: [['commenceTime', 'ASC']]
+      });
+      
+      const nowTime = now.getTime();
+      const recentGames = games.filter(game => new Date(game.commenceTime).getTime() < nowTime);
+      const upcomingGames = games.filter(game => new Date(game.commenceTime).getTime() >= nowTime);
+      
+      const nextGame = upcomingGames.length > 0 ? upcomingGames[0] : null;
+      
+      return {
+        totalCount: games.length,
+        recentCount: recentGames.length,
+        upcomingCount: upcomingGames.length,
+        nextGameDate: nextGame ? nextGame.commenceTime : null,
+        hasData: games.length > 0
+      };
+    } catch (error) {
+      console.log(`⚠️ DB 경기 체크 실패: ${error.message}`);
+      return { totalCount: 0, recentCount: 0, upcomingCount: 0, nextGameDate: null, hasData: false };
+    }
+  }
+
+  /**
    * 수집된 정보를 바탕으로 시즌 상태 결정 (개선된 범용 로직)
    */
-  determineSeasonStatus({ hasOdds, recentGames, upcomingGames, sportKey, currentStatus }) {
+  determineSeasonStatus({ hasOdds, recentGames, upcomingGames, dbGames, sportKey, currentStatus }) {
     const reasons = [];
+    
+    // 0. 실제 DB에 경기 데이터가 있는 경우 - 최우선 지표
+    if (dbGames.hasData) {
+      if (dbGames.upcomingCount > 0) {
+        reasons.push(`DB 경기 데이터 존재 (${dbGames.upcomingCount}개 예정 경기)`);
+        if (dbGames.recentCount > 0) {
+          reasons.push(`최근 ${dbGames.recentCount}개 경기 완료`);
+        }
+        return {
+          status: 'active',
+          reason: reasons.join(', ')
+        };
+      } else if (dbGames.recentCount > 0) {
+        reasons.push(`DB 경기 데이터 존재 (최근 ${dbGames.recentCount}개 경기)`);
+        return {
+          status: 'active',
+          reason: reasons.join(', ')
+        };
+      }
+    }
     
     // 1. 배당율 제공 중인 경우 - 가장 중요한 지표
     if (hasOdds.hasOdds) {
@@ -366,7 +471,7 @@ class SeasonStatusChecker {
         tomorrow.setDate(today.getDate() + 1);
         
         const todayGames = hasOdds.games.filter(game => {
-          const gameTime = new Date(game.commence_time);
+          const gameTime = new Date(game.commence_time + 'Z');
           return gameTime >= today && gameTime < tomorrow;
         });
         

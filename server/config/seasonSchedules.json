@@ -1,0 +1,131 @@
+{
+  "_metadata": {
+    "lastModified": "2025-10-16T21:58:16.710Z",
+    "modifiedBy": "auto-updater",
+    "schemaVersion": "1.0",
+    "description": "시즌 일정 및 상태 정보 (자동 업데이트 가능)",
+    "lastChange": "basketball_nba: active → active"
+  },
+  "soccer_korea_kleague1": {
+    "name": "K리그",
+    "status": "active",
+    "currentSeason": "2025",
+    "nextSeasonStart": "2025-03-01",
+    "description": "2025시즌 진행 중 (자동 감지: 배당율 제공 중 (1경기))",
+    "manualOverride": false
+  },
+  "soccer_japan_j_league": {
+    "name": "J리그",
+    "status": "active",
+    "currentSeason": "2025",
+    "nextSeasonStart": "2025-03-01",
+    "description": "2025시즌 진행 중 (자동 감지: 배당율 제공 중 (10경기))",
+    "manualOverride": false
+  },
+  "soccer_italy_serie_a": {
+    "name": "세리에 A",
+    "status": "offseason",
+    "currentSeason": "2025",
+    "nextSeasonStart": "2025-03-01",
+    "description": "시즌오프 (자동 감지: 시즌 시작 예정, 배당율 조기 제공 중)",
+    "manualOverride": false
+  },
+  "soccer_brazil_campeonato": {
+    "name": "브라질 세리에 A",
+    "status": "offseason",
+    "currentSeason": "2025",
+    "nextSeasonStart": "2025-03-01",
+    "description": "시즌오프 (자동 감지: 시즌 시작 예정, 배당율 조기 제공 중)",
+    "manualOverride": false
+  },
+  "soccer_usa_mls": {
+    "name": "MLS",
+    "status": "active",
+    "currentSeason": "2025",
+    "nextSeasonStart": "2025-03-01",
+    "description": "2025시즌 진행 중 (자동 감지: 배당율 제공 중 (1경기))",
+    "manualOverride": false
+  },
+  "soccer_argentina_primera_division": {
+    "name": "아르헨티나 프리메라",
+    "status": "offseason",
+    "currentSeason": "2025",
+    "nextSeasonStart": "2025-03-01",
+    "description": "시즌오프 (자동 감지: 시즌 시작 예정, 배당율 조기 제공 중)",
+    "manualOverride": false
+  },
+  "soccer_china_superleague": {
+    "name": "중국 슈퍼리그",
+    "status": "active",
+    "currentSeason": "2025",
+    "nextSeasonStart": "2025-03-01",
+    "description": "2025시즌 진행 중 (자동 감지: 배당율 제공 중 (1경기))",
+    "manualOverride": false
+  },
+  "soccer_spain_primera_division": {
+    "name": "라리가",
+    "status": "offseason",
+    "currentSeason": "2025",
+    "nextSeasonStart": "2025-03-01",
+    "description": "시즌오프 (자동 감지: 시즌 시작 예정, 배당율 조기 제공 중)",
+    "manualOverride": false
+  },
+  "soccer_germany_bundesliga": {
+    "name": "분데스리가",
+    "status": "offseason",
+    "currentSeason": "2025",
+    "nextSeasonStart": "2025-03-01",
+    "description": "시즌오프 (자동 감지: 시즌 시작 예정, 배당율 조기 제공 중)",
+    "manualOverride": false
+  },
+  "soccer_england_premier_league": {
+    "name": "프리미어리그",
+    "status": "offseason",
+    "currentSeason": "2025",
+    "nextSeasonStart": "2025-03-01",
+    "description": "시즌오프 (자동 감지: 시즌 시작 예정, 배당율 조기 제공 중)",
+    "manualOverride": false
+  },
+  "basketball_nba": {
+    "name": "NBA",
+    "status": "active",
+    "currentSeason": "2025",
+    "nextSeasonStart": "2025-10-01",
+    "description": "2025시즌 진행 중 (자동 감지: DB 경기 데이터 존재 (15개 예정 경기))",
+    "manualOverride": false,
+    "lastAutoUpdate": "2025-10-16T21:58:16.710Z",
+    "updateReason": "DB 경기 데이터 존재 (15개 예정 경기)"
+  },
+  "basketball_kbl": {
+    "name": "KBL",
+    "status": "active",
+    "currentSeason": "2025",
+    "nextSeasonStart": "2025-10-01",
+    "description": "2025시즌 진행 중 (자동 감지: 배당율 제공 중 (1경기))",
+    "manualOverride": false
+  },
+  "baseball_mlb": {
+    "name": "MLB",
+    "status": "active",
+    "currentSeason": "2025",
+    "nextSeasonStart": "2025-03-01",
+    "description": "2025시즌 진행 중 (자동 감지: 배당율 제공 중 (1경기))",
+    "manualOverride": false
+  },
+  "baseball_kbo": {
+    "name": "KBO",
+    "status": "active",
+    "currentSeason": "2025",
+    "nextSeasonStart": "2025-03-01",
+    "description": "2025시즌 진행 중 (자동 감지: 배당율 제공 중 (1경기))",
+    "manualOverride": false
+  },
+  "americanfootball_nfl": {
+    "name": "NFL",
+    "status": "active",
+    "currentSeason": "2025",
+    "nextSeasonStart": "2025-09-01",
+    "description": "2025시즌 진행 중 (배당율 기반 활성 판단)",
+    "manualOverride": false
+  }
+}

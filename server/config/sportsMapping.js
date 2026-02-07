@@ -104,121 +104,63 @@ export const SPORT_CATEGORIES = {
   }
 };
 
-// 시즌 일정 정보 (2025년 기준)
-export const SEASON_SCHEDULES = {
-  // 축구
-  'soccer_korea_kleague1': {
-    name: 'K리그',
-    status: 'active',
-    currentSeason: '2025',
-    nextSeasonStart: '2025-03-01',
-    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (1경기))'
-  },
-  'soccer_japan_j_league': {
-    name: 'J리그',
-    status: 'active',
-    currentSeason: '2025',
-    nextSeasonStart: '2025-03-01',
-    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (10경기))'
-  },
-  'soccer_italy_serie_a': {
-    name: '세리에 A',
-    status: 'offseason',
-    currentSeason: '2025',
-    nextSeasonStart: '2025-03-01',
-    description: '시즌오프 (자동 감지: 시즌 시작 예정, 배당율 조기 제공 중)'
-  },
-  'soccer_brazil_campeonato': {
-    name: '브라질 세리에 A',
-    status: 'offseason',
-    currentSeason: '2025',
-    nextSeasonStart: '2025-03-01',
-    description: '시즌오프 (자동 감지: 시즌 시작 예정, 배당율 조기 제공 중)'
-  },
-  'soccer_usa_mls': {
-    name: 'MLS',
-    status: 'active',
-    currentSeason: '2025',
-    nextSeasonStart: '2025-03-01',
-    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (1경기))'
-  },
-  'soccer_argentina_primera_division': {
-    name: '아르헨티나 프리메라',
-    status: 'offseason',
-    currentSeason: '2025',
-    nextSeasonStart: '2025-03-01',
-    description: '시즌오프 (자동 감지: 시즌 시작 예정, 배당율 조기 제공 중)'
-  },
-  'soccer_china_superleague': {
-    name: '중국 슈퍼리그',
-    status: 'active',
-    currentSeason: '2025',
-    nextSeasonStart: '2025-03-01',
-    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (1경기))'
-  },
-  'soccer_spain_primera_division': {
-    name: '라리가',
-    status: 'offseason',
-    currentSeason: '2025',
-    nextSeasonStart: '2025-03-01',
-    description: '시즌오프 (자동 감지: 시즌 시작 예정, 배당율 조기 제공 중)'
-  },
-  'soccer_germany_bundesliga': {
-    name: '분데스리가',
-    status: 'offseason',
-    currentSeason: '2025',
-    nextSeasonStart: '2025-03-01',
-    description: '시즌오프 (자동 감지: 시즌 시작 예정, 배당율 조기 제공 중)'
-  },
-  'soccer_england_premier_league': {
-    name: '프리미어리그',
-    status: 'offseason',
-    currentSeason: '2025',
-    nextSeasonStart: '2025-03-01',
-    description: '시즌오프 (자동 감지: 시즌 시작 예정, 배당율 조기 제공 중)'
-  },
-  
-  // 농구
-  'basketball_nba': {
-    name: 'NBA',
-    status: 'offseason',
-    currentSeason: '2025',
-    nextSeasonStart: '2025-10-01',
-    description: '시즌오프 (자동 감지: 시즌 시작 예정, 배당율 조기 제공 중)'
-  },
-  'basketball_kbl': {
-    name: 'KBL',
-    status: 'active',
-    currentSeason: '2025',
-    nextSeasonStart: '2025-10-01',
-    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (1경기))'
-  },
-  
-  // 야구
-  'baseball_mlb': {
-    name: 'MLB',
-    status: 'active',
-    currentSeason: '2025',
-    nextSeasonStart: '2025-03-01',
-    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (1경기))'
-  },
-  'baseball_kbo': {
-    name: 'KBO',
-    status: 'active',
-    currentSeason: '2025',
-    nextSeasonStart: '2025-03-01',
-    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (1경기))'
-  },
-  
-  // 미식축구
-  'americanfootball_nfl': {
-    name: 'NFL',
-    status: 'active',
-    currentSeason: '2025',
-    nextSeasonStart: '2025-09-01',
-    description: '2025시즌 진행 중 (자동 감지: 배당율 제공 중 (1경기))'
+// ✅ 시즌 일정 정보 (JSON 파일에서 동적 로드)
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+/**
+ * seasonSchedules.json 파일에서 시즌 정보를 로드
+ * - 캐시 무효화 지원 (서버 재시작 없이 변경사항 반영 가능)
+ */
+function loadSeasonSchedules() {
+  try {
+    const configPath = join(__dirname, 'seasonSchedules.json');
+    const content = readFileSync(configPath, 'utf8');
+    return JSON.parse(content);
+  } catch (error) {
+    console.error('❌ seasonSchedules.json 로드 실패:', error.message);
+    return {}; // 빈 객체 반환 (fallback)
   }
-};
+}
+
+// 초기 로드
+let _seasonSchedulesCache = loadSeasonSchedules();
+
+// Export: 기본 시즌 정보 객체
+export const SEASON_SCHEDULES = new Proxy(_seasonSchedulesCache, {
+  get(target, prop) {
+    // _metadata는 내부 관리용이므로 제외
+    if (prop === '_metadata' || prop === 'reload') {
+      return undefined;
+    }
+    return target[prop];
+  }
+});
+
+/**
+ * seasonSchedules.json 리로드 함수
+ * - 서버 재시작 없이 변경사항 반영
+ * - 관리자 페이지나 스케줄러에서 호출 가능
+ */
+export function reloadSeasonSchedules() {
+  console.log('🔄 seasonSchedules.json 리로드 중...');
+  const fresh = loadSeasonSchedules();
+  
+  // 기존 객체 속성 모두 제거
+  Object.keys(_seasonSchedulesCache).forEach(key => {
+    delete _seasonSchedulesCache[key];
+  });
+  
+  // 새로운 속성 복사
+  Object.assign(_seasonSchedulesCache, fresh);
+  
+  console.log(`✅ seasonSchedules.json 리로드 완료: ${Object.keys(fresh).length - 1}개 리그`); // -1: _metadata 제외
+  return _seasonSchedulesCache;
+}
 
 // 유틸리티 함수들
 export const getSportKey = (displayName) => {

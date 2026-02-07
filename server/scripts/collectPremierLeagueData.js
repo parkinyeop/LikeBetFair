@@ -1,8 +1,10 @@
 import axios from 'axios';
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName, findBestTeamMatch } from '../normalizeUtils.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+const sequelize = createScriptSequelize();
 
-const THESPORTSDB_API_KEY = '3'; // 실제 운영키로 교체 필요
+const THESPORTSDB_API_KEY = process.env.THESPORTSDB_API_KEY || '3'; // 실제 운영키로 교체 필요
 const LEAGUE_ID = '4328'; // EPL 리그 ID
 const MAIN_CATEGORY = 'soccer';
 const SUB_CATEGORY = 'EPL';
@@ -101,8 +103,20 @@ async function collectPremierLeagueData() {
 // 직접 실행
 if (import.meta.url === `file://${process.argv[1]}`) {
   collectPremierLeagueData()
-    .then(() => { console.log('✅ 스크립트 완료'); process.exit(0); })
-    .catch(error => { console.error('❌ 스크립트 실패:', error); process.exit(1); });
+    .then(async () => {
+ console.log('✅ 스크립트 완료'); process.exit(0); 
+      // 데이터베이스 연결 종료
+      console.log('🔌 데이터베이스 연결 종료 중...');
+      await sequelize.close();
+      console.log('✅ 데이터베이스 연결 종료 완료');
+    })
+    .catch(async (error) => {
+ console.error('❌ 스크립트 실패:', error); process.exit(1); 
+      // 데이터베이스 연결 종료
+      console.log('🔌 데이터베이스 연결 종료 중...');
+      await sequelize.close();
+      console.log('✅ 데이터베이스 연결 종료 완료');
+    });
 }
 
 export { collectPremierLeagueData }; 

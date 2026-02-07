@@ -1,4 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
+import { buildApiUrl } from '../config/apiConfig';
+import { getSportKey } from '../config/sportsMapping';
+import { adjustOddsSophisticated } from '../utils/oddsCalculator';
 
 export interface ExchangeGame {
   id: string;
@@ -11,6 +14,11 @@ export interface ExchangeGame {
   league: string;
   category: string;
   availableMarkets: Market[];
+  // 배당률 필드 추가
+  homeTeamOdds?: number;
+  awayTeamOdds?: number;
+  drawOdds?: number;
+  officialOdds?: any;
 }
 
 interface Market {
@@ -25,27 +33,168 @@ export function useExchangeGames(category?: string) {
   const [games, setGames] = useState<ExchangeGame[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [payoutRateSettings, setPayoutRateSettings] = useState({ returnRate: 0.99, enabled: true });
+
+  // 환수율 설정 로드 함수
+  const loadPayoutRateSettings = useCallback(async () => {
+    try {
+      const response = await fetch(buildApiUrl('/api/admin/public-settings/exchange-odds-return-rate'));
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data) {
+          setPayoutRateSettings(data.data);
+          console.log('🎯 환수율 설정 로드됨:', data.data);
+        }
+      }
+    } catch (error) {
+      console.error('환수율 설정 로드 오류:', error);
+    }
+  }, []);
+
+  // 🆕 배당률만 갱신하는 함수 (상태 리셋 방지)
+  const refreshOddsOnly = useCallback(async () => {
+    if (!category) return;
+    
+    try {
+      const sportKey = getSportKey(category);
+      const response = await fetch(buildApiUrl(`/api/odds/${sportKey}`));
+      
+      if (!response.ok) {
+        console.error('[useExchangeGames] 배당률 갱신 실패:', response.status);
+        return;
+      }
+      
+      const data = await response.json();
+      
+      // 기존 게임 데이터와 새 배당률 데이터를 병합
+      setGames(prevGames => {
+        return prevGames.map(prevGame => {
+          const newGame = data.find((g: any) => 
+            g.homeTeam === prevGame.homeTeam && 
+            g.awayTeam === prevGame.awayTeam &&
+            g.commenceTime === prevGame.commenceTime
+          );
+          
+          if (newGame) {
+            return {
+              ...prevGame,
+              // 배당률만 업데이트
+              homeTeamOdds: newGame.homeTeamOdds,
+              awayTeamOdds: newGame.awayTeamOdds,
+              drawOdds: newGame.drawOdds,
+              officialOdds: newGame.officialOdds,
+              availableMarkets: newGame.availableMarkets
+            };
+          }
+          
+          return prevGame;
+        });
+      });
+      
+      console.log('[useExchangeGames] 배당률만 갱신 완료 (상태 유지)');
+    } catch (error) {
+      console.error('[useExchangeGames] 배당률 갱신 오류:', error);
+    }
+  }, [category]);
 
   const fetchGames = useCallback(async () => {
     try {
+      console.log('🔄 fetchGames 호출됨, category:', category);
       setLoading(true);
       setError(null);
 
-      const params = new URLSearchParams();
+      // 환수율 설정 먼저 로드
+      await loadPayoutRateSettings();
+
+      // 카테고리에서 스포츠 키 추출
+      let sportKey = '';
       if (category) {
-        params.append('category', category);
+        if (category.includes(" > ")) {
+          const subCategory = category.split(" > ")[1];
+          sportKey = getSportKey(subCategory) || '';
+        } else {
+          sportKey = getSportKey(category) || '';
+        }
       }
 
-      const response = await fetch(`http://localhost:5050/api/exchange/games?${params}`);
+      if (!sportKey) {
+        console.log('❌ 스포츠 키를 찾을 수 없음:', category);
+        setGames([]);
+        return;
+      }
+
+      // /api/odds/{sport} API 사용 (익스체인지 홈과 동일한 데이터 소스)
+      const url = buildApiUrl(`/api/odds/${sportKey}`);
+      console.log('⏱️ API 요청 시작:', url);
+      const startTime = Date.now();
+      const response = await fetch(url);
+      const endTime = Date.now();
+      console.log('⏱️ API 응답 완료:', endTime - startTime, 'ms');
       
       if (!response.ok) {
         throw new Error(`게임 목록 조회 실패: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('🎮 Exchange 게임 목록 조회 성공:', data.games.length, '개');
+      console.log('🎮 Exchange 게임 목록 조회 성공:', data.length, '개');
+      console.log('🔍 첫 번째 게임 데이터 구조:', data[0]);
       
-      setGames(data.games);
+      // 데이터 변환 시작 시간
+      const transformStartTime = Date.now();
+      
+      // ExchangeGame 형태로 변환
+      const exchangeGames: ExchangeGame[] = data.map((game: any) => {
+        // sportKey를 직접 설정 (API 응답에서 가져오지 않고 현재 요청한 sportKey 사용)
+        const gameSportKey = sportKey;
+        console.log('🔍 게임 변환:', {
+          originalSportKey: game.sport_key,
+          usingSportKey: gameSportKey,
+          homeTeam: game.home_team,
+          awayTeam: game.away_team,
+          hasExchangeOdds: !!game.exchangeOdds,
+          hasOriginalOdds: !!game.originalOdds
+        });
+        
+        // ✅ 익스체인지용 배당율 사용 (API에서 제공하는 exchangeOdds 또는 원본)
+        const displayOdds = game.exchangeOdds || game.originalOdds || game.officialOdds || {};
+        
+        // 1. 원본 officialOdds를 깊은 복사하여 수정 준비
+        const adjustedOfficialOdds = JSON.parse(JSON.stringify(displayOdds));
+        
+        
+        // ✅ API에서 이미 환수율이 적용된 배당율을 받으므로 추가 계산 불필요
+        
+        // 3. 최종적으로 조정된 배당률 객체를 반환
+        return {
+          id: game.id || '',
+          eventId: game.id || '',
+          homeTeam: game.home_team || '',
+          awayTeam: game.away_team || '',
+          commenceTime: game.commence_time || '',
+          status: 'upcoming',
+          sportKey: gameSportKey,
+          league: gameSportKey ? gameSportKey.split('_').pop() || '' : '',
+          category: category || '',
+          availableMarkets: game.bookmakers?.[0]?.markets || [],
+          // 조정된 데이터에서 값을 가져오도록 보장
+          // exchangeOdds는 직접 숫자 값, sportsbookOdds는 {averagePrice, count} 객체
+          homeTeamOdds: typeof adjustedOfficialOdds.h2h?.[game.home_team] === 'number'
+            ? adjustedOfficialOdds.h2h[game.home_team]
+            : adjustedOfficialOdds.h2h?.[game.home_team]?.averagePrice || null,
+          awayTeamOdds: typeof adjustedOfficialOdds.h2h?.[game.away_team] === 'number'
+            ? adjustedOfficialOdds.h2h[game.away_team]
+            : adjustedOfficialOdds.h2h?.[game.away_team]?.averagePrice || null,
+          drawOdds: typeof adjustedOfficialOdds.h2h?.Draw === 'number'
+            ? adjustedOfficialOdds.h2h.Draw
+            : adjustedOfficialOdds.h2h?.Draw?.averagePrice || null,
+          officialOdds: adjustedOfficialOdds, // 완전히 조정된 객체로 교체
+        };
+      });
+      
+      const transformEndTime = Date.now();
+      console.log('⏱️ 데이터 변환 완료:', transformEndTime - transformStartTime, 'ms');
+      
+      setGames(exchangeGames);
     } catch (err) {
       console.error('❌ Exchange 게임 목록 조회 오류:', err);
       setError(err instanceof Error ? err.message : '게임 목록 조회 중 오류 발생');
@@ -53,11 +202,19 @@ export function useExchangeGames(category?: string) {
     } finally {
       setLoading(false);
     }
-  }, [category]);
+  }, [category]); // payoutRateSettings 제거
 
   useEffect(() => {
     fetchGames();
   }, [fetchGames]);
+
+  // 환수율 설정이 변경될 때만 새로고침
+  useEffect(() => {
+    if (payoutRateSettings.returnRate !== 0.99 || payoutRateSettings.enabled !== true) {
+      console.log('🔄 환수율 설정 변경 감지, 게임 데이터 새로고침');
+      fetchGames();
+    }
+  }, [payoutRateSettings.returnRate, payoutRateSettings.enabled, fetchGames]);
 
   // 카테고리별 게임 필터링
   const getGamesByCategory = useCallback((filterCategory: string) => {
@@ -88,8 +245,12 @@ export function useExchangeGames(category?: string) {
     loading,
     error,
     refetch: fetchGames,
+    refreshOddsOnly, // 🆕 배당률만 갱신하는 함수 추가
     getGamesByCategory,
     getGamesBySport,
+    // 환수율 설정 새로고침 함수 추가
+    refreshPayoutRateSettings: loadPayoutRateSettings,
+    payoutRateSettings,
     // 통계 정보
     stats: {
       total: games.length,

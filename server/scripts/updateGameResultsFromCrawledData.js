@@ -1,6 +1,9 @@
 import GameResult from '../models/gameResultModel.js';
 import fs from 'fs';
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+
+// 스크립트 전용 Sequelize 인스턴스 생성
+const sequelize = createScriptSequelize();
 
 // === 팀명 표준화 매핑 ===
 const teamNameMap = {
@@ -30,7 +33,14 @@ async function fixTeamNames() {
     }
   }
   console.log(`총 ${updated}건의 팀명이 표준화되었습니다.`);
+  
+  // 데이터베이스 연결 종료
+  await sequelize.close();
 }
 
 // ... 기존 main 함수/로직 아래에 호출 추가 ...
-fixTeamNames().catch(e => { console.error(e); process.exit(1); }); 
+fixTeamNames().catch(async (e) => { 
+  console.error(e); 
+  await sequelize.close();
+  process.exit(1); 
+}); 

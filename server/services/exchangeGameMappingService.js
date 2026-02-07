@@ -38,7 +38,8 @@ class ExchangeGameMappingService {
     
     // 오늘~7일 후까지 범위 계산 (UTC 기준)
     const now = new Date();
-    const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    // UTC 기준으로 오늘 날짜 계산 (9시간 연산 제거)
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const weekLater = new Date(today);
     weekLater.setUTCDate(today.getUTCDate() + 7);
 
@@ -153,7 +154,6 @@ class ExchangeGameMappingService {
               commenceTime: foundOddsCache.commenceTime,
               mainCategory: foundOddsCache.mainCategory,
               subCategory: foundOddsCache.subCategory,
-              gameResultId: gameResult.id,
               ...await this.extractOddsFromCache(foundOddsCache, selection, side)
             };
           }
@@ -181,7 +181,6 @@ class ExchangeGameMappingService {
         commenceTime: oddsCache.commenceTime,
         mainCategory: oddsCache.mainCategory,
         subCategory: oddsCache.subCategory,
-        gameResultId: null, // OddsCache에서 직접 가져온 경우
         ...oddsData
       };
 
@@ -255,18 +254,32 @@ class ExchangeGameMappingService {
         layOdds = opposingOutcome ? opposingOutcome.price : null;
       }
 
-      console.log('✅ OddsCache에서 배당율 추출 성공:', {
+      // 원본 배당율 (가중치 적용 전) - 소수점 3자리
+      const originalBackOdds = backOdds !== null ? parseFloat(backOdds.toFixed(3)) : null;
+      const originalLayOdds = layOdds !== null ? parseFloat(layOdds.toFixed(3)) : null;
+
+      // 원본 배당율 사용 (가중치는 조회 시에만 적용)
+      const finalBackOdds = originalBackOdds;
+      const finalLayOdds = originalLayOdds;
+
+      console.log('✅ OddsCache에서 배당율 추출 및 가중치 적용 완료:', {
         selection,
         side,
-        backOdds,
-        layOdds,
-        oddsSource: bookmaker.title
+        sportKey: oddsCache.sportKey,
+        originalBackOdds,
+        originalLayOdds,
+        finalBackOdds,
+        finalLayOdds,
+        oddsSource: bookmaker.title,
+        weightApplied: side === 'back'
       });
 
       return {
-        backOdds: backOdds !== null ? parseFloat(backOdds.toFixed(2)) : null,
-        layOdds: layOdds !== null ? parseFloat(layOdds.toFixed(2)) : null,
-        oddsSource: bookmaker.title
+        backOdds: finalBackOdds,
+        layOdds: finalLayOdds,
+        oddsSource: bookmaker.title,
+        originalBackOdds, // 원본 배당율 보존
+        originalLayOdds   // 원본 배당율 보존
       };
 
     } catch (error) {
@@ -285,6 +298,14 @@ class ExchangeGameMappingService {
       // 1. OddsCache에서 경기 정보 및 배당율 조회 (GameResult 의존성 제거)
       const mappedData = { ...orderData };
       
+      console.log('🔍 mapGameDataToOrder 시작:', {
+        gameId: orderData.gameId,
+        selection: orderData.selection,
+        side: orderData.side,
+        originalCommenceTime: orderData.commenceTime,
+        originalCommenceTimeType: typeof orderData.commenceTime
+      });
+      
       if (orderData.gameId && orderData.selection) {
         const oddsCacheData = await this.getOddsCacheData(orderData.gameId, orderData.selection, orderData.side);
         
@@ -293,17 +314,29 @@ class ExchangeGameMappingService {
           mappedData.homeTeam = oddsCacheData.homeTeam;
           mappedData.awayTeam = oddsCacheData.awayTeam;
           mappedData.commenceTime = oddsCacheData.commenceTime;
-          mappedData.gameResultId = oddsCacheData.gameResultId;
           mappedData.sportKey = this.getSportKeyFromCategories(
             oddsCacheData.mainCategory, 
             oddsCacheData.subCategory
           );
           
-          // 배당율 설정
+          // 🆕 디버깅: commenceTime 매핑 결과 확인
+          console.log('🔍 commenceTime 매핑 결과:', {
+            gameId: orderData.gameId,
+            originalCommenceTime: orderData.commenceTime,
+            oddsCacheCommenceTime: oddsCacheData.commenceTime,
+            mappedCommenceTime: mappedData.commenceTime,
+            mappedCommenceTimeType: typeof mappedData.commenceTime,
+            mappedCommenceTimeISO: mappedData.commenceTime?.toISOString()
+          });
+          
+          // 배당율 설정 (가중치 적용)
           mappedData.backOdds = oddsCacheData.backOdds;
           mappedData.layOdds = oddsCacheData.layOdds;
           mappedData.oddsSource = oddsCacheData.oddsSource;
           mappedData.oddsUpdatedAt = new Date();
+          
+          // 원본 배당율 사용 (가중치는 조회 시에만 적용)
+          mappedData.adjustedPrice = orderData.price;
 
           console.log('✅ OddsCache 기반 게임 매핑 성공:', {
             gameId: orderData.gameId,
@@ -314,7 +347,8 @@ class ExchangeGameMappingService {
             side: orderData.side,
             backOdds: mappedData.backOdds,
             layOdds: mappedData.layOdds,
-            oddsSource: mappedData.oddsSource
+            oddsSource: mappedData.oddsSource,
+            commenceTime: mappedData.commenceTime
           });
         } else {
           console.log('⚠️ OddsCache에서 경기 정보를 찾을 수 없음:', orderData.gameId);
@@ -323,6 +357,16 @@ class ExchangeGameMappingService {
 
       // 2. selectionDetails 구조화
       mappedData.selectionDetails = this.createSelectionDetails(mappedData);
+
+      // 🆕 디버깅: 최종 매핑 결과 확인
+      console.log('🔍 최종 매핑 결과:', {
+        gameId: orderData.gameId,
+        homeTeam: mappedData.homeTeam,
+        awayTeam: mappedData.awayTeam,
+        commenceTime: mappedData.commenceTime,
+        commenceTimeType: typeof mappedData.commenceTime,
+        commenceTimeISO: mappedData.commenceTime?.toISOString()
+      });
 
       return mappedData;
 
@@ -653,21 +697,21 @@ class ExchangeGameMappingService {
   }
 
   /**
-   * 자동 정산을 위한 매칭된 주문 조회
-   * @param {string} gameResultId 
+   * 자동 정산을 위한 매칭된 주문 조회 (경기 식별자 방식)
+   * @param {string} homeTeam 
+   * @param {string} awayTeam 
+   * @param {string} commenceTime 
    * @returns {Array} 정산 대상 주문들
    */
-  async getOrdersForSettlement(gameResultId) {
+  async getOrdersForSettlementByMatch(homeTeam, awayTeam, commenceTime) {
     return await ExchangeOrder.findAll({
       where: {
-        gameResultId: gameResultId,
+        homeTeam,
+        awayTeam,
+        commenceTime,
         status: 'matched',
         autoSettlement: true
-      },
-      include: [{
-        model: GameResult,
-        as: 'gameResult'
-      }]
+      }
     });
   }
 
@@ -688,7 +732,6 @@ class ExchangeGameMappingService {
         awayTeam: mappedData.awayTeam,
         commenceTime: mappedData.commenceTime,
         sportKey: mappedData.sportKey,
-        gameResultId: mappedData.gameResultId,
         selectionDetails: mappedData.selectionDetails
       });
 

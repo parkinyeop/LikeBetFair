@@ -1,15 +1,102 @@
 // 정규화 및 매핑 유틸 함수 모듈
 
 /**
+ * Accent(diacritic) 문자를 기본 ASCII 문자로 변환
+ * NFD 정규화 + Combining Diacritical Marks 제거
+ * @param {string} str - 변환할 문자열
+ * @returns {string} Accent가 제거된 문자열
+ */
+function normalizeAccents(str) {
+  if (!str) return '';
+  
+  // NFD (Canonical Decomposition) 정규화 후 Combining Diacritical Marks 제거
+  // 예: "São" → "Sa\u0303o" → "Sao"
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+/**
  * 팀명 정규화: 영문/숫자/한글만 남기고, 공백 및 특수문자 제거, 소문자 변환
+ * 아르헨티나 프리메라 디비시온 팀명을 고려한 개선된 정규화
  */
 function normalizeTeamName(team) {
   if (!team) return '';
-  return team
+  
+  // 🔧 유니코드 악센트 먼저 제거
+  let normalized = normalizeAccents(team)
     .toLowerCase()
     .replace(/[^a-z0-9가-힣]/g, '')
     .replace(/\s+/g, '')
     .trim();
+  
+  // 아르헨티나 프리메라 디비시온 특별 처리
+  if (normalized.includes('belgrano') && normalized.includes('cordoba')) {
+    normalized = 'belgrano';
+  }
+  if (normalized.includes('sanmartin') && normalized.includes('sanjuan')) {
+    normalized = 'sanmartndesanjuan';
+  }
+  if (normalized.includes('vlez') && normalized.includes('sarsfield')) {
+    normalized = 'vlezsarsfield';
+  }
+  if (normalized.includes('rosario') && normalized.includes('central')) {
+    normalized = 'rosariocentral';
+  }
+  if (normalized.includes('defensa') && normalized.includes('justicia')) {
+    normalized = 'defensayjusticia';
+  }
+  if (normalized.includes('lanus') || normalized.includes('lans')) {
+    normalized = 'lans';
+  }
+  if (normalized.includes('deportivo') && normalized.includes('riestra')) {
+    normalized = 'deportivoriestra';
+  }
+  if (normalized.includes('estudiantes') && normalized.includes('plata')) {
+    normalized = 'estudiantesdelaplata';
+  }
+  if (normalized.includes('gimnasia') && normalized.includes('esgrima')) {
+    normalized = 'gimnasiayesgrimadelaplata';
+  }
+  if (normalized.includes('river') && normalized.includes('plate')) {
+    normalized = 'riverplate';
+  }
+  if (normalized.includes('boca') && normalized.includes('juniors')) {
+    normalized = 'bocajuniors';
+  }
+  if (normalized.includes('central') && normalized.includes('cordoba')) {
+    normalized = 'centralcrdobadesantiagodelestero';
+  }
+  if (normalized.includes('newells') && normalized.includes('oldboys')) {
+    normalized = 'newellsoldboys';
+  }
+  if (normalized.includes('independiente') && normalized.includes('rivadavia')) {
+    normalized = 'independienterivadavia';
+  }
+  if (normalized.includes('barracas') && normalized.includes('central')) {
+    normalized = 'barracascentral';
+  }
+  if (normalized.includes('racing') && normalized.includes('club')) {
+    normalized = 'racingclub';
+  }
+  if (normalized.includes('talleres') && normalized.includes('cordoba')) {
+    normalized = 'talleresdecrdoba';
+  }
+  if (normalized.includes('union') && normalized.includes('santafe')) {
+    normalized = 'unin';
+  }
+  if (normalized === 'union') {
+    normalized = 'unin';
+  }
+  if (normalized.includes('argentinos') && normalized.includes('juniors')) {
+    normalized = 'argentinosjuniors';
+  }
+  if (normalized.includes('atletico') && normalized.includes('tucuman')) {
+    normalized = 'atltcotucumn';
+  }
+  if (normalized.includes('san') && normalized.includes('lorenzo')) {
+    normalized = 'sanlorenzo';
+  }
+  
+  return normalized;
 }
 
 /**
@@ -69,6 +156,37 @@ const globalTeamMapping = {
   'lgtwins': 'lgtwins',
   'samsunglions': 'samsunglions',
 
+  // === K리그 (한국 프로축구) ===
+  'jejuunited': 'jejusk',
+  'jejuunitedfc': 'jejusk',
+  'jeju united fc': 'jeju sk',
+  'jeju united': 'jeju sk',
+  'ulsanhyundai': 'ulsanhd',
+  'ulsanhyundaifc': 'ulsanhd',
+  'ulsan hyundai fc': 'ulsan hd',
+  'ulsan hyundai': 'ulsan hd',
+  'sangjusangmu': 'sangjusangmu',
+  'sangjusangmufc': 'sangjusangmu',
+  'sangju sangmu fc': 'sangju sangmu',
+  'sangju sangmu': 'sangju sangmu',
+  'gwangjufc': 'gwangjufc',
+  'gwangju fc': 'gwangju fc',
+  'daegufc': 'daegufc', 
+  'daegu fc': 'daegu fc',
+  'jeonbukhyundai': 'jeonbukhyundai',
+  'jeonbuk hyundai motors': 'jeonbuk hyundai motors',
+  'suwonfc': 'suwonfc',
+  'suwon fc': 'suwon fc',
+  'fcseoul': 'fcseoul',
+  'fc seoul': 'fc seoul',
+  'pohangsteelers': 'pohangsteelers',
+  'pohang steelers': 'pohang steelers',
+  'daejeonhanacitizen': 'daejeonhanacitizen',
+  'daejeon hana citizen': 'daejeon hana citizen',
+  'gangwonfc': 'gangwonfc',
+  'gangwon fc': 'gangwon fc',
+  'anyang': 'anyang',
+
   // === MLB (미국 프로야구) ===
   'arizonadiamondbacks': 'arizonadiamondbacks',
   'atlantabraves': 'atlantabraves',
@@ -78,6 +196,7 @@ const globalTeamMapping = {
   'chicagowhitesox': 'chicagowhitesox',
   'cincinnatireds': 'cincinnatireds',
   'clevelandguardians': 'clevelandguardians',
+  'clevelandindians': 'clevelandguardians', // 구단명 변경 대응
   'coloradorockies': 'coloradorockies',
   'detroittigers': 'detroittigers',
   'houstonastros': 'houstonastros',
@@ -160,6 +279,8 @@ const globalTeamMapping = {
   'beijingguoan': 'beijingguoan',
   'shandongtaishanfc': 'shandongtaishan',
   'shandongtaishan': 'shandongtaishan',
+  'shandonglunengtaishan': 'shandongtaishan',  // Shandong Luneng Taishan FC → Shandong Taishan
+  'shandonglunengtaishanfc': 'shandongtaishan',
   'wuhanthreetownsfc': 'wuhanthreetowns',
   'wuhanthreetowns': 'wuhanthreetowns',
   'changchunyataifc': 'changchunyatai',
@@ -172,6 +293,37 @@ const globalTeamMapping = {
   'chengdurongcheng': 'chengdurongcheng',
   'shenzhenpengcityfc': 'shenzhenpengcity',
   'shenzhenpengcity': 'shenzhenpengcity',
+
+  // === Brasileirao (브라질 세리에 A) ===
+  'sportclubdorecife': 'sportrecife',  // Sport Club do Recife → Sport Recife
+  'sportclubrecife': 'sportrecife',    // Sport Club Recife → Sport Recife
+  'sportrecife': 'sportrecife',
+
+  // === K-League (한국 프로축구) ===
+  'jejuunitedfc': 'jejusk',
+  'jejusk': 'jejusk',
+  'jeju': 'jejusk',
+  'fcseoul': 'fcseoul',
+  'seoul': 'fcseoul',
+  'jeonbukhyundaimotors': 'jeonbukhyundai',
+  'jeonbukhyundai': 'jeonbukhyundai',
+  'ulsanhdfc': 'ulsanhd',
+  'ulsanhd': 'ulsanhd',
+  'pohangsteelers': 'pohangsteelers',
+  'anyang': 'anyang',
+  'fcanyang': 'anyang',
+  'gwangjufc': 'gwangjufc',
+  'gwangju': 'gwangjufc',
+  'suwonfc': 'suwonfc',
+  'suwon': 'suwonfc',
+  'daegufc': 'daegufc',
+  'daegu': 'daegufc',
+  'gangwonfc': 'gangwonfc',
+  'gangwon': 'gangwonfc',
+  'daejeonhanacitizen': 'daejeonhana',
+  'daejeonhana': 'daejeonhana',
+  'sangjusangmufc': 'sangjusangmu',
+  'sangjusangmu': 'sangjusangmu',
 
   // === EPL (잉글랜드 프리미어리그) ===
   'arsenal': 'arsenal',
@@ -221,26 +373,80 @@ const globalTeamMapping = {
   'wolves': 'wolverhampton',
   'wolverhampton': 'wolverhampton',
 
+  // === 아르헨티나 프리메라 디비시온 ===
+  'belgranodecordoba': 'belgrano',
+  'belgrano': 'belgrano',
+  'sanmartindesanjuan': 'sanmartndesanjuan',
+  'sanmartndesanjuan': 'sanmartndesanjuan',
+  'vlezsarsfield': 'vlezsarsfield',
+  'rosariocentral': 'rosariocentral',
+  'defensayjusticia': 'defensayjusticia',
+  'lans': 'lans',
+  'deportivoriestra': 'deportivoriestra',
+  'independiente': 'independiente',
+  'sarmiento': 'sarmiento',
+  'huracn': 'huracn',
+  'atltcotucumn': 'atltcotucumn',
+  'sanlorenzo': 'sanlorenzo',
+  'estudiantesdelaplata': 'estudiantesdelaplata',
+  'instituto': 'instituto',
+  'gimnasiayesgrimadelaplata': 'gimnasiayesgrimadelaplata',
+  'platense': 'platense',
+  'riverplate': 'riverplate',
+  'bocajuniors': 'bocajuniors',
+  'centralcrdobadesantiagodelestero': 'centralcrdobadesantiagodelestero',
+  'aldosivi': 'aldosivi',
+  'tigre': 'tigre',
+  'godoycruz': 'godoycruz',
+  'newellsoldboys': 'newellsoldboys',
+  'independienterivadavia': 'independienterivadavia',
+  'banfield': 'banfield',
+  'barracascentral': 'barracascentral',
+  'racingclub': 'racingclub',
+  'talleresdecrdoba': 'talleresdecrdoba',
+  'unin': 'unin',
+  'union': 'unin',
+  'unionsantafe': 'unin',
+  'uniondesantafe': 'unin',
+  'argentinosjuniors': 'argentinosjuniors',
+
   // === 기타 리그들 ===
   // EPL, 라리가, 분데스리가, 세리에A, J리그 등은 필요시 추가
 };
 
 /**
  * 팀명 비교용 정규화: 더 엄격한 정규화 (앞뒤 공백, 대소문자, 특수문자 모두 제거)
+ * 🎯 중앙화된 로직 사용 (하위 호환성 유지)
  */
 function normalizeTeamNameForComparison(team) {
   if (!team) return '';
   
-  let normalized = team
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9가-힣]/g, '')
-    .replace(/\s+/g, '');
+  // 1. Accent 정규화 (NFD → ASCII 변환)
+  let normalized = normalizeAccents(team);
   
-  // 북메이커 접미사 제거 (FanDuel, DraftKings, BetRivers 등)
+  // 2. 소문자 변환 및 trim
+  normalized = normalized.toLowerCase().trim();
+  
+  // 3. 지역 접미사 제거
+  normalized = normalized
+    .replace(/[-\s](sp|rj|mg|ba|rs|pr|ce|pe|go|sc|df|am|pa|pb|al|se|ro|ac|ap|rn|pi|to|ma|mt|ms)$/i, '')  // 브라질 주
+    .replace(/\s+(ba|cordoba|sanjuan|mendoza|santafe|entrerios|tucuman|plata)$/i, '');  // 아르헨티나 지역
+  
+  // 4. 확장명 및 전치사 제거
+  normalized = normalized
+    .replace(/\b(club|clube|fc|sc|cf|ac)\b/gi, '')
+    .replace(/\b(do|de|da|del|dels|de la|los|las|el|la)\b/gi, '')
+    .replace(/\b(deportivo)\b/gi, '');  // deportivo 제거 (접두사/접미사 모두)
+  
+  // 5. 모든 공백 및 특수문자 제거
+  normalized = normalized
+    .replace(/\s+/g, '')
+    .replace(/[^a-z0-9가-힣]/g, '');
+  
+  // 6. 북메이커 접미사 제거
   normalized = normalized.replace(/(fanduel|draftkings|betrivers)$/i, '');
   
-  // 글로벌 팀명 매핑 적용
+  // 7. 글로벌 팀명 매핑 적용
   if (globalTeamMapping[normalized]) {
     normalized = globalTeamMapping[normalized];
   }
@@ -526,6 +732,7 @@ function findBestTeamMatch(targetTeam, candidateTeams, threshold = 0.8) {
 }
 
 export {
+  normalizeAccents,
   normalizeTeamName,
   normalizeTeamNameForComparison,
   normalizeCategory,

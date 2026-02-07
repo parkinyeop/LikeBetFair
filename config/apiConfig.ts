@@ -254,7 +254,7 @@ export function formatCurrency(amount: number): string {
  * 배당률 포맷팅
  */
 export function formatOdds(odds: number): string {
-  return odds.toFixed(2);
+  return odds.toFixed(3);
 }
 
 // ===== 초기화 =====

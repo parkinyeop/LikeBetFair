@@ -53,6 +53,11 @@ const OddsHistory = sequelize.define('OddsHistory', {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW
+  },
+  oddsApiId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    comment: 'OddsAPI에서 제공하는 경기 고유 ID'
   }
 }, {
   tableName: 'OddsHistories',

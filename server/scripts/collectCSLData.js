@@ -1,9 +1,11 @@
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName } from '../normalizeUtils.js';
 import axios from 'axios';
+import createScriptSequelize from '../config/scriptDatabase.js';
+const sequelize = createScriptSequelize();
 
 const CSL_LEAGUE_ID = '4359';  // 중국 슈퍼리그 TheSportsDB ID
-const API_KEY = '116108';      // TheSportsDB API 키
+const API_KEY = process.env.THESPORTSDB_API_KEY || '116108';      // TheSportsDB API 키
 
 async function collectCSLData() {
   console.log('🇨🇳 중국 슈퍼리그 데이터 수집 시작...');
@@ -178,9 +180,15 @@ async function collectCSLData() {
 // 스크립트 직접 실행 시
 if (import.meta.url === `file://${process.argv[1]}`) {
   collectCSLData()
-    .then(() => {
+    .then(async () => {
+
       console.log('✅ 중국 슈퍼리그 데이터 수집 스크립트 완료');
       process.exit(0);
+    
+      // 데이터베이스 연결 종료
+      console.log('🔌 데이터베이스 연결 종료 중...');
+      await sequelize.close();
+      console.log('✅ 데이터베이스 연결 종료 완료');
     })
     .catch((error) => {
       console.error('❌ 스크립트 실행 실패:', error);

@@ -1,5 +1,8 @@
-import sequelize from '../models/sequelize.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
 import ExchangeOrder from '../models/exchangeOrderModel.js';
+
+// 스크립트 전용 Sequelize 인스턴스 생성
+const sequelize = createScriptSequelize();
 
 async function updateExistingExchangeOrders() {
   try {
@@ -41,9 +44,13 @@ async function updateExistingExchangeOrders() {
     }
     
     console.log('기존 Exchange 주문들의 배당율 정보 업데이트 완료!');
+    
+    // 데이터베이스 연결 종료
+    await sequelize.close();
     process.exit(0);
   } catch (error) {
     console.error('업데이트 중 오류 발생:', error);
+    await sequelize.close();
     process.exit(1);
   }
 }

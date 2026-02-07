@@ -6,8 +6,104 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import next from 'next';
+import fs from 'fs';
 
+// 환경변수 로드 (여러 파일 시도)
+dotenv.config({ path: '.env.local' });
+dotenv.config({ path: '.env' });
 dotenv.config();
+
+// ✅ 서버 로그 파일 기록 설정 (데일리)
+const __filename_early = fileURLToPath(import.meta.url);
+const __dirname_early = path.dirname(__filename_early);
+const logsDir = path.join(path.dirname(__dirname_early), 'logs');
+
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
+
+// 로그 파일 경로 생성 함수 (데일리)
+function getLogFilePath() {
+  const now = new Date();
+  // ✅ 로컬 시간대(한국 시간) 기준으로 날짜 생성 (UTC → KST 변환)
+  const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
+  const dateStr = kstDate.toISOString().split('T')[0]; // YYYY-MM-DD
+  return path.join(logsDir, `server-${dateStr}.log`);
+}
+
+// console.log override (터미널 + 파일 동시 기록)
+const originalLog = console.log;
+const originalError = console.error;
+const originalWarn = console.warn;
+
+console.log = (...args) => {
+  const timestamp = new Date().toISOString();
+  const message = args.map(arg =>
+    typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+  ).join(' ');
+
+  originalLog(...args); // 터미널 출력 (항상)
+
+  // 🔇 파일 기록 필터링: 반복적인 디버그 로그는 파일에 쓰지 않음
+  const skipFilePatterns = [
+    '[VerifyToken]',           // 토큰 검증 로그
+    'JWT_SECRET 상태',         // JWT 시크릿 로그
+    'GET /orders',             // 주문 조회 (10초마다)
+    'GET /balance',            // 잔액 조회 (10초마다)
+    'GET /api/exchange/orders', // 익스체인지 주문
+    'GET /api/exchange/balance',// 익스체인지 잔액
+    'GET /api/auth/balance',   // 인증 잔액
+    'GET /all-orders',         // 전체 주문
+    'GET /api/exchange/all-orders'
+  ];
+
+  const shouldSkipFile = skipFilePatterns.some(pattern => message.includes(pattern));
+
+  if (!shouldSkipFile) {
+    try {
+      fs.appendFileSync(getLogFilePath(), `[${timestamp}] [LOG] ${message}\n`);
+    } catch (err) {
+      originalError('로그 파일 쓰기 실패:', err);
+    }
+  }
+};
+
+console.error = (...args) => {
+  const timestamp = new Date().toISOString();
+  const message = args.map(arg => 
+    typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+  ).join(' ');
+  
+  originalError(...args); // 터미널 출력
+  try {
+    fs.appendFileSync(getLogFilePath(), `[${timestamp}] [ERROR] ${message}\n`);
+  } catch (err) {
+    originalError('로그 파일 쓰기 실패:', err);
+  }
+};
+
+console.warn = (...args) => {
+  const timestamp = new Date().toISOString();
+  const message = args.map(arg => 
+    typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+  ).join(' ');
+  
+  originalWarn(...args); // 터미널 출력
+  try {
+    fs.appendFileSync(getLogFilePath(), `[${timestamp}] [WARN] ${message}\n`);
+  } catch (err) {
+    originalError('로그 파일 쓰기 실패:', err);
+  }
+};
+
+console.log('✅ [Server] 데일리 로그 파일 기록 활성화:', getLogFilePath());
+
+// 환경 변수 확인
+console.log('[환경변수] ODDS_API_KEY:', process.env.ODDS_API_KEY ? '설정됨' : '미설정');
+console.log('[환경변수] THE_ODDS_API_KEY:', process.env.THE_ODDS_API_KEY ? '설정됨' : '미설정');
+console.log('[환경변수] THESPORTSDB_API_KEY:', process.env.THESPORTSDB_API_KEY ? '설정됨' : '미설정');
+console.log('[환경변수] JWT_SECRET:', process.env.JWT_SECRET ? '설정됨' : '미설정');
+console.log('[환경변수] SYSTEM_ADMIN_ID:', process.env.SYSTEM_ADMIN_ID ? '설정됨' : '미설정');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,7 +119,23 @@ const sequelize = new Sequelize({
   username: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   dialect: 'postgres',
-  logging: false
+  logging: false,
+  pool: {
+    max: 20,        // 최대 연결 수 (기본 5 → 20으로 증가)
+    min: 2,         // 최소 연결 수 유지 (항상 2개 연결 유지)
+    acquire: 60000, // 연결 획득 타임아웃 (60초)
+    idle: 30000,    // 유휴 연결 타임아웃 (30초 후 반환)
+    evict: 1000     // 연결 제거 체크 간격 (1초마다)
+  },
+  dialectOptions: {
+    connectTimeout: 60000,  // 연결 타임아웃 (60초)
+    keepAlive: true,        // Keep-Alive 활성화
+    keepAliveInitialDelayMillis: 10000  // Keep-Alive 초기 지연 (10초)
+  },
+  retry: {
+    max: 3,         // 재시도 최대 횟수
+    timeout: 3000   // 재시도 대기 시간 (3초)
+  }
 });
 
 // 글로벌 변수로 DB 연결 상태 관리
@@ -44,8 +156,14 @@ import authRoutes from './routes/auth.js';
 import betRoutes from './routes/bet.js';
 import adminRoutes from './routes/admin.js';
 import exchangeRoutes from './routes/exchange.js';
+import exchangeMultibetRoutes from './routes/exchangeMultibetRoutes.js';
+import manualGameResultRoutes from './routes/manualGameResult.js';
+import manualOddsRoutes from './routes/manualOdds.js';
+import mypageRoutes from './routes/mypage.js';
 
-
+// 🆕 정산 스케줄러 활성화
+import './jobs/settlementScheduler.js';
+console.log('✅ [Server] 정산 스케줄러가 로드되었습니다.');
 
 const app = express();
 
@@ -65,10 +183,22 @@ app.use((req, res, next) => {
   next();
 });
 
-// 요청 로깅 미들웨어
+// 요청 로깅 미들웨어 (보안 강화)
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) {
-    console.log(`[API] ${req.method} ${req.path}`, req.body);
+    // 민감한 정보가 포함된 경로는 요청 본문을 로그하지 않음
+    const sensitivePaths = ['/api/auth/login', '/api/auth/register'];
+    const isSensitivePath = sensitivePaths.includes(req.path);
+    
+    if (isSensitivePath) {
+      console.log(`[API] ${req.method} ${req.path}`, {
+        hasBody: !!req.body,
+        bodyKeys: req.body ? Object.keys(req.body) : [],
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      console.log(`[API] ${req.method} ${req.path}`, req.body);
+    }
   }
   next();
 });
@@ -101,13 +231,32 @@ app.get('/health', (req, res) => {
 //   res.send("Server is running");
 // });
 
-// API Routes (순서 중요!)
+// API Routes (순서 중요! 구체적인 경로를 먼저 등록)
+// 🔍 디버깅: 모든 /api/admin 요청 로깅
+app.use('/api/admin', (req, res, next) => {
+  console.log(`🔍 [Admin API] ${req.method} ${req.url}`);
+  next();
+});
+
+// 🔍 Exchange API 요청 로깅 추가
+app.use('/api/exchange', (req, res, next) => {
+  console.log(`🔍 [Exchange API] ${req.method} ${req.url}`);
+  if (req.method === 'POST') {
+    console.log(`📦 [Exchange API] Request Body:`, JSON.stringify(req.body));
+  }
+  next();
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/bet', betRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin', manualGameResultRoutes);
+app.use('/api/admin', manualOddsRoutes);
 app.use('/api/game-results', gameResultRoutes);
-app.use('/api/exchange', exchangeRoutes);
+app.use('/api/exchange/multibet', exchangeMultibetRoutes); // 구체적인 경로를 먼저 등록
+app.use('/api/exchange', exchangeRoutes); // 일반적인 경로를 나중에 등록
 app.use('/api/odds', oddsRoutes);
+app.use('/api/mypage', mypageRoutes);
 
 // API 라우트 디버깅
 app.use('/api/*', (req, res, next) => {
@@ -140,15 +289,7 @@ app.all('*', (req, res) => {
   return handle(req, res);
 });
 
-// 스케줄러 초기화
-// 빌드 환경에서는 스케줄러 비활성화 (타임아웃 방지)
-if (process.env.NODE_ENV !== 'production' || process.env.DISABLE_SCHEDULER !== 'true') {
-  import('./jobs/oddsUpdateJob.js').catch(err => {
-    console.log('[스케줄러] 빌드 환경에서 스케줄러 로드 실패 (정상):', err.message);
-  });
-} else {
-  console.log('[스케줄러] 빌드 환경에서 스케줄러 비활성화됨');
-}
+// 스케줄러 초기화는 startServer 함수 내부에서 처리
 
 // 배팅 결과 업데이트는 oddsUpdateJob.js에서만 처리 (중복 방지)
 
@@ -157,6 +298,9 @@ import { setupSeasonStatusScheduler } from './services/seasonStatusUpdater.js';
 
 // Exchange WebSocket 서비스 import
 import exchangeWebSocketService from './services/exchangeWebSocketService.js';
+
+// 액션 아이템 모니터링 Job import
+import actionItemMonitorJob from './jobs/actionItemMonitorJob.js';
 
 // 데이터베이스 연결 및 서버 시작
 const PORT = process.env.PORT || (() => {
@@ -200,6 +344,11 @@ async function startServer() {
     
     // 데이터베이스 동기화 및 초기화
     console.log('[시작] 데이터베이스 테이블 동기화...');
+    
+    // 모든 모델 import (테이블 생성을 위해)
+    const Settings = (await import('./models/settingsModel.js')).default;
+    console.log('✅ Settings 모델 로드됨:', Settings.name);
+    
     await sequelize.sync({ alter: true });
     console.log('✅ Database tables synchronized successfully.');
     
@@ -277,6 +426,20 @@ async function startServer() {
     await nextApp.prepare();
     console.log('✅ Next.js 앱 준비 완료');
     
+    // 스케줄러 초기화
+    console.log('[시작] 스케줄러 초기화 중...');
+    if (process.env.NODE_ENV !== 'production' || process.env.DISABLE_SCHEDULER !== 'true') {
+      try {
+        await import('./jobs/oddsUpdateJob.js');
+        console.log('[스케줄러] ✅ 스케줄러 로드 성공');
+      } catch (err) {
+        console.error('[스케줄러] ❌ 스케줄러 로드 실패:', err.message);
+        console.error('[스케줄러] 스택 트레이스:', err.stack);
+      }
+    } else {
+      console.log('[스케줄러] 빌드 환경에서 스케줄러 비활성화됨');
+    }
+    
     // 서버 시작
     console.log(`[시작] Express 서버 시작 중... (포트: ${PORT})`);
     const server = app.listen(PORT, '0.0.0.0', () => {
@@ -287,6 +450,12 @@ async function startServer() {
       console.log('[시작] Exchange WebSocket 서비스 초기화...');
       exchangeWebSocketService.initialize(server);
       console.log('✅ Exchange WebSocket 서비스 초기화 완료');
+
+      // 액션 아이템 모니터링 시스템 초기화
+      console.log('[시작] 액션 아이템 모니터링 시스템 초기화...');
+      actionItemMonitorJob.setWebSocketService(exchangeWebSocketService);
+      actionItemMonitorJob.start();
+      console.log('✅ 액션 아이템 모니터링 시스템 초기화 완료');
       
       // 기본 계정 생성 (비동기로 처리)
       if (process.env.NODE_ENV === 'production') {
@@ -336,6 +505,7 @@ async function startServer() {
 async function createDefaultAccounts() {
   try {
     const User = (await import('./models/userModel.js')).default;
+    const Settings = (await import('./models/settingsModel.js')).default;
     const bcrypt = await import('bcryptjs');
     
     // 관리자 계정 확인 및 생성

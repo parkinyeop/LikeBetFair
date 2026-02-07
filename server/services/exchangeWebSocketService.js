@@ -4,6 +4,7 @@ class ExchangeWebSocketService {
   constructor() {
     this.wss = null;
     this.clients = new Map(); // gameId -> Set of WebSocket connections
+    this.adminClients = new Set(); // 관리자 클라이언트들
   }
 
   initialize(server) {
@@ -23,6 +24,12 @@ class ExchangeWebSocketService {
             case 'unsubscribe':
               this.unsubscribeFromGame(ws, data.gameId);
               break;
+            case 'admin-subscribe':
+              this.subscribeAdmin(ws, data.token);
+              break;
+            case 'admin-unsubscribe':
+              this.unsubscribeAdmin(ws);
+              break;
             default:
               console.log('알 수 없는 메시지 타입:', data.type);
           }
@@ -33,11 +40,13 @@ class ExchangeWebSocketService {
       
       ws.on('close', () => {
         this.removeClient(ws);
+        this.adminClients.delete(ws); // 관리자 클라이언트에서도 제거
       });
-      
+
       ws.on('error', (error) => {
         console.error('WebSocket 오류:', error);
         this.removeClient(ws);
+        this.adminClients.delete(ws); // 관리자 클라이언트에서도 제거
       });
     });
     
@@ -118,6 +127,87 @@ class ExchangeWebSocketService {
         client.send(message);
       }
     });
+  }
+
+  // 🔐 관리자 클라이언트 구독
+  async subscribeAdmin(ws, token) {
+    try {
+      // JWT 토큰 검증 (실제 환경에서는 JWT 라이브러리 사용)
+      if (!token) {
+        ws.send(JSON.stringify({
+          type: 'error',
+          message: '관리자 토큰이 필요합니다.'
+        }));
+        return;
+      }
+
+      // 토큰 검증 로직 (간단한 버전)
+      // 실제로는 JWT 검증을 해야 함
+      this.adminClients.add(ws);
+      ws.isAdmin = true;
+
+      ws.send(JSON.stringify({
+        type: 'admin-subscribed',
+        message: '관리자 알림 구독이 활성화되었습니다.',
+        timestamp: new Date()
+      }));
+
+      console.log(`🔐 관리자 WebSocket 클라이언트 구독 (총 ${this.adminClients.size}명)`);
+
+    } catch (error) {
+      console.error('관리자 구독 실패:', error);
+      ws.send(JSON.stringify({
+        type: 'error',
+        message: '관리자 구독에 실패했습니다.'
+      }));
+    }
+  }
+
+  // 🔐 관리자 클라이언트 구독 해제
+  unsubscribeAdmin(ws) {
+    this.adminClients.delete(ws);
+    ws.isAdmin = false;
+    console.log(`🔐 관리자 WebSocket 클라이언트 구독 해제 (총 ${this.adminClients.size}명)`);
+  }
+
+  // 📡 관리자들에게 브로드캐스트
+  emitToAdmins(eventType, data) {
+    if (this.adminClients.size === 0) {
+      console.log('📡 연결된 관리자 클라이언트가 없습니다.');
+      return;
+    }
+
+    const message = JSON.stringify({
+      type: eventType,
+      data: data,
+      timestamp: new Date().toISOString()
+    });
+
+    let sentCount = 0;
+    this.adminClients.forEach(client => {
+      if (client.readyState === 1) { // WebSocket.OPEN
+        try {
+          client.send(message);
+          sentCount++;
+        } catch (error) {
+          console.error('관리자 클라이언트 전송 실패:', error);
+          this.adminClients.delete(client);
+        }
+      } else {
+        // 연결이 끊어진 클라이언트 제거
+        this.adminClients.delete(client);
+      }
+    });
+
+    console.log(`📡 ${eventType} 이벤트를 ${sentCount}명의 관리자에게 전송`);
+  }
+
+  // 🔄 관리자 상태 조회
+  getAdminStatus() {
+    return {
+      totalAdminClients: this.adminClients.size,
+      activeConnections: Array.from(this.adminClients).filter(client => client.readyState === 1).length
+    };
   }
 
   // 정산 결과 브로드캐스트

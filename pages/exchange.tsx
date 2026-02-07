@@ -1,619 +1,2284 @@
-import React, { useState, useEffect } from 'react';
-import { useExchange, ExchangeOrder } from '../hooks/useExchange';
-import { useAuth } from '../contexts/AuthContext';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { getGameInfo, getSeasonInfo, getSeasonStatusStyle, getSeasonStatusBadge } from '../config/sportsMapping';
+import { SPORTS_TREE, getSportKey, getSeasonInfo, getSeasonStatusBadge, getSeasonStatusStyle, SPORT_CATEGORIES, getDisplayNameFromSportKey } from '../config/sportsMapping';
+import { API_CONFIG, buildApiUrl } from '../config/apiConfig';
+import { normalizeTeamNameForComparison } from '../utils/matchSportsbookGame';
+import { convertUtcToLocal, getCurrentLocalTime } from '../utils/timeUtils';
+import { useExchangeContext } from '../contexts/ExchangeContext';
+import { useExchange } from '../hooks/useExchange';
+import { applyExchangeReturnRate as applyExchangeReturnRateUtil } from '../utils/oddsCalculator';
+import { formatHandicap, groupHandicapsByPoint, filterHalfPointHandicaps } from '../utils/handicapUtils';
+import ExchangeMarketBoard from '../components/ExchangeMarketBoard';
 
-// 간단한 Toast 알림 컴포넌트
-const Toast = ({ message, type = 'info', onClose }: { message: string; type?: 'info' | 'warning' | 'success'; onClose: () => void }) => {
-  useEffect(() => {
-    const timer = setTimeout(onClose, 5000);
-    return () => clearTimeout(timer);
-  }, [onClose]);
-
-  const bgColor = type === 'warning' ? 'bg-yellow-100 border-yellow-400' : 
-                  type === 'success' ? 'bg-green-100 border-green-400' : 
-                  'bg-blue-100 border-blue-400';
-  const textColor = type === 'warning' ? 'text-yellow-800' : 
-                   type === 'success' ? 'text-green-800' : 
-                   'text-blue-800';
-
-  return (
-    <div className={`fixed top-4 right-4 z-50 p-4 border rounded-lg shadow-lg ${bgColor} ${textColor} max-w-sm`}>
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">{message}</span>
-        <button onClick={onClose} className="ml-2 text-gray-500 hover:text-gray-700">
-          ×
-        </button>
-      </div>
-    </div>
-  );
-};
-
-export default function ExchangePage() {
-  const { isLoggedIn, token, userId } = useAuth(); // userId 포함
-  const { fetchOrderbook, placeMatchOrder, orders } = useExchange();
+export default function Exchange() {
   const router = useRouter();
-  const [orderbook, setOrderbook] = useState<ExchangeOrder[]>([]);
-  const [gameInfo, setGameInfo] = useState<any>(null);
-  const [sportGameCounts, setSportGameCounts] = useState<{[key: string]: number}>({});
-  const [toast, setToast] = useState<{ message: string; type: 'info' | 'warning' | 'success' } | null>(null);
+  const { 
+    selectedBet, 
+    setSelectedBet,
+    // 🆕 멀티배팅 관련 상태와 함수들
+    multiBetSelections,
+    addMultiBetSelection,
+    removeMultiBetSelection,
+    clearMultiBet,
+    isMultiBetSelected
+  } = useExchangeContext();
+  const [todayGames, setTodayGames] = useState<Record<string, any[]>>({});
+  const [todayLoading, setTodayLoading] = useState(false);
+  const [todayFlatGames, setTodayFlatGames] = useState<any[]>([]);
+  const [viewMode, setViewMode] = useState<'today' | 'league'>('today');
+  const [selectedMainCategory, setSelectedMainCategory] = useState<string>('Soccer');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [currentSportKey, setCurrentSportKey] = useState<string>('');
+  const [games, setGames] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // 🆕 마켓 체크박스 상태 추가
+  const [todayGameMarkets, setTodayGameMarkets] = useState<{[gameId: string]: Set<string>}>({});
+  const [leagueGameMarkets, setLeagueGameMarkets] = useState<{[gameId: string]: Set<string>}>({});
+  
+  // 🆕 Exchange 주문 데이터 상태 추가
+  const [exchangeOrders, setExchangeOrders] = useState<any[]>([]);
+  const [oddsReturnRateSettings, setOddsReturnRateSettings] = useState({ returnRate: 0.95, enabled: true });
 
-  // 취소된 주문 확인 및 알림
-  const checkCancelledOrders = async () => {
-    if (!isLoggedIn || !token) return;
-    
+  const { fetchAllOpenOrders } = useExchange();
+  
+  // 🆕 Exchange 주문 데이터 로드 함수
+  const loadExchangeOrders = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050'}/api/exchange/orders?status=cancelled`, {
+      const orders = await fetchAllOpenOrders();
+      setExchangeOrders(orders);
+      console.log('🔍 Exchange 주문 데이터 로드:', orders.length, '개');
+    } catch (error) {
+      console.error('❌ Exchange 주문 데이터 로드 실패:', error);
+    }
+  };
+  
+  // 🆕 관리자 설정에서 환수율 설정 가져오기
+  const loadOddsReturnRateSettings = async () => {
+    try {
+      console.log('🔍 Exchange 환수율 설정 로드 시도...');
+      const response = await fetch(buildApiUrl('/api/admin/public-settings/exchange-odds-return-rate'), {
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
+      console.log('🔍 Exchange 환수율 설정 응답 상태:', response.status);
+      
       if (response.ok) {
-        const orders = await response.json();
-        
-        orders.forEach((order: any) => {
-          if (order.settlementNote?.includes('매칭되지 않아')) {
-            setToast({
-              type: 'warning',
-              message: `${order.homeTeam} vs ${order.awayTeam} 주문이 매칭되지 않아 취소되었습니다.`
-            });
-          }
-        });
-      }
-    } catch (error) {
-      console.error('취소된 주문 확인 중 오류:', error);
-    }
-  };
-
-  // 페이지 로드 시 취소된 주문 확인
-  useEffect(() => {
-    checkCancelledOrders();
-  }, [isLoggedIn]);
-
-  // 각 스포츠의 경기 개수 가져오기
-  useEffect(() => {
-    const fetchSportGameCounts = async () => {
-      // 스포츠북의 모든 리그 가져오기 (사이드바 SPORTS_TREE 순서와 일치)
-      const sports = [
-        // 축구
-        { id: 'kleague', sport: 'soccer_korea_kleague1' },
-        { id: 'jleague', sport: 'soccer_japan_j_league' },
-        { id: 'seriea', sport: 'soccer_italy_serie_a' },
-        { id: 'brasileirao', sport: 'soccer_brazil_campeonato' },
-        { id: 'mls', sport: 'soccer_usa_mls' },
-        { id: 'argentina', sport: 'soccer_argentina_primera_division' },
-        { id: 'csl', sport: 'soccer_china_superleague' },
-        { id: 'laliga', sport: 'soccer_spain_primera_division' },
-        { id: 'bundesliga', sport: 'soccer_germany_bundesliga' },
-        // 농구
-        { id: 'nba', sport: 'basketball_nba' },
-        { id: 'kbl', sport: 'basketball_kbl' },
-        // 야구
-        { id: 'mlb', sport: 'baseball_mlb' },
-        { id: 'kbo', sport: 'baseball_kbo' },
-        // 미식축구
-        { id: 'nfl', sport: 'americanfootball_nfl' }
-      ];
-
-      const counts: {[key: string]: number} = {};
-      
-      for (const { id, sport } of sports) {
-        try {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050'}/api/odds/${sport}`);
-          if (response.ok) {
-            const data = await response.json();
-            // 현재 시간 이후의 경기만 카운트
-            const now = new Date();
-            const futureGames = data.filter((game: any) => {
-              const gameTime = new Date(game.commence_time);
-              return gameTime > now;
-            });
-            counts[id] = futureGames.length;
-          } else {
-            counts[id] = 0;
-          }
-        } catch (error) {
-          console.error(`Error fetching ${sport} games:`, error);
-          counts[id] = 0;
-        }
-      }
-      
-      setSportGameCounts(counts);
-    };
-
-    fetchSportGameCounts();
-    
-    // 5분마다 경기 개수 업데이트 (백그라운드에서도 동작하도록 강화)
-    const interval = setInterval(() => {
-      console.log('[Exchange] 주기적 스포츠 게임 수 갱신 시도');
-      fetchSportGameCounts();
-    }, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Page Visibility API - 탭 활성화시 즉시 갱신
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        console.log('[Exchange] 탭 활성화 - 스포츠 게임 수 즉시 갱신');
-        const fetchSportGameCounts = async () => {
-          // 기존 코드와 동일한 sports 배열 사용
-          const sports = [
-            // 축구
-            { id: 'kleague', sport: 'soccer_korea_kleague1' },
-            { id: 'jleague', sport: 'soccer_japan_j_league' },
-            { id: 'seriea', sport: 'soccer_italy_serie_a' },
-            { id: 'brasileirao', sport: 'soccer_brazil_campeonato' },
-            { id: 'mls', sport: 'soccer_usa_mls' },
-            { id: 'argentina', sport: 'soccer_argentina_primera_division' },
-            { id: 'csl', sport: 'soccer_china_superleague' },
-            { id: 'laliga', sport: 'soccer_spain_primera_division' },
-            { id: 'bundesliga', sport: 'soccer_germany_bundesliga' },
-            // 농구
-            { id: 'nba', sport: 'basketball_nba' },
-            { id: 'kbl', sport: 'basketball_kbl' },
-            // 야구
-            { id: 'mlb', sport: 'baseball_mlb' },
-            { id: 'kbo', sport: 'baseball_kbo' },
-            // 미식축구
-            { id: 'nfl', sport: 'americanfootball_nfl' }
-          ];
-
-          const counts: {[key: string]: number} = {};
-          
-          for (const { id, sport } of sports) {
-            try {
-              const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050'}/api/odds/${sport}`);
-              if (response.ok) {
-                const data = await response.json();
-                // 현재 시간 이후의 경기만 카운트
-                const now = new Date();
-                const futureGames = data.filter((game: any) => {
-                  const gameTime = new Date(game.commence_time);
-                  return gameTime > now;
-                });
-                counts[id] = futureGames.length;
-              } else {
-                counts[id] = 0;
-              }
-            } catch (error) {
-              console.error(`Error fetching ${sport} games:`, error);
-              counts[id] = 0;
-            }
-          }
-          
-          setSportGameCounts(counts);
-        };
-        fetchSportGameCounts();
-      }
-    };
-
-    if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }
-  }, []);
-
-  // 대표 경기의 호가 데이터 로드 (실제 데이터가 있는 게임 ID)
-  useEffect(() => {
-    if (isLoggedIn && token) {
-      // 실제 오픈 상태인 주문들의 게임 ID를 동적으로 가져오기
-      const fetchActiveGameId = async () => {
-        try {
-          // 먼저 사용자의 열린 주문을 확인
-          const userOpenOrders = orders.filter(order => order.status === 'open');
-          
-          if (userOpenOrders.length > 0) {
-            // 사용자의 열린 주문이 있으면 해당 gameId 사용
-            const activeGameId = userOpenOrders[0].gameId;
-            console.log('🏠 Exchange 홈 - 사용자 열린 주문에서 활성 게임 ID:', activeGameId);
-            const info = getGameInfo(activeGameId);
-            setGameInfo(info);
-            
-            fetchOrderbook(activeGameId, '승패', 0).then((orders) => {
-              console.log('🏠 Exchange 홈 - 호가 데이터 로드:', orders);
-              setOrderbook(orders);
-            });
-          } else {
-            // 사용자의 열린 주문이 없으면 전체 열린 주문 조회
-            console.log('🏠 Exchange 홈 - 사용자 열린 주문 없음, 전체 열린 주문 조회');
-            
-            // 전체 열린 주문 조회
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050'}/api/exchange/all-orders`, {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              }
-            });
-            
-            if (response.ok) {
-              const allOrders = await response.json();
-              if (allOrders.length > 0) {
-                const activeGameId = allOrders[0].gameId;
-                console.log('🏠 Exchange 홈 - 전체 열린 주문에서 활성 게임 ID:', activeGameId);
-                const info = getGameInfo(activeGameId);
-                setGameInfo(info);
-                
-                fetchOrderbook(activeGameId, '승패', 0).then((orders) => {
-                  console.log('🏠 Exchange 홈 - 호가 데이터 로드:', orders);
-                  setOrderbook(orders);
-                });
-              } else {
-                console.log('🏠 Exchange 홈 - 전체 열린 주문도 없음');
-                setOrderbook([]);
-                setGameInfo(null);
-              }
-            } else {
-              console.log('🏠 Exchange 홈 - 전체 열린 주문 조회 실패');
-              setOrderbook([]);
-              setGameInfo(null);
-            }
-          }
-        } catch (error) {
-          console.error('활성 게임 ID 가져오기 실패:', error);
-          // 에러 시 기본 게임 ID 사용
-          const defaultGameId = 'bae04692-964e-46f5-bc45-386225b7ec50';
-          const info = getGameInfo(defaultGameId);
-          setGameInfo(info);
-          
-          fetchOrderbook(defaultGameId, '승패', 0).then((orders) => {
-            console.log('🏠 Exchange 홈 - 기본 호가 데이터 로드:', orders);
-            setOrderbook(orders);
-          });
-        }
-      };
-      
-      fetchActiveGameId();
-    } else {
-      setOrderbook([]);
-      setGameInfo(null);
-    }
-  }, [isLoggedIn, token, fetchOrderbook, orders]);
-
-  // 매치 주문 핸들러
-  const handleMatchOrder = async (existingOrder: ExchangeOrder) => {
-    if (!isLoggedIn || !token) {
-      alert('로그인이 필요합니다.');
-      return;
-    }
-
-    // 프론트엔드에서도 자기 주문인지 한 번 더 확인
-    if (String(userId) === String(existingOrder.userId)) {
-      alert('자신의 주문과는 매칭할 수 없습니다.');
-      console.log('🚫 프론트엔드 방어: 자기 주문 매칭 시도 차단');
-      return;
-    }
-
-    try {
-      // 기존 주문의 반대편으로 매치 주문 생성
-      const oppositeSide: 'back' | 'lay' = existingOrder.side === 'back' ? 'lay' : 'back';
-      const matchPrice = existingOrder.price; // 기존 주문 가격으로 매치
-      
-      const orderData = {
-        gameId: existingOrder.gameId,
-        market: existingOrder.market,
-        line: existingOrder.line,
-        side: oppositeSide,
-        price: matchPrice,
-        amount: existingOrder.amount // 전액 매치
-      };
-
-      console.log('🎯 홈에서 매치 주문 실행:', orderData);
-      console.log('🎯 매칭 대상 주문 userId:', existingOrder.userId, '내 userId:', userId);
-      
-      const result = await placeMatchOrder(orderData);
-      
-      if (result.success) {
-        alert(`✅ 매치 성공!\n매치된 금액: ${result.totalMatched.toLocaleString()}원\n매치 개수: ${result.matches}개`);
-        
-        // 호가창 데이터 새로고침 (동적으로 활성 게임 ID 가져오기)
-        try {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050'}/api/exchange/orderbook-test?gameId=bae04692-964e-46f5-bc45-386225b7ec50&market=승패&line=0`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          if (response.ok) {
-            const data = await response.json();
-            const orders = data.orders || [];
-            const activeGameId = orders.length > 0 ? orders[0].gameId : 'bae04692-964e-46f5-bc45-386225b7ec50';
-            const updatedOrderbook = await fetchOrderbook(activeGameId, '승패', 0);
-            setOrderbook(updatedOrderbook);
-          }
-        } catch (error) {
-          console.error('호가창 새로고침 실패:', error);
+        const data = await response.json();
+        console.log('🔍 Exchange 환수율 설정 응답 데이터:', data);
+        if (data.success) {
+          setOddsReturnRateSettings(data.data);
+          console.log('✅ Exchange 환수율 설정 로드 성공:', data.data);
+        } else {
+          console.log('❌ Exchange 환수율 설정 응답 실패:', data.error);
         }
       } else {
-        alert('매치 실패: ' + (result.error || '알 수 없는 오류'));
+        const errorText = await response.text();
+        console.log('❌ Exchange 환수율 설정 HTTP 오류:', response.status, errorText);
       }
     } catch (error) {
-      console.error('❌ 홈에서 매치 주문 오류:', error);
-      alert('매치 주문 중 오류가 발생했습니다: ' + (error as Error).message);
+      console.error('❌ Exchange 환수율 설정 로드 실패:', error);
+    }
+  };
+  
+  // 🆕 Exchange 배당율에 환수율 적용 (내재 확률 기반 정교한 계산)
+  const applyExchangeReturnRate = (originalOdds: number, allOdds: number[] = [], returnRate?: number) => {
+    if (!originalOdds || !oddsReturnRateSettings.enabled) {
+      return originalOdds;
+    }
+
+    // 환수율 파라미터가 없으면 설정에서 가져오기
+    const effectiveReturnRate = returnRate || oddsReturnRateSettings.returnRate;
+    
+    // utils 함수 사용
+    const adjustedOdds = applyExchangeReturnRateUtil(originalOdds, allOdds, effectiveReturnRate);
+    
+    return adjustedOdds;
+  };
+  
+  // 🎯 버튼이 선택되었는지 확인하는 함수 - Exchange 기존 로직 유지
+  const isButtonSelected = (gameId: string, buttonKey: string) => {
+    // buttonKey에서 팀명과 마켓 추출 (예: "승패_New England Revolution" -> market: "승패", team: "New England Revolution")
+    const [market, team] = buttonKey.split('_', 2);
+    
+    // 🆕 1. selectedBet 확인 (단일 베팅 선택)
+    if (selectedBet && selectedBet.gameId === gameId && 
+        selectedBet.market === market && selectedBet.team === team) {
+      console.log('🎯 isButtonSelected: selectedBet으로 선택됨');
+      return true;
+    }
+    
+    // 🆕 2. 멀티배팅 선택 상태 확인
+    const isMultiBet = isMultiBetSelected(gameId, market, team);
+    if (isMultiBet) {
+      console.log('🎯 isButtonSelected: 멀티배팅으로 선택됨');
+      return true;
+    }
+    
+    // console.log('🎯 isButtonSelected: 선택되지 않음', { 
+    //   gameId, buttonKey, market, team, 
+    //   selectedBet: selectedBet ? '있음' : '없음',
+    //   isMultiBet
+    // });
+    return false;
+  };
+
+  // 🎯 버튼 클릭 핸들러 - 토글 기능 개선
+  const handleButtonClick = (game: any, team: string, price: number, market: string = '승패') => {
+    console.log('🎯 버튼 클릭됨:', { game, team, price, market });
+    
+    console.log('🎯 현재 selectedBet 상태:', selectedBet);
+    console.log('🎯 game.id:', game.id, '타입:', typeof game.id);
+    
+    // 🆕 1. selectedBet에서 같은 베팅인지 확인
+    const isSelectedBet = selectedBet && selectedBet.gameId === game.id && selectedBet.team === team && selectedBet.market === market;
+    
+    // 🆕 2. 멀티배팅에서 같은 베팅인지 확인
+    const isMultiBetSelected = multiBetSelections.some(
+      (mb) => mb.gameId === game.id && mb.team === team && mb.market === market
+    );
+    
+    // 🆕 3. 토글 로직: 이미 선택된 베팅이면 해제, 아니면 선택
+    if (isSelectedBet || isMultiBetSelected) {
+      console.log('🎯 동일한 베팅 재클릭 - 선택 해제');
+      
+      // selectedBet에서 제거
+      if (isSelectedBet) {
+        setSelectedBet(null);
+      }
+      
+      // 멀티배팅에서도 제거
+      if (isMultiBetSelected) {
+        removeMultiBetSelection(game.id, market, team);
+      }
+      
+      console.log('🎯 베팅 선택 해제 완료');
+    } else {
+      console.log('🎯 새로운 베팅 선택');
+      
+      // 🆕 익스체인지에서 승패+핸디캡 조합 제한 (스포츠북과 동일)
+      const isWinLoss = market === '승패';
+      const isHandicap = market === '핸디캡';
+      
+      // 승패 선택 시: 같은 경기의 핸디캡 제거
+      if (isWinLoss) {
+        const handicapSelections = multiBetSelections.filter(mb => 
+          mb.gameId === game.id && mb.market === '핸디캡'
+        );
+        handicapSelections.forEach(mb => {
+          console.log('🎯 승패 선택으로 인한 핸디캡 제거:', mb.team);
+          removeMultiBetSelection(mb.gameId, mb.market, mb.team);
+        });
+        
+        // selectedBet에서도 핸디캡 제거
+        if (selectedBet && selectedBet.gameId === game.id && selectedBet.market === '핸디캡') {
+          console.log('🎯 승패 선택으로 인한 selectedBet 핸디캡 제거:', selectedBet.team);
+          setSelectedBet(null);
+        }
+      }
+      
+      // 핸디캡 선택 시: 같은 경기의 승패 제거
+      if (isHandicap) {
+        const winLossSelections = multiBetSelections.filter(mb => 
+          mb.gameId === game.id && mb.market === '승패'
+        );
+        winLossSelections.forEach(mb => {
+          console.log('🎯 핸디캡 선택으로 인한 승패 제거:', mb.team);
+          removeMultiBetSelection(mb.gameId, mb.market, mb.team);
+        });
+        
+        // selectedBet에서도 승패 제거
+        if (selectedBet && selectedBet.gameId === game.id && selectedBet.market === '승패') {
+          console.log('🎯 핸디캡 선택으로 인한 selectedBet 승패 제거:', selectedBet.team);
+          setSelectedBet(null);
+        }
+      }
+      
+      // 🆕 같은 마켓의 기존 선택 제거 (승패+총점, 총점+핸디캡은 허용)
+      if (selectedBet && selectedBet.gameId === game.id && selectedBet.market === market) {
+        console.log('🎯 같은 경기+같은 마켓의 기존 선택 제거:', selectedBet.team);
+        setSelectedBet(null);
+      }
+      
+      // 멀티배팅에서 같은 경기+같은 마켓 선택만 제거
+      const sameGameMarketSelections = multiBetSelections.filter(mb => 
+        mb.gameId === game.id && mb.market === market
+      );
+      sameGameMarketSelections.forEach(mb => {
+        console.log('🎯 멀티배팅에서 같은 경기+같은 마켓 선택 제거:', mb.team);
+        removeMultiBetSelection(mb.gameId, mb.market, mb.team);
+      });
+      
+      // 새로운 베팅 선택
+      const newSelectedBet = {
+        team,
+        price,
+        type: 'back' as const,
+        gameId: game.id,
+        market: market,
+        homeTeam: game.home_team,
+        awayTeam: game.away_team,
+        commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString() // UTC로 변환
+      };
+      console.log('🎯 새 베팅 선택할 객체:', newSelectedBet);
+      setSelectedBet(newSelectedBet);
+      
+      // 🆕 멀티배팅에도 자동 추가
+      const multiBetSelection = {
+        orderId: Date.now(), // 임시 ID
+        gameId: game.id,
+        homeTeam: game.home_team,
+        awayTeam: game.away_team,
+        market: market,
+        selection: team,
+        team: team, // 🆕 team 필드 추가
+        side: 'back' as const,
+        odds: price,
+        price: price,
+        amount: 0, // 사용자가 입력할 금액
+        commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString(), // UTC로 변환
+        sportKey: game.sport_key || 'soccer',
+        desc: `${game.home_team} vs ${game.away_team}`, // 🆕 desc 필드 추가
+        option: market === 'Over/Under' ? team : undefined, // 🆕 option 필드 추가
+        point: market === 'Over/Under' ? (() => {
+          // Over/Under의 경우 point 추출
+          const match = team.match(/(\d+\.?\d*)/);
+          return match ? match[1] : undefined;
+        })() : undefined // 🆕 point 필드 추가
+      };
+      addMultiBetSelection(multiBetSelection);
+      console.log('🎯 새 베팅 선택 완료 및 멀티배팅에 추가:', { team, price, market });
     }
   };
 
-  if (orderbook.length > 0) {
-    const order = orderbook[0];
-    // order 객체에서 직접 정보 추출
-    const info = {
-      homeTeam: order.homeTeam || 'Unknown',
-      awayTeam: order.awayTeam || 'Unknown',
-      gameDate: order.commenceTime ? new Date(order.commenceTime).toLocaleString('ko-KR') : 'Unknown',
-      sport: order.sportKey ? order.sportKey.split('_')[0] : 'Unknown',
-      displayName: `${order.homeTeam || 'Unknown'} vs ${order.awayTeam || 'Unknown'}`
-    };
-    console.log('실제 order 객체:', JSON.stringify(order, null, 2));
-    console.log('getGameInfo 반환:', info);
-  }
+  // 🆕 초기 마켓 설정 함수 - 게임이 로드될 때마다 기본값 설정
+  const initializeGameMarkets = (gameId: string, isToday: boolean = true) => {
+    if (isToday) {
+      setTodayGameMarkets(prev => {
+        if (!prev[gameId]) {
+          return { ...prev, [gameId]: new Set(['승패']) };
+        }
+        return prev;
+      });
+    } else {
+      setLeagueGameMarkets(prev => {
+        if (!prev[gameId]) {
+          return { ...prev, [gameId]: new Set(['승패']) };
+        }
+        return prev;
+      });
+    }
+  };
 
-  return (
-    <div className="h-full flex flex-col">
-      {/* Toast 알림 */}
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
+
+
+
+
+  // 🆕 배당률만 갱신 (상태 유지)
+  const refreshOddsOnly = async () => {
+    try {
+      console.log('[Exchange] 🔄 배당률만 갱신 시작 (상태 유지)');
       
-      {/* 실시간 호가 현황 - 상단 */}
-      <div className="bg-white rounded shadow p-6 mb-4">
-        <h3 className="text-lg font-bold mb-4">🔥 실시간 호가 현황</h3>
-        {!isLoggedIn ? (
-          <div className="text-center py-8">
-            <p className="text-gray-600">로그인 후 실시간 호가 정보를 확인할 수 있습니다.</p>
-          </div>
-        ) : orderbook.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-gray-500">현재 등록된 호가가 없습니다.</p>
-            <p className="text-sm text-gray-400">아래 스포츠를 선택해서 새로운 호가를 등록해보세요!</p>
-          </div>
-        ) : (
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="text-sm text-gray-600 mb-3">
-              {orderbook.length > 0 ? (() => {
-                const backOrder = orderbook.find(o => o.side === 'back' && o.status === 'open');
-                const layOrder = orderbook.find(o => o.side === 'lay' && o.status === 'open');
-                // 경기 정보(팀명, 시간 등)는 Back/Lay 중 하나에서 가져옴
-                const gameInfo = backOrder || layOrder;
-                if (!backOrder && !layOrder) {
-                  return <div className="text-center text-gray-400 py-8">현재 오픈된 호가가 없습니다.</div>;
+      const activeLeagues = Object.entries(SPORT_CATEGORIES);
+      
+      for (const [displayName, config] of activeLeagues) {
+        try {
+          const apiUrl = buildApiUrl(`${API_CONFIG.ENDPOINTS.ODDS}/${config.sportKey}`);
+          const response = await fetch(apiUrl);
+          
+          if (!response.ok) {
+            console.log(`⚠️ ${displayName} 배당률 갱신 실패:`, response.status);
+            continue;
+          }
+          
+          const data = await response.json();
+          
+          // 환수율 적용된 데이터 받아서 사용 (이미 서버에서 환수율이 적용된 상태)
+          setTodayFlatGames(prevGames => {
+            let matchedCount = 0;
+            let totalCount = 0;
+            
+            const updatedGames = prevGames.map(prevGame => {
+              totalCount++;
+              const newGame = data.find((g: any) => {
+                // 필드명 차이 고려 (home_team vs homeTeam)
+                const homeMatch = (g.homeTeam || g.home_team) === prevGame.homeTeam;
+                const awayMatch = (g.awayTeam || g.away_team) === prevGame.awayTeam;
+                const timeMatch = (g.commenceTime || g.commence_time) === prevGame.commenceTime;
+                
+                return homeMatch && awayMatch && timeMatch;
+              });
+              
+              if (newGame) {
+                matchedCount++;
+                console.log(`🎯 매칭 발견: ${prevGame.homeTeam} vs ${prevGame.awayTeam}`, {
+                  beforeOdds: prevGame.homeTeamOdds,
+                  afterOdds: newGame.homeTeamOdds,
+                  officialOdds: newGame.officialOdds
+                });
+                
+                // 환수율이 이미 적용된 배당률로 업데이트
+                return {
+                  ...prevGame,
+                  officialOdds: newGame.officialOdds,
+                  bookmakers: newGame.bookmakers,
+                  homeTeamOdds: newGame.homeTeamOdds,
+                  awayTeamOdds: newGame.awayTeamOdds,
+                  drawOdds: newGame.drawOdds
+                };
+              }
+              
+              return prevGame;
+            });
+            
+            if (matchedCount > 0) {
+              console.log(`✅ ${displayName}: ${matchedCount}/${totalCount} 게임 매칭 및 배당률 업데이트됨`);
+            }
+            
+            return updatedGames;
+          });
+          
+          console.log(`✅ ${displayName} 배당률 갱신 완료`);
+        } catch (error) {
+          console.error(`❌ ${displayName} 배당률 갱신 오류:`, error);
+        }
+      }
+      
+      console.log('[Exchange] ✅ 배당률 갱신 완료 (상태 유지)');
+    } catch (error) {
+      console.error('[Exchange] ❌ 배당률 갱신 오류:', error);
+    }
+  };
+
+  // Today Betting 데이터 가져오기
+  const fetchTodayGames = async () => {
+    try {
+      setTodayLoading(true);
+      const activeLeagues = Object.entries(SPORT_CATEGORIES);
+      const gamesData: Record<string, any[]> = {};
+      
+      for (const [displayName, config] of activeLeagues) {
+        let apiUrl = '';
+        try {
+          apiUrl = buildApiUrl(`${API_CONFIG.ENDPOINTS.ODDS}/${config.sportKey}`);
+          console.log(`🔍 ${displayName} 데이터 요청:`, apiUrl);
+          const response = await fetch(apiUrl);
+          console.log(`📊 ${displayName} 응답 상태:`, response.status, response.statusText);
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`✅ ${displayName} 데이터 로드 성공:`, data.length, '개 경기');
+            
+            const now = getCurrentLocalTime();
+            const oneDayAgo = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
+            const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+            const bettingDeadlineMinutes = 10;
+            
+            const filteredGames = data.filter((game: any) => {
+              const localGameTime = convertUtcToLocal(game.commence_time);
+              return localGameTime >= oneDayAgo && localGameTime <= sevenDaysLater;
+            });
+            
+            const uniqueGamesMap = new Map();
+            filteredGames.forEach((game: any) => {
+              const key = `${game.home_team}|${game.away_team}|${game.commence_time}`;
+              if (!uniqueGamesMap.has(key)) {
+                uniqueGamesMap.set(key, game);
+              } else {
+                const prev = uniqueGamesMap.get(key);
+                const prevBookmakersCount = Array.isArray(prev.bookmakers) ? prev.bookmakers.length : 0;
+                const currBookmakersCount = Array.isArray(game.bookmakers) ? game.bookmakers.length : 0;
+                if (currBookmakersCount > prevBookmakersCount) {
+                  uniqueGamesMap.set(key, game);
                 }
-                return (
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gray-50 border border-gray-200 rounded p-4 shadow mt-4">
-                    {/* 경기 정보 */}
-                    <div className="flex-1 min-w-[180px]">
-                      {gameInfo ? (
-                        <>
-                          <div className="font-semibold text-base text-gray-800">{gameInfo.homeTeam} vs {gameInfo.awayTeam}</div>
-                          <div className="text-xs text-gray-500">{gameInfo.commenceTime ? new Date(gameInfo.commenceTime).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '시간 미정'}</div>
-                        </>
-                      ) : (
-                        <div className="text-gray-400">경기 정보 없음</div>
-                      )}
-                    </div>
-                    {/* Back 정보 */}
-                    <div className="flex flex-col items-center min-w-[120px]">
-                      <div className="text-xs text-blue-600 font-semibold mb-1">Back</div>
-                      {backOrder ? (
-                        <>
-                          <div className="font-bold text-blue-700 text-lg">{(backOrder.backOdds || backOrder.price).toFixed(2)}</div>
-                          <div className="text-blue-600">{backOrder.amount.toLocaleString()}원</div>
-                        </>
-                      ) : layOrder ? (
-                        <>
-                          <div className="font-bold text-blue-700 text-lg">{(layOrder.backOdds || 'N/A')}</div>
-                          <div className="text-blue-600">매칭 대기</div>
-                        </>
-                      ) : (
-                        <div className="text-gray-400">-</div>
-                      )}
-                    </div>
-                    {/* Lay 정보 */}
-                    <div className="flex flex-col items-center min-w-[120px]">
-                      <div className="text-xs text-pink-600 font-semibold mb-1">Lay</div>
-                      {layOrder ? (
-                        <>
-                          <div className="font-bold text-pink-700 text-lg">{(layOrder.layOdds || layOrder.price).toFixed(2)}</div>
-                          <div className="text-pink-600">{layOrder.amount.toLocaleString()}원</div>
-                        </>
-                      ) : (
-                        <div className="text-gray-400">-</div>
-                      )}
-                    </div>
-                    {/* 매칭 버튼 */}
-                    <div className="flex flex-col items-center min-w-[120px]">
-                      {/* Back만 있을 때 → Lay로 배팅 */}
-                      {backOrder && !layOrder && (
-                        (() => {
-                          console.log('매칭 버튼 상태 (Lay로 배팅):', {
-                            userId,
-                            orderUserId: backOrder.userId,
-                            disabled: !userId || String(userId) === String(backOrder.userId)
-                          });
-                          return (
-                            <button
-                              onClick={() => {
-                                if (!userId || String(userId) === String(backOrder.userId)) {
-                                  alert('자신의 주문과는 매칭할 수 없습니다.');
-                                  return;
-                                }
-                                handleMatchOrder(backOrder);
-                              }}
-                              className={`px-4 py-2 text-white text-xs rounded transition-colors ${
-                                !userId || String(userId) === String(backOrder.userId)
-                                  ? 'bg-gray-300 cursor-not-allowed'
-                                  : 'bg-pink-500 hover:bg-pink-600'
-                              }`}
-                              disabled={!userId || String(userId) === String(backOrder.userId)}
-                            >
-                              Lay로 배팅{String(userId) === String(backOrder.userId) ? ' (내 주문)' : ''}
-                            </button>
-                          );
-                        })()
-                      )}
-                      {/* Lay만 있을 때 → Back으로 배팅 */}
-                      {layOrder && !backOrder && (
-                        (() => {
-                          console.log('매칭 버튼 상태 (Back으로 배팅):', {
-                            userId,
-                            orderUserId: layOrder.userId,
-                            disabled: !userId || String(userId) === String(layOrder.userId)
-                          });
-                          return (
-                            <button
-                              onClick={() => {
-                                if (!userId || String(userId) === String(layOrder.userId)) {
-                                  alert('자신의 주문과는 매칭할 수 없습니다.');
-                                  return;
-                                }
-                                handleMatchOrder(layOrder);
-                              }}
-                              className={`px-4 py-2 text-white text-xs rounded transition-colors ${
-                                !userId || String(userId) === String(layOrder.userId)
-                                  ? 'bg-gray-300 cursor-not-allowed'
-                                  : 'bg-blue-500 hover:bg-blue-600'
-                              }`}
-                              disabled={!userId || String(userId) === String(layOrder.userId)}
-                            >
-                              Back으로 배팅{String(userId) === String(layOrder.userId) ? ' (내 주문)' : ''}
-                            </button>
-                          );
-                        })()
-                      )}
-                      {/* 둘 다 있을 때는 매칭 버튼 없음 (이미 매칭됨) */}
-                      {backOrder && layOrder && (
-                        <div className="text-xs text-gray-400">매칭 대기 없음</div>
-                      )}
-                    </div>
+              }
+            });
+            const uniqueGames = Array.from(uniqueGamesMap.values());
+            
+            const categorizedGames = uniqueGames.map((game: any) => {
+              const localGameTime = convertUtcToLocal(game.commence_time);
+              const bettingDeadline = new Date(localGameTime.getTime() - bettingDeadlineMinutes * 60 * 1000);
+              const isBettable = now < bettingDeadline;
+              
+              let officialOdds = game.officialOdds;
+              if (!officialOdds && game.bookmakers && Array.isArray(game.bookmakers)) {
+                officialOdds = {};
+                
+                // 🆕 모든 마켓 데이터 처리 (h2h, totals, spreads 등)
+                const marketData: Record<string, Record<string, { count: number; totalPrice: number }>> = {};
+                
+                game.bookmakers.forEach((bookmaker: any) => {
+                  if (bookmaker.markets && Array.isArray(bookmaker.markets)) {
+                    bookmaker.markets.forEach((market: any) => {
+                      if (!marketData[market.key]) {
+                        marketData[market.key] = {};
+                      }
+                      
+                      if (market.outcomes && Array.isArray(market.outcomes)) {
+                        market.outcomes.forEach((outcome: any) => {
+                          const outcomeKey = outcome.name || outcome.point || outcome.value;
+                          if (outcomeKey !== undefined) {
+                            if (!marketData[market.key][outcomeKey]) {
+                              marketData[market.key][outcomeKey] = { count: 0, totalPrice: 0 };
+                            }
+                            marketData[market.key][outcomeKey].count++;
+                            marketData[market.key][outcomeKey].totalPrice += outcome.price;
+                          }
+                        });
+                      }
+                    });
+                  }
+                });
+                
+                // 🆕 각 마켓별로 평균 배당율 계산
+                Object.entries(marketData).forEach(([marketKey, outcomes]) => {
+                  if (Object.keys(outcomes).length > 0) {
+                    officialOdds[marketKey] = {};
+                    Object.entries(outcomes).forEach(([outcomeKey, data]) => {
+                      officialOdds[marketKey][outcomeKey] = {
+                        count: data.count,
+                        averagePrice: data.totalPrice / data.count
+                      };
+                    });
+                  }
+                });
+              }
+              
+              return {
+                ...game,
+                sport_key: game.sport || config.sportKey,
+                sportTitle: displayName,
+                sport_title: displayName,
+                officialOdds: officialOdds || game.officialOdds,
+                isBettable,
+                gameTime: localGameTime,
+                bettingDeadline
+              };
+            });
+            
+            const sortedGames = categorizedGames.sort((a, b) => {
+              const currentTime = now.getTime();
+              const aTime = a.gameTime.getTime();
+              const bTime = b.gameTime.getTime();
+              
+              const aIsFuture = aTime >= currentTime;
+              const bIsFuture = bTime >= currentTime;
+              
+              if (aIsFuture && !bIsFuture) return -1;
+              if (!aIsFuture && bIsFuture) return 1;
+              
+              if (aIsFuture && bIsFuture) {
+                return aTime - bTime;
+              }
+              
+              return bTime - aTime;
+            });
+            
+            if (sortedGames.length > 0) {
+              gamesData[displayName] = sortedGames;
+            }
+          }
+        } catch (err) {
+          console.error(`❌ ${displayName} 데이터 로드 실패:`, err);
+          console.error(`🔍 ${displayName} API URL:`, apiUrl);
+        }
+      }
+      
+      setTodayGames(gamesData);
+      
+             const allGames = Object.values(gamesData).flat();
+       const now = getCurrentLocalTime();
+       const sortedAllGames = allGames.sort((a, b) => {
+         const currentTime = now.getTime();
+         const aTime = a.gameTime.getTime();
+         const bTime = b.gameTime.getTime();
+        
+        const aIsFuture = aTime >= currentTime;
+        const bIsFuture = bTime >= currentTime;
+        
+        if (aIsFuture && !bIsFuture) return -1;
+        if (!aIsFuture && bIsFuture) return 1;
+        
+        if (aIsFuture && bIsFuture) {
+          return aTime - bTime;
+        }
+        
+        return bTime - aTime;
+      });
+      
+      setTodayFlatGames(sortedAllGames);
+
+      // 🆕 모든 게임에 대해 기본 마켓 설정
+      sortedAllGames.forEach(game => {
+        if (!todayGameMarkets[game.id]) {
+          setTodayGameMarkets(prev => ({
+            ...prev,
+            [game.id]: new Set(['승패'])
+          }));
+        }
+      });
+      
+      const bettableGames = sortedAllGames.filter(game => game.isBettable);
+      const totalGames = sortedAllGames.length;
+      
+      console.log("=== Today Betting 전체 통계 ===");
+      console.log("전체 경기 개수:", totalGames);
+      console.log("베팅 가능한 경기 개수:", bettableGames.length);
+      console.log("베팅 불가능한 경기 개수:", totalGames - bettableGames.length);
+      
+      const leagueDataCount: Record<string, number> = {};
+      Object.entries(gamesData).forEach(([league, games]) => {
+        leagueDataCount[league] = games.length;
+      });
+      console.log("리그별 배당율 데이터 개수:", leagueDataCount);
+      
+    } catch (error) {
+      console.error('❌ Today Betting 데이터 로드 실패:', error);
+    } finally {
+      setTodayLoading(false);
+    }
+  };
+
+  // League View 데이터 가져오기
+  const fetchLeagueGames = async (category: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const sportKey = getSportKey(category);
+      if (!sportKey) {
+        setError('Invalid sport category');
+        return;
+      }
+      
+      setCurrentSportKey(sportKey);
+      
+      const apiUrl = buildApiUrl(`${API_CONFIG.ENDPOINTS.ODDS}/${sportKey}`);
+      const response = await fetch(apiUrl);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${category} data`);
+      }
+      
+      const data = await response.json();
+      
+      const now = getCurrentLocalTime();
+      const oneDayAgo = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
+      const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const bettingDeadlineMinutes = 10;
+      
+      const filteredGames = data.filter((game: any) => {
+        const localGameTime = convertUtcToLocal(game.commence_time);
+        const isValid = localGameTime >= oneDayAgo && localGameTime <= sevenDaysLater;
+        return isValid;
+      });
+      
+      const processedGames = filteredGames.map((game: any) => {
+        const localGameTime = convertUtcToLocal(game.commence_time);
+        const bettingDeadline = new Date(localGameTime.getTime() - bettingDeadlineMinutes * 60 * 1000);
+        const isBettable = now < bettingDeadline;
+        
+        let officialOdds = game.officialOdds;
+        if (!officialOdds && game.bookmakers && Array.isArray(game.bookmakers)) {
+          officialOdds = {};
+          
+          // 🆕 모든 마켓 데이터 처리 (h2h, totals, spreads 등)
+          const marketData: Record<string, Record<string, { count: number; totalPrice: number }>> = {};
+          
+          game.bookmakers.forEach((bookmaker: any) => {
+            if (bookmaker.markets && Array.isArray(bookmaker.markets)) {
+              bookmaker.markets.forEach((market: any) => {
+                if (!marketData[market.key]) {
+                  marketData[market.key] = {};
+                }
+                
+                if (market.outcomes && Array.isArray(market.outcomes)) {
+                  market.outcomes.forEach((outcome: any) => {
+                    const outcomeKey = outcome.name || outcome.point || outcome.value;
+                    if (outcomeKey !== undefined) {
+                      if (!marketData[market.key][outcomeKey]) {
+                        marketData[market.key][outcomeKey] = { count: 0, totalPrice: 0 };
+                      }
+                      marketData[market.key][outcomeKey].count++;
+                      marketData[market.key][outcomeKey].totalPrice += outcome.price;
+                    }
+                  });
+                }
+              });
+            }
+          });
+          
+          // 🆕 각 마켓별로 평균 배당율 계산
+          Object.entries(marketData).forEach(([marketKey, outcomes]) => {
+            if (Object.keys(outcomes).length > 0) {
+              officialOdds[marketKey] = {};
+              Object.entries(outcomes).forEach(([outcomeKey, data]) => {
+                officialOdds[marketKey][outcomeKey] = {
+                  count: data.count,
+                  averagePrice: data.totalPrice / data.count
+                };
+              });
+            }
+          });
+        }
+        
+        return {
+          ...game,
+          sport_key: sportKey,
+          sportTitle: category,
+          officialOdds: officialOdds || game.officialOdds,
+          isBettable,
+          gameTime: localGameTime,
+          bettingDeadline
+        };
+      });
+      
+      const sortedGames = processedGames.sort((a, b) => {
+        const currentTime = now.getTime();
+        const aTime = a.gameTime.getTime();
+        const bTime = b.gameTime.getTime();
+        
+        const aIsFuture = aTime >= currentTime;
+        const bIsFuture = bTime >= currentTime;
+        
+        if (aIsFuture && !bIsFuture) return -1;
+        if (!aIsFuture && bIsFuture) return 1;
+        
+        if (aIsFuture && bIsFuture) {
+          return aTime - bTime;
+        }
+        
+        return bTime - aTime;
+      });
+      
+      setGames(sortedGames);
+
+      // 🆕 모든 게임에 대해 기본 마켓 설정
+      sortedGames.forEach(game => {
+        if (!leagueGameMarkets[game.id]) {
+          setLeagueGameMarkets(prev => ({
+            ...prev,
+            [game.id]: new Set(['승패'])
+          }));
+        }
+      });
+      
+    } catch (error) {
+      console.error(`❌ ${category} 데이터 로드 실패:`, error);
+      setError(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 🆕 마켓 체크박스 토글 함수들
+  const toggleTodayGameMarket = (gameId: string, market: string) => {
+    setTodayGameMarkets(prev => {
+      const current = prev[gameId] || new Set();
+      const newSet = new Set(current);
+      
+      if (newSet.has(market)) {
+        newSet.delete(market);
+      } else {
+        newSet.add(market);
+      }
+      
+      // 최소 하나는 선택되도록 보장
+      if (newSet.size === 0) {
+        newSet.add('승패');
+      }
+      
+      return { ...prev, [gameId]: newSet };
+    });
+  };
+
+  const toggleLeagueGameMarket = (gameId: string, market: string) => {
+    setLeagueGameMarkets(prev => {
+      const current = prev[gameId] || new Set();
+      const newSet = new Set(current);
+      
+      if (newSet.has(market)) {
+        newSet.delete(market);
+      } else {
+        newSet.add(market);
+      }
+      
+      // 최소 하나는 선택되도록 보장
+      if (newSet.size === 0) {
+        newSet.add('승패');
+      }
+      
+      return { ...prev, [gameId]: newSet };
+    });
+  };
+
+  // 🆕 경기의 선택된 마켓들 가져오기
+  const getTodaySelectedMarkets = (gameId: string) => {
+    return todayGameMarkets[gameId] || new Set(['승패']);
+  };
+
+  const getLeagueSelectedMarkets = (gameId: string) => {
+    return leagueGameMarkets[gameId] || new Set(['승패']);
+  };
+
+  const handleCategoryChange = async (category: string) => {
+    setSelectedCategory(category);
+
+    // 메인 카테고리인지 확인 (예: Soccer, Basketball 등)
+    if (SPORTS_TREE[category as keyof typeof SPORTS_TREE]) {
+      console.log(`📂 메인 카테고리 선택: ${category} - 하위 리그들 로딩 시작`);
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        const leagues = SPORTS_TREE[category as keyof typeof SPORTS_TREE];
+        const gamesData: Record<string, any[]> = {};
+        const allGames: any[] = [];
+
+        // 모든 하위 리그를 병렬로 처리
+        const apiPromises = leagues.map(async (leagueName: string) => {
+          const leagueConfig = SPORT_CATEGORIES[leagueName];
+          if (!leagueConfig) return null;
+
+          const apiUrl = buildApiUrl(`${API_CONFIG.ENDPOINTS.ODDS}/${leagueConfig.sportKey}`);
+
+          try {
+            console.log(`🔄 ${leagueName} 데이터 로딩 중...`);
+            const response = await fetch(apiUrl);
+
+            if (!response.ok) {
+              throw new Error(`Failed to fetch ${leagueName} data`);
+            }
+
+            const data = await response.json();
+
+            const now = getCurrentLocalTime();
+            const oneDayAgo = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
+            const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+            const bettingDeadlineMinutes = 10;
+
+            const filteredGames = data.filter((game: any) => {
+              const localGameTime = convertUtcToLocal(game.commence_time);
+              const isValid = localGameTime >= oneDayAgo && localGameTime <= sevenDaysLater;
+              return isValid;
+            });
+
+            const processedGames = filteredGames.map((game: any) => {
+              const localGameTime = convertUtcToLocal(game.commence_time);
+              const bettingDeadline = new Date(localGameTime.getTime() - bettingDeadlineMinutes * 60 * 1000);
+              const isBettable = now < bettingDeadline;
+
+              let officialOdds = game.officialOdds;
+              if (!officialOdds && game.bookmakers && Array.isArray(game.bookmakers)) {
+                officialOdds = {};
+
+                const marketData: Record<string, Record<string, { count: number; totalPrice: number }>> = {};
+
+                game.bookmakers.forEach((bookmaker: any) => {
+                  if (bookmaker.markets && Array.isArray(bookmaker.markets)) {
+                    bookmaker.markets.forEach((market: any) => {
+                      if (!marketData[market.key]) {
+                        marketData[market.key] = {};
+                      }
+
+                      if (market.outcomes && Array.isArray(market.outcomes)) {
+                        market.outcomes.forEach((outcome: any) => {
+                          const outcomeKey = outcome.name || outcome.point || outcome.value;
+                          if (outcomeKey !== undefined) {
+                            if (!marketData[market.key][outcomeKey]) {
+                              marketData[market.key][outcomeKey] = { count: 0, totalPrice: 0 };
+                            }
+                            marketData[market.key][outcomeKey].count++;
+                            marketData[market.key][outcomeKey].totalPrice += outcome.price;
+                          }
+                        });
+                      }
+                    });
+                  }
+                });
+
+                Object.keys(marketData).forEach(marketKey => {
+                  officialOdds[marketKey] = {};
+                  Object.keys(marketData[marketKey]).forEach(outcomeKey => {
+                    const { count, totalPrice } = marketData[marketKey][outcomeKey];
+                    officialOdds[marketKey][outcomeKey] = (totalPrice / count).toFixed(3);
+                  });
+                });
+              }
+
+              return {
+                ...game,
+                id: `${game.home_team}-${game.away_team}-${game.commence_time}`,
+                localGameTime: localGameTime,
+                isBettable: isBettable,
+                league: leagueName,
+                sportKey: leagueConfig.sportKey,
+                officialOdds: officialOdds || {}
+              };
+            });
+
+            console.log(`✅ ${leagueName}: ${processedGames.length}개 경기 로드 완료`);
+
+            gamesData[leagueName] = processedGames;
+            allGames.push(...processedGames);
+
+            return { leagueName, games: processedGames };
+          } catch (error) {
+            console.error(`❌ ${leagueName} 데이터 로딩 실패:`, error);
+            return null;
+          }
+        });
+
+        await Promise.all(apiPromises);
+
+        // ✅ 미래 경기 우선 정렬 (가까운 순)
+        const now = getCurrentLocalTime();
+        const sortedAllGames = allGames.sort((a, b) => {
+          const currentTime = now.getTime();
+          const aTime = new Date(a.localGameTime).getTime();
+          const bTime = new Date(b.localGameTime).getTime();
+          
+          const aIsFuture = aTime >= currentTime;
+          const bIsFuture = bTime >= currentTime;
+          
+          // 미래 vs 과거: 미래 우선
+          if (aIsFuture && !bIsFuture) return -1;
+          if (!aIsFuture && bIsFuture) return 1;
+          
+          // 둘 다 미래: 가까운 순
+          if (aIsFuture && bIsFuture) {
+            return aTime - bTime;
+          }
+          
+          // 둘 다 과거: 최근 순
+          return bTime - aTime;
+        });
+
+        setGames(sortedAllGames);
+
+        // 기본 마켓 설정
+        sortedAllGames.forEach(game => {
+          if (!leagueGameMarkets[game.id]) {
+            setLeagueGameMarkets(prev => ({
+              ...prev,
+              [game.id]: new Set(['승패'])
+            }));
+          }
+        });
+
+        const bettableGames = sortedAllGames.filter(game => game.isBettable);
+        const totalGames = sortedAllGames.length;
+
+        console.log("=== League Category 전체 통계 ===");
+        console.log("전체 경기 개수:", totalGames);
+        console.log("베팅 가능한 경기 개수:", bettableGames.length);
+        console.log("베팅 불가능한 경기 개수:", totalGames - bettableGames.length);
+
+        const leagueDataCount: Record<string, number> = {};
+        Object.entries(gamesData).forEach(([league, games]) => {
+          leagueDataCount[league] = games.length;
+        });
+        console.log("리그별 배당율 데이터 개수:", leagueDataCount);
+
+      } catch (error) {
+        console.error(`❌ ${category} 메인 카테고리 데이터 로드 실패:`, error);
+        setError(error instanceof Error ? error.message : 'Unknown error');
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // 단일 리그 처리 (기존 로직)
+      fetchLeagueGames(category);
+    }
+  };
+
+  // Today Betting View 컴포넌트
+  const TodayBettingView = () => {
+    if (todayLoading) return <div className="text-center py-8 text-white">Loading...</div>;
+    if (todayFlatGames.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <div className="mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-700 rounded-full mb-4">
+              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+          <h3 className="text-lg font-semibold text-white mb-2">📅 No Games Scheduled for Today</h3>
+          <p className="text-gray-300 mb-4">No games found for today and tomorrow in active leagues.</p>
+        </div>
+      );
+    }
+    
+    const bettableGames = todayFlatGames.filter(game => game.isBettable);
+    const totalGames = todayFlatGames.length;
+    
+    return (
+      <div className="space-y-4">
+        {/* 배팅 가능한 경기 수 표시 */}
+        <div className="bg-blue-900 border border-blue-700 rounded-lg p-4 mb-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-300">{bettableGames.length}</div>
+                <div className="text-sm text-blue-200">Betting Available</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-gray-300">{totalGames}</div>
+                <div className="text-sm text-gray-200">Total Games</div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-sm text-gray-300">
+                📅 {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', weekday: 'short' })}
+              </div>
+              <div className="text-xs text-gray-400">Updated: {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>
+            </div>
+          </div>
+        </div>
+        
+        {todayFlatGames?.map((game: any) => {
+          const gameTime = new Date(game.commence_time);
+          const localGameTime = convertUtcToLocal(game.commence_time);
+          const isBettable = game.isBettable !== undefined ? game.isBettable : true;
+          
+          const officialOdds = game.officialOdds || {};
+          const h2hOdds = officialOdds.h2h || {};
+          
+                     // 축구의 경우 Draw 포함, 다른 스포츠는 홈/어웨이만
+           let outcomes: any[] = [];
+
+           if (game.sport_key?.includes('soccer')) {
+             const homeOdds = h2hOdds[game.home_team];
+             const awayOdds = h2hOdds[game.away_team];
+             const drawOdds = Object.entries(h2hOdds).find(([name, _]) =>
+               name.toLowerCase().includes('draw') || name === 'Draw' || name === 'Tie'
+             );
+             
+             // 전체 배당율 배열 생성
+             const allOdds = [
+               (homeOdds as any)?.averagePrice,
+               (drawOdds?.[1] as any)?.averagePrice,
+               (awayOdds as any)?.averagePrice
+             ].filter(odds => odds !== undefined);
+             
+             outcomes = [
+               { 
+                 name: game.home_team, 
+                 price: applyExchangeReturnRate((homeOdds as any)?.averagePrice, allOdds, oddsReturnRateSettings.returnRate)
+               },
+               { 
+                 name: 'Draw', 
+                 price: applyExchangeReturnRate((drawOdds?.[1] as any)?.averagePrice, allOdds, oddsReturnRateSettings.returnRate)
+               },
+               { 
+                 name: game.away_team, 
+                 price: applyExchangeReturnRate((awayOdds as any)?.averagePrice, allOdds, oddsReturnRateSettings.returnRate)
+               }
+             ].filter(outcome => outcome.price !== undefined);
+          } else {
+            // 야구, 농구 등: Draw 없이 홈/어웨이만
+            const h2hKeys = Object.keys(h2hOdds);
+            const homeKey = h2hKeys.find(key => 
+              normalizeTeamNameForComparison(key) === normalizeTeamNameForComparison(game.home_team)
+            );
+            const awayKey = h2hKeys.find(key => 
+              normalizeTeamNameForComparison(key) === normalizeTeamNameForComparison(game.away_team)
+            );
+            
+            // 전체 배당율 배열 생성
+            const allOdds = [
+              homeKey ? h2hOdds[homeKey]?.averagePrice : undefined,
+              awayKey ? h2hOdds[awayKey]?.averagePrice : undefined
+            ].filter(odds => odds !== undefined);
+            
+            outcomes = [
+              { 
+                name: game.home_team, 
+                price: applyExchangeReturnRate(homeKey ? h2hOdds[homeKey]?.averagePrice : undefined, allOdds, oddsReturnRateSettings.returnRate)
+              },
+              { 
+                name: game.away_team, 
+                price: applyExchangeReturnRate(awayKey ? h2hOdds[awayKey]?.averagePrice : undefined, allOdds, oddsReturnRateSettings.returnRate)
+              }
+            ].filter(outcome => outcome.price !== undefined);
+          }
+          
+          return (
+            <div key={game.id} className={`bg-gray-800 rounded-lg shadow p-4 ${!isBettable ? 'opacity-60' : ''}`}>
+              <div className="flex justify-between items-center mb-3">
+                <div className="flex-1">
+                  <span className="text-lg font-bold text-white">🏟️ {game.home_team} vs {game.away_team}</span>
+                  <div className="text-sm text-gray-400 mt-1">
+                    {(() => {
+                      const leagueName = getDisplayNameFromSportKey(game.sport_key) || game.sportTitle || 'Unknown League';
+                      
+                      let sportIcon = '🏆';
+                      if (game.sport_key?.includes('soccer')) sportIcon = '⚽';
+                      else if (game.sport_key?.includes('basketball')) sportIcon = '🏀';
+                      else if (game.sport_key?.includes('baseball')) sportIcon = '⚾';
+                      else if (game.sport_key?.includes('americanfootball')) sportIcon = '🏈';
+                      
+                      return (
+                        <span className="inline-flex items-center gap-2">
+                          <span>{sportIcon}</span>
+                          <span>{leagueName}</span>
+                        </span>
+                      );
+                    })()}
                   </div>
-                );
-              })() : (
-                <strong>🏀 Loading game information...</strong>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm text-gray-300">
+                    📅 {localGameTime.toLocaleDateString()} {localGameTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                  {!isBettable && (
+                    <div className="text-xs text-red-400 mt-1">
+                      ⏰ Betting Closed (10 min before game)
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* 🆕 마켓 체크박스 - 여러 마켓을 동시에 선택 가능 */}
+              <div className="mb-4 p-3 bg-gray-700 rounded-lg border border-gray-600">
+                <div className="text-sm font-medium text-white mb-2">📊 베팅 마켓 선택:</div>
+                <div className="flex flex-wrap gap-4">
+                  {['승패', '총점', '핸디캡'].map(market => {
+                    const isSelected = getTodaySelectedMarkets(game.id).has(market);
+                    return (
+                      <label key={market} className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleTodayGameMarket(game.id, market)}
+                          className="w-5 h-5 text-blue-600 bg-gray-600 border-gray-500 rounded focus:ring-blue-500 focus:ring-2"
+                        />
+                        <span className={`text-sm font-medium ${
+                          isSelected ? 'text-blue-400' : 'text-gray-400'
+                        }`}>
+                          {market === '승패' ? '승/패' : 
+                           market === '총점' ? '언더/오버' : '핸디캡'}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+                
+                {/* 🆕 디버깅: 사용 가능한 마켓 정보 표시 */}
+                <div className="mt-2 text-xs text-gray-400">
+                  <details>
+                    <summary className="cursor-pointer">🔍 사용 가능한 마켓 정보</summary>
+                    <pre className="mt-1 text-xs overflow-x-auto">
+                      {JSON.stringify(game.officialOdds, null, 2)}
+                    </pre>
+                  </details>
+                </div>
+              </div>
+              
+              {/* 🆕 승패 마켓 - 선택된 경우에만 표시 */}
+              {getTodaySelectedMarkets(game.id).has('승패') && outcomes.length > 0 && (
+                <div className="mb-4 p-3 bg-gray-700 rounded-lg border border-gray-600">
+                  <div className="text-sm font-medium text-white mb-2">🏆 승/패 (Win/Loss)</div>
+                  <div className="flex items-center gap-2">
+                    {outcomes.map((outcome, idx) => {
+                      let label = outcome.name;
+                      if (outcome.name.toLowerCase() === 'draw') label = 'Draw';
+                      
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            // 🎯 버튼 선택 상태 토글
+                            const wasSelected = isButtonSelected(game.id, `승패_${outcome.name}`);
+                            handleButtonClick(game, outcome.name, outcome.price, '승패');
+                            
+                            // 선택 해제된 경우가 아니라면 사이드바로 이동
+                            if (!wasSelected && isBettable && outcome.price) {
+                              const gameInfo = {
+                                gameId: game.id,
+                                homeTeam: game.home_team,
+                                awayTeam: game.away_team,
+                                sportKey: game.sport_key,
+                                market: '승패',
+                                selection: outcome.name,
+                                odds: outcome.price,
+                                commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString()
+                              };
+                              localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
+
+                              setTimeout(() => {
+                                window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                  detail: { tab: 'order' }
+                                }));
+                                setTimeout(() => {
+                                  window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                    detail: { tab: 'order' }
+                                  }));
+                                }, 200);
+                              }, 100);
+
+                              console.log('🎯 배당율 카드 클릭됨:', gameInfo);
+                            }
+                          }}
+                          className={`flex-1 p-2 rounded-lg text-center transition-colors ${
+                            isButtonSelected(game.id, `승패_${outcome.name}`)
+                              ? 'bg-yellow-500 hover:bg-yellow-600'
+                              : isBettable && outcome.price ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                          } text-white text-sm`}
+                          disabled={!isBettable || !outcome.price}
+                          title={isBettable && outcome.price ? `클릭하여 ${outcome.name} 주문하기` : '베팅 마감됨'}
+                        >
+                          <div className="font-medium">{label}</div>
+                          <div className="text-xs">{outcome.price ? outcome.price.toFixed(3) : 'N/A'}</div>
+                          {!isBettable && <div className="text-xs text-red-400 mt-1">Betting Closed</div>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {/* 🆕 총점 마켓 - 선택된 경우에만 표시 */}
+              {getTodaySelectedMarkets(game.id).has('총점') && (
+                <div className="mb-4 p-3 bg-gray-700 rounded-lg border border-gray-600">
+                  <div className="text-sm font-medium text-white mb-2">📈 언더/오버 (Over/Under)</div>
+                  {(() => {
+                    const totalsOdds = game.officialOdds?.totals || game.officialOdds?.over_under || {};
+                    const totalEntries = Object.entries(totalsOdds);
+                    
+                    if (totalEntries.length === 0) {
+                      return (
+                        <div className="text-center text-gray-400 py-3">
+                          언더/오버 배당 정보가 없습니다.
+                        </div>
+                      );
+                    }
+                    
+                    // Over/Under 쌍으로 그룹화
+                    const groupedTotals: { [point: string]: { over?: any, under?: any } } = {};
+                    
+                    totalEntries.forEach(([outcomeName, oddsData]) => {
+                      if (outcomeName.startsWith('Over ')) {
+                        const point = outcomeName.replace('Over ', '');
+                        if (!groupedTotals[point]) groupedTotals[point] = {};
+                        groupedTotals[point].over = oddsData;
+                      } else if (outcomeName.startsWith('Under ')) {
+                        const point = outcomeName.replace('Under ', '');
+                        if (!groupedTotals[point]) groupedTotals[point] = {};
+                        groupedTotals[point].under = oddsData;
+                      }
+                    });
+                    
+                    // 0.5 단위 포인트만 필터링 (0.25, 0.75 등 제외)
+                    // 0.5 단위 포인트만 필터링하고 Over/Under 쌍이 모두 있는 것만 표시, 포인트 값으로 정렬
+                    const filteredTotals = Object.entries(groupedTotals)
+                      .filter(([point, oddsPair]) => {
+                        const pointValue = parseFloat(point);
+                        const isValidPoint = !isNaN(pointValue) && (pointValue % 0.5 === 0) && (pointValue % 1 === 0 || pointValue % 1 === 0.5);
+                        const hasBothOdds = oddsPair.over && oddsPair.under; // Over와 Under가 모두 있어야 함
+                        return isValidPoint && hasBothOdds;
+                      })
+                      .sort(([pointA], [pointB]) => {
+                        const valueA = parseFloat(pointA);
+                        const valueB = parseFloat(pointB);
+                        return valueA - valueB; // 오름차순 정렬
+                      });
+                    
+                    if (filteredTotals.length === 0) {
+                      return (
+                        <div className="text-center text-gray-400 py-3">
+                          언더/오버 배당 정보 없음 (0.5 단위만)
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <div className="space-y-2">
+                        {filteredTotals.map(([point, oddsPair]) => {
+                          const overOdds = oddsPair.over?.averagePrice;
+                          const underOdds = oddsPair.under?.averagePrice;
+                          
+                          // ========================= [ 환수율 적용 로직 추가 ] =========================
+                          const allTotalsOdds = [overOdds, underOdds].filter(odds => odds != null);
+                          const adjustedOverOdds = applyExchangeReturnRate(overOdds, allTotalsOdds, oddsReturnRateSettings.returnRate);
+                          const adjustedUnderOdds = applyExchangeReturnRate(underOdds, allTotalsOdds, oddsReturnRateSettings.returnRate);
+                          // ========================================================================
+                          
+                          return (
+                            <div key={point} className="flex items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  // 🎯 버튼 선택 상태 토글
+                                  const wasSelected = isButtonSelected(game.id, `총점_Over ${point}`);
+                                  handleButtonClick(game, `Over ${point}`, adjustedOverOdds, '총점');
+                                  
+                                  // 선택 해제된 경우가 아니라면 사이드바로 이동
+                                  if (!wasSelected && isBettable && adjustedOverOdds) {
+                                    const gameInfo = {
+                                      gameId: game.id,
+                                      homeTeam: game.home_team,
+                                      awayTeam: game.away_team,
+                                      sportKey: game.sport_key,
+                                      market: '총점',
+                                      selection: `Over ${point}`,
+                                      odds: adjustedOverOdds,
+                                      commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString()
+                                    };
+                                    localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
+
+                                    setTimeout(() => {
+                                      window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                        detail: { tab: 'order' }
+                                      }));
+                                      setTimeout(() => {
+                                        window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                          detail: { tab: 'order' }
+                                        }));
+                                      }, 200);
+                                    }, 100);
+
+                                    console.log('🎯 Over 배당율 카드 클릭됨:', gameInfo);
+                                  }
+                                }}
+                                className={`flex-1 p-2 rounded-lg text-center transition-colors ${
+                                  isButtonSelected(game.id, `총점_Over ${point}`)
+                                    ? 'bg-yellow-500 hover:bg-yellow-600'
+                                    : isBettable && adjustedOverOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                } text-white text-sm`}
+                                disabled={!isBettable || !adjustedOverOdds}
+                              >
+                                <div className="font-medium">{game.home_team}</div>
+                                <div className="text-xs">{adjustedOverOdds ? adjustedOverOdds.toFixed(3) : 'N/A'}</div>
+                              </button>
+                              <div className="w-12 text-sm font-medium text-blue-400 text-center">{point}</div>
+                              <button
+                                onClick={() => {
+                                  // 🎯 버튼 선택 상태 토글
+                                  const wasSelected = isButtonSelected(game.id, `총점_Under ${point}`);
+                                  handleButtonClick(game, `Under ${point}`, adjustedUnderOdds, '총점');
+                                  
+                                  // 선택 해제된 경우가 아니라면 사이드바로 이동
+                                  if (!wasSelected && isBettable && adjustedUnderOdds) {
+                                    const gameInfo = {
+                                      gameId: game.id,
+                                      homeTeam: game.home_team,
+                                      awayTeam: game.away_team,
+                                      sportKey: game.sport_key,
+                                      market: '총점',
+                                      selection: `Under ${point}`,
+                                      odds: adjustedUnderOdds,
+                                      commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString()
+                                    };
+                                    localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
+
+                                    setTimeout(() => {
+                                      window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                        detail: { tab: 'order' }
+                                      }));
+                                      setTimeout(() => {
+                                        window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                          detail: { tab: 'order' }
+                                        }));
+                                      }, 200);
+                                    }, 100);
+
+                                    console.log('🎯 Under 배당율 카드 클릭됨:', gameInfo);
+                                  }
+                                }}
+                                className={`flex-1 p-2 rounded-lg text-center transition-colors ${
+                                  isButtonSelected(game.id, `총점_Under ${point}`)
+                                    ? 'bg-yellow-500 hover:bg-yellow-600'
+                                    : isBettable && adjustedUnderOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                } text-white text-sm`}
+                                disabled={!isBettable || !adjustedUnderOdds}
+                              >
+                                <div className="font-medium">{game.away_team}</div>
+                                <div className="text-xs">{adjustedUnderOdds ? adjustedUnderOdds.toFixed(3) : 'N/A'}</div>
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+              
+              {/* 🆕 핸디캡 마켓 - 선택된 경우에만 표시 */}
+              {getTodaySelectedMarkets(game.id).has('핸디캡') && (
+                <div className="mb-4 p-3 bg-gray-700 rounded-lg border border-gray-600">
+                  <div className="text-sm font-medium text-white mb-2">🎯 핸디캡 (Handicap)</div>
+                  {(() => {
+                    const spreadsOdds = game.officialOdds?.spreads || game.officialOdds?.handicap || {};
+                    const spreadEntries = Object.entries(spreadsOdds);
+                    
+                    if (spreadEntries.length === 0) {
+                      return (
+                        <div className="text-center text-gray-400 py-3">
+                          핸디캡 배당 정보가 없습니다.
+                        </div>
+                      );
+                    }
+                    
+                    // ✅ 수정: groupHandicapsByPoint 함수 사용
+                    const groupedSpreads = groupHandicapsByPoint(
+                      spreadsOdds,
+                      game.home_team,
+                      game.away_team
+                    );
+                    
+                    const filteredSpreads = filterHalfPointHandicaps(groupedSpreads);
+                    
+                    if (filteredSpreads.length === 0) {
+                      return (
+                        <div className="text-center text-gray-400 py-3">
+                          핸디캡 배당 정보 없음
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <div className="space-y-2">
+                        {filteredSpreads.map(([absPoint, oddsPair]) => {
+                          const homeData = oddsPair.home;
+                          const awayData = oddsPair.away;
+                          
+                          const homeOdds = homeData?.oddsData?.averagePrice;
+                          const awayOdds = awayData?.oddsData?.averagePrice;
+                          const pointValue = parseFloat(absPoint);
+                          // ✅ 수정: groupHandicapsByPoint()에서 계산된 실제 핸디캡 값 사용
+                          const homeHandicap = homeData?.handicap || 0;
+                          const awayHandicap = awayData?.handicap || 0;
+                          
+                          // ========================= [ 환수율 적용 로직 추가 ] =========================
+                          const allSpreadsOdds = [homeOdds, awayOdds].filter(odds => odds != null);
+                          const adjustedHomeOdds = applyExchangeReturnRate(homeOdds, allSpreadsOdds, oddsReturnRateSettings.returnRate);
+                          const adjustedAwayOdds = applyExchangeReturnRate(awayOdds, allSpreadsOdds, oddsReturnRateSettings.returnRate);
+                          // ========================================================================
+                          
+                          return (
+                            <div key={absPoint} className="flex items-center gap-2">
+                              {adjustedHomeOdds != null && (
+                                <button
+                                  onClick={() => {
+                                    // 🎯 버튼 선택 상태 토글
+                                    const selection = `${game.home_team} ${formatHandicap(homeHandicap)}`;
+                                    const wasSelected = isButtonSelected(game.id, `핸디캡_${selection}`);
+                                    handleButtonClick(game, selection, adjustedHomeOdds, '핸디캡');
+                                    
+                                    // 선택 해제된 경우가 아니라면 사이드바로 이동
+                                    if (!wasSelected && isBettable && adjustedHomeOdds) {
+                                      const gameInfo = {
+                                        gameId: game.id,
+                                        homeTeam: game.home_team,
+                                        awayTeam: game.away_team,
+                                        sportKey: game.sport_key,
+                                        market: '핸디캡',
+                                        selection: selection,
+                                        odds: adjustedHomeOdds,
+                                        commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString()
+                                      };
+                                      localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
+
+                                      setTimeout(() => {
+                                        window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                          detail: { tab: 'order' }
+                                        }));
+                                        setTimeout(() => {
+                                          window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                            detail: { tab: 'order' }
+                                          }));
+                                        }, 200);
+                                      }, 100);
+
+                                      console.log('🎯 홈팀 핸디캡 배당율 카드 클릭됨:', gameInfo);
+                                    }
+                                  }}
+                                  className={`flex-1 p-2 rounded-lg text-center transition-colors ${
+                                    isButtonSelected(game.id, `핸디캡_${game.home_team} ${formatHandicap(homeHandicap)}`)
+                                      ? 'bg-yellow-500 hover:bg-yellow-600'
+                                      : isBettable && adjustedHomeOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                  } text-white text-sm`}
+                                  disabled={!isBettable || !adjustedHomeOdds}
+                                >
+                                  <div className="font-medium">{game.home_team} {formatHandicap(homeHandicap)}</div>
+                                  <div className="text-xs">{adjustedHomeOdds ? adjustedHomeOdds.toFixed(3) : 'N/A'}</div>
+                                </button>
+                              )}
+                              <div className="w-12 text-sm font-medium text-blue-400 text-center">
+                                {homeHandicap != null ? formatHandicap(homeHandicap) : `-${pointValue}`}
+                              </div>
+                              {adjustedAwayOdds != null && (
+                                <button
+                                  onClick={() => {
+                                    // 🎯 버튼 선택 상태 토글
+                                    const selection = `${game.away_team} ${formatHandicap(awayHandicap)}`;
+                                    const wasSelected = isButtonSelected(game.id, `핸디캡_${selection}`);
+                                    handleButtonClick(game, selection, adjustedAwayOdds, '핸디캡');
+                                    
+                                    // 선택 해제된 경우가 아니라면 사이드바로 이동
+                                    if (!wasSelected && isBettable && adjustedAwayOdds) {
+                                      const gameInfo = {
+                                        gameId: game.id,
+                                        homeTeam: game.home_team,
+                                        awayTeam: game.away_team,
+                                        sportKey: game.sport_key,
+                                        market: '핸디캡',
+                                        selection: selection,
+                                        odds: adjustedAwayOdds,
+                                        commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString()
+                                      };
+                                      localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
+
+                                      setTimeout(() => {
+                                        window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                          detail: { tab: 'order' }
+                                        }));
+                                        setTimeout(() => {
+                                          window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                            detail: { tab: 'order' }
+                                          }));
+                                        }, 200);
+                                      }, 100);
+
+                                      console.log('🎯 원정팀 핸디캡 배당율 카드 클릭됨:', gameInfo);
+                                    }
+                                  }}
+                                  className={`flex-1 p-2 rounded-lg text-center transition-colors ${
+                                    isButtonSelected(game.id, `핸디캡_${game.away_team} ${formatHandicap(awayHandicap)}`)
+                                      ? 'bg-yellow-500 hover:bg-yellow-600'
+                                      : isBettable && adjustedAwayOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                  } text-white text-sm`}
+                                  disabled={!isBettable || !adjustedAwayOdds}
+                                >
+                                  <div className="font-medium">{game.away_team} {formatHandicap(awayHandicap)}</div>
+                                  <div className="text-xs">{adjustedAwayOdds ? adjustedAwayOdds.toFixed(3) : 'N/A'}</div>
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
               )}
             </div>
-            <div className="mt-3 text-center">
-              <button
-                onClick={() => router.push('/exchange/orderbook')}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-              >
-                전체 호가 보기 →
-              </button>
-            </div>
-          </div>
-        )}
+          );
+        })}
       </div>
+    );
+  };
 
-      {/* 경기 선택 - 하단 */}
-      <div className="bg-white rounded shadow p-4 flex-1">
-        <h3 className="text-lg font-bold mb-3">스포츠 선택 (Exchange 거래)</h3>
-        <div className="text-center mb-4">
-          <p className="text-gray-600 text-sm">원하는 스포츠를 선택하여 호가 거래를 시작하세요.</p>
-        </div>
-        <div className="space-y-6">
-          {/* 카테고리별로 그룹핑해서 표시 */}
-          {Object.entries({
-            '축구': [
-              { id: 'kleague', name: 'K League 1', sport: 'soccer_korea_kleague1', emoji: '⚽' },
-              { id: 'jleague', name: 'J League', sport: 'soccer_japan_j_league', emoji: '⚽' },
-              { id: 'seriea', name: 'Serie A', sport: 'soccer_italy_serie_a', emoji: '⚽' },
-              { id: 'brasileirao', name: 'Brasileirao', sport: 'soccer_brazil_campeonato', emoji: '⚽' },
-              { id: 'mls', name: 'MLS', sport: 'soccer_usa_mls', emoji: '⚽' },
-              { id: 'argentina', name: 'Primera Division', sport: 'soccer_argentina_primera_division', emoji: '⚽' },
-              { id: 'csl', name: 'Chinese Super League', sport: 'soccer_china_superleague', emoji: '⚽' },
-              { id: 'laliga', name: 'La Liga', sport: 'soccer_spain_primera_division', emoji: '⚽' },
-              { id: 'bundesliga', name: 'Bundesliga', sport: 'soccer_germany_bundesliga', emoji: '⚽' }
-            ],
-            '농구': [
-              { id: 'nba', name: 'NBA', sport: 'basketball_nba', emoji: '🏀' },
-              { id: 'kbl', name: 'KBL', sport: 'basketball_kbl', emoji: '🏀' }
-            ],
-            '야구': [
-              { id: 'mlb', name: 'MLB', sport: 'baseball_mlb', emoji: '⚾' },
-              { id: 'kbo', name: 'KBO', sport: 'baseball_kbo', emoji: '⚾' }
-            ],
-            '미식축구': [
-              { id: 'nfl', name: 'NFL', sport: 'americanfootball_nfl', emoji: '🏈' }
-            ]
-          }).map(([categoryName, sports]) => (
-            <div key={categoryName} className="space-y-3">
-              <h4 className="text-lg font-semibold text-gray-700 border-b border-gray-200 pb-2">
-                {categoryName}
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {sports.map((sport) => {
-                  const count = sportGameCounts[sport.id] ?? 0;
-                  const seasonInfo = getSeasonInfo(sport.sport);
-                  // 시즌 정보와 경기 개수를 모두 고려하여 활성 상태 결정
-                  const isAvailable = count > 0 || (seasonInfo?.status === 'active');
-                  const hasGames = count > 0;
-                  const statusStyle = seasonInfo ? getSeasonStatusStyle(seasonInfo.status) : { color: '#6B7280', backgroundColor: '#F3F4F6' };
-                  const statusBadge = seasonInfo ? getSeasonStatusBadge(seasonInfo.status) : '알 수 없음';
+  // League View 컴포넌트
+  const LeagueView = () => {
+    if (loading) return <div className="text-center py-8 text-white">Loading...</div>;
+    if (error) return <div className="text-center py-8 text-red-400">Error: {error}</div>;
+    
+    return (
+      <>
+        {/* 상위 카테고리 탭 */}
+        <div className="mb-6">
+          <div className="flex gap-2 mb-4">
+            {Object.keys(SPORTS_TREE || {}).map((mainCategory) => (
+              <button
+                key={mainCategory}
+                onClick={() => {
+                  setSelectedMainCategory(mainCategory);
+                  setSelectedCategory('');
+                  setGames([]);
+                  handleCategoryChange(mainCategory);
+                }}
+                className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                  selectedMainCategory === mainCategory
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                {mainCategory}
+              </button>
+            ))}
+          </div>
+          
+          {/* 하위 카테고리 버튼들 */}
+          {selectedMainCategory && (
+            <div className="mb-6">
+              <div className="text-lg font-bold mb-3 text-blue-300">{selectedMainCategory}</div>
+              <div className="flex flex-wrap gap-2">
+                {SPORTS_TREE[selectedMainCategory]?.map((category) => {
+                  const sportKey = getSportKey(category);
+                  const seasonInfo = getSeasonInfo(sportKey);
+                  const statusBadge = seasonInfo ? getSeasonStatusBadge(seasonInfo.status) : null;
+                  const statusStyle = seasonInfo ? getSeasonStatusStyle(seasonInfo.status) : null;
                   
                   return (
                     <button
-                      key={sport.id}
-                      onClick={() => router.push(`/exchange/${sport.sport}`)}
-                      className={`p-4 rounded-lg border text-left transition-colors ${
-                        isAvailable 
-                          ? 'border-gray-200 bg-gray-50 hover:bg-blue-50 hover:border-blue-300 hover:shadow-md' 
-                          : 'border-gray-200 bg-gray-100 opacity-60 cursor-not-allowed'
+                      key={category}
+                      onClick={() => handleCategoryChange(category)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors relative border-2 shadow-sm ${
+                        selectedCategory === category
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : seasonInfo 
+                            ? (seasonInfo.status === 'active' 
+                                ? 'bg-blue-900 border-blue-400 text-blue-200 hover:bg-blue-800 hover:border-blue-300'
+                                : seasonInfo.status === 'break'
+                                ? 'bg-yellow-900 border-yellow-400 text-yellow-200 hover:bg-yellow-800 hover:border-yellow-300'
+                                : 'bg-gray-700 border-gray-400 text-gray-300 hover:bg-gray-600')
+                            : 'bg-gray-700 border-gray-400 text-gray-300 hover:bg-gray-600'
                       }`}
-                      disabled={!isAvailable}
                     >
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="text-2xl">{sport.emoji}</div>
-                        <div 
-                          className="px-2 py-1 rounded text-xs font-medium"
-                          style={statusStyle}
-                        >
-                          {statusBadge}
-                        </div>
-                      </div>
-                      <div className={`font-semibold text-sm ${isAvailable ? 'text-blue-600' : 'text-gray-500'}`}>
-                        {sport.name}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {hasGames 
-                          ? `${count}경기 예정` 
-                          : seasonInfo?.status === 'active' 
-                          ? '경기 일정 확인중...'
-                          : '경기 없음'
-                        }
-                      </div>
-                      {seasonInfo && (
-                        <div className="text-xs text-gray-400 mt-1">
-                          {seasonInfo.status === 'active' 
-                            ? `${seasonInfo.currentSeason}시즌 진행중`
-                            : seasonInfo.status === 'offseason'
-                            ? (seasonInfo.nextSeasonStart && seasonInfo.nextSeasonStart !== 'TBD' 
-                                               ? `Off Season (Starts ${new Date(seasonInfo.nextSeasonStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
-                : 'Off Season (Schedule TBD)')
-                            : `Break${seasonInfo.breakPeriod ? ` (Resume ${new Date(seasonInfo.breakPeriod.end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})` : ''}`
-                          }
-                        </div>
-                      )}
-                      <div className="text-xs text-blue-500 mt-1">
-                        {hasGames 
-                          ? '클릭하여 보기 →' 
-                          : seasonInfo?.status === 'active' 
-                          ? '클릭하여 보기 →'
-                          : seasonInfo?.status === 'offseason'
-                          ? '시즌 준비중'
-                          : '준비 중'
-                        }
+                      <div className="flex items-center gap-2">
+                        <span>{category}</span>
+                        {statusBadge && seasonInfo && seasonInfo.status !== 'active' && (
+                          <span className="text-xs px-2 py-1 rounded-full" style={statusStyle || undefined}>
+                            {statusBadge}
+                          </span>
+                        )}
                       </div>
                     </button>
                   );
                 })}
               </div>
             </div>
-          ))}
+          )}
         </div>
+
+        {/* 선택된 카테고리 정보 */}
+        {selectedCategory && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-white">
+                현재 선택: {selectedCategory}
+              </h2>
+              {(() => {
+                const sportKey = getSportKey(selectedCategory);
+                const seasonInfo = getSeasonInfo(sportKey);
+                const statusBadge = seasonInfo ? getSeasonStatusBadge(seasonInfo.status) : null;
+                const statusStyle = seasonInfo ? getSeasonStatusStyle(seasonInfo.status) : null;
+                
+                return statusBadge ? (
+                  <span className="text-xs px-2 py-1 rounded-full" style={statusStyle || undefined}>
+                    {statusBadge}
+                  </span>
+                ) : null;
+              })()}
+            </div>
+            
+            {/* 경기 수 정보 표시 */}
+            {(() => {
+              const bettableGames = games?.filter(game => game.isBettable) || [];
+              const totalGames = games?.length || 0;
+              
+              return (
+                <div className="bg-blue-900 border border-blue-700 rounded-lg p-4 mt-2">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center space-x-4">
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-blue-300">{bettableGames.length}</div>
+                        <div className="text-sm text-blue-200">배팅 가능</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-gray-300">{totalGames}</div>
+                        <div className="text-sm text-gray-200">전체 경기</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm text-gray-300">
+                        📅 {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', weekday: 'short' })}
+                      </div>
+                      <div className="text-xs text-gray-400">Updated: {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* 경기 목록 */}
+        <div className="grid grid-cols-1 gap-4">
+          {SPORTS_TREE[selectedMainCategory as keyof typeof SPORTS_TREE] && games.length === 0 ? (
+            <div className="text-center py-12 bg-gray-800 rounded-lg">
+              <div className="mb-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-700 rounded-full mb-4">
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-2">🏟️ 경기가 없습니다</h3>
+              <p className="text-gray-300">현재 {selectedCategory ? selectedCategory : selectedMainCategory} 경기가 예정되어 있지 않습니다.</p>
+            </div>
+          ) : !selectedCategory && !SPORTS_TREE[selectedMainCategory as keyof typeof SPORTS_TREE] ? (
+            <div className="text-center py-12 bg-gray-800 rounded-lg">
+              <div className="mb-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-700 rounded-full mb-4">
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  </svg>
+                </div>
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-2">⚽ Please Select a League</h3>
+              <p className="text-gray-300">Select your desired league from above to view game information for that league.</p>
+            </div>
+          ) : games.length === 0 ? (
+            <div className="text-center py-8 text-gray-400">
+              현재 {selectedCategory}에 대한 예정된 경기가 없습니다.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {games?.map((game, index) => {
+                const localGameTime = convertUtcToLocal(game.commence_time);
+                const h2hOdds = game.officialOdds?.h2h || {};
+                
+                                 let outcomes: any[] = [];
+                 // 축구 리그인지 확인 (League 기반 또는 sportKey 기반)
+                 const isSoccer = game.sport_key?.includes('soccer') ||
+                                 game.league === 'K League' ||
+                                 game.league === 'J League' ||
+                                 game.league === 'Serie A' ||
+                                 game.league === 'Brasileirao' ||
+                                 game.league === 'MLS' ||
+                                 game.league === 'Argentina Primera' ||
+                                 game.league === 'Chinese Super League' ||
+                                 game.league === 'La Liga' ||
+                                 game.league === 'Bundesliga' ||
+                                 game.league === 'Premier League';
+
+                 if (isSoccer) {
+                   const homeOdds = h2hOdds[game.home_team];
+                   const awayOdds = h2hOdds[game.away_team];
+                   const drawOdds = Object.entries(h2hOdds).find(([name, _]) => 
+                     name.toLowerCase().includes('draw') || name === 'Draw' || name === 'Draw' || name === 'Tie'
+                   );
+                   
+                   // 전체 배당율 배열 생성
+                   const allOdds = [
+                     (homeOdds as any)?.averagePrice,
+                     (drawOdds?.[1] as any)?.averagePrice,
+                     (awayOdds as any)?.averagePrice
+                   ].filter(odds => odds !== undefined);
+                   
+                   outcomes = [
+                     { name: game.home_team, price: applyExchangeReturnRate((homeOdds as any)?.averagePrice, allOdds, oddsReturnRateSettings.returnRate) },
+                     { name: 'Draw', price: applyExchangeReturnRate((drawOdds?.[1] as any)?.averagePrice, allOdds, oddsReturnRateSettings.returnRate) },
+                     { name: game.away_team, price: applyExchangeReturnRate((awayOdds as any)?.averagePrice, allOdds, oddsReturnRateSettings.returnRate) }
+                   ].filter(outcome => outcome.price !== undefined);
+                } else {
+                  const h2hKeys = Object.keys(h2hOdds);
+                  const homeKey = h2hKeys.find(key => 
+                    normalizeTeamNameForComparison(key) === normalizeTeamNameForComparison(game.home_team)
+                  );
+                  const awayKey = h2hKeys.find(key => 
+                    normalizeTeamNameForComparison(key) === normalizeTeamNameForComparison(game.away_team)
+                  );
+                  
+                  // 전체 배당율 배열 생성
+                  const allOdds = [
+                    homeKey ? h2hOdds[homeKey]?.averagePrice : undefined,
+                    awayKey ? h2hOdds[awayKey]?.averagePrice : undefined
+                  ].filter(odds => odds !== undefined);
+                  
+                  outcomes = [
+                    { name: game.home_team, price: applyExchangeReturnRate(homeKey ? h2hOdds[homeKey]?.averagePrice : undefined, allOdds, oddsReturnRateSettings.returnRate) },
+                    { name: game.away_team, price: applyExchangeReturnRate(awayKey ? h2hOdds[awayKey]?.averagePrice : undefined, allOdds, oddsReturnRateSettings.returnRate) }
+                  ].filter(outcome => outcome.price !== undefined);
+                }
+                
+                return (
+                  <div key={index} className={`bg-gray-800 rounded-lg shadow p-4 ${!game.isBettable ? 'opacity-60' : ''}`}>
+                    <div className="flex justify-between items-center mb-3">
+                      <div>
+                        <span className="text-lg font-bold text-white">🏟️ {game.home_team} vs {game.away_team}</span>
+                        <div className="text-sm text-gray-400 mt-1">
+                          {game.sport_key?.includes('soccer') && '⚽'} {game.sport_key?.includes('basketball') && '🏀'} {game.sport_key?.includes('baseball') && '⚾'} {game.sport_key?.includes('americanfootball') && '🏈'} {game.league || game.sport_title || 'Unknown League'}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm text-gray-300">
+                          📅 {localGameTime.toLocaleDateString()} {localGameTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        {!game.isBettable && (
+                          <div className="text-xs text-red-400 mt-1">
+                            ⏰ Betting Closed (10 min before game)
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* 🆕 마켓 체크박스 - 여러 마켓을 동시에 선택 가능 */}
+                    <div className="mb-4 p-3 bg-gray-700 rounded-lg border border-gray-600">
+                      <div className="text-sm font-medium text-white mb-2">📊 베팅 마켓 선택:</div>
+                      <div className="flex flex-wrap gap-4">
+                        {['승패', '총점', '핸디캡'].map(market => {
+                          const isSelected = getLeagueSelectedMarkets(game.id).has(market);
+                          return (
+                            <label key={market} className="flex items-center space-x-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleLeagueGameMarket(game.id, market)}
+                                className="w-5 h-5 text-blue-600 bg-gray-600 border-gray-500 rounded focus:ring-blue-500 focus:ring-2"
+                              />
+                              <span className={`text-sm font-medium ${
+                                isSelected ? 'text-blue-400' : 'text-gray-400'
+                              }`}>
+                                {market === '승패' ? '승/패' : 
+                                 market === '총점' ? '언더/오버' : '핸디캡'}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      
+                      {/* �� 디버깅: 사용 가능한 마켓 정보 표시 */}
+                      <div className="mt-2 text-xs text-gray-400">
+                        <details>
+                          <summary className="cursor-pointer">🔍 사용 가능한 마켓 정보</summary>
+                          <pre className="mt-1 text-xs overflow-x-auto">
+                            {JSON.stringify(game.officialOdds, null, 2)}
+                          </pre>
+                        </details>
+                      </div>
+                    </div>
+                    
+                    {/* 🆕 승패 마켓 - 선택된 경우에만 표시 */}
+                    {getLeagueSelectedMarkets(game.id).has('승패') && outcomes.length > 0 && (
+                      <div className="mb-4 p-3 bg-gray-700 rounded-lg border border-gray-600">
+                        <div className="text-sm font-medium text-white mb-2">🏆 승/패 (Win/Loss)</div>
+                        <div className="flex items-center gap-2">
+                          {outcomes.map((outcome, idx) => {
+                            let label = outcome.name;
+                            if (outcome.name.toLowerCase() === 'draw') label = 'Draw';
+                            
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() => {
+                                  // 🎯 버튼 선택 상태 토글
+                                  const wasSelected = isButtonSelected(game.id, `승패_${outcome.name}`);
+                                  handleButtonClick(game, outcome.name, outcome.price, '승패');
+                                  
+                                  // 선택 해제된 경우가 아니라면 사이드바로 이동
+                                  if (!wasSelected && game.isBettable && outcome.price) {
+                                    const gameInfo = {
+                                      gameId: game.id,
+                                      homeTeam: game.home_team,
+                                      awayTeam: game.away_team,
+                                      sportKey: game.sport_key,
+                                      market: '승패',
+                                      selection: outcome.name,
+                                      odds: outcome.price,
+                                      commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString()
+                                    };
+                                    localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
+
+                                    setTimeout(() => {
+                                      window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                        detail: { tab: 'order' }
+                                      }));
+                                      setTimeout(() => {
+                                        window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                          detail: { tab: 'order' }
+                                        }));
+                                      }, 200);
+                                    }, 100);
+
+                                    console.log('🎯 배당율 카드 클릭됨:', gameInfo);
+                                  }
+                                }}
+                                className={`flex-1 p-2 rounded-lg text-center transition-colors ${
+                                  isButtonSelected(game.id, `승패_${outcome.name}`)
+                                    ? 'bg-yellow-500 hover:bg-yellow-600'
+                                    : game.isBettable && outcome.price ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                } text-white text-sm`}
+                                disabled={!game.isBettable || !outcome.price}
+                                title={game.isBettable && outcome.price ? `클릭하여 ${outcome.name} 주문하기` : '베팅 마감됨'}
+                              >
+                                <div className="font-medium">{label}</div>
+                                <div className="text-xs">{outcome.price ? outcome.price.toFixed(3) : 'N/A'}</div>
+                                {!game.isBettable && <div className="text-xs text-red-400 mt-1">Betting Closed</div>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* 🆕 총점 마켓 - 선택된 경우에만 표시 */}
+                    {getLeagueSelectedMarkets(game.id).has('총점') && (
+                      <div className="mb-4 p-3 bg-gray-700 rounded-lg border border-gray-600">
+                        <div className="text-sm font-medium text-white mb-2">📈 언더/오버 (Over/Under)</div>
+                        {(() => {
+                          const totalsOdds = game.officialOdds?.totals || game.officialOdds?.over_under || {};
+                          const totalEntries = Object.entries(totalsOdds);
+                          
+                          if (totalEntries.length === 0) {
+                            return (
+                              <div className="text-center text-gray-400 py-3">
+                                언더/오버 배당 정보가 없습니다.
+                              </div>
+                            );
+                          }
+                          
+                          // Over/Under 쌍으로 그룹화
+                          const groupedTotals: { [point: string]: { over?: any, under?: any } } = {};
+                          
+                          totalEntries.forEach(([outcomeName, oddsData]) => {
+                            if (outcomeName.startsWith('Over ')) {
+                              const point = outcomeName.replace('Over ', '');
+                              if (!groupedTotals[point]) groupedTotals[point] = {};
+                              groupedTotals[point].over = oddsData;
+                            } else if (outcomeName.startsWith('Under ')) {
+                              const point = outcomeName.replace('Under ', '');
+                              if (!groupedTotals[point]) groupedTotals[point] = {};
+                              groupedTotals[point].under = oddsData;
+                            }
+                          });
+                          
+                          // 0.5 단위 포인트만 필터링하고 Over/Under 쌍이 모두 있는 것만 표시, 포인트 값으로 정렬
+                          const filteredTotals = Object.entries(groupedTotals)
+                            .filter(([point, oddsPair]) => {
+                              const pointValue = parseFloat(point);
+                              const isValidPoint = !isNaN(pointValue) && (pointValue % 0.5 === 0) && (pointValue % 1 === 0 || pointValue % 1 === 0.5);
+                              const hasBothOdds = oddsPair.over && oddsPair.under; // Over와 Under가 모두 있어야 함
+                              return isValidPoint && hasBothOdds;
+                            })
+                            .sort(([pointA], [pointB]) => {
+                              const valueA = parseFloat(pointA);
+                              const valueB = parseFloat(pointB);
+                              return valueA - valueB; // 오름차순 정렬
+                            });
+                          
+                          if (filteredTotals.length === 0) {
+                            return (
+                              <div className="text-center text-gray-400 py-3">
+                                언더/오버 배당 정보 없음 (0.5 단위만)
+                              </div>
+                            );
+                          }
+                          
+                          return (
+                            <div className="space-y-2">
+                              {filteredTotals.map(([point, oddsPair]) => {
+                                const overOdds = oddsPair.over?.averagePrice;
+                                const underOdds = oddsPair.under?.averagePrice;
+                                
+                                // 🆕 환수율 적용
+                                const allTotalsOdds = [overOdds, underOdds].filter(odds => odds !== undefined);
+                                const adjustedOverOdds = overOdds ? applyExchangeReturnRate(overOdds, allTotalsOdds, oddsReturnRateSettings.returnRate) : undefined;
+                                const adjustedUnderOdds = underOdds ? applyExchangeReturnRate(underOdds, allTotalsOdds, oddsReturnRateSettings.returnRate) : undefined;
+                                
+                                return (
+                                  <div key={point} className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => {
+                                        // 🎯 버튼 선택 상태 토글
+                                        const wasSelected = isButtonSelected(game.id, `총점_Over ${point}`);
+                                        if (adjustedOverOdds) {
+                                          handleButtonClick(game, `Over ${point}`, adjustedOverOdds, '총점');
+                                        }
+                                        
+                                        // 선택 해제된 경우가 아니라면 사이드바로 이동
+                                        if (!wasSelected && game.isBettable && adjustedOverOdds) {
+                                          const gameInfo = {
+                                            gameId: game.id,
+                                            homeTeam: game.home_team,
+                                            awayTeam: game.away_team,
+                                            sportKey: game.sport_key,
+                                            market: '총점',
+                                            selection: `Over ${point}`,
+                                            odds: adjustedOverOdds,
+                                            commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString()
+                                          };
+                                          localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
+
+                                          setTimeout(() => {
+                                            window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                              detail: { tab: 'order' }
+                                            }));
+                                            setTimeout(() => {
+                                              window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                                detail: { tab: 'order' }
+                                              }));
+                                            }, 200);
+                                          }, 100);
+
+                                          console.log('🎯 총점 마켓 배당율 카드 클릭됨:', gameInfo);
+                                        }
+                                      }}
+                                      className={`flex-1 p-2 rounded-lg text-center transition-colors ${
+                                        isButtonSelected(game.id, `총점_Over ${point}`)
+                                          ? 'bg-yellow-500 hover:bg-yellow-600'
+                                          : game.isBettable && adjustedOverOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                      } text-white text-sm`}
+                                      disabled={!game.isBettable || !adjustedOverOdds}
+                                    >
+                                      <div className="font-medium">{game.home_team}</div>
+                                      <div className="text-xs">{adjustedOverOdds ? adjustedOverOdds.toFixed(3) : 'N/A'}</div>
+                                    </button>
+                                    <div className="w-12 text-sm font-medium text-blue-400 text-center">{point}</div>
+                                    <button
+                                      onClick={() => {
+                                        // 🎯 버튼 선택 상태 토글
+                                        const wasSelected = isButtonSelected(game.id, `총점_Under ${point}`);
+                                        if (adjustedUnderOdds) {
+                                          handleButtonClick(game, `Under ${point}`, adjustedUnderOdds, '총점');
+                                        }
+                                        
+                                        // 선택 해제된 경우가 아니라면 사이드바로 이동
+                                        if (!wasSelected && game.isBettable && adjustedUnderOdds) {
+                                          const gameInfo = {
+                                            gameId: game.id,
+                                            homeTeam: game.home_team,
+                                            awayTeam: game.away_team,
+                                            sportKey: game.sport_key,
+                                            market: '총점',
+                                            selection: `Under ${point}`,
+                                            odds: adjustedUnderOdds,
+                                            commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString()
+                                          };
+                                          localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
+
+                                          setTimeout(() => {
+                                            window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                              detail: { tab: 'order' }
+                                            }));
+                                            setTimeout(() => {
+                                              window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                                detail: { tab: 'order' }
+                                              }));
+                                            }, 200);
+                                          }, 100);
+
+                                          console.log('🎯 Under 배당율 카드 클릭됨:', gameInfo);
+                                        }
+                                      }}
+                                      className={`flex-1 p-2 rounded-lg text-center transition-colors ${
+                                        isButtonSelected(game.id, `총점_Under ${point}`)
+                                          ? 'bg-yellow-500 hover:bg-yellow-600'
+                                          : game.isBettable && adjustedUnderOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                      } text-white text-sm`}
+                                      disabled={!game.isBettable || !adjustedUnderOdds}
+                                    >
+                                      <div className="font-medium">{game.away_team}</div>
+                                      <div className="text-xs">{adjustedUnderOdds ? adjustedUnderOdds.toFixed(3) : 'N/A'}</div>
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                    
+                    {/* 🆕 핸디캡 마켓 - 선택된 경우에만 표시 */}
+                    {getLeagueSelectedMarkets(game.id).has('핸디캡') && (
+                      <div className="mb-4 p-3 bg-gray-700 rounded-lg border border-gray-600">
+                        <div className="text-sm font-medium text-white mb-2">🎯 핸디캡 (Handicap)</div>
+                        {(() => {
+                          const spreadsOdds = game.officialOdds?.spreads || game.officialOdds?.handicap || {};
+                          const spreadEntries = Object.entries(spreadsOdds);
+                          
+                          if (spreadEntries.length === 0) {
+                            return (
+                              <div className="text-center text-gray-400 py-3">
+                                핸디캡 배당 정보가 없습니다.
+                              </div>
+                            );
+                          }
+                          
+                          // ✅ 수정: groupHandicapsByPoint 함수 사용
+                          const groupedSpreads = groupHandicapsByPoint(
+                            spreadsOdds,
+                            game.home_team,
+                            game.away_team
+                          );
+                          
+                          const filteredSpreads = filterHalfPointHandicaps(groupedSpreads);
+                          
+                          if (filteredSpreads.length === 0) {
+                            return (
+                              <div className="text-center text-gray-400 py-3">
+                                핸디캡 배당 정보 없음
+                              </div>
+                            );
+                          }
+                          
+                          return (
+                            <div className="space-y-2">
+                              {filteredSpreads.map(([absPoint, oddsPair]) => {
+                                const homeData = oddsPair.home;
+                                const awayData = oddsPair.away;
+                                
+                                const homeOdds = homeData?.oddsData?.averagePrice;
+                                const awayOdds = awayData?.oddsData?.averagePrice;
+                                
+                                // 🆕 환수율 적용
+                                const allSpreadsOdds = [homeOdds, awayOdds].filter(odds => odds !== undefined);
+                                const adjustedHomeOdds = homeOdds ? applyExchangeReturnRate(homeOdds, allSpreadsOdds, oddsReturnRateSettings.returnRate) : undefined;
+                                const adjustedAwayOdds = awayOdds ? applyExchangeReturnRate(awayOdds, allSpreadsOdds, oddsReturnRateSettings.returnRate) : undefined;
+                                const pointValue = parseFloat(absPoint);
+                                // ✅ 수정: groupHandicapsByPoint()에서 계산된 실제 핸디캡 값 사용
+                                const homeHandicap = homeData?.handicap || 0;
+                                const awayHandicap = awayData?.handicap || 0;
+                                
+                                return (
+                                  <div key={absPoint} className="flex items-center gap-2">
+                                    {homeOdds != null && (
+                                      <button
+                                        onClick={() => {
+                                          // 🎯 버튼 선택 상태 토글
+                                          const selection = `${game.home_team} ${formatHandicap(homeHandicap)}`;
+                                          const wasSelected = isButtonSelected(game.id, `핸디캡_${selection}`);
+                                          if (adjustedHomeOdds) {
+                                            handleButtonClick(game, selection, adjustedHomeOdds, '핸디캡');
+                                          }
+                                          
+                                          // 선택 해제된 경우가 아니라면 사이드바로 이동
+                                          if (!wasSelected && game.isBettable && adjustedHomeOdds) {
+                                            const gameInfo = {
+                                              gameId: game.id,
+                                              homeTeam: game.home_team,
+                                              awayTeam: game.away_team,
+                                              sportKey: game.sport_key,
+                                              market: '핸디캡',
+                                              selection: selection,
+                                              odds: adjustedHomeOdds,
+                                              commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString()
+                                            };
+                                            localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
+
+                                            setTimeout(() => {
+                                              window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                                detail: { tab: 'order' }
+                                              }));
+                                              setTimeout(() => {
+                                                window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                                  detail: { tab: 'order' }
+                                                }));
+                                              }, 200);
+                                            }, 100);
+
+                                            console.log('🎯 홈팀 핸디캡 배당율 카드 클릭됨:', gameInfo);
+                                          }
+                                        }}
+                                        className={`flex-1 p-2 rounded-lg text-center transition-colors ${
+                                          isButtonSelected(game.id, `핸디캡_${game.home_team} ${formatHandicap(homeHandicap)}`)
+                                            ? 'bg-yellow-500 hover:bg-yellow-600'
+                                            : game.isBettable && adjustedHomeOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                        } text-white text-sm`}
+                                        disabled={!game.isBettable || !adjustedHomeOdds}
+                                        title={game.isBettable && adjustedHomeOdds ? `클릭하여 ${game.home_team} ${formatHandicap(homeHandicap)} 주문하기` : '베팅 마감됨'}
+                                      >
+                                        <div className="font-medium">{game.home_team} {formatHandicap(homeHandicap)}</div>
+                                        <div className="text-xs">{adjustedHomeOdds ? adjustedHomeOdds.toFixed(3) : 'N/A'}</div>
+                                      </button>
+                                    )}
+                                    <div className="w-12 text-sm font-medium text-blue-400 text-center">
+                                      {homeHandicap != null ? formatHandicap(homeHandicap) : `-${pointValue}`}
+                                    </div>
+                                    {awayOdds != null && (
+                                      <button
+                                        onClick={() => {
+                                          // 🎯 버튼 선택 상태 토글
+                                          const selection = `${game.away_team} ${formatHandicap(awayHandicap)}`;
+                                          const wasSelected = isButtonSelected(game.id, `핸디캡_${selection}`);
+                                          if (adjustedAwayOdds) {
+                                            handleButtonClick(game, selection, adjustedAwayOdds, '핸디캡');
+                                          }
+                                          
+                                          // 선택 해제된 경우가 아니라면 사이드바로 이동
+                                          if (!wasSelected && game.isBettable && adjustedAwayOdds) {
+                                            const gameInfo = {
+                                              gameId: game.id,
+                                              homeTeam: game.home_team,
+                                              awayTeam: game.away_team,
+                                              sportKey: game.sport_key,
+                                              market: '핸디캡',
+                                              selection: selection,
+                                              odds: adjustedAwayOdds,
+                                              commenceTime: game.commence_time.endsWith('Z') ? game.commence_time : new Date(game.commence_time + 'Z').toISOString()
+                                            };
+                                            localStorage.setItem('selectedGameForOrder', JSON.stringify(gameInfo));
+
+                                            setTimeout(() => {
+                                              window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                                detail: { tab: 'order' }
+                                              }));
+                                              setTimeout(() => {
+                                                window.dispatchEvent(new CustomEvent('exchangeSidebarTabChange', {
+                                                  detail: { tab: 'order' }
+                                                }));
+                                              }, 200);
+                                            }, 100);
+
+                                            console.log('🎯 어웨이팀 핸디캡 배당율 카드 클릭됨:', gameInfo);
+                                          }
+                                        }}
+                                        className={`flex-1 p-2 rounded-lg text-center transition-colors ${
+                                          isButtonSelected(game.id, `핸디캡_${game.away_team} ${formatHandicap(awayHandicap)}`)
+                                            ? 'bg-yellow-500 hover:bg-yellow-600'
+                                            : game.isBettable && adjustedAwayOdds ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+                                        } text-white text-sm`}
+                                        disabled={!game.isBettable || !adjustedAwayOdds}
+                                        title={game.isBettable && adjustedAwayOdds ? `클릭하여 ${game.away_team} ${formatHandicap(awayHandicap)} 주문하기` : '베팅 마감됨'}
+                                      >
+                                        <div className="font-medium">{game.away_team} {formatHandicap(awayHandicap)}</div>
+                                        <div className="text-xs">{adjustedAwayOdds ? adjustedAwayOdds.toFixed(3) : 'N/A'}</div>
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </>
+    );
+  };
+
+  useEffect(() => {
+    if (viewMode === 'today') {
+      fetchTodayGames();
+    }
+    loadOddsReturnRateSettings(); // 🆕 환수율 설정 로드
+    
+    const handleOrderPlaced = () => {
+      console.log('🔄 주문 완료 이벤트 감지, 익스체인지 홈 투데이 베팅 데이터 새로고침');
+      
+      // 🆕 주문 완료 후 선택 상태 초기화
+      console.log('🎯 주문 완료로 인한 선택 상태 초기화');
+      setSelectedBet(null);
+      clearMultiBet();
+      
+      if (viewMode === 'today') {
+        fetchTodayGames();
+      }
+    };
+
+    // 🆕 환수율 설정 변경 이벤트 리스너
+    const handlePayoutRateChanged = () => {
+      console.log('🔄 환수율 설정 변경 감지, 설정 새로고침');
+      loadOddsReturnRateSettings();
+    };
+
+    window.addEventListener('exchangeOrderPlaced', handleOrderPlaced);
+    window.addEventListener('payoutRateChanged', handlePayoutRateChanged);
+    
+    if (typeof document !== 'undefined') {
+      // 🆕 배당률만 갱신 (상태 유지) - 1분마다
+      const oddsInterval = setInterval(() => {
+        console.log('[Exchange] 🔄 배당률만 갱신 시도 (상태 유지)');
+        if (viewMode === 'today') {
+          refreshOddsOnly();
+        }
+      }, 1 * 60 * 1000); // 1분 간격
+      
+      // 🆕 전체 데이터 갱신 - 5분마다
+      const fullInterval = setInterval(() => {
+        console.log('[Exchange Today] 주기적 경기 데이터 갱신 시도');
+        if (viewMode === 'today') {
+          fetchTodayGames();
+        }
+      }, 5 * 60 * 1000);
+      
+      return () => {
+        clearInterval(oddsInterval);
+        clearInterval(fullInterval);
+        window.removeEventListener('exchangeOrderPlaced', handleOrderPlaced);
+        window.removeEventListener('payoutRateChanged', handlePayoutRateChanged);
+      };
+    }
+    return () => {
+      window.removeEventListener('exchangeOrderPlaced', handleOrderPlaced);
+      window.removeEventListener('payoutRateChanged', handlePayoutRateChanged);
+    };
+  }, [viewMode]);
+
+  return (
+    <div className="p-6">
+      <div className="bg-black rounded shadow p-6 mb-4">
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-2xl font-bold text-white">Sports Exchange</h1>
+          {/* 3개 탭 네비게이션 */}
+          <div className="flex items-center space-x-2">
+            <button
+              disabled
+              className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg font-medium shadow-lg cursor-not-allowed flex items-center space-x-2 ring-2 ring-blue-400"
+            >
+              <span>🏠</span>
+              <span>배팅</span>
+            </button>
+            <button
+              onClick={() => router.push('/exchange/live-odds')}
+              className="px-4 py-2 bg-green-700 text-white text-sm rounded-lg font-medium hover:bg-green-500 hover:shadow-lg transition-all flex items-center space-x-2 opacity-70 hover:opacity-100"
+            >
+              <span>📊</span>
+              <span>주문현황</span>
+            </button>
+            <button
+              onClick={() => router.push('/exchange/orderbook')}
+              className="px-4 py-2 bg-pink-700 text-white text-sm rounded-lg font-medium hover:bg-pink-500 hover:shadow-lg transition-all flex items-center space-x-2 opacity-70 hover:opacity-100"
+            >
+              <span>📋</span>
+              <span>매치</span>
+            </button>
+          </div>
+        </div>
+        
+        {/* 🎯 Today Betting vs 🏟️ League View 탭 */}
+        <div className="mb-6 flex gap-2">
+          <button
+            onClick={() => setViewMode('today')}
+            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+              viewMode === 'today'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+          >
+            🎯 Today Betting
+          </button>
+          <button
+            onClick={() => {
+              setViewMode('league');
+              setSelectedMainCategory('Soccer');
+              setSelectedCategory('');
+              setGames([]);
+              setError(null);
+              setLoading(false);
+              handleCategoryChange('Soccer');
+            }}
+            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+              viewMode === 'league'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+          >
+            🏟️ League View
+          </button>
+        </div>
+
+        {/* 선택된 모드에 따른 컨텐츠 표시 */}
+        {viewMode === 'today' ? (
+          <TodayBettingView />
+        ) : (
+          <LeagueView />
+        )}
       </div>
     </div>
   );

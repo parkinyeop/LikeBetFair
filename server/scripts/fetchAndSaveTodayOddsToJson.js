@@ -35,7 +35,7 @@ async function fetchAndSaveTodayOddsToJson() {
       const oddsList = await oddsApiService.fetchRecentOdds(cat);
       // 오늘(UTC) 날짜만 필터링
       const todayOdds = oddsList.filter(o => {
-        const dt = new Date(o.commence_time);
+        const dt = new Date(o.commence_time + 'Z');
         return dt >= start && dt < end;
       });
       result[cat] = todayOdds;

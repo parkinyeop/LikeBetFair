@@ -1,8 +1,10 @@
 import axios from 'axios';
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName } from '../normalizeUtils.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+const sequelize = createScriptSequelize();
 
-const THESPORTSDB_API_KEY = '116108'; // 프리미엄 키
+const THESPORTSDB_API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // 프리미엄 키
 const NBA_LEAGUE_ID = '4387'; // NBA 리그 ID
 
 // NBA 팀명 세트 (정규화된 공식 팀명으로 검증)
@@ -136,7 +138,7 @@ async function collectNBASeasonData() {
               commenceTime: commenceTime,
               status: status,
               score: score,
-              result: result,
+              // result 필드 제거 - status로 대체
               eventId: event.idEvent,
               lastUpdated: new Date()
             });
@@ -180,13 +182,25 @@ async function collectNBASeasonData() {
 
 // 스크립트 실행
 if (import.meta.url === `file://${process.argv[1]}`) {
-  collectNBASeasonData().then(() => {
+  collectNBASeasonData().then(async () => {
+
     console.log('스크립트 실행 완료');
     process.exit(0);
-  }).catch(error => {
+  
+      // 데이터베이스 연결 종료
+      console.log('🔌 데이터베이스 연결 종료 중...');
+      await sequelize.close();
+      console.log('✅ 데이터베이스 연결 종료 완료');
+    }).catch(async (error) => {
+
     console.error('스크립트 실행 중 오류:', error);
     process.exit(1);
-  });
+  
+      // 데이터베이스 연결 종료
+      console.log('🔌 데이터베이스 연결 종료 중...');
+      await sequelize.close();
+      console.log('✅ 데이터베이스 연결 종료 완료');
+    });
 }
 
 export default collectNBASeasonData; 

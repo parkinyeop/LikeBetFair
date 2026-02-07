@@ -1,4 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { buildServerApiUrl, SERVER_CONFIG } from '../../../config/serverApiConfig';
 
 export default async function handler(
   req: NextApiRequest,
@@ -10,8 +11,7 @@ export default async function handler(
     return res.status(400).json({ error: 'Invalid sport parameter' });
   }
 
-  const serverUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050';
-  const url = `${serverUrl}/api/odds/${sport}`;
+  const url = buildServerApiUrl(`${SERVER_CONFIG.ENDPOINTS.ODDS}/${sport}`);
 
   try {
     const response = await fetch(url);

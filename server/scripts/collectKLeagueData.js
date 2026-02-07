@@ -1,5 +1,7 @@
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName } from '../normalizeUtils.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+const sequelize = createScriptSequelize();
 
 // K리그 1 팀명 매핑 테이블 (TheSportsDB 팀명 → 정규화된 팀명)
 const KLEAGUE_TEAM_MAPPING = {
@@ -21,7 +23,7 @@ async function collectKLeagueData() {
   console.log('=== K리그 1 데이터 수집 시작 ===\n');
   
   try {
-    const API_KEY = '116108'; // 프리미엄 키
+    const API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // 프리미엄 키
     const LEAGUE_ID = '4689'; // K리그 1 리그 ID
     
     // 최근 30일간의 데이터 수집
@@ -197,10 +199,16 @@ async function collectKLeagueData() {
     console.log(`\n📈 총 K리그 경기 수: ${totalKLeague}개`);
     
   } catch (error) {
+
     console.error('❌ K리그 데이터 수집 실패:', error.message);
-  }
   
-  process.exit(0);
+  } finally {
+    // 데이터베이스 연결 종료
+    console.log('🔌 데이터베이스 연결 종료 중...');
+    await sequelize.close();
+    console.log('✅ 데이터베이스 연결 종료 완료');
+    process.exit(1);
+  }
 }
 
 collectKLeagueData(); 

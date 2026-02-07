@@ -45,7 +45,7 @@ export default function BettingModal({ isOpen, onClose, onConfirm, selection }: 
     if (isNaN(stake) || stake <= 0) return 0;
     
     if (selection.type === 'back') {
-      return (stake * selection.price) - stake;
+      return stake * selection.price; // 본금 포함
     } else {
       return stake - (stake / selection.price);
     }
@@ -58,8 +58,16 @@ export default function BettingModal({ isOpen, onClose, onConfirm, selection }: 
       return;
     }
 
-    if (stake < 1000) {
-      setError('Minimum bet amount is 1,000 KRW.');
+    if (stake < 10) {
+      setError('Minimum bet amount is 10 KRW.');
+      return;
+    }
+
+    // 🆕 10원 단위가 아니면 반올림
+    const roundedStake = Math.round(stake / 10) * 10;
+    if (roundedStake !== stake) {
+      setError(`Amount will be rounded to ${roundedStake.toLocaleString()} KRW (10 KRW unit).`);
+      setAmount(roundedStake.toString());
       return;
     }
 
@@ -106,7 +114,7 @@ export default function BettingModal({ isOpen, onClose, onConfirm, selection }: 
               <span className={`font-bold text-lg ${
                 selection.type === 'back' ? 'text-blue-600' : 'text-pink-600'
               }`}>
-                {selection.price.toFixed(2)}
+                {selection.price.toFixed(3)}
               </span>
             </div>
             <div className="text-sm text-gray-600 mt-1">
@@ -123,10 +131,10 @@ export default function BettingModal({ isOpen, onClose, onConfirm, selection }: 
               type="number"
               value={amount}
               onChange={(e) => handleAmountChange(e.target.value)}
-              placeholder="Enter bet amount"
+              placeholder="Enter bet amount (10 KRW unit)"
               className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              min="1000"
-              step="1000"
+              min="10"
+              step="10"
             />
             {error && (
               <p className="text-red-500 text-sm mt-1">{error}</p>
@@ -143,7 +151,7 @@ export default function BettingModal({ isOpen, onClose, onConfirm, selection }: 
                 </div>
                 <div className="flex justify-between">
                   <span>Odds:</span>
-                  <span className="font-semibold">{selection.price.toFixed(2)}</span>
+                  <span className="font-semibold">{selection.price.toFixed(3)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Expected Profit:</span>

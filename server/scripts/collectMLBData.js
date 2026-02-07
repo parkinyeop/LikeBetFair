@@ -1,9 +1,11 @@
 import axios from 'axios';
 import { Op } from 'sequelize';
 import GameResult from '../models/gameResultModel.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+const sequelize = createScriptSequelize();
 import { normalizeTeamName, normalizeCategoryPair } from '../normalizeUtils.js';
 
-const API_KEY = '116108'; // TheSportsDB 프리미엄 키
+const API_KEY = process.env.THESPORTSDB_API_KEY || '116108'; // TheSportsDB 프리미엄 키
 const BASE_URL = 'https://www.thesportsdb.com/api/v1/json';
 const MLB_LEAGUE_ID = '4424'; // MLB 리그 ID
 
@@ -239,10 +241,10 @@ async function collectMLBData() {
           result = event.strStatus.toLowerCase();
         }
         // 2. TheSportsDB 상태 매핑 - 명시적으로 finished인 경우
-        else if (event.strStatus === 'Match Finished' || event.intHomeScore !== null) {
+        else if (event.strStatus === 'FT' || event.strStatus === 'Match Finished' || event.intHomeScore !== null) {
           status = 'finished';
           
-          if (event.intHomeScore !== null && event.intAwayScore !== null) {
+          if (event.intHomeScore && event.intAwayScore) {
             score = JSON.stringify([
               { name: event.strHomeTeam, score: event.intHomeScore.toString() },
               { name: event.strAwayTeam, score: event.intAwayScore.toString() }
@@ -261,7 +263,7 @@ async function collectMLBData() {
           }
         }
         // 3. 스코어가 있지만 status가 finished가 아닌 경우 - 보수적 시간 기반 처리
-        else if (event.intHomeScore !== null && event.intAwayScore !== null) {
+        else if (event.intHomeScore && event.intAwayScore) {
           const gameTime = new Date(commenceTime);
           const now = new Date();
           const hoursSinceGame = (now - gameTime) / (1000 * 60 * 60);
@@ -377,9 +379,13 @@ async function collectMLBData() {
     
   } catch (error) {
     console.error('❌ MLB 데이터 수집 중 오류 발생:', error.message);
+  } finally {
+    // 데이터베이스 연결 종료
+    console.log('🔌 데이터베이스 연결 종료 중...');
+    await sequelize.close();
+    console.log('✅ 데이터베이스 연결 종료 완료');
+    process.exit(0);
   }
-  
-  process.exit(0);
 }
 
 collectMLBData(); 

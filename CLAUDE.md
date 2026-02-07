@@ -131,3 +131,16 @@ The application supports multiple sports leagues with mapping in:
 - Scheduled jobs to minimize real-time processing load
 
 This is a complex betting platform requiring careful handling of financial data, real-time updates, and sports data integration. Always test thoroughly when making changes to betting logic or database schemas.
+
+## Git Commit Guidelines
+
+### Commit Message Format
+- **ALWAYS** prefix commit messages with `[Claude]`
+- Format: `[Claude] <type>: <description>`
+- Types: feat, fix, refactor, docs, style, test, chore
+- Example: `[Claude] fix: 익스체인지 베팅 Lay 정산 로직 수정`
+
+### Commit Workflow
+- Stage only relevant files for each commit
+- Write detailed commit messages explaining the why, not just the what
+- Include testing scenarios when fixing critical bugs

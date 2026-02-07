@@ -16,6 +16,7 @@ const Layout = memo(({ children }: LayoutProps) => {
   const router = useRouter();
   const [selected, setSelected] = useState("NBA");
   const [betslipTab, setBetslipTab] = useState<'betslip' | 'mybets'>('betslip'); // 배팅슬립 탭 상태 추가
+  const [exchangeActiveTab, setExchangeActiveTab] = useState<'order' | 'history'>('order'); // Exchange 사이드바 탭 상태 추가
   const [resetToHome, setResetToHome] = useState(false); // 홈 리셋 상태
   const { setTabChangeCallback } = useBetStore();
   
@@ -109,16 +110,23 @@ const Layout = memo(({ children }: LayoutProps) => {
       setSelected("");
     };
 
+    const handleExchangeSidebarTabChange = (event: CustomEvent) => {
+      // Exchange 사이드바 탭 변경 요청 처리
+      setExchangeActiveTab(event.detail.tab);
+    };
+
     window.addEventListener('bettingAreaSelected', handleBettingAreaSelected);
     window.addEventListener('categorySelected', handleCategorySelected as EventListener);
     window.addEventListener('sportsbookSelected', handleSportsbookSelected);
     window.addEventListener('exchangeHomeSelected', handleExchangeHomeSelected);
+    window.addEventListener('exchangeSidebarTabChange', handleExchangeSidebarTabChange as EventListener);
     
     return () => {
       window.removeEventListener('bettingAreaSelected', handleBettingAreaSelected);
       window.removeEventListener('categorySelected', handleCategorySelected as EventListener);
       window.removeEventListener('sportsbookSelected', handleSportsbookSelected);
       window.removeEventListener('exchangeHomeSelected', handleExchangeHomeSelected);
+      window.removeEventListener('exchangeSidebarTabChange', handleExchangeSidebarTabChange as EventListener);
     };
   }, []);
 
@@ -146,7 +154,10 @@ const Layout = memo(({ children }: LayoutProps) => {
           }
           right={
             isExchange ? (
-              <ExchangeSidebar />
+              <ExchangeSidebar 
+                activeTab={exchangeActiveTab}
+                onTabChange={setExchangeActiveTab}
+              />
             ) : (
               <div className="h-full flex flex-col">
                 <BetslipSidebar 

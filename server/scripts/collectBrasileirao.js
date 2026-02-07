@@ -1,6 +1,8 @@
 import axios from 'axios';
 import GameResult from '../models/gameResultModel.js';
 import { normalizeTeamName } from '../normalizeUtils.js';
+import createScriptSequelize from '../config/scriptDatabase.js';
+const sequelize = createScriptSequelize();
 
 /**
  * 브라질 세리에 A 2025 시즌 데이터 수집
@@ -47,8 +49,8 @@ async function collectBrasileirao() {
         const homeTeam = normalizeTeamName(event.strHomeTeam);
         const awayTeam = normalizeTeamName(event.strAwayTeam);
         
-        // 경기 날짜 파싱
-        const commenceTime = new Date(event.dateEvent + 'T' + (event.strTime || '00:00:00'));
+        // 경기 날짜 파싱 (UTC 기준)
+        const commenceTime = new Date(event.dateEvent + 'T' + (event.strTime || '00:00:00') + 'Z');
         
         // 스코어 및 결과 파싱
         let score = null;
@@ -145,13 +147,25 @@ async function collectBrasileirao() {
 // 직접 실행
 if (import.meta.url === `file://${process.argv[1]}`) {
   collectBrasileirao()
-    .then(() => {
+    .then(async () => {
+
       console.log('✅ 스크립트 완료');
       process.exit(0);
+    
+      // 데이터베이스 연결 종료
+      console.log('🔌 데이터베이스 연결 종료 중...');
+      await sequelize.close();
+      console.log('✅ 데이터베이스 연결 종료 완료');
     })
-    .catch(error => {
+    .catch(async (error) => {
+
       console.error('❌ 스크립트 실패:', error);
       process.exit(1);
+    
+      // 데이터베이스 연결 종료
+      console.log('🔌 데이터베이스 연결 종료 중...');
+      await sequelize.close();
+      console.log('✅ 데이터베이스 연결 종료 완료');
     });
 }
 

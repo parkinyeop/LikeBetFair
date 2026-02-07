@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { buildApiUrl } from '../config/apiConfig';
 
 interface AuthContextType {
   isLoggedIn: boolean;
@@ -8,6 +9,7 @@ interface AuthContextType {
   adminLevel: number;
   token: string | null;
   userId: string | null;
+  isAuthLoading: boolean; // 인증 로딩 상태 추가
   login: (username: string, balance: number, token: string, isAdmin?: boolean, adminLevel?: number, userId?: string) => void;
   logout: () => void;
   setBalance: (balance: number) => void;
@@ -26,6 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [adminLevel, setAdminLevel] = useState(0);
   const [token, setToken] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true); // 인증 로딩 상태 추가
 
   // 탭별 고유 식별자 생성
   const [tabId, setTabId] = useState<string | null>(null);
@@ -70,6 +73,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setAdminLevel(storedAdminLevel ? Number(storedAdminLevel) : 0);
             if (storedUserId) setUserId(storedUserId);
             else setUserId(null);
+            
+            // ✅ 페이지 로드 시 서버에서 최신 정보 가져오기 (비동기)
+            setTimeout(async () => {
+              try {
+                console.log('[AuthContext] 페이지 로드 후 사용자 정보 동기화 시작');
+                const url = buildApiUrl(`/api/auth/balance?t=${Date.now()}`);
+                const response = await fetch(url, {
+                  headers: {
+                    'x-auth-token': storedToken,
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                  }
+                });
+                
+                if (response.ok) {
+                  const data = await response.json();
+                  console.log('[AuthContext] 최신 사용자 정보 동기화 완료:', data);
+                  
+                  // 잔액 업데이트
+                  const newBalance = Number(data.balance);
+                  setBalance(newBalance);
+                  sessionStorage.setItem(`balance_${tabId}`, newBalance.toString());
+                  
+                  // 관리자 레벨 업데이트
+                  if (data.isAdmin !== undefined) {
+                    setIsAdmin(data.isAdmin);
+                    setAdminLevel(data.adminLevel || 0);
+                    sessionStorage.setItem(`isAdmin_${tabId}`, data.isAdmin.toString());
+                    sessionStorage.setItem(`adminLevel_${tabId}`, (data.adminLevel || 0).toString());
+                    console.log('[AuthContext] 관리자 레벨 동기화:', {
+                      isAdmin: data.isAdmin,
+                      adminLevel: data.adminLevel
+                    });
+                  }
+                } else {
+                  console.log('[AuthContext] 사용자 정보 동기화 실패, 캐시된 데이터 사용');
+                }
+              } catch (error) {
+                console.error('[AuthContext] 사용자 정보 동기화 오류:', error);
+              }
+            }, 100); // 100ms 후 실행
           } else {
             console.log('[AuthContext] 저장된 인증 정보 없음 (tabId:', tabId, ')');
           }
@@ -85,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUserId(null);
         } finally {
           setIsInitialized(true);
+          setIsAuthLoading(false); // 인증 로딩 완료
         }
       };
 
@@ -92,6 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       // SSR 환경에서는 초기화만 완료
       setIsInitialized(true);
+      setIsAuthLoading(false);
     }
   }, []);
 
@@ -191,7 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // API URL 결정 (apiConfig 사용)
       const apiUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                     ? 'http://localhost:5050' 
+                     ? 'buildApiUrl' 
                      : window.location.origin;
       
       console.log('[AuthContext] API URL:', apiUrl);
@@ -211,6 +258,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const newBalance = Number(data.balance);
         setBalance(newBalance);
         sessionStorage.setItem(`balance_${tabId}`, newBalance.toString());
+        
+        // ✅ 관리자 레벨도 함께 업데이트
+        if (data.isAdmin !== undefined) {
+          console.log('[AuthContext] 관리자 정보 업데이트:', {
+            isAdmin: data.isAdmin,
+            adminLevel: data.adminLevel
+          });
+          setIsAdmin(data.isAdmin);
+          setAdminLevel(data.adminLevel || 0);
+          sessionStorage.setItem(`isAdmin_${tabId}`, data.isAdmin.toString());
+          sessionStorage.setItem(`adminLevel_${tabId}`, (data.adminLevel || 0).toString());
+        }
       } else {
         const errorText = await response.text();
         console.error('[AuthContext] 잔액 새로고침 실패:', response.status, errorText);
@@ -235,13 +294,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log('[AuthContext] 강제 잔액 새로고침 시작');
       
-      // API URL 결정
-      const apiUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                     ? 'http://localhost:5050' 
-                     : window.location.origin;
+      // ✅ buildApiUrl 함수 사용 (문자열이 아님!)
+      const url = buildApiUrl(`/api/auth/balance?t=${Date.now()}`);
+      console.log('[AuthContext] API URL:', url);
       
       // 캐시 방지를 위한 타임스탬프 추가
-      const response = await fetch(`${apiUrl}/api/auth/balance?t=${Date.now()}`, {
+      const response = await fetch(url, {
         headers: {
           'x-auth-token': token,
           'Content-Type': 'application/json',
@@ -258,6 +316,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const newBalance = Number(data.balance);
         setBalance(newBalance);
         sessionStorage.setItem(`balance_${tabId}`, newBalance.toString());
+        
+        // ✅ 관리자 레벨도 함께 업데이트
+        if (data.isAdmin !== undefined) {
+          console.log('[AuthContext] 관리자 정보 업데이트:', {
+            isAdmin: data.isAdmin,
+            adminLevel: data.adminLevel
+          });
+          setIsAdmin(data.isAdmin);
+          setAdminLevel(data.adminLevel || 0);
+          sessionStorage.setItem(`isAdmin_${tabId}`, data.isAdmin.toString());
+          sessionStorage.setItem(`adminLevel_${tabId}`, (data.adminLevel || 0).toString());
+        }
       } else {
         const errorText = await response.text();
         console.error('[AuthContext] 강제 잔액 새로고침 실패:', response.status, errorText);
@@ -297,6 +367,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       adminLevel,
       token,
       userId,
+      isAuthLoading,
       login,
       logout,
       setBalance,

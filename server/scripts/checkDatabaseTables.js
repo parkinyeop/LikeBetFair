@@ -1,18 +1,10 @@
-import { Sequelize } from 'sequelize';
 import dotenv from 'dotenv';
+import createScriptSequelize from '../config/scriptDatabase.js';
 
 dotenv.config();
 
-// Sequelize 인스턴스 생성
-const sequelize = new Sequelize({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  username: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  dialect: 'postgres',
-  logging: false
-});
+// 스크립트 전용 Sequelize 인스턴스 생성
+const sequelize = createScriptSequelize();
 
 async function checkDatabaseTables() {
   try {
